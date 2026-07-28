@@ -1,0 +1,35 @@
+# Environment and Secret Key Files
+.env
+.env.local
+.env.*.local
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!jsconfig.json
+!server/package.json
+!server/package-lock.json
+!client/package.json
+!client/package-lock.json
+
+# Private Keys
+*.pem
+*.p12
+*.pfx
+*firebase-adminsdk*.json
+
+# Dependency Directories
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production & Build Outputs
+client/dist/
+client/build/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
