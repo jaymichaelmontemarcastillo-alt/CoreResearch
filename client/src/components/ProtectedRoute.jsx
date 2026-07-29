@@ -7,10 +7,12 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
-          <p className="text-slate-400 text-sm font-medium">Verifying Session & Role Permissions...</p>
+          <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+            Verifying Session & Role Permissions...
+          </p>
         </div>
       </div>
     );

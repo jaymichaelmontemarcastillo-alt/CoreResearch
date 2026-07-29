@@ -1,35 +1,38 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { ShieldAlert, ArrowLeft } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+// src/pages/Unauthorized.jsx
+import React from "react";
+import { Link } from "react-router-dom";
+import { AuthLayout } from "../components/AuthLayout";
+import { Button } from "../components/ui/Button";
+import { ShieldAlert, ArrowLeft } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export const Unauthorized = () => {
   const { role } = useAuth();
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-rose-500/20 bg-rose-950/10 text-center space-y-5">
-        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+    <AuthLayout title="Access Denied">
+      <div className="text-center space-y-5 py-6">
+        <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center mx-auto">
           <ShieldAlert className="w-8 h-8" />
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-white">Access Denied</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Your account role (<span className="text-rose-400 font-semibold">{role || 'Guest'}</span>) does not have permission to access this portal.
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Permission Required</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
+            Your account role (
+            <span className="text-red-500 dark:text-red-400 font-semibold">
+              {role || "Guest"}
+            </span>
+            ) does not have permission to access this portal.
           </p>
         </div>
 
-        <div className="pt-2">
-          <Link to="/dashboard">
-            <Button variant="outline" className="w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" /> Return to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </Card>
-    </div>
+        <Link to="/dashboard">
+          <Button variant="outline" className="w-full">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Return to Dashboard
+          </Button>
+        </Link>
+      </div>
+    </AuthLayout>
   );
 };

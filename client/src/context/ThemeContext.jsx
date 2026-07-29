@@ -13,17 +13,15 @@ export const useTheme = () => {
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('core_research_theme');
-    return saved || 'dark';
+    return saved || 'light';
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('light-mode');
-      root.classList.remove('dark');
-    } else {
-      root.classList.remove('light-mode');
+    if (theme === 'dark') {
       root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
     }
     localStorage.setItem('core_research_theme', theme);
   }, [theme]);

@@ -1,11 +1,16 @@
-import React from 'react';
+// src/components/ui/Card.jsx
+import React from "react";
 
-export const Card = ({ children, className = '', hover = false, ...props }) => {
+export const Card = ({
+  children,
+  className = "",
+  hover = false,
+  padding = true,
+  ...props
+}) => {
   return (
     <div
-      className={`glass-panel rounded-2xl p-6 shadow-xl ${
-        hover ? 'glass-panel-hover cursor-pointer' : ''
-      } ${className}`}
+      className={`bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-card ${padding ? "p-6" : ""} ${hover ? "card-hover cursor-pointer" : ""} ${className}`}
       {...props}
     >
       {children}

@@ -1,23 +1,24 @@
-// src/components/ui/Input.jsx
+// src/components/ui/Select.jsx
 import React from "react";
+import { ChevronDown } from "lucide-react";
 
-export const Input = ({
+export const Select = ({
   label,
   error,
-  helperText,
   icon: Icon,
   className = "",
   id,
+  children,
   ...props
 }) => {
-  const inputId =
+  const selectId =
     id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
   return (
     <div className="w-full space-y-1.5">
       {label && (
         <label
-          htmlFor={inputId}
+          htmlFor={selectId}
           className="block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           {label}
@@ -29,23 +30,25 @@ export const Input = ({
             <Icon className="w-4 h-4" />
           </div>
         )}
-        <input
-          id={inputId}
-          className={`w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 
+        <select
+          id={selectId}
+          className={`w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100
                      focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary 
-                     transition-all duration-200 rounded-lg text-sm py-2.5 px-3.5 ${Icon ? "pl-10" : ""} ${
+                     transition-all duration-200 rounded-lg text-sm py-2.5 pr-10 appearance-none ${Icon ? "pl-10" : "pl-3.5"} ${
                        error
                          ? "border-red-300 dark:border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
                          : ""
                      } ${className}`}
           {...props}
-        />
+        >
+          {children}
+        </select>
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+          <ChevronDown className="w-4 h-4" />
+        </div>
       </div>
       {error && (
         <p className="text-xs text-red-500 dark:text-red-400 font-medium mt-1">{error}</p>
-      )}
-      {helperText && !error && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{helperText}</p>
       )}
     </div>
   );
