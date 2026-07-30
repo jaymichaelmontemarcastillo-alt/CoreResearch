@@ -39,13 +39,23 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.warn('[AuthContext] Backend sync failed, using client fallback:', error.message);
-      // Fallback profile
+      const nameParts = (firebaseUser.displayName || firebaseUser.email.split('@')[0]).trim().split(' ');
       setUserProfile({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
+        first_name: nameParts[0] || 'User',
+        last_name: nameParts.slice(1).join(' ') || '',
         fullName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
         role: defaultRole,
-        department: 'Computer Studies'
+        role_id: defaultRole,
+        department: 'Computer Studies',
+        department_id: 'Computer Studies',
+        studentIdOrEmployeeId: '',
+        status: 'active',
+        is_approved: true,
+        profile_image: firebaseUser.photoURL || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
     }
   };
@@ -99,14 +109,19 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
+      const nameParts = fullName.trim().split(' ');
       // Register record on Express API
       try {
         await api.post('/auth/register', {
           uid: result.user.uid,
           email,
+          first_name: nameParts[0] || 'User',
+          last_name: nameParts.slice(1).join(' ') || '',
           fullName,
           role,
+          role_id: role,
           department,
+          department_id: department,
           studentIdOrEmployeeId
         });
       } catch (apiErr) {
@@ -148,13 +163,23 @@ export const AuthProvider = ({ children }) => {
       }
 
       // Default fallback profile marking needsOnboarding = true
+      const nameParts = (result.user.displayName || result.user.email.split('@')[0]).trim().split(' ');
       const newProfile = {
         uid: result.user.uid,
         email: result.user.email,
+        first_name: nameParts[0] || 'User',
+        last_name: nameParts.slice(1).join(' ') || '',
         fullName: result.user.displayName || result.user.email.split('@')[0],
         role: defaultRole,
+        role_id: defaultRole,
         department: 'Computer Studies',
+        department_id: 'Computer Studies',
         studentIdOrEmployeeId: '',
+        status: 'active',
+        is_approved: true,
+        profile_image: result.user.photoURL || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         needsOnboarding: true
       };
 

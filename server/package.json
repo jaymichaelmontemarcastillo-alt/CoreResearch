@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "seed:db": "node --env-file=.env src/scripts/seedFirestoreAdmin.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

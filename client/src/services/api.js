@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { auth } from './firebase';
 
+const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : (typeof process !== 'undefined' ? process.env : {});
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: env.VITE_API_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,9 +20,11 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       } else {
         // Fallback check for dev mode token stored in localStorage
-        const devToken = localStorage.getItem('core_research_dev_token');
-        if (devToken) {
-          config.headers.Authorization = `Bearer ${devToken}`;
+        if (typeof localStorage !== 'undefined') {
+          const devToken = localStorage.getItem('core_research_dev_token');
+          if (devToken) {
+            config.headers.Authorization = `Bearer ${devToken}`;
+          }
         }
       }
     } catch (error) {

@@ -35,23 +35,40 @@ export const Onboarding = () => {
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     try {
+      const first_name = firstName.trim();
+      const last_name = lastName.trim();
+
       await api.post("/auth/register", {
         uid: currentUser.uid,
         email: currentUser.email,
+        first_name,
+        last_name,
         fullName,
         role,
+        role_id: role,
         department,
+        department_id: department,
         studentIdOrEmployeeId,
+        status: "active",
+        is_approved: true,
+        profile_image: currentUser.photoURL || "",
       });
 
       if (updateProfileLocal) {
         updateProfileLocal({
           uid: currentUser.uid,
           email: currentUser.email,
+          first_name,
+          last_name,
           fullName,
           role,
+          role_id: role,
           department,
+          department_id: department,
           studentIdOrEmployeeId,
+          status: "active",
+          is_approved: true,
+          profile_image: currentUser.photoURL || "",
           needsOnboarding: false,
         });
       }

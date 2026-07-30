@@ -1,0 +1,12 @@
+export { default as firebase } from './firebase';
+export { default as api } from './api';
+export { default as userService } from './user.service';
+export { default as titleProposalService } from './titleProposal.service';
+export { default as manuscriptService } from './manuscript.service';
+export { default as researchGroupService } from './researchGroup.service';
+export { default as adviserService } from './adviser.service';
+export { default as scheduleService } from './schedule.service';
+export { default as gradingService } from './grading.service';
+export { default as notificationService } from './notification.service';
+export { default as storageService } from './storage.service';
+export { default as seedFirestore } from './seedFirestore';
