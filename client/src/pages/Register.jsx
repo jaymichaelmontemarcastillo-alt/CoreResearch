@@ -5,24 +5,13 @@ import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
 import { Lock, Mail, Eye, EyeOff, Briefcase, Building2 } from "lucide-react";
 
-const ROLE_OPTIONS = [
-  { value: "student", label: "Student" },
-  { value: "adviser", label: "Adviser" },
-  { value: "panelist", label: "Panelist" },
-];
-
 const DEPARTMENT_OPTIONS = [
-  "Computer Studies",
-  "Engineering",
-  "Business Administration",
-  "Education",
-  "Arts and Sciences",
-  "Nursing",
+  "Information Technology",
+  "Computer Science",
 ];
 
 export const Register = () => {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
   const [department, setDepartment] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -48,7 +37,7 @@ export const Register = () => {
 
     setLoading(true);
     try {
-      await register(email, password, { role, department });
+      await register(email, password, "", "student", department, "");
       navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Failed to create account.");
@@ -78,27 +67,15 @@ export const Register = () => {
           </div>
         </div>
 
-        {/* Role + Department */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
-            <div className="relative">
-              <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-              <select className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none" value={role} onChange={(e) => setRole(e.target.value)} required>
-                <option value="" disabled>Select role</option>
-                {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
-              </select>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
-            <div className="relative">
-              <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-              <select className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none" value={department} onChange={(e) => setDepartment(e.target.value)} required>
-                <option value="" disabled>Select department</option>
-                {DEPARTMENT_OPTIONS.map((d) => (<option key={d} value={d}>{d}</option>))}
-              </select>
-            </div>
+        {/* Department */}
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
+          <div className="relative">
+            <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+            <select className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none" value={department} onChange={(e) => setDepartment(e.target.value)} required>
+              <option value="" disabled>Select department</option>
+              {DEPARTMENT_OPTIONS.map((d) => (<option key={d} value={d}>{d}</option>))}
+            </select>
           </div>
         </div>
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { Button } from "../components/ui/Button";
 import { User, Building, Contact, ArrowRight } from "lucide-react";
 import api from "../services/api";
@@ -18,7 +19,7 @@ export const Onboarding = () => {
   const [firstName, setFirstName] = useState(initialNameParts[0] || "");
   const [lastName, setLastName] = useState(initialNameParts.slice(1).join(" ") || "");
   const [role, setRole] = useState(userProfile?.role || "student");
-  const [department, setDepartment] = useState(userProfile?.department || "Computer Studies");
+  const [department, setDepartment] = useState(userProfile?.department || "Information Technology");
   const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState(userProfile?.studentIdOrEmployeeId || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -102,7 +103,7 @@ export const Onboarding = () => {
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Your Role</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {["student", "adviser", "panelist", "admin"].map((item) => (
+            {["student", "adviser"].map((item) => (
               <button
                 key={item}
                 type="button"
@@ -120,7 +121,17 @@ export const Onboarding = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Department / College" type="text" placeholder="e.g. Computer Studies" icon={Building} value={department} onChange={(e) => setDepartment(e.target.value)} required />
+          <Select
+            label="Department / College"
+            icon={Building}
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            required
+          >
+            <option value="" disabled>Select department</option>
+            <option value="Information Technology">Information Technology</option>
+            <option value="Computer Science">Computer Science</option>
+          </Select>
           <Input label={role === "student" ? "Student ID Number" : "Employee ID Number"} type="text" placeholder="e.g. 2024-1002" icon={Contact} value={studentIdOrEmployeeId} onChange={(e) => setStudentIdOrEmployeeId(e.target.value)} required />
         </div>
 
