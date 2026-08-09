@@ -6,8 +6,10 @@ import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Button } from "../components/ui/Button";
-import { User, Building, Contact, ArrowRight } from "lucide-react";
-import api from "../services/api";
+import { User, Building2, Contact, ArrowRight, Lock, Eye, EyeOff, Briefcase } from "lucide-react";
+import { updatePassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../services/firebase";
 
 export const Onboarding = () => {
   const { currentUser, userProfile, updateProfileLocal } = useAuth();
@@ -21,6 +23,9 @@ export const Onboarding = () => {
   const [role, setRole] = useState(userProfile?.role || "student");
   const [department, setDepartment] = useState(userProfile?.department || "Information Technology");
   const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState(userProfile?.studentIdOrEmployeeId || "");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,21 +37,36 @@ export const Onboarding = () => {
     e.preventDefault();
     setError("");
 
-    if (!firstName || !lastName || !studentIdOrEmployeeId) {
+    if (!firstName || !lastName || !studentIdOrEmployeeId || !password || !confirmPassword) {
       return setError("Please complete all required profile fields.");
+    }
+    
+    if (password !== confirmPassword) {
+      return setError("Passwords do not match.");
+    }
+    
+    if (password.length < 6) {
+      return setError("Password must be at least 6 characters.");
     }
 
     setLoading(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     try {
+      // Dito natin sine-save yung bagong password na tinype ng user.
+      // Dahil via Google Sign In sila pumasok (kaya nasa Onboarding sila), 
+      // wala pa silang password. Kaya gagamitin natin yung updatePassword() 
+      // para next time, pwede na silang mag-log in gamit ang email at password nila.
+      await updatePassword(currentUser, password);
+      
       const first_name = firstName.trim();
       const last_name = lastName.trim();
 
-      // Ise-save na natin yung record sa database gamit yung backend API.
+      // Ise-save na natin yung record sa database gamit ang Firestore SDK directly.
       // Dito na binubuo yung "User Profile" document sa Firestore na naka-link sa UID nila.
       // Pagkatapos nito, tapos na ang Onboarding flow.
-      await api.post("/auth/register", {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await setDoc(userRef, {
         uid: currentUser.uid,
         email: currentUser.email,
         first_name,
@@ -60,7 +80,9 @@ export const Onboarding = () => {
         status: "active",
         is_approved: true,
         profile_image: currentUser.photoURL || "",
-      });
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { merge: true });
 
       // Update natin yung local Auth context para mag-reflect agad yung changes 
       // sa UI (tulad ng pangalan at role) nang hindi na kailangan mag-refresh.
@@ -103,50 +125,92 @@ export const Onboarding = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="First Name" type="text" placeholder="e.g. Alex" icon={User} value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-          <Input label="Last Name" type="text" placeholder="e.g. Rivera" icon={User} value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-        </div>
-
-        {/* Role Picker */}
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Your Role</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {["student", "adviser"].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setRole(item)}
-                className={`py-2 px-3 rounded-lg text-sm font-medium border transition-all ${
-                  role === item
-                    ? "bg-primary text-white border-primary shadow-sm"
-                    : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-slate-600"
-                }`}
-              >
-                {item.charAt(0).toUpperCase() + item.slice(1)}
-              </button>
-            ))}
+        {/* Name Fields */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
+            <div className="relative">
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <input type="text" placeholder="e.g. Alex" className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</label>
+            <div className="relative">
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <input type="text" placeholder="e.g. Rivera" className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
-            label="Department / College"
-            icon={Building}
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            required
-          >
-            <option value="" disabled>Select department</option>
-            <option value="Information Technology">Information Technology</option>
-            <option value="Computer Science">Computer Science</option>
-          </Select>
-          <Input label={role === "student" ? "Student ID Number" : "Employee ID Number"} type="text" placeholder="e.g. 2024-1002" icon={Contact} value={studentIdOrEmployeeId} onChange={(e) => setStudentIdOrEmployeeId(e.target.value)} required />
+        {/* Role and Department */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+            <div className="relative">
+              <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+              <select className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none" value={role} onChange={(e) => setRole(e.target.value)} required>
+                <option value="" disabled>Select role</option>
+                {["student", "adviser"].map((item) => (
+                  <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
+            <div className="relative">
+              <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+              <select className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none" value={department} onChange={(e) => setDepartment(e.target.value)} required>
+                <option value="" disabled>Select department</option>
+                <option value="Information Technology">Information Technology</option>
+                <option value="Computer Science">Computer Science</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <Button type="submit" className="w-full mt-2" isLoading={loading}>
-          Complete Registration <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        {/* ID Number */}
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{role === "student" ? "Student ID Number" : "Employee ID Number"}</label>
+          <div className="relative">
+            <Contact className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            <input type="text" placeholder="e.g. 2024-1002" className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition" value={studentIdOrEmployeeId} onChange={(e) => setStudentIdOrEmployeeId(e.target.value)} required />
+          </div>
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+          <div className="relative">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            <input type={showPassword ? "text" : "password"} placeholder="Create a password (min 6 characters)" className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Confirm Password */}
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm password</label>
+          <div className="relative">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            <input type="password" placeholder="Re-enter your password" className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+          </div>
+        </div>
+
+        {/* Submit */}
+        <button type="submit" disabled={loading} className="w-full h-11 bg-primary hover:bg-primary-hover text-white font-medium text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+              Completing Registration...
+            </span>
+          ) : (
+            <span className="flex items-center">Complete Registration <ArrowRight className="w-4 h-4 ml-2" /></span>
+          )}
+        </button>
       </form>
     </AuthLayout>
   );

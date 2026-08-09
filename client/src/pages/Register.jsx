@@ -23,6 +23,7 @@ export const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { register, loginWithGoogle } = useAuth();
@@ -50,8 +51,16 @@ export const Register = () => {
     setLoading(true);
     try {
       await register(email, password, "", role || "student", department, "");
-      navigate("/dashboard");
+      
+      // Pag nag-success yung creation ng account, magpapakita tayo ng success message.
+      // Hihintayin natin ng 4 seconds bago i-redirect sa dashboard para mabasa nila.
+      setSuccess("Successfully signed up! Please wait until the admin accepts your request.");
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 4000);
     } catch (err) {
+      // Kung existing na yung email, magpapakita tayo ng specific message para 
+      // i-guide yung user na mag-login na lang.
       if (err.code === "auth/email-already-in-use") {
         setError("This email is already registered. Please log in instead.");
       } else {
@@ -67,14 +76,21 @@ export const Register = () => {
       title="Create your account"
       subtitle="Join CoreResearch and manage your research journey"
     >
+      {success && (
+        <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400 text-sm">
+          {success}
+        </div>
+      )}
+      
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Email */}
+      {!success && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Email */}
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Institutional email</label>
           <div className="relative">
@@ -156,6 +172,7 @@ export const Register = () => {
           <span>Sign up with Google</span>
         </button>
       </form>
+      )}
 
       <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
         Already have an account?{" "}

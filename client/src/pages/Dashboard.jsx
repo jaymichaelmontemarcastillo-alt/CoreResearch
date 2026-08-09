@@ -87,77 +87,185 @@ export const Dashboard = () => {
 
       {/* Main Content Grid: Pipeline + Active Papers + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Research Pipeline & Active Manuscripts */}
+        {/* Left 2 Cols: Role-Specific Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Module Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Card hover className="flex flex-col justify-between space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <Badge variant="blue">Proposal Stage</Badge>
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Title Proposals
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                  Submit new research titles, review evaluation status, and adviser recommendations.
-                </p>
-              </div>
-              <Link
-                to="/proposals"
-                className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-              >
-                View Proposals <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </Card>
+          
+          {/* ====== STUDENT CONTENT ====== */}
+          {(!role || role === "student") && (
+            <>
+              {/* Module Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Card hover className="flex flex-col justify-between space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <Badge variant="blue">Proposal Stage</Badge>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      Title Proposals
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                      Submit new research titles, review evaluation status, and adviser recommendations.
+                    </p>
+                  </div>
+                  <Link
+                    to="/proposals"
+                    className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
+                  >
+                    View Proposals <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Link>
+                </Card>
 
-            <Card hover className="flex flex-col justify-between space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <FolderGit2 className="w-5 h-5" />
-                </div>
-                <Badge variant="emerald">Versioning</Badge>
+                <Card hover className="flex flex-col justify-between space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                      <FolderGit2 className="w-5 h-5" />
+                    </div>
+                    <Badge variant="emerald">Versioning</Badge>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      Manuscript Repository
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                      Upload PDF/DOCX drafts, track submission timelines, and download revisions.
+                    </p>
+                  </div>
+                  <Link
+                    to="/manuscripts"
+                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
+                  >
+                    Open Manuscripts <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Link>
+                </Card>
               </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Manuscript Repository
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                  Upload PDF/DOCX drafts, track submission timelines, and download revisions.
-                </p>
-              </div>
-              <Link
-                to="/manuscripts"
-                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
-              >
-                Open Manuscripts <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </Card>
-          </div>
 
-          {/* Current Research Highlight */}
-          <Card className="space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                CURRENT MANUSCRIPT DRAFT
-              </h3>
-              <Badge variant="purple">v1.2 In Progress</Badge>
+              {/* Current Research Highlight */}
+              <Card className="space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    CURRENT MANUSCRIPT DRAFT
+                  </h3>
+                  <Badge variant="purple">v1.2 In Progress</Badge>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                    Enhancing RAG Retrieval with Hybrid Graph-Vector Embeddings
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Last edited 2 days ago — <strong className="text-gray-700 dark:text-gray-300">80% complete</strong>
+                  </p>
+                  <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden mt-2">
+                    <div className="bg-primary h-2 rounded-full w-[80%]" />
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {/* ====== ADMIN CONTENT ====== */}
+          {role === "admin" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card hover className="flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <Badge variant="amber">Access Control</Badge>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    User Directory
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Manage institutional accounts, assign roles, and handle department assignments.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/users"
+                  className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 hover:underline pt-2"
+                >
+                  Manage Users <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </Card>
+
+              <Card hover className="flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <Badge variant="emerald">Knowledge Base</Badge>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    Repository Overview
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Monitor published papers and institutional research output.
+                  </p>
+                </div>
+                <Link
+                  to="/repository"
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
+                >
+                  View Repository <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </Card>
             </div>
-            <div className="space-y-2">
-              <h4 className="text-base font-bold text-gray-900 dark:text-white">
-                Enhancing RAG Retrieval with Hybrid Graph-Vector Embeddings
-              </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Last edited 2 days ago — <strong className="text-gray-700 dark:text-gray-300">80% complete</strong>
-              </p>
-              <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden mt-2">
-                <div className="bg-primary h-2 rounded-full w-[80%]" />
-              </div>
+          )}
+
+          {/* ====== ADVISER & PANELIST CONTENT ====== */}
+          {(role === "adviser" || role === "panelist") && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card hover className="flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <Badge variant="blue">Pending Action</Badge>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    Review Proposals
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Evaluate and approve new title proposals submitted by students.
+                  </p>
+                </div>
+                <Link
+                  to="/proposals"
+                  className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
+                >
+                  View Proposals <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </Card>
+
+              <Card hover className="flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <Badge variant="purple">Collaboration</Badge>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                    Feedback Threads
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Provide feedback on ongoing manuscript drafts and revisions.
+                  </p>
+                </div>
+                <Link
+                  to="/reviews"
+                  className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 hover:underline pt-2"
+                >
+                  View Reviews <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </Card>
             </div>
-          </Card>
+          )}
         </div>
 
         {/* Right Col: Recent Activity */}

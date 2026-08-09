@@ -7,7 +7,8 @@ import {
   sendPasswordResetEmail,
   onAuthStateChanged 
 } from 'firebase/auth';
-import { auth, googleProvider } from '../services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db, googleProvider } from '../services/firebase';
 import api from '../services/api';
 
 
@@ -34,16 +35,18 @@ export const AuthProvider = ({ children }) => {
   // gamit ang API natin para magamit ng buong app (e.g. for Dashboard at Protected Routes).
   const syncProfileWithBackend = async (firebaseUser, defaultRole = 'student') => {
     try {
-      const token = await firebaseUser.getIdToken();
-      const response = await api.post('/auth/login-sync', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data && response.data.data) {
-        setUserProfile(response.data.data);
+      // Fetch directly from Firestore users collection
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        setUserProfile(userDoc.data());
+      } else {
+        throw new Error("User document not found");
       }
     } catch (error) {
-      console.warn('[AuthContext] Backend sync failed, using client fallback:', error.message);
-      const nameParts = (firebaseUser.displayName || firebaseUser.email.split('@')[0]).trim().split(' ');
+      console.warn('[AuthContext] Firestore fetch failed, using client fallback:', error.message);
+      const nameParts = (firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User").trim().split(' ');
       setUserProfile({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
@@ -124,9 +127,10 @@ export const AuthProvider = ({ children }) => {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
       const nameParts = fullName.trim().split(' ');
-      // Register record on Express API
+      // Register record directly to Firestore users collection
       try {
-        await api.post('/auth/register', {
+        const userRef = doc(db, 'users', result.user.uid);
+        const userProfileData = {
           uid: result.user.uid,
           email,
           first_name: nameParts[0] || 'User',
@@ -136,10 +140,16 @@ export const AuthProvider = ({ children }) => {
           role_id: role,
           department,
           department_id: department,
-          studentIdOrEmployeeId
-        });
-      } catch (apiErr) {
-        console.warn('[AuthContext] API registration sync warning:', apiErr.message);
+          studentIdOrEmployeeId,
+          status: 'active',
+          is_approved: true,
+          profile_image: result.user.photoURL || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        await setDoc(userRef, userProfileData, { merge: true });
+      } catch (dbErr) {
+        console.warn('[AuthContext] Firestore registration warning:', dbErr.message);
       }
 
       await syncProfileWithBackend(result.user, role);
@@ -162,15 +172,13 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       
-      // Try fetching profile from backend
+      // Try fetching profile from Firestore
       try {
-        const token = await result.user.getIdToken();
-        const response = await api.post('/auth/login-sync', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const userDocRef = doc(db, 'users', result.user.uid);
+        const userDoc = await getDoc(userDocRef);
         
-        if (response.data && response.data.data) {
-          const profile = response.data.data;
+        if (userDoc.exists()) {
+          const profile = userDoc.data();
           // Check if profile needs onboarding (e.g. ID is default or missing)
           if (!profile.studentIdOrEmployeeId || profile.studentIdOrEmployeeId === 'GOOGLE-USER') {
             profile.needsOnboarding = true;
@@ -179,7 +187,7 @@ export const AuthProvider = ({ children }) => {
           return { ...result, needsOnboarding: profile.needsOnboarding };
         }
       } catch (syncErr) {
-        console.warn('[AuthContext] Backend sync warning:', syncErr.message);
+        console.warn('[AuthContext] Firestore sync warning:', syncErr.message);
       }
 
       // Default fallback profile marking needsOnboarding = true
