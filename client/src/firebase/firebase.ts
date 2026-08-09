@@ -5,8 +5,10 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
 /**
- * Firebase Configuration Object sourced strictly from Vite Environment Variables.
- * Ensure a .env.local file exists in the client directory.
+ * Dito sinesetup yung main connection natin sa Firebase.
+ * Kumukuha ng config mula sa .env variables (via Vite) para secure.
+ * Connected ito sa buong app kasi lahat ng Firebase services (Auth, Firestore, Storage)
+ * dito kumukuha ng main instance.
  */
 const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : (typeof process !== 'undefined' ? process.env as any : {});
 
@@ -66,13 +68,22 @@ const app: FirebaseApp =
 
 /**
  * Core Firebase Modular SDK Services
+ * Ito yung mga main services na gagamitin natin sa ibat-ibang modules.
  */
+// Ito yung gagamitin for User Authentication (Login, Register, Google).
+// Pag nag-login ang user dito, magpo-provide ito ng UID.
 const auth: Auth = getAuth(app);
+
+// Ito yung connection sa Firestore database natin. 
+// Dito ise-save yung "users" collection (para sa roles at profile) pati iba pang app data.
 const db: Firestore = getFirestore(app);
+
+// Para sa file uploads like profile pictures o manuscript documents.
 const storage: FirebaseStorage = getStorage(app);
 
 /**
  * Configured Auth Providers
+ * Ginagamit ito sa Login at Register para sa "Sign in with Google" flow.
  */
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({

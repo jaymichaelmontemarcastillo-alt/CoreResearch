@@ -19,6 +19,9 @@ export const UserDirectory = () => {
   const [updatingUid, setUpdatingUid] = useState(null);
   const [toastMessage, setToastMessage] = useState("");
 
+  // Kinukuha nito yung listahan ng mga users mula sa backend API.
+  // Yung API natin, kumokonekta sa Firestore "users" collection
+  // at binabalik yung data kasama na yung search/filter results.
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -44,6 +47,10 @@ export const UserDirectory = () => {
     fetchUsers();
   };
 
+  // Dito natin binabago yung Role ng user (ex. ginagawang admin o adviser).
+  // Pinapasa yung request sa backend API (`PATCH /users/:uid/role`), 
+  // tapos yung backend na ang mag-uupdate sa Firestore record ng user na yun.
+  // Mahalaga ito para sa role-based access control (RBAC) ng app.
   const handleRoleChange = async (uid, newRole) => {
     setUpdatingUid(uid);
     try {

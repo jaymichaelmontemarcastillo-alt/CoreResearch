@@ -15,6 +15,10 @@ export const Login = () => {
   const { login, selectDevRole, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
+  // Ito yung nag-hahandle ng Login via Email & Password.
+  // Kapag kinlick ang Sign In, papasa niya yung email at password sa `login` function
+  // na nasa AuthContext. Kung tama, dire-diretso na sa Dashboard. Kung mali, 
+  // magpapakita ng error message.
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -129,6 +133,11 @@ export const Login = () => {
         </div>
 
         {/* Google Sign In */}
+        {/* 
+          Pag-click ng Google button, tatawagin nito yung `loginWithGoogle` sa AuthContext.
+          Kung existing user na, papasok diretso sa Dashboard. Kung bago pa lang, 
+          it-trigger niya yung Onboarding screen para makumpleto yung profile nila.
+        */}
         <button
           type="button"
           onClick={async () => {

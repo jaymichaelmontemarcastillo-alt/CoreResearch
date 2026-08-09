@@ -24,6 +24,10 @@ export const Onboarding = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Kapag kinumpleto ng user yung form at nag-submit...
+  // Dito natin ipapasa yung kumpletong profile details (Name, Role, Department, ID)
+  // sa Express backend natin na magse-save nito sa Firestore "users" collection.
+  // Kapag naging successful ito, tagged as 'active' na yung user at papasok na sila sa Dashboard.
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -39,6 +43,9 @@ export const Onboarding = () => {
       const first_name = firstName.trim();
       const last_name = lastName.trim();
 
+      // Ise-save na natin yung record sa database gamit yung backend API.
+      // Dito na binubuo yung "User Profile" document sa Firestore na naka-link sa UID nila.
+      // Pagkatapos nito, tapos na ang Onboarding flow.
       await api.post("/auth/register", {
         uid: currentUser.uid,
         email: currentUser.email,
@@ -55,6 +62,8 @@ export const Onboarding = () => {
         profile_image: currentUser.photoURL || "",
       });
 
+      // Update natin yung local Auth context para mag-reflect agad yung changes 
+      // sa UI (tulad ng pangalan at role) nang hindi na kailangan mag-refresh.
       if (updateProfileLocal) {
         updateProfileLocal({
           uid: currentUser.uid,

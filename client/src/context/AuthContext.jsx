@@ -28,6 +28,10 @@ export const AuthProvider = ({ children }) => {
   const [devMode, setDevMode] = useState(false);
 
   // Sync profile with Express backend API
+  // Kapag nag-login o register ang user via Firebase Auth (email man o Google), 
+  // kailangan nating i-sync yung UID nila papunta sa backend natin.
+  // Dito natin kinukuha yung buong Profile details galing sa Firestore 'users' collection 
+  // gamit ang API natin para magamit ng buong app (e.g. for Dashboard at Protected Routes).
   const syncProfileWithBackend = async (firebaseUser, defaultRole = 'student') => {
     try {
       const token = await firebaseUser.getIdToken();
@@ -91,6 +95,12 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Standard Authentication Actions
+
+  // Normal na login gamit email at password.
+  // Flow: 
+  // 1. Firebase Auth vavalidate yung credentials.
+  // 2. Pag okay, babalik yung `result.user` (may UID).
+  // 3. Ite-trigger yung `syncProfileWithBackend` para kunin ang Firestore 'users' data nila.
   const login = async (email, password) => {
     setLoading(true);
     try {
@@ -104,6 +114,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Dito kino-create yung Firebase Authentication account ng bagong user.
+  // Pag successful, ginagamit yung returned UID para ma-identify yung user sa backend.
+  // Connected ito sa Register page. Kahit incomplete pa yung ibang details (kasi sa Onboarding pa yun),
+  // gagawa na tayo ng record sa backend/Firestore via API para may connection na.
   const register = async (email, password, fullName, role, department, studentIdOrEmployeeId) => {
     setLoading(true);
     try {
@@ -137,6 +151,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Google Auth flow. 
+  // Flow: 
+  // 1. Firebase Auth popup para sa Google Login.
+  // 2. Kukunin yung UID at i-check sa backend kung may existing profile na.
+  // 3. Kung bago yung user (wala pang 'studentIdOrEmployeeId'), ifa-flag natin na 'needsOnboarding = true'.
+  // 4. Ipupunta sila sa Onboarding page para kumpletuhin yung profile bago makapasok sa Dashboard.
   const loginWithGoogle = async (defaultRole = 'student') => {
     setLoading(true);
     try {
