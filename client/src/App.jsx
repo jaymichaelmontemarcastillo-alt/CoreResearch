@@ -13,6 +13,7 @@ import { Dashboard } from './pages/Dashboard';
 
 import { UserDirectory } from './pages/UserDirectory';
 import { Courses } from './pages/Courses';
+import { Sections } from './pages/Sections';
 import { Proposals } from './pages/Proposals';
 import { SubmitProposal } from './pages/SubmitProposal';
 import { ProposalDetail } from './pages/ProposalDetail';
@@ -69,6 +70,7 @@ export default function App() {
                 <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                   <Route path="/admin/users" element={<UserDirectory />} />
                   <Route path="/admin/courses" element={<Courses />} />
+                  <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
                 </Route>
               </Route>
             </Route>

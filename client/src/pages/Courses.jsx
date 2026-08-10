@@ -6,7 +6,8 @@ import { Input } from "../components/ui/Input";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
-import { BookOpen, Plus, Trash2, Edit2, RefreshCw } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit2, RefreshCw, List } from "lucide-react";
+import { Link } from "react-router-dom";
 import { courseService } from "../services/course.service";
 
 export const Courses = () => {
@@ -195,6 +196,16 @@ export const Courses = () => {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
+                  <Link to={`/admin/courses/${course.id}/sections`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      title="View Sections"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"
