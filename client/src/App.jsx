@@ -65,7 +65,9 @@ export default function App() {
                 <Route path="/repository" element={<Repository />} />
 
                 {/* Admin User Management */}
-                <Route path="/admin/users" element={<UserDirectory />} />
+                <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                  <Route path="/admin/users" element={<UserDirectory />} />
+                </Route>
               </Route>
             </Route>
 

@@ -40,30 +40,25 @@ export const AuthProvider = ({ children }) => {
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
+        // User is fully registered in our database
         setUserProfile(userDoc.data());
       } else {
-        throw new Error("User document not found");
+        // User account exists in Firebase Auth but NOT in our users collection.
+        // Eto yung scenario na di natapos yung registration o bago silang Google user.
+        // HINDI tayo dapat mag-mock ng full profile. Itatag natin silang needsOnboarding
+        // para ma-redirect sila ng ProtectedRoute papunta sa /onboarding.
+        console.warn('[AuthContext] User document not found in Firestore. Marking for onboarding.');
+        
+        setUserProfile({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          needsOnboarding: true
+        });
       }
     } catch (error) {
-      console.warn('[AuthContext] Firestore fetch failed, using client fallback:', error.message);
-      const nameParts = (firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User").trim().split(' ');
-      setUserProfile({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        first_name: nameParts[0] || 'User',
-        last_name: nameParts.slice(1).join(' ') || '',
-        fullName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-        role: defaultRole,
-        role_id: defaultRole,
-        department: 'Information Technology',
-        department_id: 'Information Technology',
-        studentIdOrEmployeeId: '',
-        status: 'active',
-        is_approved: true,
-        profile_image: firebaseUser.photoURL || '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+      console.error('[AuthContext] Firestore fetch failed:', error.message);
+      // Kung network error or permission error, null profile para hindi mag crash pero safe.
+      setUserProfile(null);
     }
   };
 
@@ -295,6 +290,9 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     userProfile,
     role: userProfile?.role || null,
+    department: userProfile?.department || null,
+    isApproved: userProfile?.is_approved || false,
+    status: userProfile?.status || null,
     loading,
     devMode,
     login,
