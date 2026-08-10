@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
-  const { userProfile, logout } = useAuth();
+  const { userProfile, currentUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,8 +40,13 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
     return "Dashboard";
   };
 
-  const displayName = userProfile?.fullName || "Jay Michael Castillo";
-
+  // Construct the display name robustly based on available profile/auth data
+  const displayName = 
+    userProfile?.fullName || 
+    (userProfile?.first_name && userProfile?.last_name ? `${userProfile.first_name} ${userProfile.last_name}` : null) ||
+    currentUser?.displayName ||
+    currentUser?.email?.split("@")[0] ||
+    "Researcher";
   return (
     <header
       className={`sticky top-0 z-30 h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between shrink-0 transition-all duration-200 ${

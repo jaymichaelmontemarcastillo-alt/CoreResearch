@@ -72,13 +72,19 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser({ uid: parsed.uid, email: parsed.email });
         setDevMode(true);
         setLoading(false);
-        return;
+        // We don't return here so that the Firebase listener is still attached.
       } catch (err) {
         localStorage.removeItem('core_research_dev_profile');
       }
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // If dev profile is active, ignore Firebase Auth state changes
+      if (localStorage.getItem('core_research_dev_profile')) {
+        setLoading(false);
+        return;
+      }
+
       if (user) {
         setCurrentUser(user);
         await syncProfileWithBackend(user);

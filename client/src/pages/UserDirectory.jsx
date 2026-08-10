@@ -21,7 +21,7 @@ export const UserDirectory = () => {
 
   // Kinukuha nito yung listahan ng mga users mula sa backend API.
   // Yung API natin, kumokonekta sa Firestore "users" collection
-  // at binabalik yung data kasama na yung search/filter results.
+  // and then binabalik yung data kasama na yung search/filter results.
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -117,11 +117,10 @@ export const UserDirectory = () => {
             <button
               key={r}
               onClick={() => setSelectedRole(r)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${
-                selectedRole === r
-                  ? "bg-primary text-white shadow-sm"
-                  : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${selectedRole === r
+                ? "bg-primary text-white shadow-sm"
+                : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                }`}
             >
               {r}
             </button>

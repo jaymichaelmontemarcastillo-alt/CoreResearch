@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  BookOpen,
 } from "lucide-react";
 
 export const Sidebar = ({
@@ -101,6 +102,12 @@ export const Sidebar = ({
           icon: UserCog,
           roles: ["admin"], // STRICT: Only Admin can access User Management
         },
+        {
+          label: "Courses",
+          path: "/admin/courses",
+          icon: BookOpen,
+          roles: ["admin"], // STRICT: Only Admin can access Course Management
+        },
       ],
     },
   ];
@@ -113,6 +120,9 @@ export const Sidebar = ({
     }
     if (path === "/admin/users") {
       return currentPath.startsWith("/admin/users");
+    }
+    if (path === "/admin/courses") {
+      return currentPath.startsWith("/admin/courses");
     }
     return currentPath === path;
   };

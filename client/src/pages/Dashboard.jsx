@@ -26,7 +26,7 @@ import {
 import { Link } from "react-router-dom";
 
 export const Dashboard = () => {
-  const { userProfile, role } = useAuth();
+  const { userProfile, currentUser, role } = useAuth();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -35,6 +35,14 @@ export const Dashboard = () => {
     return "Good evening";
   };
 
+  // Construct the display name robustly based on available profile/auth data
+  const displayName = 
+    userProfile?.fullName || 
+    (userProfile?.first_name && userProfile?.last_name ? `${userProfile.first_name} ${userProfile.last_name}` : null) ||
+    currentUser?.displayName ||
+    currentUser?.email?.split("@")[0] ||
+    "Researcher";
+
   return (
     <div className="space-y-6">
       {/* Welcome Banner matching Dashboard Reference */}
@@ -42,7 +50,7 @@ export const Dashboard = () => {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-              {getGreeting()}, {userProfile?.fullName || "Researcher"} 👋
+              {getGreeting()}, {displayName} 👋
             </h1>
           </div>
           <p className="text-gray-500 dark:text-gray-400 text-sm max-w-2xl">

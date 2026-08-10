@@ -12,6 +12,7 @@ import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 
 import { UserDirectory } from './pages/UserDirectory';
+import { Courses } from './pages/Courses';
 import { Proposals } from './pages/Proposals';
 import { SubmitProposal } from './pages/SubmitProposal';
 import { ProposalDetail } from './pages/ProposalDetail';
@@ -67,6 +68,7 @@ export default function App() {
                 {/* Admin User Management */}
                 <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                   <Route path="/admin/users" element={<UserDirectory />} />
+                  <Route path="/admin/courses" element={<Courses />} />
                 </Route>
               </Route>
             </Route>
