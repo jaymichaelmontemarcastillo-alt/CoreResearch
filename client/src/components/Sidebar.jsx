@@ -16,6 +16,8 @@ import {
   ChevronRight,
   LogOut,
   BookOpen,
+  Users,
+  GraduationCap,
 } from "lucide-react";
 
 export const Sidebar = ({
@@ -56,6 +58,16 @@ export const Sidebar = ({
           icon: FolderKanban,
           roles: ["student", "adviser", "admin"],
         },
+        ...(role === "student"
+          ? [
+              {
+                label: "My Group",
+                path: "/my-group",
+                icon: Users,
+                roles: ["student"],
+              },
+            ]
+          : []),
         {
           label: "Manuscripts",
           path: "/manuscripts",
@@ -101,6 +113,18 @@ export const Sidebar = ({
           path: "/admin/users",
           icon: UserCog,
           roles: ["admin"], // STRICT: Only Admin can access User Management
+        },
+        {
+          label: "Students",
+          path: "/admin/students",
+          icon: GraduationCap,
+          roles: ["admin"], // STRICT: Only Admin can access Student Management
+        },
+        {
+          label: "Research Groups",
+          path: "/admin/groups",
+          icon: Users,
+          roles: ["admin", "research_coordinator"],
         },
         {
           label: "Courses",

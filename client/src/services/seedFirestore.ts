@@ -100,6 +100,11 @@ const COURSES_DATA = [
     name: 'Bachelor of Science in Information Technology',
     departmentId: 'it',
     active: true,
+    specializations: [
+      { id: 'wmad', code: 'WMAD', name: 'Web and Mobile App Development' },
+      { id: 'amg', code: 'AMG', name: 'Animation and Motion Graphics' },
+      { id: 'smp', code: 'SMP', name: 'Service Management Program' }
+    ],
     createdAt: new Date().toISOString()
   },
   {

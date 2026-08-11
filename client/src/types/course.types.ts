@@ -6,6 +6,13 @@ export interface Course {
   active: boolean;
   createdAt: string;
   updatedAt?: string;
+  specializations?: Specialization[];
+}
+
+export interface Specialization {
+  id: string;
+  code: string;
+  name: string;
 }
 
 export interface CreateCourseInput {
@@ -13,6 +20,7 @@ export interface CreateCourseInput {
   name: string;
   departmentId: string;
   active: boolean;
+  specializations?: Specialization[];
 }
 
 export interface UpdateCourseInput {
@@ -20,4 +28,5 @@ export interface UpdateCourseInput {
   name?: string;
   departmentId?: string;
   active?: boolean;
+  specializations?: Specialization[];
 }

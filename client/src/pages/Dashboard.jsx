@@ -24,6 +24,10 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { courseService } from "../services/course.service";
+import { sectionService } from "../services/section.service";
+import { groupService } from "../services/group.service";
 
 export const Dashboard = () => {
   const { userProfile, currentUser, role } = useAuth();
@@ -42,6 +46,34 @@ export const Dashboard = () => {
     currentUser?.displayName ||
     currentUser?.email?.split("@")[0] ||
     "Researcher";
+
+  const [academicInfo, setAcademicInfo] = useState(null);
+
+  useEffect(() => {
+    if (role === "student" && userProfile?.courseId) {
+      const fetchAcademicInfo = async () => {
+        try {
+          const courses = await courseService.getAllCourses();
+          const course = courses.find((c) => c.id === userProfile.courseId);
+          let sectionName = userProfile.sectionId;
+          
+          if (course && userProfile.sectionId) {
+            const sections = await sectionService.getSectionsByCourseId(course.id);
+            const sec = sections.find((s) => s.id === userProfile.sectionId);
+            if (sec) sectionName = sec.name;
+          }
+
+          // Fetch Group Info
+          const group = await groupService.getGroupByStudentId(userProfile.uid);
+          
+          setAcademicInfo({ course, sectionName, group });
+        } catch (error) {
+          console.error("Failed to load academic info", error);
+        }
+      };
+      fetchAcademicInfo();
+    }
+  }, [role, userProfile]);
 
   return (
     <div className="space-y-6">
@@ -101,6 +133,63 @@ export const Dashboard = () => {
           {/* ====== STUDENT CONTENT ====== */}
           {(!role || role === "student") && (
             <>
+              {/* Academic Profile Widget */}
+              {userProfile && (
+                <Card className="p-5 border-blue-100 dark:border-blue-800 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
+                      <GraduationCap className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Academic Profile</h3>
+                      {userProfile.courseId ? (
+                        <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                          <p>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">Course:</span>{" "}
+                            {academicInfo?.course?.name || userProfile.courseId}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">Section:</span>{" "}
+                            {academicInfo?.sectionName || "Unassigned"}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">Year Level:</span>{" "}
+                            {userProfile.yearLevel ? `Year ${userProfile.yearLevel}` : "N/A"} 
+                            {" • "}
+                            <span className="capitalize">{userProfile.enrollmentStatus || "N/A"}</span>
+                          </p>
+
+                          {academicInfo?.group ? (
+                            <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800/50">
+                              <p className="font-semibold text-gray-900 dark:text-white mb-1 text-base">
+                                {academicInfo.group.name}
+                              </p>
+                              <div className="flex flex-col gap-1 mt-1 text-gray-600 dark:text-gray-400">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300 text-xs uppercase tracking-wider">Members:</span>
+                                {academicInfo.group.members.map(m => (
+                                  <span key={m.uid} className="flex items-center gap-1">
+                                    <span className="w-1 h-1 rounded-full bg-blue-500"></span>
+                                    {m.fullName} {m.uid === userProfile.uid ? "(You)" : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800/50 text-orange-600 dark:text-orange-400 font-medium">
+                              No Research Group Assigned Yet
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          You have not been assigned to a Course and Section yet. Please contact your coordinator.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {/* Module Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Card hover className="flex flex-col justify-between space-y-4">
