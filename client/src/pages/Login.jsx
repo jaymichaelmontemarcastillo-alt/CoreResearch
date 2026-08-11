@@ -15,10 +15,10 @@ export const Login = () => {
   const { login, selectDevRole, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  // Ito yung nag-hahandle ng Login via Email & Password.
-  // Kapag kinlick ang Sign In, papasa niya yung email at password sa `login` function
-  // na nasa AuthContext. Kung tama, dire-diretso na sa Dashboard. Kung mali, 
-  // magpapakita ng error message.
+  // Extract returnTo from URL if present
+  const queryParams = new URLSearchParams(window.location.search);
+  const returnTo = queryParams.get("returnTo") || "/dashboard";
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -26,7 +26,7 @@ export const Login = () => {
 
     try {
       await login(email, password);
-      navigate("/dashboard");
+      navigate(returnTo);
     } catch (err) {
       setError(
         err.message || "Failed to sign in. Please check your credentials.",
@@ -38,7 +38,7 @@ export const Login = () => {
 
   const handleDevRoleSelect = (role) => {
     selectDevRole(role);
-    navigate("/dashboard");
+    navigate(returnTo);
   };
 
   return (
@@ -144,9 +144,9 @@ export const Login = () => {
             try {
               const res = await loginWithGoogle("student");
               if (res?.needsOnboarding) {
-                navigate("/onboarding");
+                navigate(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`);
               } else {
-                navigate("/dashboard");
+                navigate(returnTo);
               }
             } catch (err) {
               if (err.code !== "auth/popup-closed-by-user") {

@@ -13,6 +13,10 @@ export interface UserProfile {
   department: string;
   department_id: string;
   studentIdOrEmployeeId?: string;
+  courseId?: string;
+  specializationId?: string;
+  sectionId?: string;
+  yearLevel?: number;
   status: UserStatus;
   is_approved: boolean;
   profile_image?: string;
@@ -26,4 +30,6 @@ export interface CreateUserInput extends Omit<UserProfile, 'created_at' | 'updat
   updated_at?: string;
 }
 
-export interface UpdateUserInput extends Partial<Omit<UserProfile, 'uid'>> {}
+export interface UpdateUserInput extends Partial<Omit<UserProfile, 'uid'>> {
+  [key: string]: any;
+}

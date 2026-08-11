@@ -10,10 +10,12 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { Unauthorized } from './pages/Unauthorized';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
+import { JoinSection } from './pages/JoinSection';
 
 import { UserDirectory } from './pages/UserDirectory';
 import { StudentDirectory } from './pages/StudentDirectory';
 import { ResearchGroups } from './pages/ResearchGroups';
+import { EnrollmentManagement } from './pages/EnrollmentManagement';
 import { MyGroup } from './pages/MyGroup';
 import { Courses } from './pages/Courses';
 import { Sections } from './pages/Sections';
@@ -38,6 +40,9 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            
+            {/* Public/Shared Routes */}
+            <Route path="/join/:inviteId" element={<JoinSection />} />
 
             {/* Protected Main Workspace Routes */}
             <Route element={<ProtectedRoute />}>
@@ -78,6 +83,7 @@ export default function App() {
                 <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                   <Route path="/admin/users" element={<UserDirectory />} />
                   <Route path="/admin/students" element={<StudentDirectory />} />
+                  <Route path="/admin/enrollment" element={<EnrollmentManagement />} />
                   <Route path="/admin/groups" element={<ResearchGroups />} />
                   <Route path="/admin/courses" element={<Courses />} />
                   <Route path="/admin/courses/:courseId/sections" element={<Sections />} />

@@ -4,6 +4,7 @@ export interface StudentProfile {
   fullName: string;
   studentIdOrEmployeeId: string;
   courseId?: string;
+  specializationId?: string;
   sectionId?: string;
   yearLevel?: number;
   enrollmentStatus?: 'enrolled' | 'irregular' | 'leave';
@@ -12,6 +13,7 @@ export interface StudentProfile {
 
 export interface UpdateStudentAcademicInput {
   courseId: string;
+  specializationId?: string;
   sectionId: string;
   yearLevel?: number;
   enrollmentStatus?: 'enrolled' | 'irregular' | 'leave';

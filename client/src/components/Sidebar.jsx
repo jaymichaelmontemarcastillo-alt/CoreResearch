@@ -18,6 +18,7 @@ import {
   BookOpen,
   Users,
   GraduationCap,
+  Link as LinkIcon
 } from "lucide-react";
 
 export const Sidebar = ({
@@ -119,6 +120,12 @@ export const Sidebar = ({
           path: "/admin/students",
           icon: GraduationCap,
           roles: ["admin"], // STRICT: Only Admin can access Student Management
+        },
+        {
+          label: "Enrollment",
+          path: "/admin/enrollment",
+          icon: LinkIcon,
+          roles: ["admin", "research_coordinator"],
         },
         {
           label: "Research Groups",
