@@ -23,11 +23,12 @@ import {
   Activity,
   ArrowRight,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { groupService } from "../services/group.service";
+import { Toast } from "../components/ui/Toast";
 
 export const Dashboard = () => {
   const { userProfile, currentUser, role } = useAuth();
@@ -46,6 +47,16 @@ export const Dashboard = () => {
     currentUser?.displayName ||
     currentUser?.email?.split("@")[0] ||
     "Researcher";
+
+  const location = useLocation();
+  const [toastMessage, setToastMessage] = useState(location.state?.successMessage || "");
+
+  useEffect(() => {
+    // Clear history state to avoid showing toast again on reload
+    if (location.state?.successMessage) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const [academicInfo, setAcademicInfo] = useState(null);
 
@@ -77,6 +88,10 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {toastMessage && (
+        <Toast message={toastMessage} variant="success" onClose={() => setToastMessage("")} />
+      )}
+
       {/* Welcome Banner matching Dashboard Reference */}
       <div className="p-6 sm:p-8 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5">

@@ -76,7 +76,11 @@ export const JoinSection = () => {
         sectionId: invite.sectionId
       });
       
-      navigate("/dashboard");
+      navigate("/dashboard", { 
+        state: { 
+          successMessage: `Successfully enrolled in ${course.code} - ${section.name}!` 
+        } 
+      });
     } catch (err) {
       console.error("Failed to enroll:", err);
       setError(err.message || "Failed to join section.");
@@ -110,6 +114,7 @@ export const JoinSection = () => {
   }
 
   const isAlreadyEnrolled = userProfile?.sectionId === invite.sectionId;
+  const isNotStudent = currentUser && userProfile && userProfile.role !== 'student';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-4 font-sans text-gray-900 dark:text-gray-100">
@@ -172,13 +177,27 @@ export const JoinSection = () => {
                 <Button 
                   variant="primary" 
                   className="w-full h-12 text-base font-medium rounded-xl shadow-md shadow-blue-500/20"
-                  onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/join/${inviteId}`)}`)}
+                  onClick={() => navigate(`/register?returnTo=${encodeURIComponent(`/join/${inviteId}`)}`)}
                 >
-                  Sign In to Join
+                  Create Account to Join
                 </Button>
                 <div className="text-center text-sm text-gray-500">
-                  New to CoreResearch? <Link to={`/register?returnTo=${encodeURIComponent(`/join/${inviteId}`)}`} className="text-blue-600 hover:underline">Create an account</Link>
+                  Already have an account? <Link to={`/login?returnTo=${encodeURIComponent(`/join/${inviteId}`)}`} className="text-blue-600 hover:underline">Sign In</Link>
                 </div>
+              </div>
+            ) : isNotStudent ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 justify-center text-red-600 dark:text-red-400 font-medium bg-red-50 dark:bg-red-500/10 p-3 rounded-lg">
+                  <AlertCircle className="w-5 h-5" />
+                  Only student accounts can join sections.
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 rounded-xl"
+                  onClick={() => navigate("/dashboard")}
+                >
+                  Go to Dashboard
+                </Button>
               </div>
             ) : isAlreadyEnrolled ? (
               <div className="space-y-4">
