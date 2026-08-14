@@ -278,6 +278,14 @@ export const AuthProvider = ({ children }) => {
         role: 'admin',
         department: 'Dean of Research Office',
         studentIdOrEmployeeId: 'ADM-0001'
+      },
+      research_coordinator: {
+        uid: 'dev-coordinator-01',
+        email: 'coord.santos@university.edu',
+        fullName: 'Prof. Maria Santos',
+        role: 'research_coordinator',
+        department: 'Department of Information Technology',
+        studentIdOrEmployeeId: 'EMP-7700'
       }
     };
 

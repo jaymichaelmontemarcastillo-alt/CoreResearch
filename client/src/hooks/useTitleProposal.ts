@@ -1,52 +1,98 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// useTitleProposal — React hook for proposal state management
+// ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react';
 import titleProposalService from '../services/titleProposal.service';
 import {
   TitleProposal,
   CreateProposalInput,
   UpdateProposalInput,
+  CoordinatorEvaluationInput,
   ProposalStatus,
-  ProposalReviewComment,
 } from '../types/proposal.types';
 
-export const useTitleProposal = (
-  studentId?: string,
-  adviserId?: string,
-  groupId?: string
-) => {
+interface UseTitleProposalOptions {
+  /** If provided, fetches proposals for this research group (student view) */
+  groupId?: string;
+  /** If true, fetches ALL submitted/active proposals (coordinator view) */
+  coordinatorMode?: boolean;
+  /** If provided, fetches submitted/active proposals for these groups (adviser view) */
+  adviserGroupIds?: string[];
+}
+
+export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
+  const { groupId, coordinatorMode = false, adviserGroupIds } = options;
+
   const [proposals, setProposals] = useState<TitleProposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchProposals = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let data: TitleProposal[] = [];
-      if (groupId) {
+      if (coordinatorMode) {
+        data = await titleProposalService.getSubmittedProposals();
+      } else if (adviserGroupIds) {
+        data = await titleProposalService.getProposalsByGroupIds(adviserGroupIds);
+      } else if (groupId) {
         data = await titleProposalService.getProposalsByGroup(groupId);
-      } else if (studentId) {
-        data = await titleProposalService.getProposalsByStudent(studentId);
-      } else if (adviserId) {
-        data = await titleProposalService.getProposalsByAdviser(adviserId);
       } else {
         data = await titleProposalService.getAllProposals();
       }
       setProposals(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load title proposals');
+      setError(err.message || 'Failed to load proposals');
     } finally {
       setLoading(false);
     }
-  }, [studentId, adviserId, groupId]);
+  }, [groupId, coordinatorMode, adviserGroupIds]);
 
   useEffect(() => {
     fetchProposals();
   }, [fetchProposals]);
 
-  const submitProposal = async (input: CreateProposalInput): Promise<TitleProposal> => {
+  // ── Student Actions ────────────────────────────────────────────────────────
+
+  /**
+   * Create a new proposal and save it as a draft.
+   */
+  const createDraft = async (input: CreateProposalInput): Promise<TitleProposal> => {
     setLoading(true);
     try {
-      const created = await titleProposalService.createProposal(input);
+      const created = await titleProposalService.createProposal({
+        ...input,
+        status: 'draft',
+      });
+      await fetchProposals();
+      return created;
+    } catch (err: any) {
+      setError(err.message || 'Failed to save draft');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Create a new proposal and immediately submit it.
+   */
+  const createAndSubmit = async (
+    input: CreateProposalInput,
+    submittedByUid: string,
+    submittedByName: string
+  ): Promise<TitleProposal> => {
+    setLoading(true);
+    try {
+      // Create as draft first, then submit
+      const created = await titleProposalService.createProposal({
+        ...input,
+        status: 'draft',
+      });
+      await titleProposalService.submitProposal(created.id, submittedByUid, submittedByName);
       await fetchProposals();
       return created;
     } catch (err: any) {
@@ -57,6 +103,66 @@ export const useTitleProposal = (
     }
   };
 
+  /**
+   * Update a draft's content without changing status.
+   */
+  const saveDraft = async (id: string, updates: UpdateProposalInput): Promise<void> => {
+    setLoading(true);
+    try {
+      await titleProposalService.saveDraft(id, updates);
+      await fetchProposals();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save draft');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Submit an existing draft proposal for coordinator review.
+   */
+  const submitExistingDraft = async (
+    id: string,
+    submittedByUid: string,
+    submittedByName: string
+  ): Promise<void> => {
+    setLoading(true);
+    try {
+      await titleProposalService.submitProposal(id, submittedByUid, submittedByName);
+      await fetchProposals();
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit proposal');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Update and resubmit a 'needs_revision' proposal.
+   */
+  const resubmitProposal = async (
+    id: string,
+    updates: UpdateProposalInput,
+    submittedByUid: string,
+    submittedByName: string
+  ): Promise<void> => {
+    setLoading(true);
+    try {
+      await titleProposalService.resubmitProposal(id, updates, submittedByUid, submittedByName);
+      await fetchProposals();
+    } catch (err: any) {
+      setError(err.message || 'Failed to resubmit proposal');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Generic field update (auto-save in forms).
+   */
   const updateProposal = async (id: string, updates: UpdateProposalInput): Promise<void> => {
     setLoading(true);
     try {
@@ -70,23 +176,9 @@ export const useTitleProposal = (
     }
   };
 
-  const updateStatus = async (id: string, status: ProposalStatus): Promise<void> => {
-    return updateProposal(id, { status });
-  };
-
-  const addComment = async (id: string, comment: ProposalReviewComment): Promise<void> => {
-    setLoading(true);
-    try {
-      await titleProposalService.addComment(id, comment);
-      await fetchProposals();
-    } catch (err: any) {
-      setError(err.message || 'Failed to add comment');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  /**
+   * Delete a draft proposal.
+   */
   const deleteProposal = async (id: string): Promise<void> => {
     setLoading(true);
     try {
@@ -100,26 +192,82 @@ export const useTitleProposal = (
     }
   };
 
-  const canEdit = (proposal: TitleProposal): boolean => {
-    return proposal.status === 'pending' || proposal.status === 'revisions_required';
+  // ── Coordinator Actions ────────────────────────────────────────────────────
+
+  /**
+   * Coordinator: request revision with feedback.
+   */
+  const requestRevision = async (
+    id: string,
+    evaluation: CoordinatorEvaluationInput
+  ): Promise<void> => {
+    setLoading(true);
+    try {
+      await titleProposalService.requestRevision(id, evaluation);
+      await fetchProposals();
+    } catch (err: any) {
+      setError(err.message || 'Failed to request revision');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const canDelete = (proposal: TitleProposal): boolean => {
-    return proposal.status === 'pending';
+  /**
+   * Coordinator: approve the proposal.
+   */
+  const approveProposal = async (
+    id: string,
+    evaluation: CoordinatorEvaluationInput
+  ): Promise<void> => {
+    setLoading(true);
+    try {
+      await titleProposalService.approveProposal(id, evaluation);
+      await fetchProposals();
+    } catch (err: any) {
+      setError(err.message || 'Failed to approve proposal');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // ── Permission Helpers ─────────────────────────────────────────────────────
+
+  const canStudentEdit = (status: ProposalStatus): boolean =>
+    titleProposalService.canStudentEdit(status);
+
+  const canStudentDelete = (status: ProposalStatus): boolean =>
+    titleProposalService.canStudentDelete(status);
+
+  const canCoordinatorReview = (status: ProposalStatus): boolean =>
+    titleProposalService.canCoordinatorReview(status);
+
+  // ── Return ─────────────────────────────────────────────────────────────────
 
   return {
     proposals,
     loading,
     error,
     refetch: fetchProposals,
-    submitProposal,
+
+    // Student
+    createDraft,
+    createAndSubmit,
+    saveDraft,
+    submitExistingDraft,
+    resubmitProposal,
     updateProposal,
-    updateStatus,
-    addComment,
     deleteProposal,
-    canEdit,
-    canDelete,
+
+    // Coordinator
+    requestRevision,
+    approveProposal,
+
+    // Permission helpers
+    canStudentEdit,
+    canStudentDelete,
+    canCoordinatorReview,
   };
 };
 

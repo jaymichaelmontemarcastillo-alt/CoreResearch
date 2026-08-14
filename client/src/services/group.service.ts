@@ -3,6 +3,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
   collection,
   query,
   where,
@@ -68,7 +69,36 @@ export const groupService = {
     const querySnap = await getDocs(q);
     if (querySnap.empty) return null;
     return querySnap.docs[0].data() as ResearchGroup;
-  }
+  },
+
+  /**
+   * Fetch all groups assigned to a specific adviser.
+   */
+  async getGroupsByAdviserId(adviserId: string): Promise<ResearchGroup[]> {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('adviserId', '==', adviserId)
+    );
+    const querySnap = await getDocs(q);
+    return querySnap.docs.map((d) => d.data() as ResearchGroup);
+  },
+
+  /**
+   * Assign (or update) an adviser on a group.
+   * Called by admin from the User Directory.
+   */
+  async updateGroupAdviser(
+    groupId: string,
+    adviserId: string,
+    adviserName: string
+  ): Promise<void> {
+    const ref = doc(db, COLLECTION_NAME, groupId);
+    await updateDoc(ref, {
+      adviserId,
+      adviserName,
+      updatedAt: new Date().toISOString(),
+    });
+  },
 };
 
 export default groupService;

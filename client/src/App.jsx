@@ -22,6 +22,8 @@ import { Sections } from './pages/Sections';
 import { Proposals } from './pages/Proposals';
 import { SubmitProposal } from './pages/SubmitProposal';
 import { ProposalDetail } from './pages/ProposalDetail';
+import { CoordinatorProposals } from './pages/CoordinatorProposals';
+import { CoordinatorProposalReview } from './pages/CoordinatorProposalReview';
 import { Projects } from './pages/Projects';
 import { Manuscripts } from './pages/Manuscripts';
 import { Reviews } from './pages/Reviews';
@@ -60,6 +62,12 @@ export default function App() {
                 <Route path="/proposals" element={<Proposals />} />
                 <Route path="/proposals/new" element={<SubmitProposal />} />
                 <Route path="/proposals/:id" element={<ProposalDetail />} />
+
+                {/* Coordinator Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['research_coordinator', 'admin']} />}>
+                  <Route path="/coordinator/proposals" element={<CoordinatorProposals />} />
+                  <Route path="/coordinator/proposals/:id" element={<CoordinatorProposalReview />} />
+                </Route>
 
                 {/* Research Projects */}
                 <Route path="/projects" element={<Projects />} />

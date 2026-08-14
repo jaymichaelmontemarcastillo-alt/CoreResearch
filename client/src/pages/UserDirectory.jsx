@@ -1,6 +1,5 @@
 // src/pages/UserDirectory.jsx
 import React, { useState, useEffect } from "react";
-import api from "../services/api";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -10,29 +9,24 @@ import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
 import { Search, Shield, Filter, RefreshCw } from "lucide-react";
+import { userService } from "../services/user.service";
 
 export const UserDirectory = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedRole, setSelectedRole] = useState("all");
+  const [selectedTab, setSelectedTab] = useState("all");
   const [updatingUid, setUpdatingUid] = useState(null);
   const [toastMessage, setToastMessage] = useState("");
 
-  // Kinukuha nito yung listahan ng mga users mula sa backend API.
-  // Yung API natin, kumokonekta sa Firestore "users" collection
-  // and then binabalik yung data kasama na yung search/filter results.
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/users", {
-        params: { role: selectedRole, search },
-      });
-      if (response.data && response.data.data) {
-        setUsers(response.data.data);
-      }
+      const allUsers = await userService.getAllUsers();
+      setUsers(allUsers);
     } catch (error) {
       console.error("[UserDirectory] fetch users error:", error);
+      setToastMessage("Error fetching users from database.");
     } finally {
       setLoading(false);
     }
@@ -40,23 +34,18 @@ export const UserDirectory = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [selectedRole]);
+  }, []);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchUsers();
-  };
-
-  // Dito natin binabago yung Role ng user (ex. ginagawang admin o adviser).
-  // Pinapasa yung request sa backend API (`PATCH /users/:uid/role`), 
-  // tapos yung backend na ang mag-uupdate sa Firestore record ng user na yun.
-  // Mahalaga ito para sa role-based access control (RBAC) ng app.
   const handleRoleChange = async (uid, newRole) => {
     setUpdatingUid(uid);
     try {
-      await api.patch(`/users/${uid}/role`, { role: newRole });
+      await userService.updateUser(uid, { role: newRole });
       setToastMessage(`Role updated to ${newRole.toUpperCase()} successfully.`);
-      await fetchUsers();
+      
+      // Update local state instead of full refetch for better UX
+      setUsers((prev) => 
+        prev.map((u) => (u.uid === uid ? { ...u, role: newRole } : u))
+      );
     } catch (error) {
       alert(`Failed to update role: ${error.message}`);
     } finally {
@@ -68,20 +57,49 @@ export const UserDirectory = () => {
     student: "blue",
     adviser: "emerald",
     panelist: "purple",
+    research_coordinator: "teal",
     admin: "amber",
   };
+  
+  const roleDisplayNames = {
+    student: "Student",
+    adviser: "Adviser",
+    panelist: "Panelist",
+    research_coordinator: "Research Coordinator",
+    admin: "Admin",
+  };
+
+  const facultyRoles = ["adviser", "research_coordinator", "panelist"];
+
+  // ── Filtering Logic ──
+  const filteredUsers = users.filter((u) => {
+    // 1. Tab Filter
+    if (selectedTab === "student" && u.role !== "student") return false;
+    if (selectedTab === "admin" && u.role !== "admin") return false;
+    if (selectedTab === "faculty" && !facultyRoles.includes(u.role)) return false;
+
+    // 2. Search Filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const nameMatch = u.fullName?.toLowerCase().includes(q);
+      const emailMatch = u.email?.toLowerCase().includes(q);
+      const idMatch = u.studentIdOrEmployeeId?.toLowerCase().includes(q);
+      if (!nameMatch && !emailMatch && !idMatch) return false;
+    }
+
+    return true;
+  });
 
   const columns = [
     { label: "User" },
     { label: "ID Number" },
     { label: "Department" },
     { label: "Current Role" },
-    { label: "Modify Role", className: "text-right" },
+    { label: "Assign Role", className: "text-right" },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <PageHeader
         icon={Shield}
         title="User Directory & RBAC Management"
@@ -99,30 +117,33 @@ export const UserDirectory = () => {
 
       {/* Filter Bar */}
       <Card className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex-1 w-full flex items-center gap-2">
+        <div className="flex-1 w-full flex items-center gap-2">
           <Input
             placeholder="Search by name, email, or ID number..."
             icon={Search}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <Button type="submit" variant="secondary" size="md">
-            Search
-          </Button>
-        </form>
+        </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-          {["all", "student", "adviser", "panelist", "admin"].map((r) => (
+          {[
+            { id: "all", label: "All" },
+            { id: "student", label: "Student" },
+            { id: "faculty", label: "Faculty" },
+            { id: "admin", label: "Admin" },
+          ].map((tab) => (
             <button
-              key={r}
-              onClick={() => setSelectedRole(r)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${selectedRole === r
-                ? "bg-primary text-white shadow-sm"
-                : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                }`}
+              key={tab.id}
+              onClick={() => setSelectedTab(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${
+                selectedTab === tab.id
+                  ? "bg-primary text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              }`}
             >
-              {r}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -133,53 +154,60 @@ export const UserDirectory = () => {
         {loading ? (
           <TableRow>
             <TableCell colSpan={5} className="py-8 text-center text-gray-400 dark:text-gray-500">
-              Loading users...
+              Loading users from database...
             </TableCell>
           </TableRow>
-        ) : users.length === 0 ? (
+        ) : filteredUsers.length === 0 ? (
           <TableRow>
             <TableCell colSpan={5} className="py-8 text-center text-gray-400 dark:text-gray-500">
               No users matching criteria.
             </TableCell>
           </TableRow>
         ) : (
-          users.map((u) => (
+          filteredUsers.map((u) => (
             <TableRow key={u.uid}>
               <TableCell className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center font-bold text-xs">
-                  {u.fullName ? u.fullName.charAt(0) : "U"}
+                  {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div>
-                  <div className="font-bold text-gray-900 dark:text-white text-sm">{u.fullName}</div>
+                  <div className="font-bold text-gray-900 dark:text-white text-sm">
+                    {u.fullName || "Unnamed User"}
+                  </div>
                   <div className="text-gray-400 dark:text-gray-500 text-[11px]">{u.email}</div>
                 </div>
               </TableCell>
 
-              <TableCell className="font-mono text-gray-500 dark:text-gray-400">
+              <TableCell className="font-mono text-gray-500 dark:text-gray-400 text-xs">
                 {u.studentIdOrEmployeeId || "N/A"}
               </TableCell>
 
-              <TableCell className="font-medium text-gray-700 dark:text-gray-300">
+              <TableCell className="font-medium text-gray-700 dark:text-gray-300 text-sm">
                 {u.department || "General"}
               </TableCell>
 
               <TableCell>
                 <Badge variant={roleVariants[u.role] || "blue"}>
-                  {u.role ? u.role.toUpperCase() : "STUDENT"}
+                  {roleDisplayNames[u.role] ? roleDisplayNames[u.role].toUpperCase() : (u.role || "STUDENT").toUpperCase()}
                 </Badge>
               </TableCell>
 
               <TableCell className="text-right">
-                <div className="w-36 ml-auto">
+                <div className="w-48 ml-auto">
                   <Select
-                    value={u.role}
+                    value={u.role || "student"}
                     disabled={updatingUid === u.uid}
                     onChange={(e) => handleRoleChange(u.uid, e.target.value)}
                   >
                     <option value="student">Student</option>
-                    <option value="adviser">Adviser</option>
-                    <option value="panelist">Panelist</option>
-                    <option value="admin">Administrator</option>
+                    <optgroup label="Faculty Roles">
+                      <option value="adviser">Adviser</option>
+                      <option value="research_coordinator">Research Coordinator</option>
+                      <option value="panelist">Panelist</option>
+                    </optgroup>
+                    <optgroup label="System Roles">
+                      <option value="admin">Administrator</option>
+                    </optgroup>
                   </Select>
                 </div>
               </TableCell>
@@ -190,3 +218,5 @@ export const UserDirectory = () => {
     </div>
   );
 };
+
+export default UserDirectory;

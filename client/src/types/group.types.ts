@@ -12,6 +12,8 @@ export interface ResearchGroup {
   memberIds: string[];
   members: ResearchGroupMember[];
   status: 'incomplete' | 'ready' | 'active';
+  adviserId?: string;      // UID of the assigned adviser (set by admin/coordinator)
+  adviserName?: string;    // Denormalized for display
   createdAt: string;
   updatedAt: string;
 }
@@ -21,4 +23,6 @@ export interface CreateResearchGroupInput {
   sectionId: string;
   memberIds: string[];
   members: ResearchGroupMember[];
+  adviserId?: string;
+  adviserName?: string;
 }

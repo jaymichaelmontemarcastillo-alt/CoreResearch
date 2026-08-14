@@ -1,6 +1,5 @@
 // src/pages/Schedules.jsx
 import React, { useState, useEffect } from "react";
-import api from "../services/api";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -19,6 +18,8 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { scheduleService } from "../services/schedule.service";
+import { userService } from "../services/user.service";
 
 export const Schedules = () => {
   const { role } = useAuth();
@@ -42,16 +43,18 @@ export const Schedules = () => {
   const fetchSchedules = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/schedules");
-      if (res.data && res.data.data) {
-        setSchedules(res.data.data);
-      }
+      // Fetch directly from Firestore instead of Express API
+      const list = await scheduleService.getAllSchedules();
+      
+      // Sort by date/time client-side just to be safe
+      const sorted = list.sort((a, b) => {
+        return new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`);
+      });
+      setSchedules(sorted);
 
-      if (role === "admin") {
-        const panRes = await api.get("/users", { params: { role: "panelist" } });
-        if (panRes.data && panRes.data.data) {
-          setPanelists(panRes.data.data);
-        }
+      if (role === "admin" || role === "research_coordinator") {
+        const panRes = await userService.getUsersByRole("panelist");
+        setPanelists(panRes || []);
       }
     } catch (err) {
       console.error("[Schedules] fetch error:", err);
@@ -70,7 +73,14 @@ export const Schedules = () => {
 
     setSubmitting(true);
     try {
-      await api.post("/schedules", {
+      // Resolve names for the selected IDs
+      const panelistNames = selectedPanelistIds.map(id => {
+        const match = panelists.find(p => p.uid === id);
+        return match ? match.fullName : "Panelist";
+      });
+
+      await scheduleService.createSchedule({
+        projectId: `proj-${Date.now()}`, // placeholder if not linked
         projectTitle,
         studentName,
         defenseType,
@@ -79,12 +89,14 @@ export const Schedules = () => {
         endTime,
         venue,
         panelistIds: selectedPanelistIds,
+        panelistNames,
       });
 
       setToast("Defense presentation scheduled successfully!");
       setModalOpen(false);
       setProjectTitle("");
       setStudentName("");
+      setSelectedPanelistIds([]);
       await fetchSchedules();
     } catch (err) {
       alert(`Schedule creation error: ${err.message}`);
@@ -106,7 +118,7 @@ export const Schedules = () => {
         title="Defense Presentation Calendar & Schedules"
         description="Schedule research defenses, assign panel evaluation committees, and view presentation venues."
         actions={
-          role === "admin" && (
+          (role === "admin" || role === "research_coordinator") && (
             <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
               <PlusCircle className="w-4 h-4 mr-2" /> Schedule Defense Presentation
             </Button>
@@ -139,7 +151,7 @@ export const Schedules = () => {
                   <Badge variant={sch.defenseType === "final_defense" ? "emerald" : "purple"}>
                     {sch.defenseType === "final_defense" ? "FINAL DEFENSE" : "PROPOSAL DEFENSE"}
                   </Badge>
-                  <Badge variant="blue">SCHEDULED</Badge>
+                  <Badge variant="blue">{(sch.status || "SCHEDULED").toUpperCase()}</Badge>
                 </div>
 
                 <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{sch.projectTitle}</h3>
@@ -293,3 +305,5 @@ export const Schedules = () => {
     </div>
   );
 };
+
+export default Schedules;

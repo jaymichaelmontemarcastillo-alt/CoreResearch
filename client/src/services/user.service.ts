@@ -43,6 +43,15 @@ export const userService = {
   },
 
   /**
+   * Fetch all users.
+   */
+  async getAllUsers(): Promise<UserProfile[]> {
+    const q = query(collection(db, COLLECTION_NAME));
+    const querySnap = await getDocs(q);
+    return querySnap.docs.map((doc) => doc.data() as UserProfile);
+  },
+
+  /**
    * Fetch all users matching a specific role (e.g. 'student', 'adviser', 'panelist', 'admin').
    */
   async getUsersByRole(role: UserRole): Promise<UserProfile[]> {

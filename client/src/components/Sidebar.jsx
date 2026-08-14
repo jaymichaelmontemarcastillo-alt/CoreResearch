@@ -18,7 +18,8 @@ import {
   BookOpen,
   Users,
   GraduationCap,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ClipboardList,
 } from "lucide-react";
 
 export const Sidebar = ({
@@ -45,7 +46,7 @@ export const Sidebar = ({
           label: "Dashboard",
           path: "/dashboard",
           icon: LayoutDashboard,
-          roles: ["student", "adviser", "panelist", "admin"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Proposals",
@@ -54,10 +55,16 @@ export const Sidebar = ({
           roles: ["student", "adviser", "admin"],
         },
         {
+          label: "Proposal Review",
+          path: "/coordinator/proposals",
+          icon: ClipboardList,
+          roles: ["research_coordinator", "admin"],
+        },
+        {
           label: "Projects",
           path: "/projects",
           icon: FolderKanban,
-          roles: ["student", "adviser", "admin"],
+          roles: ["student", "adviser", "admin", "research_coordinator"],
         },
         ...(role === "student"
           ? [
@@ -73,13 +80,13 @@ export const Sidebar = ({
           label: "Manuscripts",
           path: "/manuscripts",
           icon: FileText,
-          roles: ["student", "adviser", "panelist", "admin"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Repository",
           path: "/repository",
           icon: Library,
-          roles: ["student", "adviser", "panelist", "admin"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
       ],
     },
@@ -90,13 +97,13 @@ export const Sidebar = ({
           label: "Reviews",
           path: "/reviews",
           icon: MessageSquare,
-          roles: ["student", "adviser", "panelist", "admin"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Schedules",
           path: "/schedules",
           icon: CalendarDays,
-          roles: ["student", "adviser", "panelist", "admin"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Grading",
@@ -148,6 +155,9 @@ export const Sidebar = ({
     const currentPath = location.pathname;
     if (path === "/proposals") {
       return currentPath.startsWith("/proposals");
+    }
+    if (path === "/coordinator/proposals") {
+      return currentPath.startsWith("/coordinator/proposals");
     }
     if (path === "/admin/users") {
       return currentPath.startsWith("/admin/users");

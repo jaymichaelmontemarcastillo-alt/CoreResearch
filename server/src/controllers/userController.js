@@ -100,3 +100,38 @@ export const updateUserRole = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Update user profile (Admin only)
+ */
+export const updateUserProfile = async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const updates = req.body;
+
+    if (isDevMockMode) {
+      const existing = mockUsersDb.get(uid);
+      if (!existing) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+      const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+      mockUsersDb.set(uid, updated);
+    } else {
+      const userRef = db.collection('users').doc(uid);
+      const doc = await userRef.get();
+      if (!doc.exists) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+      await userRef.update({ ...updates, updatedAt: new Date().toISOString() });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `User profile updated.`,
+      data: { uid, ...updates }
+    });
+  } catch (error) {
+    console.error('[UserController] updateUserProfile error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
