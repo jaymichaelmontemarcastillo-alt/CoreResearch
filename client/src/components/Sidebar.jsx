@@ -68,16 +68,16 @@ export const Sidebar = ({
         },
         ...(role === "student"
           ? [
-              {
-                label: "My Group",
-                path: "/my-group",
-                icon: Users,
-                roles: ["student"],
-              },
-            ]
+            {
+              label: "My Group",
+              path: "/my-group",
+              icon: Users,
+              roles: ["student"],
+            },
+          ]
           : []),
         {
-          label: "Manuscripts",
+          label: role === "adviser" ? "My Advisory" : role === "student" ? "Manuscript" : "Manuscripts",
           path: "/manuscripts",
           icon: FileText,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
@@ -234,22 +234,19 @@ export const Sidebar = ({
                     <Link
                       key={item.label}
                       to={item.path}
-                      className={`relative group flex items-center transition-all duration-150 ${
-                        collapsed
+                      className={`relative group flex items-center transition-all duration-150 ${collapsed
                           ? "justify-center h-11 w-11 mx-auto rounded-xl shrink-0"
                           : "gap-3.5 h-11 px-3.5 rounded-xl text-sm font-medium"
-                      } ${
-                        active
+                        } ${active
                           ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
                           : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-slate-800/60"
-                      }`}
+                        }`}
                     >
                       <Icon
-                        className={`w-5 h-5 shrink-0 transition-colors ${
-                          active
+                        className={`w-5 h-5 shrink-0 transition-colors ${active
                             ? "text-blue-600 dark:text-blue-400"
                             : "text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200"
-                        }`}
+                          }`}
                       />
 
                       {!collapsed && <span className="truncate">{item.label}</span>}
@@ -277,11 +274,10 @@ export const Sidebar = ({
         {/* Dedicated Logout Button */}
         <button
           onClick={handleLogout}
-          className={`relative group flex items-center text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all ${
-            collapsed
+          className={`relative group flex items-center text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all ${collapsed
               ? "justify-center h-11 w-11 mx-auto rounded-xl shrink-0"
               : "gap-3.5 h-11 px-3.5 w-full rounded-xl"
-          }`}
+            }`}
         >
           <LogOut className="w-5 h-5 shrink-0 text-red-500 dark:text-red-400" />
           {!collapsed && <span>Logout</span>}
@@ -301,9 +297,8 @@ export const Sidebar = ({
     <>
       {/* Desktop Fixed Sidebar */}
       <aside
-        className={`hidden lg:block fixed left-0 top-0 bottom-0 z-40 transition-all duration-200 ${
-          collapsed ? "w-20" : "w-64"
-        }`}
+        className={`hidden lg:block fixed left-0 top-0 bottom-0 z-40 transition-all duration-200 ${collapsed ? "w-20" : "w-64"
+          }`}
       >
         {renderContent()}
       </aside>
