@@ -11,7 +11,7 @@ export const DataTable = ({ columns, children, className = "" }) => {
               {columns.map((col, i) => (
                 <th
                   key={i}
-                  className={`py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ${col.className || ""}`}
+                  className={`py-3.5 px-4 text-[13px] font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap ${col.className || ""}`}
                 >
                   {col.label}
                 </th>
@@ -37,7 +37,7 @@ export const TableRow = ({ children, className = "", ...props }) => (
 );
 
 export const TableCell = ({ children, className = "", ...props }) => (
-  <td className={`py-3.5 px-4 text-gray-700 dark:text-gray-300 ${className}`} {...props}>
+  <td className={`py-3.5 px-4 text-[13px] text-gray-700 dark:text-gray-300 ${className}`} {...props}>
     {children}
   </td>
 );

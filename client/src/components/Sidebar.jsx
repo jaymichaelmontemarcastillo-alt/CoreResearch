@@ -126,12 +126,6 @@ export const Sidebar = ({
           label: "Students",
           path: "/admin/students",
           icon: GraduationCap,
-          roles: ["admin"], // STRICT: Only Admin can access Student Management
-        },
-        {
-          label: "Enrollment",
-          path: "/admin/enrollment",
-          icon: LinkIcon,
           roles: ["admin", "research_coordinator"],
         },
         {

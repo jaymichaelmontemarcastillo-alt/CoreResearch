@@ -15,7 +15,6 @@ import { JoinSection } from './pages/JoinSection';
 import { UserDirectory } from './pages/UserDirectory';
 import { StudentDirectory } from './pages/StudentDirectory';
 import { ResearchGroups } from './pages/ResearchGroups';
-import { EnrollmentManagement } from './pages/EnrollmentManagement';
 import { MyGroup } from './pages/MyGroup';
 import { Courses } from './pages/Courses';
 import { Sections } from './pages/Sections';
@@ -88,11 +87,13 @@ export default function App() {
                 <Route path="/repository" element={<Repository />} />
 
                 {/* Admin User Management */}
+                <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator']} />}>
+                  <Route path="/admin/students" element={<StudentDirectory />} />
+                  <Route path="/admin/groups" element={<ResearchGroups />} />
+                </Route>
+
                 <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                   <Route path="/admin/users" element={<UserDirectory />} />
-                  <Route path="/admin/students" element={<StudentDirectory />} />
-                  <Route path="/admin/enrollment" element={<EnrollmentManagement />} />
-                  <Route path="/admin/groups" element={<ResearchGroups />} />
                   <Route path="/admin/courses" element={<Courses />} />
                   <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
                 </Route>

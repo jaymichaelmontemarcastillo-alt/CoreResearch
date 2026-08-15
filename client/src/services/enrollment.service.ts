@@ -59,6 +59,30 @@ export const enrollmentService = {
   },
 
   /**
+   * Get invitations exactly matching the course, specialization, and section
+   */
+  async getInvitationsForFilters(courseId: string, specializationId?: string, sectionId?: string): Promise<EnrollmentInvitation[]> {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('courseId', '==', courseId)
+    );
+    const querySnap = await getDocs(q);
+    const invites = querySnap.docs.map((docSnap) => docSnap.data() as EnrollmentInvitation);
+    
+    return invites.filter(invite => {
+      const invSpec = invite.specializationId || "";
+      const querySpec = specializationId || "";
+      if (invSpec !== querySpec) return false;
+      
+      const invSec = invite.sectionId || "";
+      const querySec = sectionId || "";
+      if (invSec !== querySec) return false;
+      
+      return true;
+    });
+  },
+
+  /**
    * Deactivate an invitation
    */
   async deactivateInvitation(id: string): Promise<void> {
@@ -86,6 +110,14 @@ export const enrollmentService = {
     }
     
     await userService.updateUser(uid, updates);
+  },
+
+  /**
+   * Delete an invitation permanently
+   */
+  async deleteInvitation(id: string): Promise<void> {
+    const inviteRef = doc(db, COLLECTION_NAME, id);
+    await deleteDoc(inviteRef);
   }
 };
 
