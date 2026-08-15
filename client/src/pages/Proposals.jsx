@@ -8,6 +8,7 @@ import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
+import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import {
   FileText,
   PlusCircle,
@@ -72,8 +73,9 @@ export const Proposals = () => {
   }, [role, currentUser, userProfile]);
 
   // For coordinator/admin, use coordinator mode (see all submitted proposals)
-  const isCoordinator =
-    role === "research_coordinator" || role === "admin";
+  const isCoordinator = role === "research_coordinator" || role === "admin";
+  const isStudent = role === "student";
+  const noGroupAssigned = isStudent && !group && !groupLoading;
 
   const {
     proposals,
@@ -89,7 +91,7 @@ export const Proposals = () => {
       ? { adviserGroupIds: adviserGroupIds || [] }
       : group
       ? { groupId: group.id }
-      : {}
+      : { fetchNone: noGroupAssigned }
   );
 
   const [filterStatus, setFilterStatus] = useState("all");
@@ -139,6 +141,15 @@ export const Proposals = () => {
     return null;
   }
 
+  // Define table columns based on Google Classroom-inspired clean look
+  const tableColumns = [
+    { label: "Proposal", className: "w-full min-w-[300px]" },
+    { label: "Group", className: "min-w-[150px]" },
+    { label: "Status", className: "min-w-[140px]" },
+    { label: "Created Date", className: "min-w-[130px]" },
+    { label: "Action", className: "text-right min-w-[140px]" },
+  ];
+
   return (
     <div className="space-y-6">
       {toast && (
@@ -157,7 +168,7 @@ export const Proposals = () => {
             : "Create and manage your research title proposals."
         }
         actions={
-          role === "student" && (
+          role === "student" && group && (
             <Link to="/proposals/new">
               <Button variant="primary" size="md">
                 <PlusCircle className="w-4 h-4 mr-2" />
@@ -168,235 +179,206 @@ export const Proposals = () => {
         }
       />
 
-      {/* Group Context Banner */}
-      {role === "student" && !groupLoading && (
-        <Card className="p-4">
-          {group ? (
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                  Your Research Group
-                </p>
-                <p className="font-bold text-gray-900 dark:text-white text-sm">
-                  {group.name}
-                  <span className="ml-2 text-xs font-normal text-gray-500">
-                    · {group.members?.length ?? group.memberIds?.length ?? 0} members
-                  </span>
-                </p>
-              </div>
-              <Link
-                to="/my-group"
-                className="ml-auto text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-              >
-                View Group <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <p className="text-sm font-medium">
-                You are not assigned to a research group yet. Please contact your
-                Research Coordinator.
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
-
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold">
           {error}
         </div>
       )}
 
-      {/* Search + Filter Bar */}
-      <Card className="p-4 flex flex-col md:flex-row items-center gap-4">
-        <div className="flex-1 w-full">
-          <Input
-            placeholder="Search by title or category..."
-            icon={Search}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* Empty State for Students without a group */}
+      {noGroupAssigned ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 md:p-16 flex flex-col items-center justify-center text-center shadow-sm">
+          <div className="w-20 h-20 bg-blue-50 dark:bg-slate-800/60 rounded-full flex items-center justify-center mb-6">
+            <Users className="w-8 h-8 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+            You're not in a research group yet
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8 text-sm leading-relaxed">
+            You must be part of an assigned research group before you can create and manage research title proposals. 
+            Please contact your Research Coordinator.
+          </p>
+          <Link to="/my-group">
+            <Button variant="primary" size="md">
+              View Group Status
+            </Button>
+          </Link>
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-          {filterTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterStatus(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                filterStatus === tab.id
-                  ? "bg-primary text-white shadow-sm"
-                  : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* Proposal List */}
-      {isLoading ? (
-        <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
-          Loading proposals...
-        </div>
-      ) : filteredProposals.length === 0 ? (
-        <Card className="p-8">
-          <EmptyState
-            icon={FileText}
-            title={filterStatus === "all" ? "No Proposals Yet" : `No ${PROPOSAL_STATUS_CONFIG[filterStatus]?.label ?? filterStatus} Proposals`}
-            description={
-              role === "student" && !group
-                ? "Join a research group first before submitting a proposal."
-                : role === "student"
-                ? "Create your first title proposal for your research group."
-                : "No proposals match the current filters."
-            }
-            action={
-              role === "student" && group && filterStatus === "all" ? (
-                <Link to="/proposals/new">
-                  <Button variant="primary" size="sm">
-                    <PlusCircle className="w-4 h-4 mr-1.5" />
-                    Create Proposal
-                  </Button>
-                </Link>
-              ) : null
-            }
-          />
-        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredProposals.map((p) => {
-            const cfg = PROPOSAL_STATUS_CONFIG[p.status] ?? {
-              label: p.status,
-              variant: "gray",
-            };
-            const StatusIcon = STATUS_ICON[p.status] ?? Clock;
-            const editable = canStudentEdit(p.status);
-            const deletable = canStudentDelete(p.status);
+        <>
+          {/* Search + Filter Bar (Redesigned as independent controls) */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-slate-800">
+            <div className="w-full md:max-w-md">
+              <Input
+                placeholder="Search by title or category..."
+                icon={Search}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-white dark:bg-slate-900 shadow-sm"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+              <Filter className="w-4 h-4 text-gray-400 shrink-0 mr-1 hidden sm:block" />
+              {filterTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilterStatus(tab.id)}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                    filterStatus === tab.id
+                      ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-            return (
-              <Card key={p.id} hover className="flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
-                  {/* Status + Category row */}
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <Badge
-                      variant={cfg.variant}
-                      className="flex items-center gap-1"
-                    >
-                      <StatusIcon className="w-3.5 h-3.5" />
-                      {cfg.label}
-                    </Badge>
-                    {p.researchCategory && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 truncate max-w-[200px]">
-                        {p.researchCategory}
-                      </span>
-                    )}
-                  </div>
+          {/* Proposal List */}
+          {isLoading ? (
+            <div className="py-16 text-center text-gray-400 dark:text-gray-500 text-sm flex flex-col items-center">
+              <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+              Loading proposals...
+            </div>
+          ) : filteredProposals.length === 0 ? (
+            <div className="py-12 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 border-dashed">
+              <EmptyState
+                icon={FileText}
+                title={filterStatus === "all" ? "No Proposals Yet" : `No ${PROPOSAL_STATUS_CONFIG[filterStatus]?.label ?? filterStatus} Proposals`}
+                description={
+                  role === "student"
+                    ? "Create your first title proposal for your research group."
+                    : "No proposals match the current filters."
+                }
+                action={
+                  role === "student" && filterStatus === "all" ? (
+                    <Link to="/proposals/new">
+                      <Button variant="primary" size="sm">
+                        <PlusCircle className="w-4 h-4 mr-1.5" />
+                        Create Proposal
+                      </Button>
+                    </Link>
+                  ) : null
+                }
+              />
+            </div>
+          ) : (
+            <DataTable columns={tableColumns} className="shadow-sm">
+              {filteredProposals.map((p) => {
+                const cfg = PROPOSAL_STATUS_CONFIG[p.status] ?? {
+                  label: p.status,
+                  variant: "gray",
+                };
+                const StatusIcon = STATUS_ICON[p.status] ?? Clock;
+                const editable = canStudentEdit(p.status);
+                const deletable = canStudentDelete(p.status);
 
-                  {/* Title */}
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white line-clamp-2 hover:text-primary dark:hover:text-blue-400 transition">
-                    <Link to={`/proposals/${p.id}`}>{p.title}</Link>
-                  </h3>
+                return (
+                  <TableRow key={p.id} className="group">
+                    <TableCell className="max-w-[300px]">
+                      <div className="space-y-1">
+                        <Link 
+                          to={`/proposals/${p.id}`}
+                          className="text-[14px] font-semibold text-gray-900 dark:text-white line-clamp-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
+                          {p.title}
+                        </Link>
+                        {p.researchCategory && (
+                          <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 mt-1">
+                            {p.researchCategory}
+                          </span>
+                        )}
+                        {/* Needs Revision feedback snippet */}
+                        {p.status === "needs_revision" && p.coordinatorFeedback && (
+                          <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30">
+                            <p className="text-[11px] font-medium text-red-600 dark:text-red-400 line-clamp-1">
+                              Feedback: {p.coordinatorFeedback}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
 
-                  {/* Rationale preview */}
-                  {p.rationale && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
-                      {p.rationale}
-                    </p>
-                  )}
-
-                  {/* Needs Revision feedback snippet */}
-                  {p.status === "needs_revision" && p.coordinatorFeedback && (
-                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40">
-                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-0.5">
-                        Coordinator Feedback:
-                      </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 line-clamp-2">
-                        {p.coordinatorFeedback}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Meta */}
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-primary" />
-                      <span>
-                        Created:{" "}
-                        <strong>{new Date(p.createdAt).toLocaleDateString()}</strong>
-                      </span>
-                    </div>
-                    {p.revisionCount > 0 && (
-                      <div className="flex items-center gap-1.5 text-amber-500">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>
-                          Rev: <strong>#{p.revisionCount}</strong>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                        <Users className="w-3.5 h-3.5 shrink-0" />
+                        <span className="font-medium truncate max-w-[120px]">
+                          {p.groupName || "—"}
                         </span>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </TableCell>
 
-                {/* Actions row */}
-                <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Users className="w-3.5 h-3.5 text-primary" />
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">
-                      {p.groupName || "—"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* View */}
-                    <Link
-                      to={`/proposals/${p.id}`}
-                      className="p-1.5 rounded-lg text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-800 transition"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Link>
-
-                    {/* Edit — only for student + editable status */}
-                    {role === "student" && editable && (
-                      <button
-                        onClick={() => navigate(`/proposals/new?edit=${p.id}`)}
-                        className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
-                        title="Edit Proposal"
+                    <TableCell>
+                      <Badge
+                        variant={cfg.variant}
+                        className="flex w-max items-center gap-1 text-[11px] px-2 py-0.5"
                       >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    )}
+                        <StatusIcon className="w-3 h-3" />
+                        {cfg.label}
+                      </Badge>
+                    </TableCell>
 
-                    {/* Delete — only for student + draft */}
-                    {role === "student" && deletable && (
-                      <button
-                        onClick={() => handleDelete(p.id, p.title)}
-                        disabled={deletingId === p.id}
-                        className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                        title="Delete Draft"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {new Date(p.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      {p.revisionCount > 0 && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-amber-500 mt-1">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>Rev #{p.revisionCount}</span>
+                        </div>
+                      )}
+                    </TableCell>
 
-                    <Link
-                      to={`/proposals/${p.id}`}
-                      className="text-xs font-bold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline ml-1"
-                    >
-                      Details <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* View */}
+                        <Link
+                          to={`/proposals/${p.id}`}
+                          className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+
+                        {/* Edit */}
+                        {role === "student" && editable && (
+                          <button
+                            onClick={() => navigate(`/proposals/new?edit=${p.id}`)}
+                            className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+                            title="Edit Proposal"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {/* Delete */}
+                        {role === "student" && deletable && (
+                          <button
+                            onClick={() => handleDelete(p.id, p.title)}
+                            disabled={deletingId === p.id}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors"
+                            title="Delete Draft"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </DataTable>
+          )}
+        </>
       )}
     </div>
   );

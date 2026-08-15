@@ -18,10 +18,12 @@ interface UseTitleProposalOptions {
   coordinatorMode?: boolean;
   /** If provided, fetches submitted/active proposals for these groups (adviser view) */
   adviserGroupIds?: string[];
+  /** If true, returns an empty list without querying (e.g. student without a group) */
+  fetchNone?: boolean;
 }
 
 export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
-  const { groupId, coordinatorMode = false, adviserGroupIds } = options;
+  const { groupId, coordinatorMode = false, adviserGroupIds, fetchNone = false } = options;
 
   const [proposals, setProposals] = useState<TitleProposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,7 +36,9 @@ export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
     setError(null);
     try {
       let data: TitleProposal[] = [];
-      if (coordinatorMode) {
+      if (fetchNone) {
+        data = [];
+      } else if (coordinatorMode) {
         data = await titleProposalService.getSubmittedProposals();
       } else if (adviserGroupIds) {
         data = await titleProposalService.getProposalsByGroupIds(adviserGroupIds);
@@ -49,7 +53,7 @@ export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [groupId, coordinatorMode, adviserGroupIds]);
+  }, [groupId, coordinatorMode, adviserGroupIds, fetchNone]);
 
   useEffect(() => {
     fetchProposals();
