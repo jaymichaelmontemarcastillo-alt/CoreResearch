@@ -39,6 +39,64 @@ const STATUS_ICONS = {
   approved: CheckCircle2,
 };
 
+const DocumentViewer = ({ attachment }) => {
+  if (!attachment) return null;
+
+  const isPdf = attachment.contentType === 'application/pdf' || attachment.fileName.toLowerCase().endsWith('.pdf');
+  const isOffice = [
+    'application/msword', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+    'application/vnd.ms-powerpoint', 
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ].includes(attachment.contentType) || 
+  /\.(doc|docx|ppt|pptx)$/i.test(attachment.fileName);
+
+  if (isPdf) {
+    return (
+      <div className="w-full h-[700px] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-slate-900 shadow-inner">
+        <iframe 
+          src={attachment.downloadUrl} 
+          title={attachment.fileName}
+          className="w-full h-full"
+          frameBorder="0"
+        />
+      </div>
+    );
+  }
+
+  if (isOffice) {
+    const encodedUrl = encodeURIComponent(attachment.downloadUrl);
+    const googleDocsViewer = `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
+    return (
+      <div className="w-full h-[700px] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-slate-900 shadow-inner">
+        <iframe 
+          src={googleDocsViewer} 
+          title={attachment.fileName}
+          className="w-full h-full"
+          frameBorder="0"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 border-2 border-dashed border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 rounded-xl text-center">
+      <FileText className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        Preview not available for this file type.
+      </p>
+      <a 
+        href={attachment.downloadUrl} 
+        target="_blank" 
+        rel="noreferrer"
+        className="mt-3 inline-block text-xs font-bold bg-primary text-white px-4 py-2 rounded-lg shadow hover:bg-primary/90 transition"
+      >
+        Download {attachment.fileName}
+      </a>
+    </div>
+  );
+};
+
 export const ProposalDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -318,37 +376,22 @@ export const ProposalDetail = () => {
           </div>
         </div>
 
-        {/* Rationale / Background */}
-        <ContentSection
-          icon={FileText}
-          title="Rationale &amp; Background"
-          content={proposal.rationale}
-        />
-
-        {/* Objectives */}
-        <ContentSection
-          icon={Target}
-          title="Research Objectives"
-          content={proposal.objectives}
-        />
-
-        {/* Scope and Delimitation */}
-        {proposal.scopeAndDelimitation && (
-          <ContentSection
-            icon={ShieldAlert}
-            title="Scope and Delimitation"
-            content={proposal.scopeAndDelimitation}
-          />
-        )}
-
-        {/* Methodology */}
-        {proposal.methodology && (
-          <ContentSection
-            icon={Compass}
-            title="Methodology"
-            content={proposal.methodology}
-          />
-        )}
+        {/* Document Viewer Section */}
+        <div className="pt-2">
+          {proposal.attachments && proposal.attachments.length > 0 ? (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
+                <FileText className="w-4 h-4 text-primary" />
+                Proposal Document
+              </h3>
+              <DocumentViewer attachment={proposal.attachments[0]} />
+            </div>
+          ) : (
+            <div className="p-6 text-center border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl">
+              <p className="text-sm text-gray-500 font-medium">No document attached to this proposal.</p>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* ── SUBMISSION INFO (meta card) ─────────────────────────────────────── */}

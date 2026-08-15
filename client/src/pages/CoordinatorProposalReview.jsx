@@ -37,6 +37,64 @@ const STATUS_ICONS = {
   draft: FileEdit,
 };
 
+const DocumentViewer = ({ attachment }) => {
+  if (!attachment) return null;
+
+  const isPdf = attachment.contentType === 'application/pdf' || attachment.fileName.toLowerCase().endsWith('.pdf');
+  const isOffice = [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ].includes(attachment.contentType) ||
+    /\.(doc|docx|ppt|pptx)$/i.test(attachment.fileName);
+
+  if (isPdf) {
+    return (
+      <div className="w-full h-[700px] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-slate-900 shadow-inner">
+        <iframe
+          src={attachment.downloadUrl}
+          title={attachment.fileName}
+          className="w-full h-full"
+          frameBorder="0"
+        />
+      </div>
+    );
+  }
+
+  if (isOffice) {
+    const encodedUrl = encodeURIComponent(attachment.downloadUrl);
+    const googleDocsViewer = `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
+    return (
+      <div className="w-full h-[700px] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-gray-50 dark:bg-slate-900 shadow-inner">
+        <iframe
+          src={googleDocsViewer}
+          title={attachment.fileName}
+          className="w-full h-full"
+          frameBorder="0"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 border-2 border-dashed border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 rounded-xl text-center">
+      <FileText className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        Preview not available for this file type.
+      </p>
+      <a
+        href={attachment.downloadUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-block text-xs font-bold bg-primary text-white px-4 py-2 rounded-lg shadow hover:bg-primary/90 transition"
+      >
+        Download {attachment.fileName}
+      </a>
+    </div>
+  );
+};
+
 export const CoordinatorProposalReview = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -249,34 +307,26 @@ export const CoordinatorProposalReview = () => {
                 </span>
               </div>
             )}
+
           </div>
         </div>
 
-        {/* Content Sections */}
-        <ContentSection
-          icon={FileText}
-          title="Rationale &amp; Background"
-          content={proposal.rationale}
-        />
-        <ContentSection
-          icon={Target}
-          title="Research Objectives"
-          content={proposal.objectives}
-        />
-        {proposal.scopeAndDelimitation && (
-          <ContentSection
-            icon={ShieldAlert}
-            title="Scope and Delimitation"
-            content={proposal.scopeAndDelimitation}
-          />
-        )}
-        {proposal.methodology && (
-          <ContentSection
-            icon={Compass}
-            title="Methodology"
-            content={proposal.methodology}
-          />
-        )}
+        {/* Document Viewer Section */}
+        <div className="pt-2">
+          {proposal.attachments && proposal.attachments.length > 0 ? (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
+                <FileText className="w-4 h-4 text-primary" />
+                Proposal Document
+              </h3>
+              <DocumentViewer attachment={proposal.attachments[0]} />
+            </div>
+          ) : (
+            <div className="p-6 text-center border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl">
+              <p className="text-sm text-gray-500 font-medium">No document attached to this proposal.</p>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* ── Previous Review Info (if already reviewed) ───────────────────────── */}
@@ -331,11 +381,10 @@ export const CoordinatorProposalReview = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Request Revision */}
                 <label
-                  className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition ${
-                    decision === "needs_revision"
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                      : "border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
-                  }`}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition ${decision === "needs_revision"
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                    : "border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
+                    }`}
                 >
                   <input
                     type="radio"
@@ -358,11 +407,10 @@ export const CoordinatorProposalReview = () => {
 
                 {/* Approve */}
                 <label
-                  className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition ${
-                    decision === "approved"
-                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
-                      : "border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
-                  }`}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition ${decision === "approved"
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
+                    : "border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
+                    }`}
                 >
                   <input
                     type="radio"

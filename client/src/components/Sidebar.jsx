@@ -52,7 +52,7 @@ export const Sidebar = ({
           label: "Proposals",
           path: "/proposals",
           icon: FileSignature,
-          roles: ["student", "adviser", "admin"],
+          roles: ["student", "adviser"],
         },
         {
           label: "Proposal Review",

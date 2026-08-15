@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { Textarea } from "../components/ui/Textarea";
+import { Modal } from "../components/ui/Modal";
 import {
   FileText,
   ArrowLeft,
@@ -45,12 +45,46 @@ const formatBytes = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const EMPTY_FORM = {
-  title: "",
-  rationale: "",
-  objectives: "",
-  scopeAndDelimitation: "",
-  methodology: "",
+// Circular Progress Component
+const CircularProgress = ({ progress }) => {
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg className="transform -rotate-90 w-24 h-24">
+        {/* Track */}
+        <circle
+          className="text-gray-200 dark:text-gray-700"
+          strokeWidth="6"
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx="48"
+          cy="48"
+        />
+        {/* Progress indicator */}
+        <circle
+          className="text-primary transition-all duration-300 ease-out"
+          strokeWidth="6"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx="48"
+          cy="48"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
+          {Math.round(progress)}%
+        </span>
+      </div>
+    </div>
+  );
 };
 
 export const SubmitProposal = () => {
@@ -69,7 +103,7 @@ export const SubmitProposal = () => {
     "Student";
 
   // ── State ────────────────────────────────────────────────────────────────────
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [title, setTitle] = useState("");
   const [group, setGroup] = useState(null);
   const [course, setCourse] = useState(null);
   const [section, setSection] = useState(null);
@@ -79,13 +113,17 @@ export const SubmitProposal = () => {
   const [pendingFiles, setPendingFiles] = useState([]); // File[] — not yet uploaded
   const [existingAttachments, setExistingAttachments] = useState([]); // already saved
   const [fileError, setFileError] = useState("");
+  
+  // Upload state
   const [uploading, setUploading] = useState(false);
+  const [overallProgress, setOverallProgress] = useState(0);
 
   const [pageLoading, setPageLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
+  const [groupProposals, setGroupProposals] = useState([]);
 
   // ── Load everything on mount ─────────────────────────────────────────────────
   useEffect(() => {
@@ -107,6 +145,10 @@ export const SubmitProposal = () => {
             const foundSection = sections.find((s) => s.id === g.sectionId);
             setSection(foundSection);
           }
+
+          // Fetch all proposals for this group to check for duplicates
+          const proposals = await titleProposalService.getProposalsByGroup(g.id);
+          setGroupProposals(proposals || []);
         }
 
         // 2. If editing, load the existing proposal
@@ -123,13 +165,7 @@ export const SubmitProposal = () => {
             return;
           }
           setExistingProposal(proposal);
-          setFormData({
-            title: proposal.title || "",
-            rationale: proposal.rationale || "",
-            objectives: proposal.objectives || "",
-            scopeAndDelimitation: proposal.scopeAndDelimitation || "",
-            methodology: proposal.methodology || "",
-          });
+          setTitle(proposal.title || "");
           setExistingAttachments(proposal.attachments || []);
         }
       } catch (err) {
@@ -143,29 +179,24 @@ export const SubmitProposal = () => {
   }, [editId, studentUid]);
 
   // ── Form helpers ─────────────────────────────────────────────────────────────
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (validationErrors[field]) {
-      setValidationErrors((prev) => ({ ...prev, [field]: "" }));
+  const handleTitleChange = (val) => {
+    setTitle(val);
+    if (validationErrors.title) {
+      setValidationErrors((prev) => ({ ...prev, title: "" }));
     }
   };
 
   const validateForm = (requireAll = true) => {
     const errors = {};
-    if (!formData.title.trim()) errors.title = "Research Title is required.";
+    if (!title.trim()) errors.title = "Research Title is required.";
     
     const hasFiles = pendingFiles.length > 0 || existingAttachments.length > 0;
 
+    // For importing, if we are fully submitting (requireAll = true), they MUST have a document.
     if (requireAll && !hasFiles) {
-      if (!formData.rationale.trim())
-        errors.rationale = "Rationale / Background is required. (Or attach a document)";
-      if (!formData.objectives.trim())
-        errors.objectives = "Research Objectives are required. (Or attach a document)";
-      if (!formData.scopeAndDelimitation.trim())
-        errors.scopeAndDelimitation = "Scope and Delimitation is required. (Or attach a document)";
-      if (!formData.methodology.trim())
-        errors.methodology = "Methodology is required. (Or attach a document)";
+      errors.files = "A proposal document must be attached to submit.";
     }
+    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -173,6 +204,10 @@ export const SubmitProposal = () => {
   // ── File handling ─────────────────────────────────────────────────────────────
   const handleFilePick = (e) => {
     setFileError("");
+    if (validationErrors.files) {
+       setValidationErrors((prev) => ({ ...prev, files: "" }));
+    }
+
     const newFiles = Array.from(e.target.files || []);
     const valid = [];
     for (const file of newFiles) {
@@ -184,6 +219,22 @@ export const SubmitProposal = () => {
         setFileError(`"${file.name}" is not a supported file type (PDF, DOC, DOCX, PPT, PPTX).`);
         continue;
       }
+
+      // Prevent duplicate documents from the same group
+      let isDuplicate = false;
+      for (const p of groupProposals) {
+        if (p.id === editId) continue; // ignore the proposal currently being edited
+        if (p.attachments?.some(a => a.fileName === file.name)) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      if (isDuplicate) {
+        setFileError(`A document named "${file.name}" has already been submitted by your group in another proposal.`);
+        continue;
+      }
+
       valid.push(file);
     }
     setPendingFiles((prev) => [...prev, ...valid]);
@@ -201,30 +252,54 @@ export const SubmitProposal = () => {
 
   // Upload pending files and return combined attachment array
   const uploadAndGetAttachments = async (proposalId) => {
+    if (pendingFiles.length === 0) return existingAttachments;
+    
+    setUploading(true);
+    setOverallProgress(0);
+    
     const uploaded = [];
-    for (const file of pendingFiles) {
-      const result = await storageService.uploadFile(
-        file,
-        `proposals/${proposalId}/documents`
-      );
-      uploaded.push({
-        fileName: file.name,
-        downloadUrl: result.downloadUrl,
-        fullPath: result.fullPath,
-        fileSize: file.size,
-        contentType: file.type,
-        uploadedAt: new Date().toISOString(),
-      });
+    
+    try {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const file = pendingFiles[i];
+        
+        // Progress base per file (e.g. if 2 files, 0-50% is first file, 50-100% is second file)
+        const baseProgress = (i / pendingFiles.length) * 100;
+        const progressSlice = 100 / pendingFiles.length;
+
+        const result = await storageService.uploadFileWithProgress(
+          file,
+          `proposals/${proposalId}/documents`,
+          (fileProgress) => {
+            const currentOverall = baseProgress + (fileProgress / 100) * progressSlice;
+            setOverallProgress(currentOverall);
+          }
+        );
+        uploaded.push({
+          fileName: file.name,
+          downloadUrl: result.downloadUrl,
+          fullPath: result.fullPath,
+          fileSize: file.size,
+          contentType: file.type,
+          uploadedAt: new Date().toISOString(),
+        });
+      }
+    } finally {
+      // Keep uploading true until the DB save finishes to prevent closing modal too early
+      // but let the progress hit 100
+      setOverallProgress(100);
     }
+    
     return [...existingAttachments, ...uploaded];
   };
 
   const buildContentPayload = () => ({
-    title: formData.title.trim(),
-    rationale: formData.rationale.trim(),
-    objectives: formData.objectives.trim(),
-    scopeAndDelimitation: formData.scopeAndDelimitation.trim(),
-    methodology: formData.methodology.trim(),
+    title: title.trim(),
+    // Keep empty strings for legacy fields just in case they are required elsewhere
+    rationale: "",
+    objectives: "",
+    scopeAndDelimitation: "",
+    methodology: "",
   });
 
   const buildGroupContext = () => ({
@@ -247,7 +322,6 @@ export const SubmitProposal = () => {
     }
     setSavingDraft(true);
     setError("");
-    setUploading(pendingFiles.length > 0);
     try {
       const content = buildContentPayload();
       if (isEditMode && existingProposal) {
@@ -259,8 +333,8 @@ export const SubmitProposal = () => {
           ...buildGroupContext(),
           status: "draft",
         });
-        if (pendingFiles.length > 0) {
-          const attachments = await uploadAndGetAttachments(created.id);
+        const attachments = await uploadAndGetAttachments(created.id);
+        if (attachments.length > 0) {
           await titleProposalService.updateProposal(created.id, { attachments });
         }
       }
@@ -279,7 +353,7 @@ export const SubmitProposal = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm(true)) {
-      setError("Please complete all required fields before submitting.");
+      setError("Please complete all required fields and attach your document before submitting.");
       return;
     }
     if (!group) {
@@ -288,7 +362,6 @@ export const SubmitProposal = () => {
     }
     setSubmitting(true);
     setError("");
-    setUploading(pendingFiles.length > 0);
     try {
       const content = buildContentPayload();
       const isResubmit = isEditMode && existingProposal?.status === "needs_revision";
@@ -335,7 +408,7 @@ export const SubmitProposal = () => {
     ? "Revise & Resubmit Proposal"
     : isEditMode
     ? "Edit Draft Proposal"
-    : "Submit Title Proposal";
+    : "Import Title Proposal";
   const isBusy = submitting || savingDraft;
 
   if (pageLoading) {
@@ -349,6 +422,21 @@ export const SubmitProposal = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Upload Progress Modal */}
+      {uploading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 flex flex-col items-center w-72 text-center border border-gray-200 dark:border-slate-800">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
+              Uploading Document...
+            </h3>
+            <CircularProgress progress={overallProgress} />
+            <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+              Please do not close this page.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Link
         to="/proposals"
         className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-xs font-semibold"
@@ -385,13 +473,13 @@ export const SubmitProposal = () => {
         {/* Header */}
         <div className="border-b border-gray-200 dark:border-slate-800 pb-5">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-            <FileText className="w-6 h-6 text-primary" />
+            <Upload className="w-6 h-6 text-primary" />
             {pageTitle}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
             {isResubmitMode
-              ? "Address the coordinator's feedback and resubmit."
-              : "Fill in all required fields, OR simply attach your proposal document below."}
+              ? "Address the coordinator's feedback by uploading your revised document."
+              : "Simply provide your research title and import your proposal document."}
           </p>
           {group && (
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-2">
@@ -399,9 +487,6 @@ export const SubmitProposal = () => {
               <span className="text-gray-800 dark:text-gray-200">{group.name}</span>
               {course && (
                 <> · <span className="text-gray-800 dark:text-gray-200">{course.code || course.name}</span></>
-              )}
-              {section && (
-                <> · <span className="text-gray-800 dark:text-gray-200">{section.name}</span></>
               )}
             </p>
           )}
@@ -430,75 +515,12 @@ export const SubmitProposal = () => {
             <Input
               label="Research Title *"
               type="text"
-              placeholder="e.g. AI-Based Research Management System for Academic Institutions"
-              value={formData.title}
-              onChange={(e) => handleChange("title", e.target.value)}
+              placeholder="e.g. AI-Based Research Management System"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
             />
             {validationErrors.title && (
               <p className="mt-1 text-xs text-red-500 font-medium">{validationErrors.title}</p>
-            )}
-          </div>
-
-          <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 mb-2">
-             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-primary" />
-                The following text fields are <strong>optional</strong> if you attach a proposal document (PDF, DOCX, etc.) at the bottom of the page.
-             </p>
-          </div>
-
-          {/* Rationale */}
-          <div>
-            <Textarea
-              label="Rationale / Background (Optional if document attached)"
-              rows={5}
-              placeholder="Explain the background problem, context, significance of the study, and motivations for conducting this research..."
-              value={formData.rationale}
-              onChange={(e) => handleChange("rationale", e.target.value)}
-            />
-            {validationErrors.rationale && (
-              <p className="mt-1 text-xs text-red-500 font-medium">{validationErrors.rationale}</p>
-            )}
-          </div>
-
-          {/* Objectives */}
-          <div>
-            <Textarea
-              label="Specific Research Objectives (Optional if document attached)"
-              rows={4}
-              placeholder="1. Design the system architecture&#10;2. Implement the core modules&#10;3. Validate and evaluate system performance..."
-              value={formData.objectives}
-              onChange={(e) => handleChange("objectives", e.target.value)}
-            />
-            {validationErrors.objectives && (
-              <p className="mt-1 text-xs text-red-500 font-medium">{validationErrors.objectives}</p>
-            )}
-          </div>
-
-          {/* Scope */}
-          <div>
-            <Textarea
-              label="Scope and Delimitation (Optional if document attached)"
-              rows={4}
-              placeholder="Define the coverage, target users, system boundaries, limitations, and excluded features..."
-              value={formData.scopeAndDelimitation}
-              onChange={(e) => handleChange("scopeAndDelimitation", e.target.value)}
-            />
-            {validationErrors.scopeAndDelimitation && (
-              <p className="mt-1 text-xs text-red-500 font-medium">{validationErrors.scopeAndDelimitation}</p>
-            )}
-          </div>
-
-          {/* Methodology */}
-          <div>
-            <Textarea
-              label="Methodology (Optional if document attached)"
-              rows={5}
-              placeholder="Describe the research framework, system design, data collection approach, development methodology, and evaluation strategy..."
-              value={formData.methodology}
-              onChange={(e) => handleChange("methodology", e.target.value)}
-            />
-            {validationErrors.methodology && (
-              <p className="mt-1 text-xs text-red-500 font-medium">{validationErrors.methodology}</p>
             )}
           </div>
 
@@ -507,9 +529,9 @@ export const SubmitProposal = () => {
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                 <Paperclip className="w-3.5 h-3.5" />
-                Supporting Documents
+                Import Proposal Document *
                 <span className="font-normal text-gray-400 normal-case tracking-normal ml-1">
-                  (PDF, DOC, DOCX, PPT, PPTX · max {MAX_FILE_SIZE_MB}MB each)
+                  (PDF, DOC, DOCX, PPT, PPTX · max {MAX_FILE_SIZE_MB}MB)
                 </span>
               </label>
               <button
@@ -519,7 +541,7 @@ export const SubmitProposal = () => {
                 disabled={isBusy}
               >
                 <Upload className="w-3.5 h-3.5" />
-                Attach File
+                Browse File
               </button>
               <input
                 ref={fileInputRef}
@@ -530,6 +552,13 @@ export const SubmitProposal = () => {
                 className="hidden"
               />
             </div>
+
+            {validationErrors.files && (
+              <p className="text-xs text-red-500 font-medium flex items-center gap-1 mb-2">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {validationErrors.files}
+              </p>
+            )}
 
             {fileError && (
               <p className="text-xs text-red-500 font-medium flex items-center gap-1">
@@ -567,6 +596,7 @@ export const SubmitProposal = () => {
                       type="button"
                       onClick={() => removeExistingAttachment(i)}
                       className="p-1 rounded text-gray-400 hover:text-red-500 transition"
+                      disabled={isBusy}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -586,21 +616,24 @@ export const SubmitProposal = () => {
                 {pendingFiles.map((file, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-2.5 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40"
+                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-blue-100 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-900/10"
                   >
                     <FileIcon className="w-4 h-4 text-blue-500 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
                         {file.name}
                       </p>
-                      <p className="text-[10px] text-gray-400">
-                        {FILE_TYPE_LABELS[file.type] || "FILE"} · {formatBytes(file.size)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-gray-400">
+                          {FILE_TYPE_LABELS[file.type] || "FILE"} · {formatBytes(file.size)}
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => removePendingFile(i)}
                       className="p-1 rounded text-gray-400 hover:text-red-500 transition"
+                      disabled={isBusy}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -612,14 +645,16 @@ export const SubmitProposal = () => {
             {existingAttachments.length === 0 && pendingFiles.length === 0 && (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:border-primary/40 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition"
+                className="border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition"
               >
-                <Upload className="w-7 h-7 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  Click to attach supporting documents
+                <div className="w-12 h-12 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                   <Upload className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                </div>
+                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                  Drop your document here or <span className="text-primary">browse</span>
                 </p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  PDF, DOC, DOCX, PPT, PPTX · up to {MAX_FILE_SIZE_MB}MB each
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Supported: PDF, DOCX, PPTX (max {MAX_FILE_SIZE_MB}MB)
                 </p>
               </div>
             )}
@@ -639,8 +674,7 @@ export const SubmitProposal = () => {
                   type="button"
                   variant="outline"
                   onClick={handleSaveDraft}
-                  isLoading={savingDraft}
-                  disabled={submitting}
+                  disabled={isBusy || !group}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Save Draft
@@ -650,8 +684,7 @@ export const SubmitProposal = () => {
               <Button
                 type="submit"
                 variant="primary"
-                isLoading={submitting || (uploading && !savingDraft)}
-                disabled={savingDraft || !group}
+                disabled={isBusy || !group}
               >
                 {isResubmitMode ? (
                   <><RefreshCw className="w-4 h-4 mr-2" /> Resubmit Proposal</>
