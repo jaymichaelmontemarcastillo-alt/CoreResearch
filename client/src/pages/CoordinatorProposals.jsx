@@ -39,7 +39,6 @@ export const CoordinatorProposals = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ── Filter ──────────────────────────────────────────────────────────────────
   const filteredProposals = proposals.filter((p) => {
     const matchesStatus =
       filterStatus === "all" || p.status === filterStatus;
@@ -53,7 +52,6 @@ export const CoordinatorProposals = () => {
     return matchesStatus && matchesSearch;
   });
 
-  // Summary counts
   const counts = {
     submitted: proposals.filter((p) => p.status === "submitted").length,
     needs_revision: proposals.filter((p) => p.status === "needs_revision").length,
@@ -69,14 +67,12 @@ export const CoordinatorProposals = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <PageHeader
         icon={ClipboardList}
         title="Title Proposal Review"
         description="Review and evaluate research title proposals submitted by student groups."
       />
 
-      {/* Summary Stat Cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
           {
@@ -125,7 +121,6 @@ export const CoordinatorProposals = () => {
         </div>
       )}
 
-      {/* Search + Filter */}
       <Card className="p-4 flex flex-col md:flex-row items-center gap-4">
         <div className="flex-1 w-full">
           <Input
@@ -153,7 +148,6 @@ export const CoordinatorProposals = () => {
         </div>
       </Card>
 
-      {/* Proposal Table */}
       {loading ? (
         <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
           Loading proposals...
@@ -168,115 +162,132 @@ export const CoordinatorProposals = () => {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          {/* Table Header */}
-          <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-800 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            <span>Proposal</span>
-            <span>Group &amp; Course</span>
-            <span>Section</span>
-            <span>Submitted</span>
-            <span>Action</span>
-          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-800">
+                  <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 w-[35%]">
+                    Proposal
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 w-[25%]">
+                    Group & Course
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 w-[12%]">
+                    Section
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 w-[13%]">
+                    Submitted
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 w-[15%]">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                {filteredProposals.map((p) => {
+                  const cfg = PROPOSAL_STATUS_CONFIG[p.status] ?? {
+                    label: p.status,
+                    variant: "gray",
+                  };
+                  const StatusIcon = STATUS_ICONS[p.status] ?? Clock;
+                  const canReview = p.status === "submitted";
+                  const dateToShow = p.lastSubmittedAt ?? p.submittedAt;
 
-          {/* Rows */}
-          <div className="divide-y divide-gray-100 dark:divide-slate-800">
-            {filteredProposals.map((p) => {
-              const cfg = PROPOSAL_STATUS_CONFIG[p.status] ?? {
-                label: p.status,
-                variant: "gray",
-              };
-              const StatusIcon = STATUS_ICONS[p.status] ?? Clock;
-              const canReview = p.status === "submitted";
-              const dateToShow = p.lastSubmittedAt ?? p.submittedAt;
-
-              return (
-                <div
-                  key={p.id}
-                  className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-3 md:gap-4 px-6 py-4 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition"
-                >
-                  {/* Proposal title + status */}
-                  <div className="space-y-1.5">
-                    <Badge variant={cfg.variant} className="flex items-center gap-1 w-fit">
-                      <StatusIcon className="w-3 h-3" />
-                      {cfg.label}
-                    </Badge>
-                    <Link
-                      to={`/proposals/${p.id}`}
-                      className="font-semibold text-sm text-gray-900 dark:text-white hover:text-primary dark:hover:text-blue-400 transition line-clamp-2"
+                  return (
+                    <tr
+                      key={p.id}
+                      className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition"
                     >
-                      {p.title}
-                    </Link>
-                    {p.researchCategory && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {p.researchCategory}
-                      </p>
-                    )}
-                    {p.revisionCount > 0 && (
-                      <span className="text-xs text-amber-500 font-medium">
-                        Revision #{p.revisionCount}
-                      </span>
-                    )}
-                  </div>
+                      <td className="px-6 py-4 align-top">
+                        <div className="space-y-1.5">
+                          <Badge variant={cfg.variant} className="flex items-center gap-1 w-fit">
+                            <StatusIcon className="w-3 h-3" />
+                            {cfg.label}
+                          </Badge>
+                          <Link
+                            to={`/proposals/${p.id}`}
+                            className="font-semibold text-sm text-gray-900 dark:text-white hover:text-primary dark:hover:text-blue-400 transition line-clamp-2 block"
+                          >
+                            {p.title}
+                          </Link>
+                          {p.researchCategory && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
+                              {p.researchCategory}
+                            </p>
+                          )}
+                          {p.revisionCount > 0 && (
+                            <span className="text-xs text-amber-500 font-medium">
+                              Revision #{p.revisionCount}
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                  {/* Group + Course */}
-                  <div className="flex flex-col justify-center gap-1">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                      <Users className="w-3.5 h-3.5 text-primary shrink-0" />
-                      {p.groupName || "—"}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      <BookOpen className="w-3 h-3 shrink-0" />
-                      {p.courseName || "—"}
-                    </div>
-                  </div>
+                      <td className="px-6 py-4 align-top">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                            <Users className="w-3.5 h-3.5 text-primary shrink-0" />
+                            {p.groupName || "—"}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <BookOpen className="w-3 h-3 shrink-0" />
+                            {p.courseName || "—"}
+                          </div>
+                        </div>
+                      </td>
 
-                  {/* Section */}
-                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    {p.sectionName || "—"}
-                  </div>
+                      <td className="px-6 py-4 align-middle text-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                          {p.sectionName || "—"}
+                        </span>
+                      </td>
 
-                  {/* Date */}
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                    {dateToShow
-                      ? new Date(dateToShow).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : "—"}
-                  </div>
+                      <td className="px-6 py-4 align-middle text-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {dateToShow
+                            ? new Date(dateToShow).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "—"}
+                        </span>
+                      </td>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <Link
-                      to={`/proposals/${p.id}`}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-800 transition"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Link>
-                    {canReview ? (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() =>
-                          navigate(`/coordinator/proposals/${p.id}`)
-                        }
-                      >
-                        <Shield className="w-3.5 h-3.5 mr-1.5" />
-                        Review
-                      </Button>
-                    ) : (
-                      <Link
-                        to={`/coordinator/proposals/${p.id}`}
-                        className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 hover:text-primary transition"
-                      >
-                        View <ArrowRight className="w-3 h-3" />
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                      <td className="px-6 py-4 align-middle text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Link
+                            to={`/proposals/${p.id}`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                          {canReview ? (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() =>
+                                navigate(`/coordinator/proposals/${p.id}`)
+                              }
+                            >
+                              <Shield className="w-3.5 h-3.5 mr-1.5" />
+                              Review
+                            </Button>
+                          ) : (
+                            <Link
+                              to={`/coordinator/proposals/${p.id}`}
+                              className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 hover:text-primary transition"
+                            >
+                              View <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}
