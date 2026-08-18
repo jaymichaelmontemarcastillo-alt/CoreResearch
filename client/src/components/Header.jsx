@@ -30,6 +30,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
     if (path === "/dashboard") return "Dashboard";
     if (path.startsWith("/manuscripts")) return "Manuscripts";
     if (path.startsWith("/proposals")) return "Title Proposals";
+    if (path.startsWith("/documents")) return "Documents";
     if (path.startsWith("/projects")) return "Research Projects";
     if (path.startsWith("/schedules")) return "Defense Schedules";
     if (path.startsWith("/reviews")) return "Reviews & Annotations";

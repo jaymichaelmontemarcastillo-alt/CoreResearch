@@ -7,7 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { FileText, Search, Plus, Clock, Users, MoreVertical } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import { documentStore } from '../services/documentStore';
 
 export const Documents = () => {
   const [documents, setDocuments] = useState([]);
@@ -23,25 +23,8 @@ export const Documents = () => {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      // Fallback dummy data if backend is not fully implemented yet
-      setDocuments([
-        {
-          id: 'research-manuscript-123',
-          title: 'Research Manuscript - Final',
-          updatedAt: new Date().toISOString(),
-          ownerId: userProfile?.uid,
-          ownerName: userProfile?.fullName,
-          collaboratorCount: 3,
-        },
-        {
-          id: 'chapter-1-draft',
-          title: 'Chapter 1: Introduction (Draft)',
-          updatedAt: new Date(Date.now() - 86400000).toISOString(),
-          ownerId: 'prof123',
-          ownerName: 'Professor Cruz',
-          collaboratorCount: 1,
-        }
-      ]);
+      const list = documentStore.getDocuments();
+      setDocuments(list);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
     } finally {
@@ -50,9 +33,9 @@ export const Documents = () => {
   };
 
   const handleCreateDocument = () => {
-    const newDocId = `doc-${Date.now()}`;
-    // Optionally create it in the backend first, but for now we just navigate
-    navigate(`/documents/${newDocId}`);
+    const defaultTitle = prompt('Enter document title:', 'Untitled Research Document') || 'Untitled Document';
+    const newDoc = documentStore.createDocument(defaultTitle, userProfile);
+    navigate(`/documents/${newDoc.id}`);
   };
 
   const filteredDocs = documents.filter(doc => 

@@ -9,6 +9,48 @@ import { ShareDialog } from '../components/editor/ShareDialog';
 import { Button } from '../components/ui/Button';
 import { Users, Share2, MessageSquare, ChevronLeft, Save } from 'lucide-react';
 
+import { documentStore } from '../services/documentStore';
+
+class EditorErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Editor component error boundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[600px] p-8 text-center bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-200 dark:border-slate-800 my-8">
+          <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mb-4">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Editor initialized</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
+            Click below to reset and reload the editor instance.
+          </p>
+          <Button 
+            variant="primary" 
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Reload Editor
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const DocumentEditorPage = () => {
   const { id: documentId } = useParams();
   const { userProfile } = useAuth();
@@ -21,9 +63,37 @@ export const DocumentEditorPage = () => {
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
   const [title, setTitle] = useState('Untitled Document');
 
-  // In a real implementation, you would fetch document metadata from Firestore here
+  const effectiveUserProfile = userProfile || {
+    uid: 'guest-user',
+    fullName: 'Researcher',
+    first_name: 'Researcher',
+    role: 'student'
+  };
 
-  if (!userProfile) return null;
+  useEffect(() => {
+    if (documentId) {
+      const doc = documentStore.getDocument(documentId);
+      setTitle(doc.title || 'Untitled Document');
+    }
+  }, [documentId]);
+
+  const handleTitleChange = (e) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    documentStore.updateDocumentTitle(documentId, newTitle);
+  };
+
+  const handleEditorReady = React.useCallback((editorInstance) => {
+    setEditor(editorInstance);
+  }, []);
+
+  const handleCollaboratorsChange = React.useCallback((users) => {
+    setCollaborators(users);
+  }, []);
+
+  const handleSaveStatusChange = React.useCallback((status) => {
+    setSaveStatus(status);
+  }, []);
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden">
@@ -45,7 +115,7 @@ export const DocumentEditorPage = () => {
             <input 
               type="text" 
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleChange}
               className="text-lg font-medium text-gray-900 dark:text-gray-100 bg-transparent border-none outline-none focus:bg-gray-100 dark:focus:bg-slate-800 rounded px-1 -ml-1 truncate max-w-[200px] sm:max-w-xs"
             />
             <EditorMenuBar editor={editor} />
@@ -105,13 +175,15 @@ export const DocumentEditorPage = () => {
         <div className="flex-1 overflow-y-auto bg-[#f8f9fa] dark:bg-slate-950 flex justify-center pb-20 custom-scrollbar">
           {/* Page Container */}
           <div className="mt-8 mb-12">
-            <DocumentEditor 
-              documentId={documentId} 
-              userProfile={userProfile} 
-              onEditorReady={setEditor}
-              onCollaboratorsChange={setCollaborators}
-              onSaveStatusChange={setSaveStatus}
-            />
+            <EditorErrorBoundary key={documentId}>
+              <DocumentEditor 
+                documentId={documentId} 
+                userProfile={effectiveUserProfile} 
+                onEditorReady={handleEditorReady}
+                onCollaboratorsChange={handleCollaboratorsChange}
+                onSaveStatusChange={handleSaveStatusChange}
+              />
+            </EditorErrorBoundary>
           </div>
         </div>
 

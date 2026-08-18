@@ -17,118 +17,139 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { auth } from '../../services/firebase'; // Ensure Firebase auth is available
+import { auth } from '../../services/firebase';
+import { documentStore } from '../../services/documentStore';
 
 // A simple hash function for assigning colors based on user ID
 const getUserColor = (userId) => {
   const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6'];
   let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  const str = String(userId || 'user');
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
   return colors[Math.abs(hash) % colors.length];
 };
 
-export const DocumentEditor = ({ documentId, userProfile, onEditorReady, onCollaboratorsChange, onSaveStatusChange }) => {
+export const DocumentEditor = ({ 
+  documentId, 
+  userProfile, 
+  onEditorReady, 
+  onCollaboratorsChange, 
+  onSaveStatusChange 
+}) => {
+  const [ydoc] = useState(() => new Y.Doc());
   const [provider, setProvider] = useState(null);
 
   useEffect(() => {
-    if (!documentId || !userProfile) return;
+    if (!documentId) return;
 
-    // We get the Firebase Auth token to authenticate the WebSocket connection
+    let hocuspocusProvider = null;
+    let isSubscribed = true;
+
     const setupProvider = async () => {
-      let token = '';
+      let token = `dev-token-${userProfile?.uid || 'guest'}-${userProfile?.role || 'student'}`;
       try {
         const currentUser = auth.currentUser;
         if (currentUser) {
           token = await currentUser.getIdToken();
-        } else {
-          // Development fallback
-          token = `dev-token-${userProfile.uid}-${userProfile.role}`;
         }
       } catch (e) {
-        console.warn('Failed to get auth token, using fallback', e);
-        token = `dev-token-${userProfile.uid}-${userProfile.role}`;
+        // Fallback
       }
 
-      const ydoc = new Y.Doc();
-      
-      // Determine WebSocket URL based on environment
       const wsUrl = import.meta.env.PROD 
         ? `wss://${window.location.host}/collaboration`
         : 'ws://localhost:5000/collaboration';
 
-      const hocuspocusProvider = new HocuspocusProvider({
-        url: wsUrl,
-        name: documentId,
-        document: ydoc,
-        token: token,
-        onStatus: (data) => {
-          if (data.status === 'connected') {
-            onSaveStatusChange('saved');
-          } else {
-            onSaveStatusChange('saving');
+      try {
+        hocuspocusProvider = new HocuspocusProvider({
+          url: wsUrl,
+          name: documentId,
+          document: ydoc,
+          token: token,
+          quiet: true,
+          onStatus: (data) => {
+            if (!isSubscribed) return;
+            setTimeout(() => {
+              if (onSaveStatusChange) {
+                onSaveStatusChange(data.status === 'connected' ? 'saved' : 'saving');
+              }
+            }, 0);
+          },
+          onMessage: () => {
+            if (!isSubscribed) return;
+            setTimeout(() => {
+              if (onSaveStatusChange) onSaveStatusChange('saving');
+              setTimeout(() => {
+                if (onSaveStatusChange) onSaveStatusChange('saved');
+              }, 500);
+            }, 0);
+          },
+          onAwarenessUpdate: ({ states }) => {
+            if (!isSubscribed) return;
+            const users = states.map(state => state.user).filter(Boolean);
+            const uniqueUsers = [];
+            const seen = new Set();
+            users.forEach(u => {
+              if (!seen.has(u.id)) {
+                seen.add(u.id);
+                uniqueUsers.push(u);
+              }
+            });
+            setTimeout(() => {
+              if (onCollaboratorsChange) onCollaboratorsChange(uniqueUsers);
+            }, 0);
           }
-        },
-        onMessage: () => {
-          // Whenever a message comes in or goes out, we can briefly show a "saving" state
-          onSaveStatusChange('saving');
-          setTimeout(() => onSaveStatusChange('saved'), 500);
-        },
-        onAwarenessUpdate: ({ states }) => {
-          const users = states.map(state => state.user).filter(Boolean);
-          // Deduplicate by user ID
-          const uniqueUsers = [];
-          const seen = new Set();
-          users.forEach(u => {
-            if (!seen.has(u.id)) {
-              seen.add(u.id);
-              uniqueUsers.push(u);
-            }
-          });
-          onCollaboratorsChange(uniqueUsers);
-        }
-      });
+        });
 
-      setProvider(hocuspocusProvider);
+        hocuspocusProvider.doc = ydoc;
+        if (hocuspocusProvider.awareness) {
+          hocuspocusProvider.awareness.doc = ydoc;
+        }
+
+        if (isSubscribed) {
+          setProvider(hocuspocusProvider);
+        }
+      } catch (err) {
+        console.warn('Hocuspocus provider connection warning:', err);
+      }
     };
 
     setupProvider();
 
     return () => {
-      if (provider) {
-        provider.destroy();
+      isSubscribed = false;
+      if (hocuspocusProvider) {
+        try {
+          hocuspocusProvider.destroy();
+        } catch (e) {
+          // ignore
+        }
       }
     };
-  }, [documentId, userProfile]);
+  }, [documentId, userProfile?.uid, ydoc]);
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        history: false, // History is handled by Yjs
+        history: false,
       }),
-      Underline,
       Superscript,
       Subscript,
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Image.configure({
-        inline: true,
-        allowBase64: true,
-      }),
-      Table.configure({
-        resizable: true,
-      }),
+      Image.configure({ inline: true, allowBase64: true }),
+      Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
       TableCell,
-      // Only include collaboration extensions if the provider is ready
-      ...(provider ? [
-        Collaboration.configure({
-          document: provider.document,
-        }),
+      Collaboration.configure({
+        document: ydoc,
+      }),
+      ...(provider && provider.awareness && provider.doc ? [
         CollaborationCursor.configure({
           provider: provider,
           user: {
@@ -139,22 +160,45 @@ export const DocumentEditor = ({ documentId, userProfile, onEditorReady, onColla
         }),
       ] : [])
     ],
-    content: '', // Initial content is provided by Yjs
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose-base lg:prose-lg max-w-none focus:outline-none min-h-[1056px] w-[816px] bg-white shadow-lg mx-auto p-12 sm:p-20 ring-1 ring-gray-200 dark:ring-slate-800',
+        class: 'prose prose-sm sm:prose-base lg:prose-lg max-w-none focus:outline-none min-h-[1056px] w-[816px] bg-white shadow-lg mx-auto p-12 sm:p-20 ring-1 ring-gray-200 dark:ring-slate-800 text-gray-900 dark:text-gray-900',
       },
     },
-  }, [provider]); // Re-initialize editor when provider is ready
+  }, [documentId, ydoc, provider]);
 
   useEffect(() => {
-    if (editor) {
+    if (!editor) return;
+
+    if (onEditorReady) {
       onEditorReady(editor);
     }
-  }, [editor, onEditorReady]);
 
-  if (!editor || !provider) {
-    return <div className="flex items-center justify-center min-h-[800px] text-gray-500">Connecting to collaborative editor...</div>;
+    // Seed initial template content if Yjs document is empty
+    try {
+      const fragment = ydoc.getXmlFragment('default');
+      if (fragment.length === 0 && editor.isEmpty) {
+        const docInfo = documentStore.getDocument(documentId);
+        const defaultTitle = docInfo?.title || 'Untitled Document';
+
+        editor.commands.setContent(`
+          <h1>${defaultTitle}</h1>
+          <p>Welcome to the collaborative research document editor. Start editing your manuscript here...</p>
+          <h2>1. Research Background & Context</h2>
+          <p>Write your problem statement, literature review, and research methodology in this real-time document workspace.</p>
+        `);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [editor, documentId, ydoc]);
+
+  if (!editor) {
+    return (
+      <div className="flex items-center justify-center min-h-[800px] text-gray-500">
+        Initializing document editor...
+      </div>
+    );
   }
 
   return (

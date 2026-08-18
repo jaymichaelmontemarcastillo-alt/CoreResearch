@@ -61,9 +61,9 @@ export const Sidebar = ({
           roles: ["research_coordinator", "admin"],
         },
         {
-          label: "Projects",
-          path: "/projects",
-          icon: FolderKanban,
+          label: "Documents",
+          path: "/documents",
+          icon: FileText,
           roles: ["student", "adviser", "admin", "research_coordinator"],
         },
         ...(role === "student"

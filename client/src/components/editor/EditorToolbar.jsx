@@ -45,13 +45,13 @@ export const EditorToolbar = ({ editor }) => {
         icon={Undo}
         title="Undo"
         onClick={() => editor.chain().focus().undo().run()}
-        disabled={!editor.can().chain().focus().undo().run()}
+        disabled={!editor?.can?.()?.chain()?.focus()?.undo()?.run()}
       />
       <ToolbarButton
         icon={Redo}
         title="Redo"
         onClick={() => editor.chain().focus().redo().run()}
-        disabled={!editor.can().chain().focus().redo().run()}
+        disabled={!editor?.can?.()?.chain()?.focus()?.redo()?.run()}
       />
 
       <Divider />

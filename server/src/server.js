@@ -1,7 +1,11 @@
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { WebSocketServer } from 'ws';
+import { Server } from '@hocuspocus/server';
+
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import proposalRoutes from './routes/proposalRoutes.js';
@@ -52,11 +56,6 @@ app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/repository', repositoryRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-
-
-
-
-
 // 404 Route Handler
 app.use((req, res) => {
   res.status(404).json({
@@ -76,11 +75,37 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+const httpServer = http.createServer(app);
+
+// Setup Hocuspocus Open-Source Collaborative Editing Server
+const hocuspocusServer = new Server({
+  name: 'coreresearch-hocuspocus',
+  httpServer,
+  async onAuthenticate(data) {
+    const { token } = data;
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+    return {
+      user: {
+        id: data.connection?.readOnly ? 'guest' : 'collaborator',
+      },
+    };
+  },
+  async onLoadDocument(data) {
+    return data.document;
+  },
+});
+
+hocuspocusServer.setupHttpUpgrade();
+
+httpServer.listen(PORT, () => {
   console.log(`=================================================`);
   console.log(`🚀 CoreResearch API Server running on port ${PORT}`);
+  console.log(`📡 Hocuspocus OSS WebSocket Server: ws://localhost:${PORT}/collaboration`);
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
   console.log(`=================================================`);
 });
 
 export default app;
+
