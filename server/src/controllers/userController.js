@@ -135,3 +135,95 @@ export const updateUserProfile = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Update authenticated user's own profile
+ */
+export const updateMyProfile = async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { first_name, last_name, fullName, college, department, studentIdOrEmployeeId, profile_image } = req.body;
+
+    const updates = {
+      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (first_name !== undefined) updates.first_name = first_name;
+    if (last_name !== undefined) updates.last_name = last_name;
+    if (fullName !== undefined) {
+      updates.fullName = fullName;
+    } else if (first_name || last_name) {
+      updates.fullName = `${first_name || ''} ${last_name || ''}`.trim();
+    }
+    if (college !== undefined) updates.college = college;
+    if (department !== undefined) {
+      updates.department = department;
+      updates.department_id = department;
+    }
+    if (studentIdOrEmployeeId !== undefined) updates.studentIdOrEmployeeId = studentIdOrEmployeeId;
+    if (profile_image !== undefined) updates.profile_image = profile_image;
+
+    if (isDevMockMode || !db) {
+      const existing = mockUsersDb.get(uid) || {};
+      const updated = { ...existing, uid, ...updates };
+      mockUsersDb.set(uid, updated);
+      return res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully.',
+        data: updated
+      });
+    }
+
+    const userRef = db.collection('users').doc(uid);
+    await userRef.set(updates, { merge: true });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully.',
+      data: { uid, ...updates }
+    });
+  } catch (error) {
+    console.error('[UserController] updateMyProfile error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Change authenticated user's password
+ */
+export const changeMyPassword = async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const { newPassword } = req.body;
+
+    if (!uid) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'New password must be at least 6 characters long.' });
+    }
+
+    if (isDevMockMode || !auth) {
+      return res.status(200).json({
+        success: true,
+        message: 'Password updated successfully (Dev Mode).'
+      });
+    }
+
+    await auth.updateUser(uid, { password: newPassword });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully.'
+    });
+  } catch (error) {
+    console.error('[UserController] changeMyPassword error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

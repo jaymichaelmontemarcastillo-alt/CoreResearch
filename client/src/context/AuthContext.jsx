@@ -122,26 +122,30 @@ export const AuthProvider = ({ children }) => {
   // Pag successful, ginagamit yung returned UID para ma-identify yung user sa backend.
   // Connected ito sa Register page. Kahit incomplete pa yung ibang details (kasi sa Onboarding pa yun),
   // gagawa na tayo ng record sa backend/Firestore via API para may connection na.
-  const register = async (email, password, fullName, role, department, studentIdOrEmployeeId) => {
+  const register = async (email, password, fullName, role, department, studentIdOrEmployeeId, program = '') => {
     setLoading(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
-      const nameParts = fullName.trim().split(' ');
+      const nameParts = (fullName || '').trim().split(' ');
+      const first_name = nameParts[0] || 'User';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
       // Register record directly to Firestore users collection
       try {
         const userRef = doc(db, 'users', result.user.uid);
         const userProfileData = {
           uid: result.user.uid,
           email,
-          first_name: nameParts[0] || 'User',
-          last_name: nameParts.slice(1).join(' ') || '',
-          fullName,
-          role,
-          role_id: role,
-          department,
-          department_id: department,
-          studentIdOrEmployeeId,
+          first_name,
+          last_name,
+          fullName: `${first_name} ${last_name}`.trim(),
+          role: role || 'student',
+          role_id: role || 'student',
+          department: department || 'Information Technology',
+          department_id: department || 'Information Technology',
+          program: program || '',
+          studentIdOrEmployeeId: studentIdOrEmployeeId || '',
           status: 'active',
           is_approved: true,
           profile_image: result.user.photoURL || '',
@@ -153,7 +157,7 @@ export const AuthProvider = ({ children }) => {
         console.warn('[AuthContext] Firestore registration warning:', dbErr.message);
       }
 
-      await syncProfileWithBackend(result.user, role);
+      await syncProfileWithBackend(result.user, role || 'student');
       return result;
     } catch (error) {
       throw error;
@@ -222,7 +226,31 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfileLocal = (updatedData) => {
-    setUserProfile(prev => ({ ...prev, ...updatedData }));
+    setUserProfile(prev => {
+      const merged = { ...prev, ...updatedData };
+      if (devMode || localStorage.getItem('core_research_dev_profile')) {
+        localStorage.setItem('core_research_dev_profile', JSON.stringify(merged));
+      }
+      return merged;
+    });
+  };
+
+  const updateUserProfile = async (updatedData) => {
+    // 1. Update state & dev storage
+    updateProfileLocal(updatedData);
+
+    // 2. If logged in with Firebase, sync to Firestore
+    if (currentUser?.uid && !devMode) {
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await setDoc(userRef, {
+          ...updatedData,
+          updated_at: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[AuthContext] Firestore profile update warning:', err.message);
+      }
+    }
   };
 
 
@@ -315,7 +343,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     resetPassword,
     selectDevRole,
-    updateProfileLocal
+    updateProfileLocal,
+    updateUserProfile
   };
 
 

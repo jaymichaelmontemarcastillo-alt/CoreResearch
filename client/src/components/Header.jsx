@@ -1,6 +1,6 @@
 // src/components/Header.jsx
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Avatar } from "./ui/Avatar";
@@ -11,15 +11,33 @@ import {
   Sun,
   Bell,
   LogOut,
+  User,
+  Lock,
+  ChevronDown,
+  Sparkles,
 } from "lucide-react";
 
 export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const { userProfile, currentUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleLogout = async () => {
+    setProfileDropdownOpen(false);
     await logout();
     navigate("/login");
   };
@@ -28,6 +46,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const getPageTitle = () => {
     const path = location.pathname;
     if (path === "/dashboard") return "Dashboard";
+    if (path === "/profile" || path === "/profile-settings" || path === "/settings") return "Account Settings";
     if (path.startsWith("/manuscripts")) return "Manuscripts";
     if (path.startsWith("/proposals")) return "Title Proposals";
     if (path.startsWith("/documents")) return "Documents";
@@ -48,6 +67,20 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
     currentUser?.displayName ||
     currentUser?.email?.split("@")[0] ||
     "Researcher";
+
+  const avatarSrc = userProfile?.profile_image || currentUser?.photoURL || "";
+
+  const roleLabel =
+    userProfile?.role === "admin"
+      ? "Admin"
+      : userProfile?.role === "research_coordinator"
+      ? "Coordinator"
+      : userProfile?.role === "adviser"
+      ? "Adviser"
+      : userProfile?.role === "panelist"
+      ? "Panelist"
+      : "Student";
+
   return (
     <header
       className={`sticky top-0 z-30 h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between shrink-0 transition-all duration-200 ${
@@ -80,14 +113,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
         </div>
       </div>
 
-      {/* RIGHT SECTION — Sequence matching reference image 2:
-          1. Theme toggle (Moon/Sun)
-          2. Notification bell with red dot
-          3. Vertical divider
-          4. User avatar
-          5. User name
-          6. Logout icon
-      */}
+      {/* RIGHT SECTION — Theme toggle, Notification, Divider, User Avatar & Menu */}
       <div className="flex items-center gap-3 shrink-0">
         {/* 1. Theme Toggle */}
         <button
@@ -111,23 +137,83 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
         {/* 3. Vertical Divider */}
         <div className="h-5 w-px bg-gray-200 dark:bg-slate-800 mx-0.5" />
 
-        {/* 4. User Avatar & 5. User Name */}
-        <div className="flex items-center gap-2.5">
-          <Avatar name={displayName} size="sm" color="blue" />
-          <span className="hidden md:inline-block text-sm font-medium text-gray-900 dark:text-white truncate max-w-[150px]">
-            {displayName}
-          </span>
-        </div>
+        {/* 4. User Profile Dropdown Pill */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 group"
+            title="Account & Profile Settings"
+          >
+            <Avatar name={displayName} src={avatarSrc} size="sm" color="blue" />
+            <span className="hidden md:inline-block text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px] text-left">
+              {displayName}
+            </span>
+            <ChevronDown className={`hidden md:block w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-        {/* 6. Logout Icon Button */}
-        <button
-          onClick={handleLogout}
-          className="p-2 rounded-lg text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition ml-0.5"
-          title="Logout"
-        >
-          <LogOut className="w-4 h-4 text-red-500 dark:text-red-400" />
-        </button>
+          {/* Profile Dropdown Menu */}
+          {profileDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-2 animate-scale-in">
+              {/* User Header Summary */}
+              <div className="p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl mb-1">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {displayName}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                  {userProfile?.email || currentUser?.email || "user@university.edu"}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                    {roleLabel}
+                  </span>
+                  {userProfile?.department && (
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
+                      • {userProfile.department}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Menu Links */}
+              <div className="space-y-0.5 pt-1">
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    navigate("/profile?tab=profile");
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
+                >
+                  <User className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+                  <span>Profile Settings</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    navigate("/profile?tab=password");
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
+                >
+                  <Lock className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+                  <span>Password & Security</span>
+                </button>
+              </div>
+
+              {/* Divider & Logout */}
+              <div className="my-1.5 border-t border-gray-100 dark:border-slate-800" />
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition text-left"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Log out</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
 };
+
