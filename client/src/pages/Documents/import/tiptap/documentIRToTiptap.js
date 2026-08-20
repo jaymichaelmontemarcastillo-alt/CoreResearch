@@ -54,13 +54,24 @@ export class ClientDocumentIRToTiptap {
         const marksContent = this.convertRuns(node.runs);
         const textOnly = node.runs?.map((r) => r.text).join('') || '';
         textPieces.push(textOnly);
-        htmlPieces.push(`<h${node.level}>${this.escapeHtml(textOnly)}</h${node.level}>`);
+
+        const styleAttrs = [];
+        if (node.alignment) styleAttrs.push(`text-align: ${node.alignment}`);
+        if (node.lineSpacing) styleAttrs.push(`line-height: ${node.lineSpacing}`);
+        if (node.spaceBefore) styleAttrs.push(`margin-top: ${node.spaceBefore}`);
+        if (node.spaceAfter) styleAttrs.push(`margin-bottom: ${node.spaceAfter}`);
+
+        const styleStr = styleAttrs.length > 0 ? ` style="${styleAttrs.join('; ')}"` : '';
+        htmlPieces.push(`<h${node.level}${styleStr}>${this.escapeHtml(textOnly)}</h${node.level}>`);
 
         const headingNode = {
           type: 'heading',
           attrs: {
             level: node.level || 1,
             textAlign: node.alignment || 'left',
+            lineHeight: node.lineSpacing || null,
+            spaceBefore: node.spaceBefore || null,
+            spaceAfter: node.spaceAfter || null,
           },
         };
         if (marksContent.length > 0) {
@@ -70,21 +81,52 @@ export class ClientDocumentIRToTiptap {
       }
 
       case 'paragraph': {
+        if (node.listType) {
+          return this.convertListNode(node, textPieces, htmlPieces);
+        }
+
         const marksContent = this.convertRuns(node.runs);
         const textOnly = node.runs?.map((r) => r.text).join('') || '';
         if (textOnly) textPieces.push(textOnly);
-        htmlPieces.push(`<p style="text-align: ${node.alignment || 'left'}">${this.escapeHtml(textOnly)}</p>`);
+
+        const styleAttrs = [];
+        if (node.alignment) styleAttrs.push(`text-align: ${node.alignment}`);
+        if (node.lineSpacing) styleAttrs.push(`line-height: ${node.lineSpacing}`);
+        if (node.spaceBefore) styleAttrs.push(`margin-top: ${node.spaceBefore}`);
+        if (node.spaceAfter) styleAttrs.push(`margin-bottom: ${node.spaceAfter}`);
+
+        const styleStr = styleAttrs.length > 0 ? ` style="${styleAttrs.join('; ')}"` : '';
+        htmlPieces.push(`<p${styleStr}>${this.escapeHtml(textOnly)}</p>`);
 
         const pNode = {
           type: 'paragraph',
           attrs: {
             textAlign: node.alignment || 'left',
+            lineHeight: node.lineSpacing || null,
+            spaceBefore: node.spaceBefore || null,
+            spaceAfter: node.spaceAfter || null,
           },
         };
         if (marksContent.length > 0) {
           pNode.content = marksContent;
         }
         return pNode;
+      }
+
+      case 'list': {
+        const listType = node.ordered ? 'orderedList' : 'bulletList';
+        const items = (node.items || []).map((item) => {
+          const itemNode = this.convertNode(item, textPieces, htmlPieces);
+          return {
+            type: 'listItem',
+            content: Array.isArray(itemNode) ? itemNode : [itemNode || { type: 'paragraph', content: [] }],
+          };
+        });
+
+        return {
+          type: listType,
+          content: items,
+        };
       }
 
       case 'table': {
@@ -97,7 +139,7 @@ export class ClientDocumentIRToTiptap {
             htmlPieces.push('<tr>');
 
             if (Array.isArray(row.cells)) {
-              row.cells.forEach((cell) => {
+              row.cells.forEach((cell, cellIdx) => {
                 const cellType = cell.isHeader ? 'tableHeader' : 'tableCell';
                 const cellContent = [];
 
@@ -115,6 +157,8 @@ export class ClientDocumentIRToTiptap {
                   cellContent.push({ type: 'paragraph', content: [] });
                 }
 
+                const colWidth = Array.isArray(node.colWidths) && node.colWidths[cellIdx] ? [node.colWidths[cellIdx]] : null;
+
                 htmlPieces.push(cell.isHeader ? '<th>' : '<td>');
                 htmlPieces.push(cell.isHeader ? '</th>' : '</td>');
 
@@ -123,7 +167,9 @@ export class ClientDocumentIRToTiptap {
                   attrs: {
                     colspan: cell.colSpan || 1,
                     rowspan: cell.rowSpan || 1,
-                    colwidth: null,
+                    colwidth: colWidth,
+                    backgroundColor: cell.backgroundColor || null,
+                    borderColor: cell.borderColor || null,
                   },
                   content: cellContent,
                 });
@@ -147,13 +193,17 @@ export class ClientDocumentIRToTiptap {
       }
 
       case 'image': {
-        htmlPieces.push(`<img src="${node.src || ''}" alt="${this.escapeHtml(node.alt || '')}" />`);
+        htmlPieces.push(`<img src="${node.src || ''}" alt="${this.escapeHtml(node.alt || '')}" style="width: ${node.width ? `${node.width}px` : 'auto'};" />`);
         return {
           type: 'image',
           attrs: {
             src: node.src || '',
             alt: node.alt || 'Document Image',
             title: node.alt || '',
+            width: node.width || null,
+            height: node.height || null,
+            alignment: node.alignment || 'center',
+            caption: node.caption || '',
           },
         };
       }
@@ -168,6 +218,37 @@ export class ClientDocumentIRToTiptap {
       default:
         return null;
     }
+  }
+
+  convertListNode(pNode, textPieces, htmlPieces) {
+    const listTag = pNode.listType === 'ordered' ? 'ol' : 'ul';
+    const listSchemaType = pNode.listType === 'ordered' ? 'orderedList' : 'bulletList';
+    const marksContent = this.convertRuns(pNode.runs);
+    const textOnly = pNode.runs?.map((r) => r.text).join('') || '';
+    if (textOnly) textPieces.push(textOnly);
+
+    htmlPieces.push(`<${listTag}><li>${this.escapeHtml(textOnly)}</li></${listTag}>`);
+
+    const paragraphInside = {
+      type: 'paragraph',
+      attrs: {
+        textAlign: pNode.alignment || 'left',
+        lineHeight: pNode.lineSpacing || null,
+      },
+    };
+    if (marksContent.length > 0) {
+      paragraphInside.content = marksContent;
+    }
+
+    return {
+      type: listSchemaType,
+      content: [
+        {
+          type: 'listItem',
+          content: [paragraphInside],
+        },
+      ],
+    };
   }
 
   convertRuns(runs) {
@@ -190,6 +271,7 @@ export class ClientDocumentIRToTiptap {
       if (run.fontFamily) textStyleAttrs.fontFamily = run.fontFamily;
       if (run.fontSize) textStyleAttrs.fontSize = run.fontSize;
       if (run.color) textStyleAttrs.color = run.color;
+      if (run.lineHeight) textStyleAttrs.lineHeight = run.lineHeight;
 
       if (Object.keys(textStyleAttrs).length > 0) {
         marks.push({

@@ -226,26 +226,43 @@ const saveBlob = (blob, fileName) => {
 };
 
 /**
- * Extract text from an uploaded text/HTML/DOCX file
+ * Extract rich HTML from an uploaded text/HTML/DOCX/PDF file with formatting preservation
  */
-export const extractTextFromFile = (file) => {
+export const extractTextFromFile = async (file) => {
+  if (!file) return '';
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+  try {
+    if (ext === 'docx') {
+      const { clientDocxParser } = await import('../pages/Documents/import/docx/ClientDocxParser');
+      const { clientDocumentIRToTiptap } = await import('../pages/Documents/import/tiptap/documentIRToTiptap');
+      const ir = await clientDocxParser.parse(file, file.name);
+      const { contentHtml } = clientDocumentIRToTiptap.convert(ir);
+      return contentHtml;
+    } else if (ext === 'pdf') {
+      const { clientPdfParser } = await import('../pages/Documents/import/pdf/ClientPdfParser');
+      const { clientDocumentIRToTiptap } = await import('../pages/Documents/import/tiptap/documentIRToTiptap');
+      const ir = await clientPdfParser.parse(file, file.name);
+      const { contentHtml } = clientDocumentIRToTiptap.convert(ir);
+      return contentHtml;
+    } else if (file.type === 'text/plain' || file.type === 'text/html' || ext === 'txt' || ext === 'html') {
+      return await file.text();
+    }
+  } catch (err) {
+    console.warn('[manuscriptExporter] High-fidelity extract fallback:', err.message);
+  }
+
+  // Fallback text reader
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-
-    if (file.type === "text/plain" || file.type === "text/html" || file.name.endsWith(".txt")) {
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (e) => reject(e);
-      reader.readAsText(file);
-    } else {
-      // For binary files like PDF or DOCX, read text or provide simulated formatted preview
-      reader.onload = (e) => {
-        const text = e.target.result;
-        // Simple plain-text fallback extraction
-        const cleanText = text.replace(/[^\x20-\x7E\n\r]/g, " ").replace(/\s+/g, " ");
-        resolve(`<h2>Imported File: ${file.name}</h2><p>${cleanText.slice(0, 4000)}...</p>`);
-      };
-      reader.onerror = (e) => reject(e);
-      reader.readAsText(file);
-    }
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const cleanText = typeof text === 'string' ? text.replace(/[^\x20-\x7E\n\r]/g, ' ').replace(/\s+/g, ' ') : '';
+      resolve(`<h2>Imported File: ${file.name}</h2><p>${cleanText.slice(0, 4000)}...</p>`);
+    };
+    reader.onerror = (e) => reject(e);
+    reader.readAsText(file);
   });
 };
+

@@ -6,6 +6,7 @@ import {
   createHeadingNode,
   createPageBreakNode,
   createTableNode,
+  createTableCell,
   createImageNode,
   createTextRun,
 } from '../ir/DocumentIR';
@@ -47,12 +48,11 @@ export class ClientDocxParser {
             const ext = target.split('.').pop()?.toLowerCase() || 'png';
             const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'svg' ? 'image/svg+xml' : 'image/png';
             const base64 = await imgFile.async('base64');
-            // Guard: If image is within Firestore inline budget (< 64KB), allow inline dataUrl; otherwise use placeholder reference
-            if (base64.length < 65536) {
+            if (base64.length < 524288) {
               const dataUrl = `data:${mimeType};base64,${base64}`;
               imageMap.set(id, dataUrl);
             } else {
-              imageMap.set(id, ''); // Large images will be handled via external storage provider
+              imageMap.set(id, '');
             }
           }
         }
@@ -73,6 +73,10 @@ export class ClientDocxParser {
     const nodes = [];
     let detectedPageSize = 'letter';
     let detectedOrientation = 'portrait';
+    let marginTop = '1in';
+    let marginBottom = '1in';
+    let marginLeft = '1in';
+    let marginRight = '1in';
 
     if (body) {
       const children = body.childNodes;
@@ -96,8 +100,19 @@ export class ClientDocxParser {
             const w = parseInt(pgSz.getAttribute('w:w') || '12240', 10);
             const h = parseInt(pgSz.getAttribute('w:h') || '15840', 10);
             if (w > h) detectedOrientation = 'landscape';
-            if (Math.abs(w - 11906) < 200) detectedPageSize = 'a4';
+            if (Math.abs(w - 11906) < 300) detectedPageSize = 'a4';
             else if (h > 18000) detectedPageSize = 'legal';
+          }
+          const pgMar = child.getElementsByTagName('w:pgMar')[0];
+          if (pgMar) {
+            const top = (parseInt(pgMar.getAttribute('w:top') || '1440', 10) / 1440).toFixed(2);
+            const bottom = (parseInt(pgMar.getAttribute('w:bottom') || '1440', 10) / 1440).toFixed(2);
+            const left = (parseInt(pgMar.getAttribute('w:left') || '1440', 10) / 1440).toFixed(2);
+            const right = (parseInt(pgMar.getAttribute('w:right') || '1440', 10) / 1440).toFixed(2);
+            marginTop = `${top}in`;
+            marginBottom = `${bottom}in`;
+            marginLeft = `${left}in`;
+            marginRight = `${right}in`;
           }
         }
       }
@@ -116,10 +131,10 @@ export class ClientDocxParser {
       pageSettings: {
         size: detectedPageSize,
         orientation: detectedOrientation,
-        marginTop: '1in',
-        marginBottom: '1in',
-        marginLeft: '1in',
-        marginRight: '1in',
+        marginTop,
+        marginBottom,
+        marginLeft,
+        marginRight,
       },
       nodes,
       assets: [],
@@ -132,6 +147,10 @@ export class ClientDocxParser {
 
     // Alignment
     let alignment = 'left';
+    let lineSpacing = null;
+    let spaceBefore = null;
+    let spaceAfter = null;
+
     if (pPr) {
       const jc = pPr.getElementsByTagName('w:jc')[0];
       if (jc) {
@@ -139,6 +158,18 @@ export class ClientDocxParser {
         if (val === 'center') alignment = 'center';
         else if (val === 'right') alignment = 'right';
         else if (val === 'both' || val === 'justify') alignment = 'justify';
+      }
+
+      const spacing = pPr.getElementsByTagName('w:spacing')[0];
+      if (spacing) {
+        const lineVal = parseInt(spacing.getAttribute('w:line') || '', 10);
+        if (!isNaN(lineVal)) {
+          lineSpacing = (lineVal / 240).toFixed(2);
+        }
+        const befVal = parseInt(spacing.getAttribute('w:before') || '', 10);
+        if (!isNaN(befVal)) spaceBefore = `${Math.round(befVal / 20)}pt`;
+        const aftVal = parseInt(spacing.getAttribute('w:after') || '', 10);
+        if (!isNaN(aftVal)) spaceAfter = `${Math.round(aftVal / 20)}pt`;
       }
     }
 
@@ -152,12 +183,21 @@ export class ClientDocxParser {
         if (/heading\s*1|title/i.test(styleVal)) {
           isHeading = true;
           headingLevel = 1;
-        } else if (/heading\s*2/i.test(styleVal)) {
+        } else if (/heading\s*2|subtitle/i.test(styleVal)) {
           isHeading = true;
           headingLevel = 2;
         } else if (/heading\s*3/i.test(styleVal)) {
           isHeading = true;
           headingLevel = 3;
+        } else if (/heading\s*4/i.test(styleVal)) {
+          isHeading = true;
+          headingLevel = 4;
+        } else if (/heading\s*5/i.test(styleVal)) {
+          isHeading = true;
+          headingLevel = 5;
+        } else if (/heading\s*6/i.test(styleVal)) {
+          isHeading = true;
+          headingLevel = 6;
         }
       }
     }
@@ -169,10 +209,24 @@ export class ClientDocxParser {
       if (blip) {
         const embedId = blip.getAttribute('r:embed');
         if (embedId && imageMap.has(embedId)) {
+          // Dimensions
+          let width = null;
+          let height = null;
+          const extent = drawings[d].getElementsByTagName('wp:extent')[0];
+          if (extent) {
+            const cx = parseInt(extent.getAttribute('cx') || '0', 10);
+            const cy = parseInt(extent.getAttribute('cy') || '0', 10);
+            if (cx > 0) width = Math.round(cx / 9525);
+            if (cy > 0) height = Math.round(cy / 9525);
+          }
+
           resultNodes.push(
             createImageNode({
               src: imageMap.get(embedId),
               alt: 'Document Image',
+              width,
+              height,
+              alignment: 'center',
             })
           );
         }
@@ -245,19 +299,19 @@ export class ClientDocxParser {
           fontFamily,
           fontSize,
           color,
+          lineHeight: lineSpacing,
         })
       );
     }
 
     if (runs.length > 0) {
       if (isHeading) {
-        resultNodes.push(createHeadingNode({ level: headingLevel, alignment, runs }));
+        resultNodes.push(createHeadingNode({ level: headingLevel, alignment, lineSpacing, spaceBefore, spaceAfter, runs }));
       } else {
-        resultNodes.push(createParagraphNode({ alignment, runs }));
+        resultNodes.push(createParagraphNode({ alignment, lineSpacing, spaceBefore, spaceAfter, runs }));
       }
     } else if (resultNodes.length === 0) {
-      // Preserve vertical spacer paragraph
-      resultNodes.push(createParagraphNode({ alignment, runs: [] }));
+      resultNodes.push(createParagraphNode({ alignment, lineSpacing, spaceBefore, spaceAfter, runs: [] }));
     }
 
     return resultNodes;
@@ -277,11 +331,17 @@ export class ClientDocxParser {
         const tcPr = tcElem.getElementsByTagName('w:tcPr')[0];
         let colSpan = 1;
         let rowSpan = 1;
+        let backgroundColor = null;
 
         if (tcPr) {
           const gridSpan = tcPr.getElementsByTagName('w:gridSpan')[0];
           if (gridSpan) {
             colSpan = parseInt(gridSpan.getAttribute('w:val') || '1', 10);
+          }
+          const shd = tcPr.getElementsByTagName('w:shd')[0];
+          if (shd) {
+            const fill = shd.getAttribute('w:fill');
+            if (fill && fill !== 'auto') backgroundColor = `#${fill}`;
           }
         }
 
@@ -299,12 +359,15 @@ export class ClientDocxParser {
           cellContent.push(createParagraphNode({ runs: [createTextRun({ text: '' })] }));
         }
 
-        cells.push({
-          isHeader: r === 0,
-          colSpan,
-          rowSpan,
-          content: cellContent,
-        });
+        cells.push(
+          createTableCell({
+            isHeader: r === 0,
+            colSpan,
+            rowSpan,
+            backgroundColor,
+            content: cellContent,
+          })
+        );
       }
 
       if (cells.length > 0) {

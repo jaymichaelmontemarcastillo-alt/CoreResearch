@@ -5,9 +5,9 @@ import {
   createParagraphNode,
   createHeadingNode,
   createPageBreakNode,
-  createImageNode,
   createTextRun,
 } from '../ir/DocumentIR';
+import { PdfLayoutAnalyzer } from './PdfLayoutAnalyzer';
 
 // Configure PDF.js worker in Vite
 try {
@@ -83,20 +83,17 @@ export class ClientPdfParser {
       }
 
       const textContent = await page.getTextContent();
-      const items = textContent.items || [];
+      const rawItems = textContent.items || [];
 
-      if (items.length === 0) continue;
+      if (rawItems.length === 0) continue;
 
-      // Group text items by vertical coordinate (Y-axis)
-      const lineMap = new Map();
-
-      items.forEach((item) => {
+      const processedItems = [];
+      rawItems.forEach((item) => {
         if (!item.str || !item.str.trim()) return;
 
         const y = Math.round(item.transform?.[5] || 0);
         const x = Math.round(item.transform?.[4] || 0);
         const scaleX = item.transform?.[0] || 12;
-        const scaleY = item.transform?.[3] || 12;
         const fontSize = Math.abs(Math.round(Math.hypot(scaleX, item.transform?.[1] || 0) || item.height || 12));
         const itemWidth = item.width || (item.str.length * fontSize * 0.55);
 
@@ -105,23 +102,10 @@ export class ClientPdfParser {
         const isItalic = /italic|oblique/i.test(rawFontName);
         const fontFamily = normalizeFontFamily(rawFontName);
 
-        // Find existing line bucket within 4px tolerance
-        let foundKey = null;
-        for (const key of lineMap.keys()) {
-          if (Math.abs(key - y) <= 4) {
-            foundKey = key;
-            break;
-          }
-        }
-
-        const bucketKey = foundKey !== null ? foundKey : y;
-        if (!lineMap.has(bucketKey)) {
-          lineMap.set(bucketKey, []);
-        }
-
-        lineMap.get(bucketKey).push({
+        processedItems.push({
           text: item.str,
           x,
+          y,
           width: itemWidth,
           maxX: x + itemWidth,
           fontSize,
@@ -132,13 +116,33 @@ export class ClientPdfParser {
         });
       });
 
-      // Sort lines from top to bottom (PDF Y goes 0 at bottom to height at top)
+      // Sort items by reading order (handling 2-column papers)
+      const sortedItems = PdfLayoutAnalyzer.sortReadingOrder(processedItems, pageWidth);
+
+      // Group items into horizontal lines
+      const lineMap = new Map();
+      sortedItems.forEach((item) => {
+        let foundKey = null;
+        for (const key of lineMap.keys()) {
+          if (Math.abs(key - item.y) <= 4) {
+            foundKey = key;
+            break;
+          }
+        }
+
+        const bucketKey = foundKey !== null ? foundKey : item.y;
+        if (!lineMap.has(bucketKey)) {
+          lineMap.set(bucketKey, []);
+        }
+        lineMap.get(bucketKey).push(item);
+      });
+
       const sortedYKeys = Array.from(lineMap.keys()).sort((a, b) => b - a);
 
       let prevY = null;
       let currentParagraphLines = [];
 
-      sortedYKeys.forEach((yKey, index) => {
+      sortedYKeys.forEach((yKey) => {
         const lineItems = lineMap.get(yKey).sort((a, b) => a.x - b.x);
         if (lineItems.length === 0) return;
 
@@ -150,13 +154,11 @@ export class ClientPdfParser {
           const deltaY = prevY - yKey;
           const avgFontSize = lineItems[0]?.fontSize || 12;
 
-          // If there is a significant vertical gap (e.g. 2.5x font size), flush and add empty spacer
           if (deltaY > avgFontSize * 2.4) {
             if (currentParagraphLines.length > 0) {
               nodes.push(this.buildNodeFromLineGroup(currentParagraphLines, pageWidth, pageCenter));
               currentParagraphLines = [];
             }
-            // Add vertical spacer paragraph
             nodes.push(createParagraphNode({ alignment: 'center', runs: [] }));
           }
         }
@@ -176,17 +178,14 @@ export class ClientPdfParser {
           /^(abstract|introduction|background|methodology|system architecture|results|discussion|conclusion|references|chapter\s+\d+|[0-9]+\.\s+[A-Z])/i.test(lineText);
 
         if (isHeading || isCentered) {
-          // Flush existing paragraph
           if (currentParagraphLines.length > 0) {
             nodes.push(this.buildNodeFromLineGroup(currentParagraphLines, pageWidth, pageCenter));
             currentParagraphLines = [];
           }
-          // Process heading / centered line immediately
           nodes.push(this.buildNodeFromLineGroup([lineItems], pageWidth, pageCenter, isHeading));
         } else {
           currentParagraphLines.push(lineItems);
 
-          // Flush on sentence terminator or line break
           const isParagraphEnd = /[.?!:;]$/.test(lineText) || lineItems.some((it) => it.hasEOL);
           if (isParagraphEnd) {
             nodes.push(this.buildNodeFromLineGroup(currentParagraphLines, pageWidth, pageCenter));
@@ -200,7 +199,6 @@ export class ClientPdfParser {
         currentParagraphLines = [];
       }
 
-      // Page break between pages
       if (pageNum < numPages) {
         nodes.push(createPageBreakNode());
       }
@@ -229,9 +227,6 @@ export class ClientPdfParser {
     });
   }
 
-  /**
-   * Builds high-fidelity DocumentIR node with runs and inferred alignment
-   */
   buildNodeFromLineGroup(lineGroup, pageWidth, pageCenter, forceHeading = false) {
     const allItems = lineGroup.flat();
     if (allItems.length === 0) {
@@ -243,7 +238,6 @@ export class ClientPdfParser {
     const lineWidth = maxX - minX;
     const lineMid = (minX + maxX) / 2;
 
-    // Alignment inference
     let alignment = 'left';
     if (lineWidth < pageWidth * 0.82 && Math.abs(lineMid - pageCenter) <= 32) {
       alignment = 'center';
@@ -253,11 +247,10 @@ export class ClientPdfParser {
       alignment = 'justify';
     }
 
-    // Build text runs preserving font family, font size, bold, and italic
     const runs = [];
     let currentRun = null;
 
-    allItems.forEach((item, idx) => {
+    allItems.forEach((item) => {
       const text = item.text;
       if (!text) return;
 
@@ -273,7 +266,6 @@ export class ClientPdfParser {
         currentRun.bold === isBold &&
         currentRun.italic === isItalic
       ) {
-        // Append text to existing continuous run
         currentRun.text += (currentRun.text.endsWith(' ') || text.startsWith(' ') ? '' : ' ') + text;
       } else {
         if (currentRun) {

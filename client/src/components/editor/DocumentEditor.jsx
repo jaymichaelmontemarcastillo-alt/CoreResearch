@@ -35,9 +35,7 @@ export const FontFamily = Extension.create({
             default: null,
             parseHTML: (element) => element.style.fontFamily?.replace(/['"]/g, '') || null,
             renderHTML: (attributes) => {
-              if (!attributes.fontFamily) {
-                return {};
-              }
+              if (!attributes.fontFamily) return {};
               return {
                 style: `font-family: ${attributes.fontFamily}`,
               };
@@ -76,9 +74,7 @@ export const FontSize = Extension.create({
             default: null,
             parseHTML: (element) => element.style.fontSize || null,
             renderHTML: (attributes) => {
-              if (!attributes.fontSize) {
-                return {};
-              }
+              if (!attributes.fontSize) return {};
               return {
                 style: `font-size: ${attributes.fontSize}`,
               };
@@ -95,6 +91,149 @@ export const FontSize = Extension.create({
       },
       unsetFontSize: () => ({ chain }) => {
         return chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run();
+      },
+    };
+  },
+});
+
+// Custom LineHeight Extension for Paragraph & Heading blocks
+export const LineHeight = Extension.create({
+  name: 'lineHeight',
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          lineHeight: {
+            default: null,
+            parseHTML: (element) => element.style.lineHeight || null,
+            renderHTML: (attributes) => {
+              if (!attributes.lineHeight) return {};
+              return {
+                style: `line-height: ${attributes.lineHeight}`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
+// Custom ParagraphSpacing Extension (spaceBefore & spaceAfter)
+export const ParagraphSpacing = Extension.create({
+  name: 'paragraphSpacing',
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          spaceBefore: {
+            default: null,
+            parseHTML: (element) => element.style.marginTop || null,
+            renderHTML: (attributes) => {
+              if (!attributes.spaceBefore) return {};
+              return {
+                style: `margin-top: ${attributes.spaceBefore}`,
+              };
+            },
+          },
+          spaceAfter: {
+            default: null,
+            parseHTML: (element) => element.style.marginBottom || null,
+            renderHTML: (attributes) => {
+              if (!attributes.spaceAfter) return {};
+              return {
+                style: `margin-bottom: ${attributes.spaceAfter}`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
+// Custom TableCell with background shading & border color support
+export const CustomTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (element) => element.style.backgroundColor || null,
+        renderHTML: (attributes) => {
+          if (!attributes.backgroundColor) return {};
+          return {
+            style: `background-color: ${attributes.backgroundColor}`,
+          };
+        },
+      },
+      borderColor: {
+        default: null,
+        parseHTML: (element) => element.style.borderColor || null,
+        renderHTML: (attributes) => {
+          if (!attributes.borderColor) return {};
+          return {
+            style: `border-color: ${attributes.borderColor}`,
+          };
+        },
+      },
+    };
+  },
+});
+
+// Custom Image with explicit width/height & alignment
+export const CustomImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('width') || element.style.width || null,
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {};
+          return {
+            width: attributes.width,
+            style: `width: ${attributes.width}px; max-width: 100%; height: auto;`,
+          };
+        },
+      },
+      height: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('height') || null,
+        renderHTML: (attributes) => {
+          if (!attributes.height) return {};
+          return { height: attributes.height };
+        },
+      },
+      alignment: {
+        default: 'center',
+        parseHTML: (element) => element.getAttribute('data-alignment') || 'center',
+        renderHTML: (attributes) => {
+          return {
+            'data-alignment': attributes.alignment || 'center',
+            class: `image-align-${attributes.alignment || 'center'}`,
+          };
+        },
+      },
+      caption: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-caption') || '',
+        renderHTML: (attributes) => {
+          if (!attributes.caption) return {};
+          return { 'data-caption': attributes.caption };
+        },
       },
     };
   },
@@ -139,14 +278,16 @@ export const DocumentEditor = ({
       TextStyle,
       FontFamily,
       FontSize,
+      LineHeight,
+      ParagraphSpacing,
       Color,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Image.configure({ inline: true, allowBase64: true }),
+      CustomImage.configure({ inline: true, allowBase64: true }),
       Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
-      TableCell,
+      CustomTableCell,
     ];
 
     if (ydoc) {
@@ -257,7 +398,7 @@ export const DocumentEditor = ({
 
   return (
     <div className="document-editor-container flex justify-center py-6">
-      {/* Editor CSS styles for ProseMirror, Carets, Selection and Tables */}
+      {/* Editor CSS styles for ProseMirror, Carets, Selection, Tables, Page Breaks, and Image alignment */}
       <style>{`
         .ProseMirror {
           width: ${pageStyle.width};
@@ -342,6 +483,48 @@ export const DocumentEditor = ({
           pointer-events: none;
         }
 
+        /* Visual Page Breaks */
+        .ProseMirror hr {
+          border: none;
+          border-top: 2px dashed #94a3b8;
+          margin: 2.5rem -${pageSettings?.marginLeft || '1in'} 2.5rem -${pageSettings?.marginRight || '1in'};
+          position: relative;
+        }
+        .ProseMirror hr::after {
+          content: "PAGE BREAK";
+          position: absolute;
+          top: -10px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #f1f5f9;
+          color: #64748b;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid #cbd5e1;
+        }
+
+        /* Image alignment helpers */
+        .ProseMirror img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 4px;
+          margin: 1rem 0;
+          display: block;
+        }
+        .ProseMirror img.image-align-center {
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .ProseMirror img.image-align-left {
+          margin-right: auto;
+        }
+        .ProseMirror img.image-align-right {
+          margin-left: auto;
+        }
+
         /* Manuscript typography defaults */
         .ProseMirror h1 {
           font-size: 1.875rem;
@@ -382,15 +565,11 @@ export const DocumentEditor = ({
           padding-left: 1.5rem;
           margin: 0.5rem 0;
         }
-        .ProseMirror img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 4px;
-          margin: 1rem 0;
-        }
       `}</style>
       
       <EditorContent editor={editor} />
     </div>
   );
 };
+
+export default DocumentEditor;
