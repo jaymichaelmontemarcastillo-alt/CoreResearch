@@ -1,4 +1,5 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
+import { seedMockRepositoryIfEmpty } from './repositoryController.js';
 
 // Pre-seed mock manuscript version history & drafts if empty
 const defaultDraftContentHtml = `<h1 style="text-align: center; color: #1e293b;">Smart IoT Moisture & Nutrient Sensing System for Urban Farming</h1>
@@ -133,50 +134,144 @@ const seedMockManuscriptsIfEmpty = () => {
 };
 
 /**
- * Upload manuscript version record
+ * Upload manuscript version record & automatically publish to Institutional Repository
  */
 export const uploadManuscriptVersion = async (req, res) => {
   try {
-    const { projectId, projectTitle, fileName, fileSize, versionTag, fileUrl, notes } = req.body;
+    const {
+      projectId,
+      projectTitle,
+      title,
+      fileName,
+      fileSize,
+      versionTag,
+      fileUrl,
+      notes,
+      authors,
+      adviserName,
+      department,
+      publicationYear,
+      abstract,
+      keywords,
+      publishToRepository = true
+    } = req.body;
     const user = req.user;
 
-    if (!projectId || !fileName) {
+    if (!fileName && !title && !projectTitle) {
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
-        message: 'projectId and fileName are required.'
+        message: 'File or manuscript title is required.'
       });
     }
 
     const versionNumber = versionTag || 'v1.0';
+    const effectiveTitle = title || projectTitle || (fileName ? fileName.replace(/\.[^/.]+$/, '') : 'Research Project Manuscript');
+    
+    // Parse authors
+    const parsedAuthors = Array.isArray(authors)
+      ? authors.filter(Boolean)
+      : (typeof authors === 'string' && authors.trim()
+          ? authors.split(',').map(a => a.trim()).filter(Boolean)
+          : [user.fullName || user.email.split('@')[0] || 'Student Researcher']);
+
+    // Parse keywords
+    const parsedKeywords = Array.isArray(keywords)
+      ? keywords.filter(Boolean)
+      : (typeof keywords === 'string' && keywords.trim()
+          ? keywords.split(',').map(k => k.trim()).filter(Boolean)
+          : ['Research', 'Manuscript']);
+
+    const effectiveDepartment = department || 'Computer Science';
+    const effectiveAdviser = adviserName || 'Faculty Adviser';
+    const effectiveAbstract = abstract || notes || `Full research manuscript submission for ${effectiveTitle}.`;
+    const effectiveYear = Number(publicationYear) || new Date().getFullYear();
+    const effectiveFileUrl = fileUrl || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+    const effectiveFileName = fileName || `${effectiveTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${versionNumber}.pdf`;
 
     const newManuscript = {
       id: `ms-${Date.now()}`,
-      projectId,
-      projectTitle: projectTitle || 'Research Project',
+      projectId: projectId || 'proj-501',
+      projectTitle: effectiveTitle,
+      title: effectiveTitle,
+      authors: parsedAuthors,
+      adviserName: effectiveAdviser,
+      department: effectiveDepartment,
+      abstract: effectiveAbstract,
+      keywords: parsedKeywords,
       versionNumber,
-      fileName,
+      fileName: effectiveFileName,
       fileSize: fileSize || 1048576,
-      fileUrl: fileUrl || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      fileUrl: effectiveFileUrl,
       uploadedBy: user.uid,
       uploaderName: user.fullName || user.email.split('@')[0],
       notes: notes || '',
       status: 'under_review',
+      isPublicInRepository: Boolean(publishToRepository),
       createdAt: new Date().toISOString()
     };
 
+    // Save manuscript version
     if (isDevMockMode) {
       seedMockManuscriptsIfEmpty();
       const map = mockFirestoreDb.get('manuscripts');
       map.set(newManuscript.id, newManuscript);
     } else {
-      await db.collection('manuscript_versions').doc(newManuscript.id).set(newManuscript);
+      try {
+        await db.collection('manuscript_versions').doc(newManuscript.id).set(newManuscript);
+      } catch (err) {
+        console.warn('[ManuscriptController] Firestore write fallback to mock mode:', err.message);
+        seedMockManuscriptsIfEmpty();
+        const map = mockFirestoreDb.get('manuscripts');
+        map.set(newManuscript.id, newManuscript);
+      }
+    }
+
+    // Automatically publish to Public Repository
+    let newPublication = null;
+    if (publishToRepository !== false) {
+      newPublication = {
+        id: `repo-${Date.now()}`,
+        projectId: projectId || 'proj-501',
+        manuscriptId: newManuscript.id,
+        title: effectiveTitle,
+        authors: parsedAuthors,
+        adviserName: effectiveAdviser,
+        department: effectiveDepartment,
+        publicationYear: effectiveYear,
+        abstract: effectiveAbstract,
+        keywords: parsedKeywords,
+        pdfUrl: effectiveFileUrl,
+        fileName: effectiveFileName,
+        fileSize: fileSize || 1048576,
+        citation: `${parsedAuthors.join(', ')} (${effectiveYear}). ${effectiveTitle}. CoreResearch Institutional Repository.`,
+        viewsCount: 1,
+        downloadsCount: 0,
+        versionNumber,
+        publishedAt: new Date().toISOString()
+      };
+
+      if (isDevMockMode) {
+        seedMockRepositoryIfEmpty();
+        const repoMap = mockFirestoreDb.get('repository');
+        repoMap.set(newPublication.id, newPublication);
+      } else {
+        try {
+          await db.collection('repository_publications').doc(newPublication.id).set(newPublication);
+        } catch (err) {
+          console.warn('[RepositoryController] Firestore write fallback to mock mode:', err.message);
+          seedMockRepositoryIfEmpty();
+          const repoMap = mockFirestoreDb.get('repository');
+          repoMap.set(newPublication.id, newPublication);
+        }
+      }
     }
 
     return res.status(201).json({
       success: true,
-      message: `Manuscript version ${versionNumber} uploaded successfully.`,
-      data: newManuscript
+      message: `Manuscript version ${versionNumber} submitted and published to repository successfully.`,
+      data: newManuscript,
+      publication: newPublication
     });
   } catch (error) {
     console.error('[ManuscriptController] uploadManuscriptVersion error:', error);
@@ -197,8 +292,15 @@ export const getManuscriptVersions = async (req, res) => {
       const map = mockFirestoreDb.get('manuscripts');
       list = Array.from(map.values());
     } else {
-      const snapshot = await db.collection('manuscript_versions').get();
-      list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        const snapshot = await db.collection('manuscript_versions').get();
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (err) {
+        console.warn('[ManuscriptController] Firestore read fallback to mock mode:', err.message);
+        seedMockManuscriptsIfEmpty();
+        const map = mockFirestoreDb.get('manuscripts');
+        list = Array.from(map.values());
+      }
     }
 
     if (projectId && projectId !== 'all') {

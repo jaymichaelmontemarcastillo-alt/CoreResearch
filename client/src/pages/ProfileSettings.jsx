@@ -30,35 +30,7 @@ import { ImageCropModal } from "../components/ui/ImageCropModal";
 const COLLEGES_DATA = {
   "College of Computer Studies": [
     "Department of Computer Science",
-    "Department of Information Technology",
-    "Department of Information Systems",
-  ],
-  "College of Engineering": [
-    "Department of Computer Engineering",
-    "Department of Electrical Engineering",
-    "Department of Electronics Engineering",
-    "Department of Civil Engineering",
-    "Department of Mechanical Engineering",
-    "Department of Industrial Engineering",
-  ],
-  "College of Science": [
-    "Department of Mathematics",
-    "Department of Physics",
-    "Department of Chemistry",
-    "Department of Biology",
-  ],
-  "College of Business and Accountancy": [
-    "Department of Accountancy",
-    "Department of Business Administration",
-    "Department of Marketing",
-    "Department of Financial Management",
-  ],
-  "College of Education, Arts and Sciences": [
-    "Department of Education",
-    "Department of Psychology",
-    "Department of Communication",
-    "Department of Languages and Humanities",
-  ],
+    "Department of Information Technology",]
 };
 
 export const ProfileSettings = () => {
@@ -114,7 +86,7 @@ export const ProfileSettings = () => {
       setFirstName(fName || "");
       setLastName(lName || "");
       setEmail(userProfile?.email || currentUser?.email || "");
-      
+
       const userCollege = userProfile?.college || "College of Computer Studies";
       setCollege(userCollege);
 
@@ -369,12 +341,12 @@ export const ProfileSettings = () => {
     userProfile?.role === "admin"
       ? "System Administrator"
       : userProfile?.role === "research_coordinator"
-      ? "Research Coordinator"
-      : userProfile?.role === "adviser"
-      ? "Research Adviser"
-      : userProfile?.role === "panelist"
-      ? "Defense Panelist"
-      : "Student Researcher";
+        ? "Research Coordinator"
+        : userProfile?.role === "adviser"
+          ? "Research Adviser"
+          : userProfile?.role === "panelist"
+            ? "Defense Panelist"
+            : "Student Researcher";
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
@@ -396,11 +368,10 @@ export const ProfileSettings = () => {
             {/* Tab: Profile Settings */}
             <button
               onClick={() => handleTabChange("profile")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "profile"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "profile"
                   ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
                 <User className="w-4 h-4 shrink-0" />
@@ -414,11 +385,10 @@ export const ProfileSettings = () => {
             {/* Tab: Password */}
             <button
               onClick={() => handleTabChange("password")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "password"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "password"
                   ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
                 <Lock className="w-4 h-4 shrink-0" />
@@ -432,11 +402,10 @@ export const ProfileSettings = () => {
             {/* Tab: Notifications */}
             <button
               onClick={() => handleTabChange("notifications")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "notifications"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "notifications"
                   ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
                 <Bell className="w-4 h-4 shrink-0" />
@@ -450,11 +419,10 @@ export const ProfileSettings = () => {
             {/* Tab: Verification */}
             <button
               onClick={() => handleTabChange("verification")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "verification"
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "verification"
                   ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-4 h-4 shrink-0" />
@@ -489,11 +457,10 @@ export const ProfileSettings = () => {
               {/* Feedback Alert */}
               {profileFeedback && (
                 <div
-                  className={`p-4 rounded-xl flex items-center gap-3 text-sm animate-fade-in ${
-                    profileFeedback.type === "success"
+                  className={`p-4 rounded-xl flex items-center gap-3 text-sm animate-fade-in ${profileFeedback.type === "success"
                       ? "bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                       : "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400"
-                  }`}
+                    }`}
                 >
                   {profileFeedback.type === "success" ? (
                     <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -747,11 +714,10 @@ export const ProfileSettings = () => {
               {/* Feedback Alert */}
               {passwordFeedback && (
                 <div
-                  className={`p-4 rounded-xl flex items-center gap-3 text-sm animate-fade-in ${
-                    passwordFeedback.type === "success"
+                  className={`p-4 rounded-xl flex items-center gap-3 text-sm animate-fade-in ${passwordFeedback.type === "success"
                       ? "bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                       : "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400"
-                  }`}
+                    }`}
                 >
                   {passwordFeedback.type === "success" ? (
                     <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -843,11 +809,10 @@ export const ProfileSettings = () => {
                 <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl space-y-2 text-xs">
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                        newPassword.length >= 6
+                      className={`w-4 h-4 rounded-full flex items-center justify-center ${newPassword.length >= 6
                           ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
                           : "bg-gray-200 text-gray-400 dark:bg-slate-700 dark:text-gray-500"
-                      }`}
+                        }`}
                     >
                       <Check className="w-3 h-3" />
                     </div>
@@ -864,11 +829,10 @@ export const ProfileSettings = () => {
 
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                        newPassword && confirmNewPassword && newPassword === confirmNewPassword
+                      className={`w-4 h-4 rounded-full flex items-center justify-center ${newPassword && confirmNewPassword && newPassword === confirmNewPassword
                           ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
                           : "bg-gray-200 text-gray-400 dark:bg-slate-700 dark:text-gray-500"
-                      }`}
+                        }`}
                     >
                       <Check className="w-3 h-3" />
                     </div>

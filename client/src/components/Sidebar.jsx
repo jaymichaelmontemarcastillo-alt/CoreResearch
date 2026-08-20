@@ -77,12 +77,6 @@ export const Sidebar = ({
           ]
           : []),
         {
-          label: role === "adviser" ? "My Advisory" : role === "student" ? "Manuscript" : "Manuscripts",
-          path: "/manuscripts",
-          icon: FileText,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
-        },
-        {
           label: "Repository",
           path: "/repository",
           icon: Library,
