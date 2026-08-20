@@ -1,67 +1,132 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   Bold, Italic, Underline, Strikethrough, Subscript, Superscript,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, Undo, Redo, Image as ImageIcon, Table
+  List, ListOrdered, Undo, Redo, Image as ImageIcon, Table,
+  Layout, ChevronDown, Plus, Trash2, Rows, Columns
 } from 'lucide-react';
+import { storageService } from '../../services/storage.service';
 
-const ToolbarButton = ({ onClick, isActive = false, disabled = false, icon: Icon, title }) => (
+const ToolbarButton = ({ onClick, isActive = false, disabled = false, icon: Icon, title, children }) => (
   <button
     type="button"
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-1.5 rounded-sm transition-colors ${
+    className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
       isActive 
-        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' 
+        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 font-medium' 
         : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800'
-    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
   >
-    <Icon className="w-4 h-4" />
+    {Icon && <Icon className="w-4 h-4" />}
+    {children}
   </button>
 );
 
-const Divider = () => <div className="w-[1px] h-5 bg-gray-300 dark:bg-slate-700 mx-1 shrink-0" />;
+const Divider = () => <div className="w-[1px] h-5 bg-gray-200 dark:bg-slate-700 mx-1 shrink-0" />;
 
-export const EditorToolbar = ({ editor }) => {
+const FONT_FAMILIES = [
+  { label: 'Inter (Default)', value: 'Inter, sans-serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+  { label: 'Calibri', value: 'Calibri, Candara, Segoe, sans-serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Courier New', value: '"Courier New", Courier, monospace' },
+  { label: 'Roboto', value: 'Roboto, sans-serif' },
+  { label: 'Merriweather', value: 'Merriweather, serif' },
+];
+
+const FONT_SIZES = [
+  { label: '10 pt', value: '10pt' },
+  { label: '11 pt', value: '11pt' },
+  { label: '12 pt', value: '12pt' },
+  { label: '14 pt', value: '14pt' },
+  { label: '16 pt', value: '16pt' },
+  { label: '18 pt', value: '18pt' },
+  { label: '24 pt', value: '24pt' },
+  { label: '30 pt', value: '30pt' },
+  { label: '36 pt', value: '36pt' },
+];
+
+export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
+  const fileInputRef = useRef(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showTableMenu, setShowTableMenu] = useState(false);
+
   if (!editor) return null;
 
-  const addImage = () => {
-    const url = window.prompt('Enter image URL:');
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
+  // Image Upload handler with Firebase Storage
+  const handleImageFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    try {
+      const folderPath = `document_images/${documentId || 'common'}`;
+      const uploadResult = await storageService.uploadFile(file, folderPath);
+      if (uploadResult?.downloadUrl) {
+        editor.chain().focus().setImage({ src: uploadResult.downloadUrl, alt: file.name }).run();
+      }
+    } catch (err) {
+      console.warn('Firebase Storage upload warning, falling back to FileReader base64:', err);
+      // Local fallback in case storage bucket is offline
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          editor.chain().focus().setImage({ src: event.target.result, alt: file.name }).run();
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const insertTable = () => {
-    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  const handleInsertImageUrl = () => {
+    const url = window.prompt('Enter image web URL:');
+    if (url && url.trim()) {
+      editor.chain().focus().setImage({ src: url.trim() }).run();
+    }
   };
 
+  const handleInsertTable = () => {
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    setShowTableMenu(false);
+  };
+
+  const currentFontFamily = editor.getAttributes('textStyle').fontFamily || '';
+  const currentFontSize = editor.getAttributes('textStyle').fontSize || '';
+
   return (
-    <div className="flex flex-wrap items-center gap-1 overflow-x-auto max-w-full px-2 py-1 scrollbar-hide">
+    <div className="flex flex-wrap items-center gap-1 overflow-x-auto max-w-full px-2 py-1 scrollbar-hide text-xs sm:text-sm">
       
       {/* Undo / Redo */}
       <ToolbarButton
         icon={Undo}
-        title="Undo"
+        title="Undo (Ctrl+Z)"
         onClick={() => editor.chain().focus().undo().run()}
-        disabled={!editor?.can?.()?.chain()?.focus()?.undo()?.run()}
+        disabled={!editor.can().undo()}
       />
       <ToolbarButton
         icon={Redo}
-        title="Redo"
+        title="Redo (Ctrl+Y)"
         onClick={() => editor.chain().focus().redo().run()}
-        disabled={!editor?.can?.()?.chain()?.focus()?.redo()?.run()}
+        disabled={!editor.can().redo()}
       />
 
       <Divider />
 
-      {/* Headings */}
+      {/* Headings Dropdown */}
       <select 
         value={
           editor.isActive('heading', { level: 1 }) ? 'h1' : 
           editor.isActive('heading', { level: 2 }) ? 'h2' : 
           editor.isActive('heading', { level: 3 }) ? 'h3' : 
+          editor.isActive('heading', { level: 4 }) ? 'h4' : 
+          editor.isActive('heading', { level: 5 }) ? 'h5' : 
+          editor.isActive('heading', { level: 6 }) ? 'h6' : 
           'p'
         }
         onChange={(e) => {
@@ -70,13 +135,64 @@ export const EditorToolbar = ({ editor }) => {
           else if (val === 'h1') editor.chain().focus().toggleHeading({ level: 1 }).run();
           else if (val === 'h2') editor.chain().focus().toggleHeading({ level: 2 }).run();
           else if (val === 'h3') editor.chain().focus().toggleHeading({ level: 3 }).run();
+          else if (val === 'h4') editor.chain().focus().toggleHeading({ level: 4 }).run();
+          else if (val === 'h5') editor.chain().focus().toggleHeading({ level: 5 }).run();
+          else if (val === 'h6') editor.chain().focus().toggleHeading({ level: 6 }).run();
         }}
-        className="text-sm bg-transparent border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500"
+        className="text-xs bg-transparent border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-gray-800 dark:text-gray-200 outline-none focus:border-blue-500 font-medium"
+        title="Text Heading Style"
       >
         <option value="p">Normal text</option>
-        <option value="h1">Heading 1</option>
-        <option value="h2">Heading 2</option>
-        <option value="h3">Heading 3</option>
+        <option value="h1">Heading 1 (H1)</option>
+        <option value="h2">Heading 2 (H2)</option>
+        <option value="h3">Heading 3 (H3)</option>
+        <option value="h4">Heading 4 (H4)</option>
+        <option value="h5">Heading 5 (H5)</option>
+        <option value="h6">Heading 6 (H6)</option>
+      </select>
+
+      {/* Font Family Dropdown */}
+      <select
+        value={currentFontFamily}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (val) {
+            editor.chain().focus().setFontFamily(val).run();
+          } else {
+            editor.chain().focus().unsetFontFamily().run();
+          }
+        }}
+        className="text-xs bg-transparent border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-gray-800 dark:text-gray-200 outline-none focus:border-blue-500 max-w-[120px] truncate"
+        title="Font Family"
+      >
+        <option value="">Font: Default</option>
+        {FONT_FAMILIES.map((f) => (
+          <option key={f.label} value={f.value} style={{ fontFamily: f.value }}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+
+      {/* Font Size Dropdown */}
+      <select
+        value={currentFontSize}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (val) {
+            editor.chain().focus().setFontSize(val).run();
+          } else {
+            editor.chain().focus().unsetFontSize().run();
+          }
+        }}
+        className="text-xs bg-transparent border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 text-gray-800 dark:text-gray-200 outline-none focus:border-blue-500"
+        title="Font Size"
+      >
+        <option value="">Size</option>
+        {FONT_SIZES.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.label}
+          </option>
+        ))}
       </select>
 
       <Divider />
@@ -123,21 +239,35 @@ export const EditorToolbar = ({ editor }) => {
       <Divider />
 
       {/* Text Colors */}
-      <input
-        type="color"
-        title="Text Color"
-        onInput={(event) => editor.chain().focus().setColor(event.target.value).run()}
-        value={editor.getAttributes('textStyle').color || '#000000'}
-        className="w-6 h-6 p-0 border-0 rounded cursor-pointer"
-      />
-      
-      <input
-        type="color"
-        title="Highlight Color"
-        onInput={(event) => editor.chain().focus().toggleHighlight({ color: event.target.value }).run()}
-        value={editor.getAttributes('highlight').color || '#ffffff'}
-        className="w-6 h-6 p-0 border-0 rounded cursor-pointer"
-      />
+      <div className="flex items-center gap-1">
+        <label className="relative flex items-center cursor-pointer" title="Text Color">
+          <input
+            type="color"
+            onInput={(event) => editor.chain().focus().setColor(event.target.value).run()}
+            value={editor.getAttributes('textStyle').color || '#000000'}
+            className="w-5 h-5 p-0 border-0 rounded cursor-pointer opacity-0 absolute inset-0"
+          />
+          <div className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600 flex flex-col items-center justify-center font-bold text-[11px]">
+            <span>A</span>
+            <div 
+              className="w-3.5 h-0.5 rounded-full -mt-0.5" 
+              style={{ backgroundColor: editor.getAttributes('textStyle').color || '#000000' }} 
+            />
+          </div>
+        </label>
+        
+        <label className="relative flex items-center cursor-pointer" title="Highlight Color">
+          <input
+            type="color"
+            onInput={(event) => editor.chain().focus().toggleHighlight({ color: event.target.value }).run()}
+            value={editor.getAttributes('highlight').color || '#fef08a'}
+            className="w-5 h-5 p-0 border-0 rounded cursor-pointer opacity-0 absolute inset-0"
+          />
+          <div className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600 flex items-center justify-center bg-yellow-100 text-yellow-800 text-[10px] font-bold">
+            H
+          </div>
+        </label>
+      </div>
 
       <Divider />
 
@@ -185,17 +315,127 @@ export const EditorToolbar = ({ editor }) => {
 
       <Divider />
 
-      {/* Media & Tables */}
+      {/* Media: Image Upload via Firebase Storage */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImageFileSelect}
+        accept="image/*"
+        className="hidden"
+      />
       <ToolbarButton
         icon={ImageIcon}
-        title="Insert Image"
-        onClick={addImage}
-      />
-      <ToolbarButton
-        icon={Table}
-        title="Insert Table"
-        onClick={insertTable}
-      />
+        title="Upload Image to Manuscript (Firebase Storage)"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isUploadingImage}
+      >
+        {isUploadingImage && <span className="text-[10px] animate-pulse">Uploading...</span>}
+      </ToolbarButton>
+
+      {/* Table & Table Operations Dropdown */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setShowTableMenu(!showTableMenu)}
+          title="Table Operations"
+          className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${
+            editor.isActive('table') 
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' 
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Table className="w-4 h-4" />
+          <ChevronDown className="w-3 h-3 text-gray-400" />
+        </button>
+
+        {showTableMenu && (
+          <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 text-xs animate-fade-in">
+            {!editor.isActive('table') ? (
+              <button
+                type="button"
+                onClick={handleInsertTable}
+                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 font-medium text-gray-700 dark:text-gray-200"
+              >
+                <Plus className="w-3.5 h-3.5 text-blue-600" /> Insert Table (3×3)
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().addRowBefore().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <Rows className="w-3.5 h-3.5 text-gray-500" /> Add Row Above
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().addRowAfter().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <Rows className="w-3.5 h-3.5 text-gray-500" /> Add Row Below
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().deleteRow().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 text-red-600 flex items-center gap-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Row
+                </button>
+                <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().addColumnBefore().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <Columns className="w-3.5 h-3.5 text-gray-500" /> Add Column Left
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().addColumnAfter().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <Columns className="w-3.5 h-3.5 text-gray-500" /> Add Column Right
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().deleteColumn().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 text-red-600 flex items-center gap-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Column
+                </button>
+                <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().toggleHeaderRow().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                >
+                  Toggle Header Row
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { editor.chain().focus().deleteTable().run(); setShowTableMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 font-semibold flex items-center gap-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Table
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <Divider />
+
+      {/* Page Setup & Margins Button */}
+      {onOpenPageSettings && (
+        <ToolbarButton
+          icon={Layout}
+          title="Page Setup, Margins & Size"
+          onClick={onOpenPageSettings}
+        >
+          <span className="hidden xl:inline text-xs font-medium">Page Setup</span>
+        </ToolbarButton>
+      )}
     </div>
   );
 };

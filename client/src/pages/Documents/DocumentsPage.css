@@ -1,0 +1,227 @@
+/* src/pages/Documents/DocumentsPage.css */
+
+/* ==========================================================================
+   CoreResearch Documents Workspace (Google Docs-Inspired Design System)
+   ========================================================================== */
+
+.cr-docs-workspace {
+  min-height: calc(100vh - 4rem);
+  color: var(--color-text-primary, #111827);
+  background-color: #ffffff;
+}
+
+.dark .cr-docs-workspace {
+  background-color: #0f172a;
+}
+
+/* 5px Border Radius Standard for Cards & Containers (Per Specification) */
+.cr-doc-card-radius {
+  border-radius: 5px !important;
+}
+
+/* Top Template / "Start a New Document" Section (Pure White Clean Background) */
+.cr-template-section {
+  background-color: #ffffff;
+}
+
+.dark .cr-template-section {
+  background-color: #0f172a;
+}
+
+/* Document Paper Sheet Preview Container (Portrait Aspect Ratio 1:1.35) */
+.cr-paper-sheet {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.35;
+  background-color: #ffffff;
+  border-radius: 5px 5px 0 0;
+  border-bottom: 1px solid #f1f3f5;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+}
+
+.dark .cr-paper-sheet {
+  background-color: #1e293b;
+  border-bottom-color: #334155;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Document Card Wrapper */
+.cr-doc-card {
+  position: relative;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.dark .cr-doc-card {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.cr-doc-card:hover {
+  transform: translateY(-2px);
+  border-color: #2563eb;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+}
+
+.dark .cr-doc-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* Miniature Content Typography Simulation */
+.cr-paper-content {
+  padding: 16px 14px;
+  font-family: 'Times New Roman', Times, serif, 'Inter';
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 88%, #fbfcfd 100%);
+}
+
+.dark .cr-paper-content {
+  background: linear-gradient(180deg, #1e293b 0%, #1e293b 88%, #0f172a 100%);
+}
+
+.cr-paper-header-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.cr-paper-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  color: #111827;
+  line-height: 1.2;
+  margin-bottom: 4px;
+  letter-spacing: 0.2px;
+}
+
+.dark .cr-paper-title {
+  color: #f1f5f9;
+}
+
+.cr-paper-subtitle {
+  font-size: 7px;
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.dark .cr-paper-subtitle {
+  color: #94a3b8;
+}
+
+.cr-paper-heading {
+  font-size: 8px;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
+.dark .cr-paper-heading {
+  color: #e2e8f0;
+}
+
+.cr-paper-text {
+  font-size: 6.5px;
+  line-height: 1.4;
+  color: #4b5563;
+  text-align: justify;
+  margin-bottom: 4px;
+}
+
+.dark .cr-paper-text {
+  color: #cbd5e1;
+}
+
+.cr-paper-lines-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.cr-paper-line {
+  height: 3px;
+  background-color: #e5e7eb;
+  border-radius: 1px;
+}
+
+.dark .cr-paper-line {
+  background-color: #334155;
+}
+
+/* Blank Document Card */
+.cr-blank-template-card {
+  width: 100%;
+  aspect-ratio: 1 / 1.35;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.dark .cr-blank-template-card {
+  background-color: #1e293b;
+  border-color: #374151;
+}
+
+.cr-blank-template-card:hover {
+  border-color: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12);
+}
+
+/* List View Table Styling */
+.cr-doc-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.cr-doc-table-row {
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+
+/* Import Modal Dropzone */
+.cr-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 5px;
+  transition: all 0.2s ease;
+}
+
+.dark .cr-dropzone {
+  border-color: #475569;
+}
+
+.cr-dropzone:hover,
+.cr-dropzone.active {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
+
+.dark .cr-dropzone:hover,
+.dark .cr-dropzone.active {
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.08);
+}

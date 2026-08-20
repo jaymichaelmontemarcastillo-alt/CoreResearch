@@ -1,15 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+// src/pages/DocumentEditorPage.jsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { DocumentEditor } from '../components/editor/DocumentEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { EditorMenuBar } from '../components/editor/EditorMenuBar';
 import { CommentsPanel } from '../components/editor/CommentsPanel';
 import { ShareDialog } from '../components/editor/ShareDialog';
+import { PageSettingsModal } from '../components/editor/PageSettingsModal';
 import { Button } from '../components/ui/Button';
-import { Users, Share2, MessageSquare, ChevronLeft, Save } from 'lucide-react';
+import { 
+  Users, Share2, MessageSquare, ChevronLeft, ChevronRight, Save, Cloud, 
+  CheckCircle2, Wifi, WifiOff, AlertCircle, Maximize2, Minimize2, X,
+  LayoutDashboard, FileSignature, FolderKanban, FileText, Library, CalendarDays, Award
+} from 'lucide-react';
 
-import { documentStore } from '../services/documentStore';
+import { documentStore, DEFAULT_PAGE_SETTINGS } from '../services/documentStore';
+import * as Y from 'yjs';
 
 class EditorErrorBoundary extends React.Component {
   constructor(props) {
@@ -34,10 +41,15 @@ class EditorErrorBoundary extends React.Component {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Editor initialized</h3>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Editor Error</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
-            Click below to reset and reload the editor instance.
+            The document editor encountered an error. Click below to reload the editor instance.
           </p>
+          {this.state.error && (
+            <div className="bg-red-50 text-red-600 text-xs p-2 rounded max-w-lg overflow-auto mb-4 text-left font-mono">
+              {this.state.error.message}
+            </div>
+          )}
           <Button 
             variant="primary" 
             onClick={() => this.setState({ hasError: false, error: null })}
@@ -53,60 +65,435 @@ class EditorErrorBoundary extends React.Component {
 
 export const DocumentEditorPage = () => {
   const { id: documentId } = useParams();
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth();
   const navigate = useNavigate();
   
   const [editor, setEditor] = useState(null);
   const [collaborators, setCollaborators] = useState([]);
   const [showComments, setShowComments] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showPageSettingsModal, setShowPageSettingsModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
   const [title, setTitle] = useState('Untitled Document');
+  const [pageSettings, setPageSettings] = useState(DEFAULT_PAGE_SETTINGS);
+  const [initialContent, setInitialContent] = useState(null);
+  const [documentLoaded, setDocumentLoaded] = useState(false);
+  const [sourceType, setSourceType] = useState('native');
+  
+  // Fullscreen Maximize & Drawer Sidebar state
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isMaximizedSidebarOpen, setIsMaximizedSidebarOpen] = useState(false);
+
+  // Collaborative Provider State
+  const [providerState, setProviderState] = useState({
+    ydoc: null,
+    provider: null,
+    status: 'connecting', // 'connecting', 'connected', 'disconnected'
+    error: null
+  });
+
+  const autoSaveTimeoutRef = useRef(null);
+  const titleSaveTimeoutRef = useRef(null);
 
   const effectiveUserProfile = userProfile || {
-    uid: 'guest-user',
-    fullName: 'Researcher',
-    first_name: 'Researcher',
-    role: 'student'
+    uid: currentUser?.uid || 'guest-user',
+    fullName: userProfile?.fullName || userProfile?.first_name || 'Researcher',
+    first_name: userProfile?.first_name || 'Researcher',
+    role: userProfile?.role || 'student'
   };
 
+  // Keyboard shortcut listener for Escape to exit maximized mode
   useEffect(() => {
-    if (documentId) {
-      const doc = documentStore.getDocument(documentId);
-      setTitle(doc.title || 'Untitled Document');
-    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isMaximized) {
+        if (isMaximizedSidebarOpen) {
+          setIsMaximizedSidebarOpen(false);
+        } else if (!showShareModal && !showPageSettingsModal) {
+          setIsMaximized(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMaximized, isMaximizedSidebarOpen, showShareModal, showPageSettingsModal]);
+
+  // 1. Load authoritative document metadata, settings & content from Firestore
+  useEffect(() => {
+    if (!documentId) return;
+
+    let isMounted = true;
+    const loadDocumentData = async () => {
+      try {
+        const docData = await documentStore.fetchDocument(documentId);
+        if (isMounted && docData) {
+          setTitle(docData.title || 'Untitled Document');
+          setSourceType(docData.sourceType || 'native');
+          if (docData.editorSettings?.page) {
+            setPageSettings(docData.editorSettings.page);
+          }
+          const contentToLoad = docData.content || docData.contentHtml || null;
+          if (contentToLoad) {
+            setInitialContent(contentToLoad);
+          }
+          setDocumentLoaded(true);
+        }
+      } catch (err) {
+        console.warn('Failed to load document from Firestore:', err);
+        if (isMounted) setDocumentLoaded(true);
+      }
+    };
+
+    loadDocumentData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [documentId]);
 
+  // 2. Setup stable Hocuspocus collaboration provider lifecycle
+  useEffect(() => {
+    if (!documentId) return;
+    
+    let isSubscribed = true;
+    let hocuspocusProvider = null;
+    const newYdoc = new Y.Doc();
+    
+    setProviderState({ ydoc: newYdoc, provider: null, status: 'connecting', error: null });
+
+    const initProvider = async () => {
+      let token = `dev-token-${effectiveUserProfile.uid}-${effectiveUserProfile.role}`;
+      if (currentUser) {
+        try {
+          const idToken = await currentUser.getIdToken();
+          if (idToken) token = idToken;
+        } catch (e) {
+          // fallback
+        }
+      }
+
+      if (!isSubscribed) return;
+
+      const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || 'ws://localhost:5000/collaboration';
+
+      try {
+        const { HocuspocusProvider } = await import('@hocuspocus/provider');
+
+        if (!isSubscribed) return;
+
+        hocuspocusProvider = new HocuspocusProvider({
+          url: wsUrl,
+          name: `document-${documentId}`,
+          document: newYdoc,
+          token: token,
+          broadcast: false,
+          maxAttempts: 3,
+          timeout: 4000,
+          parameters: {
+            userId: effectiveUserProfile.uid,
+            role: effectiveUserProfile.role,
+            documentId: documentId
+          },
+          onStatus: (data) => {
+            if (!isSubscribed) return;
+            if (data.status === 'connected') {
+              setProviderState(prev => ({ ...prev, status: 'connected', error: null }));
+            } else if (data.status === 'disconnected') {
+              setProviderState(prev => ({ ...prev, status: 'disconnected' }));
+            } else if (data.status === 'connecting') {
+              setProviderState(prev => ({ ...prev, status: 'connecting' }));
+            }
+          },
+          onClose: () => {
+            if (isSubscribed) {
+              setProviderState(prev => ({ ...prev, status: 'disconnected' }));
+            }
+          },
+          onMessage: () => {
+            if (!isSubscribed) return;
+          },
+          onAwarenessUpdate: ({ states }) => {
+            if (!isSubscribed) return;
+            const users = states.map(state => state.user).filter(Boolean);
+            const uniqueUsers = [];
+            const seen = new Set();
+            users.forEach(u => {
+              if (u && u.id && !seen.has(u.id)) {
+                seen.add(u.id);
+                uniqueUsers.push(u);
+              }
+            });
+            setTimeout(() => {
+              if (isSubscribed) {
+                setCollaborators(uniqueUsers);
+              }
+            }, 0);
+          }
+        });
+
+        hocuspocusProvider.doc = newYdoc;
+        if (hocuspocusProvider.awareness) {
+          hocuspocusProvider.awareness.doc = newYdoc;
+        }
+
+        if (isSubscribed) {
+          setProviderState(prev => ({ ...prev, provider: hocuspocusProvider }));
+        }
+      } catch (err) {
+        console.warn('Hocuspocus provider setup warning:', err);
+        if (isSubscribed) {
+          setProviderState(prev => ({ ...prev, status: 'disconnected', error: err.message }));
+        }
+      }
+    };
+    
+    initProvider();
+
+    return () => {
+      isSubscribed = false;
+      if (hocuspocusProvider) {
+        try { hocuspocusProvider.destroy(); } catch (e) {}
+      }
+      if (newYdoc) {
+        try { newYdoc.destroy(); } catch (e) {}
+      }
+    };
+  }, [documentId, currentUser]);
+
+  // 3. Handle Title Editing & Firestore sync
   const handleTitleChange = (e) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
-    documentStore.updateDocumentTitle(documentId, newTitle);
+
+    if (titleSaveTimeoutRef.current) {
+      clearTimeout(titleSaveTimeoutRef.current);
+    }
+    titleSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await documentStore.updateDocumentTitle(documentId, newTitle);
+      } catch (err) {
+        console.warn('Title update error:', err);
+      }
+    }, 1000);
   };
 
-  const handleEditorReady = React.useCallback((editorInstance) => {
+  // 4. Handle Editor Content Change & Firestore auto-save
+  const handleContentChange = useCallback((contentJson) => {
+    setSaveStatus('saving');
+
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const html = editor?.getHTML?.() || '';
+        const plainText = editor?.getText?.() || '';
+        await documentStore.saveDocumentContent(documentId, contentJson, html, plainText, userProfile);
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Failed to auto-save document:', err);
+        setSaveStatus('error');
+      }
+    }, 2000);
+  }, [documentId, editor, userProfile]);
+
+  // 5. Handle Page Settings Save
+  const handleSavePageSettings = async (newSettings) => {
+    setPageSettings(newSettings);
+    setShowPageSettingsModal(false);
+    try {
+      await documentStore.savePageSettings(documentId, newSettings);
+    } catch (err) {
+      console.error('Failed to save page settings:', err);
+    }
+  };
+
+  const handleEditorReady = (editorInstance) => {
     setEditor(editorInstance);
-  }, []);
+  };
 
-  const handleCollaboratorsChange = React.useCallback((users) => {
-    setCollaborators(users);
-  }, []);
+  // Create new document from file menu
+  const handleNewDocument = async () => {
+    try {
+      const newDoc = await documentStore.createDocument('Untitled Document', effectiveUserProfile);
+      if (newDoc?.id) {
+        navigate(`/documents/${newDoc.id}`);
+      }
+    } catch (e) {
+      console.error('Failed to create new doc:', e);
+    }
+  };
 
-  const handleSaveStatusChange = React.useCallback((status) => {
-    setSaveStatus(status);
-  }, []);
+  // Resizable Comments panel logic
+  const [commentsWidth, setCommentsWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('coreresearch_comments_width');
+      return saved ? Math.max(280, Math.min(650, Number(saved))) : 360;
+    } catch (e) {
+      return 360;
+    }
+  });
+
+  const [isResizingComments, setIsResizingComments] = useState(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(commentsWidth);
+
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsResizingComments(true);
+    resizeStartXRef.current = e.clientX;
+    resizeStartWidthRef.current = commentsWidth;
+
+    const onPointerMove = (moveEvent) => {
+      const deltaX = resizeStartXRef.current - moveEvent.clientX;
+      const minWidth = 280;
+      const maxWidth = Math.min(650, Math.floor(window.innerWidth * 0.55));
+      const nextWidth = Math.max(minWidth, Math.min(maxWidth, resizeStartWidthRef.current + deltaX));
+      setCommentsWidth(nextWidth);
+    };
+
+    const onPointerUp = () => {
+      setIsResizingComments(false);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  // Persist commentsWidth to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem('coreresearch_comments_width', String(commentsWidth));
+    } catch (e) {
+      // ignore
+    }
+  }, [commentsWidth]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden">
+    <div className={`flex flex-col bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
+      isMaximized 
+        ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
+        : 'h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8'
+    }`}>
+      {/* Hovering Circle Arrow Button to Open Sidebar in Maximized Mode */}
+      {isMaximized && (
+        <button
+          type="button"
+          onClick={() => setIsMaximizedSidebarOpen(!isMaximizedSidebarOpen)}
+          aria-label="Toggle navigation sidebar"
+          title={isMaximizedSidebarOpen ? "Hide navigation" : "Show navigation"}
+          className="fixed left-2 sm:left-3 top-1/2 -translate-y-1/2 z-[75] w-9 h-9 rounded-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 focus:outline-none"
+        >
+          {isMaximizedSidebarOpen ? (
+            <ChevronLeft className="w-5 h-5" />
+          ) : (
+            <ChevronRight className="w-5 h-5 ml-0.5" />
+          )}
+        </button>
+      )}
+
+      {/* Floating Slide-out Sidebar Drawer when maximized */}
+      {isMaximized && isMaximizedSidebarOpen && (
+        <>
+          <div 
+            onClick={() => setIsMaximizedSidebarOpen(false)}
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[80] transition-opacity animate-fade-in"
+          />
+          <div className="fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 shadow-2xl z-[85] flex flex-col p-4 animate-slide-right">
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-gray-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  CR
+                </div>
+                <span className="font-bold text-sm text-gray-900 dark:text-white">CoreResearch</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                title="Close sidebar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar text-xs py-2">
+              <Link
+                to="/dashboard"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/documents"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Documents</span>
+              </Link>
+              <Link
+                to="/proposals"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <FileSignature className="w-4 h-4" />
+                <span>Proposals</span>
+              </Link>
+              <Link
+                to="/manuscripts"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <FolderKanban className="w-4 h-4" />
+                <span>Manuscripts</span>
+              </Link>
+              <Link
+                to="/reviews"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <Award className="w-4 h-4" />
+                <span>Reviews</span>
+              </Link>
+              <Link
+                to="/schedules"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>Schedules</span>
+              </Link>
+              <Link
+                to="/repository"
+                onClick={() => setIsMaximizedSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <Library className="w-4 h-4" />
+                <span>Repository</span>
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Top Header Row (Google Docs style) */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10 shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10 shrink-0 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/documents')} className="px-2 text-gray-500">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
             <ChevronLeft className="w-5 h-5" />
           </Button>
           
-          <div className="w-10 h-10 rounded text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-            {/* Minimal Doc Icon */}
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+          <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
             </svg>
           </div>
@@ -116,96 +503,202 @@ export const DocumentEditorPage = () => {
               type="text" 
               value={title}
               onChange={handleTitleChange}
-              className="text-lg font-medium text-gray-900 dark:text-gray-100 bg-transparent border-none outline-none focus:bg-gray-100 dark:focus:bg-slate-800 rounded px-1 -ml-1 truncate max-w-[200px] sm:max-w-xs"
+              placeholder="Document Title"
+              className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate max-w-[200px] sm:max-w-xs transition-colors"
             />
-            <EditorMenuBar editor={editor} />
+            <EditorMenuBar 
+              editor={editor} 
+              title={title}
+              onOpenPageSettings={() => setShowPageSettingsModal(true)}
+              onNewDocument={handleNewDocument}
+            />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <div className="hidden sm:flex items-center text-xs text-gray-500 mr-2">
-            {saveStatus === 'saving' ? (
-              <>Saving...</>
-            ) : saveStatus === 'error' ? (
-              <span className="text-red-500">Error saving</span>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Collaboration Connection Status Badge */}
+          <div className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-gray-200 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-800/80">
+            {providerState.status === 'connected' ? (
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Live Sync
+              </span>
+            ) : providerState.status === 'connecting' ? (
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                <div className="w-2.5 h-2.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                Connecting...
+              </span>
             ) : (
-              <span className="flex items-center gap-1 text-gray-400"><Save className="w-3.5 h-3.5" /> Saved</span>
+              <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                <Cloud className="w-3.5 h-3.5 text-blue-500" />
+                Cloud Saved
+              </span>
+            )}
+          </div>
+
+          {/* Firestore Save Status */}
+          <div className="hidden md:flex items-center text-xs text-gray-500">
+            {saveStatus === 'saving' ? (
+              <span className="flex items-center gap-1 text-blue-500">
+                <div className="w-2.5 h-2.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </span>
+            ) : saveStatus === 'error' ? (
+              <span className="flex items-center gap-1 text-red-500">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Error saving
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-gray-400">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                Saved
+              </span>
             )}
           </div>
           
-          {/* Active Collaborators */}
-          <div className="hidden md:flex items-center -space-x-2">
+          {/* Active Collaborators Presence */}
+          <div className="hidden sm:flex items-center -space-x-1.5">
             {collaborators.map((user, i) => (
               <div 
-                key={i} 
-                className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-xs font-bold"
-                style={{ backgroundColor: user.color }}
-                title={user.name}
+                key={user.id || i} 
+                className="w-7 h-7 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
+                style={{ backgroundColor: user.color || '#3b82f6' }}
+                title={`${user.name || 'Collaborator'} (${user.role || 'Member'})`}
               >
-                {user.name.charAt(0)}
+                {(user.name || 'C').charAt(0).toUpperCase()}
               </div>
             ))}
           </div>
 
+          {/* Comments Toggle Button */}
           <Button 
             variant={showComments ? 'primary' : 'outline'} 
             size="sm" 
             onClick={() => setShowComments(!showComments)}
-            className={showComments ? '' : 'text-gray-600'}
+            className={`rounded-lg ${showComments ? '' : 'text-gray-600 dark:text-gray-300'}`}
             title="Toggle comments"
           >
-            <MessageSquare className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Comments</span>
+            <MessageSquare className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline text-xs">Comments</span>
           </Button>
 
-          <Button variant="primary" size="sm" onClick={() => setShowShareModal(true)} className="rounded-full px-4 sm:px-6 shadow-sm">
-            <Share2 className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline font-medium tracking-wide">Share</span>
+          {/* Share Dialog Button */}
+          <Button 
+            variant="primary" 
+            size="sm" 
+            onClick={() => setShowShareModal(true)} 
+            className="rounded-full px-3 sm:px-5 shadow-sm"
+          >
+            <Share2 className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline text-xs font-semibold tracking-wide">Share</span>
+          </Button>
+
+          {/* Maximize / Minimize Fullscreen Toggle Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setIsMaximized(!isMaximized);
+              setIsMaximizedSidebarOpen(false);
+            }}
+            className={`rounded-full p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-xs ${
+              isMaximized ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''
+            }`}
+            title={isMaximized ? "Exit full screen (Minimize)" : "Maximize editor (Full screen)"}
+          >
+            {isMaximized ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
           </Button>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="bg-white dark:bg-slate-900/90 border-b border-gray-200 dark:border-slate-800 p-1 flex justify-center z-10 shrink-0">
-        <EditorToolbar editor={editor} />
+      {/* Editor Toolbar */}
+      <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 p-1 flex justify-center z-10 shrink-0">
+        <EditorToolbar 
+          editor={editor} 
+          documentId={documentId}
+          onOpenPageSettings={() => setShowPageSettingsModal(true)}
+        />
       </div>
 
-      {/* Main Workspace */}
+      {/* Main Document Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
         <div className="flex-1 overflow-y-auto bg-[#f8f9fa] dark:bg-slate-950 flex justify-center pb-20 custom-scrollbar">
-          {/* Page Container */}
-          <div className="mt-8 mb-12">
+          <div className="my-6">
             <EditorErrorBoundary key={documentId}>
-              <DocumentEditor 
-                documentId={documentId} 
-                userProfile={effectiveUserProfile} 
-                onEditorReady={handleEditorReady}
-                onCollaboratorsChange={handleCollaboratorsChange}
-                onSaveStatusChange={handleSaveStatusChange}
-              />
+              {documentLoaded ? (
+                <DocumentEditor 
+                  documentId={documentId} 
+                  userProfile={effectiveUserProfile} 
+                  ydoc={providerState.ydoc}
+                  provider={providerState.provider}
+                  pageSettings={pageSettings}
+                  initialContent={initialContent}
+                  sourceType={sourceType}
+                  onEditorReady={handleEditorReady}
+                  onContentChange={handleContentChange}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <div className="font-medium text-gray-700 dark:text-gray-300 text-sm">Loading Manuscript Document...</div>
+                  <div className="text-xs text-gray-400 mt-1">Restoring Firestore state and connecting real-time collaboration</div>
+                </div>
+              )}
             </EditorErrorBoundary>
           </div>
         </div>
 
-        {/* Right Sidebar - Comments */}
+        {/* Right Sidebar - Comments Panel (Local Resizable) */}
         {showComments && (
-          <div className="w-80 shrink-0 bg-white dark:bg-slate-900 border-l border-gray-200 dark:border-slate-800 overflow-y-auto flex flex-col shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-10">
-            <div className="p-4 border-b border-gray-200 dark:border-slate-800 shrink-0 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-800 dark:text-gray-200">Comments</h3>
+          <div 
+            className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
+            style={{ width: `${commentsWidth}px` }}
+          >
+            {/* Draggable Resize Divider Handle */}
+            <div
+              onPointerDown={handleResizeStart}
+              title="Drag horizontally to resize Comments panel"
+              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
+                isResizingComments ? 'bg-blue-500/20' : ''
+              }`}
+            >
+              <div className={`w-1 h-10 rounded-full transition-colors ${
+                isResizingComments 
+                  ? 'bg-blue-600' 
+                  : 'bg-transparent group-hover:bg-blue-500/60'
+              }`} />
             </div>
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-              <CommentsPanel documentId={documentId} editor={editor} />
-            </div>
+
+            {/* Comments Component */}
+            <CommentsPanel 
+              documentId={documentId} 
+              editor={editor} 
+              onClose={() => setShowComments(false)}
+            />
           </div>
         )}
       </div>
 
+      {/* Share Dialog */}
       {showShareModal && (
         <ShareDialog 
           documentId={documentId} 
           onClose={() => setShowShareModal(false)} 
         />
       )}
+
+      {/* Page Setup & Margins Modal */}
+      <PageSettingsModal
+        isOpen={showPageSettingsModal}
+        onClose={() => setShowPageSettingsModal(false)}
+        pageSettings={pageSettings}
+        onSaveSettings={handleSavePageSettings}
+      />
     </div>
   );
 };
+export default DocumentEditorPage;

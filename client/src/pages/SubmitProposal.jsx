@@ -284,10 +284,11 @@ export const SubmitProposal = () => {
           uploadedAt: new Date().toISOString(),
         });
       }
-    } finally {
       // Keep uploading true until the DB save finishes to prevent closing modal too early
       // but let the progress hit 100
       setOverallProgress(100);
+    } catch (e) {
+      throw e;
     }
     
     return [...existingAttachments, ...uploaded];

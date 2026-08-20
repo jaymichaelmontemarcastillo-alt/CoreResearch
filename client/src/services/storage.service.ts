@@ -50,36 +50,46 @@ export const storageService = {
     const fullPath = `${folderPath}/${fileName}`;
     const storageRef: StorageReference = ref(storage, fullPath);
 
-    // Simulate progress for UI since standard uploadBytes is significantly faster 
-    // and more reliable than uploadBytesResumable for most web environments
-    let simulatedProgress = 0;
-    const progressInterval = setInterval(() => {
-      simulatedProgress += (100 - simulatedProgress) * 0.2; // ease towards 95%
-      if (simulatedProgress > 95) simulatedProgress = 95;
-      onProgress(simulatedProgress);
-    }, 200);
-
-    try {
-      const snapshot = await uploadBytes(storageRef, file, {
+    return new Promise((resolve, reject) => {
+      const uploadTask = uploadBytesResumable(storageRef, file, {
         contentType: file.type,
       });
 
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      
-      clearInterval(progressInterval);
-      onProgress(100);
+      // 60-second timeout to prevent UI from hanging if Firebase connection stalls
+      const timeoutId = setTimeout(() => {
+        uploadTask.cancel();
+        reject(new Error(`Upload timed out for file ${fileName}. Please check your connection or file size.`));
+      }, 60000);
 
-      return {
-        downloadUrl,
-        fullPath,
-        fileName,
-        fileSize: file.size,
-        contentType: file.type,
-      };
-    } catch (error) {
-      clearInterval(progressInterval);
-      throw error;
-    }
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          onProgress(progress);
+        },
+        (error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        },
+        async () => {
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            clearTimeout(timeoutId);
+            onProgress(100);
+            resolve({
+              downloadUrl,
+              fullPath,
+              fileName,
+              fileSize: file.size,
+              contentType: file.type,
+            });
+          } catch (urlError) {
+            clearTimeout(timeoutId);
+            reject(urlError);
+          }
+        }
+      );
+    });
   },
 
   /**
