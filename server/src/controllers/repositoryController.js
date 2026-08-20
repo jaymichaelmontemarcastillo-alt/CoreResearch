@@ -1,7 +1,7 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 
 // Pre-seed mock repository publications if empty
-const seedMockRepositoryIfEmpty = () => {
+export const seedMockRepositoryIfEmpty = () => {
   if (!mockFirestoreDb.has('repository')) {
     const initialRepo = [
       {
@@ -108,8 +108,15 @@ export const getRepositoryPublications = async (req, res) => {
       const map = mockFirestoreDb.get('repository');
       list = Array.from(map.values());
     } else {
-      const snapshot = await db.collection('repository_publications').get();
-      list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        const snapshot = await db.collection('repository_publications').get();
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (err) {
+        console.warn('[RepositoryController] Firestore read fallback to mock mode:', err.message);
+        seedMockRepositoryIfEmpty();
+        const map = mockFirestoreDb.get('repository');
+        list = Array.from(map.values());
+      }
     }
 
     if (department && department !== 'all') {

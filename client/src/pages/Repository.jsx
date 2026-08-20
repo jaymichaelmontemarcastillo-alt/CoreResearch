@@ -1,5 +1,6 @@
 // src/pages/Repository.jsx
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -24,9 +25,11 @@ import { useAuth } from "../context/AuthContext";
 
 export const Repository = () => {
   const { role } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [department, setDepartment] = useState("all");
 
   // Abstract & Citation Modal
@@ -45,11 +48,11 @@ export const Repository = () => {
   const [publishing, setPublishing] = useState(false);
   const [toast, setToast] = useState("");
 
-  const fetchPublications = async () => {
+  const fetchPublications = async (customSearch = search) => {
     setLoading(true);
     try {
       const res = await api.get("/repository", {
-        params: { search, department },
+        params: { search: customSearch, department },
       });
       if (res.data && res.data.data) {
         setPublications(res.data.data);
@@ -62,8 +65,16 @@ export const Repository = () => {
   };
 
   useEffect(() => {
-    fetchPublications();
+    fetchPublications(search);
   }, [department]);
+
+  useEffect(() => {
+    const urlQuery = searchParams.get("search");
+    if (urlQuery) {
+      setSearch(urlQuery);
+      fetchPublications(urlQuery);
+    }
+  }, [searchParams]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

@@ -24,7 +24,6 @@ import { ProposalDetail } from './pages/ProposalDetail';
 import { CoordinatorProposals } from './pages/CoordinatorProposals';
 import { CoordinatorProposalReview } from './pages/CoordinatorProposalReview';
 import { Projects } from './pages/Projects';
-import { Manuscripts } from './pages/Manuscripts';
 import { Documents } from './pages/Documents';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { Reviews } from './pages/Reviews';
@@ -76,9 +75,6 @@ export default function App() {
 
                 {/* Research Projects */}
                 <Route path="/projects" element={<Projects />} />
-
-                {/* Manuscripts (Legacy) */}
-                <Route path="/manuscripts" element={<Manuscripts />} />
 
                 {/* Real-time Documents Editor */}
                 <Route path="/documents" element={<Documents />} />

@@ -47,7 +47,6 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
     const path = location.pathname;
     if (path === "/dashboard") return "Dashboard";
     if (path === "/profile" || path === "/profile-settings" || path === "/settings") return "Account Settings";
-    if (path.startsWith("/manuscripts")) return "Manuscripts";
     if (path.startsWith("/proposals")) return "Title Proposals";
     if (path.startsWith("/documents")) return "Documents";
     if (path.startsWith("/projects")) return "Research Projects";
