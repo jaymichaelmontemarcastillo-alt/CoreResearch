@@ -304,11 +304,11 @@ wss.on('connection', (ws, request) => {
   });
 });
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`=================================================`);
   console.log(`🚀 CoreResearch API Server running on port ${PORT}`);
-  console.log(`📡 Hocuspocus OSS WebSocket Server: ws://localhost:${PORT}/collaboration`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📡 Hocuspocus OSS WebSocket Server: ws://0.0.0.0:${PORT}/collaboration`);
+  console.log(`🌐 Health check: http://0.0.0.0:${PORT}/api/health`);
   console.log(`=================================================`);
 });
 

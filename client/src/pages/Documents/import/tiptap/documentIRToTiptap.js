@@ -1,16 +1,21 @@
 // src/pages/Documents/import/tiptap/documentIRToTiptap.js
 
 /**
- * Client-Side DocumentIR to Tiptap ProseMirror Schema Converter
- * Guarantees zero 'undefined' properties so Firestore never rejects the document.
+ * Converts canonical Document Intermediate Representation (IR) into ProseMirror / Tiptap JSON schema
+ * guarantees 100% schema alignment with DocumentEditor extensions and zero 'undefined' properties.
  */
-export class ClientDocumentIRToTiptap {
+export class DocumentIRToTiptap {
+  /**
+   * Convert DocumentIR to Tiptap JSON, HTML preview, and plain text
+   * @param {Object} ir - DocumentIR instance
+   * @returns {{ tiptapJson: Object, contentHtml: string, plainText: string }}
+   */
   convert(ir) {
     const content = [];
     const textPieces = [];
     const htmlPieces = [];
 
-    if (Array.isArray(ir.nodes)) {
+    if (Array.isArray(ir?.nodes)) {
       ir.nodes.forEach((node) => {
         const tiptapNode = this.convertNode(node, textPieces, htmlPieces);
         if (tiptapNode) {
@@ -31,10 +36,13 @@ export class ClientDocumentIRToTiptap {
       });
     }
 
-    const cleanDoc = JSON.parse(JSON.stringify({
-      type: 'doc',
-      content,
-    }));
+    // Clean serialization to ensure 0 undefined properties for Firestore
+    const cleanDoc = JSON.parse(
+      JSON.stringify({
+        type: 'doc',
+        content,
+      })
+    );
 
     const plainText = textPieces.join('\n\n').trim();
     const contentHtml = htmlPieces.join('\n');
@@ -53,7 +61,7 @@ export class ClientDocumentIRToTiptap {
       case 'heading': {
         const marksContent = this.convertRuns(node.runs);
         const textOnly = node.runs?.map((r) => r.text).join('') || '';
-        textPieces.push(textOnly);
+        if (textOnly) textPieces.push(textOnly);
 
         const styleAttrs = [];
         if (node.alignment) styleAttrs.push(`text-align: ${node.alignment}`);
@@ -62,12 +70,12 @@ export class ClientDocumentIRToTiptap {
         if (node.spaceAfter) styleAttrs.push(`margin-bottom: ${node.spaceAfter}`);
 
         const styleStr = styleAttrs.length > 0 ? ` style="${styleAttrs.join('; ')}"` : '';
-        htmlPieces.push(`<h${node.level}${styleStr}>${this.escapeHtml(textOnly)}</h${node.level}>`);
+        htmlPieces.push(`<h${node.level || 1}${styleStr}>${this.escapeHtml(textOnly)}</h${node.level || 1}>`);
 
         const headingNode = {
           type: 'heading',
           attrs: {
-            level: node.level || 1,
+            level: Math.min(6, Math.max(1, Number(node.level) || 1)),
             textAlign: node.alignment || 'left',
             lineHeight: node.lineSpacing || null,
             spaceBefore: node.spaceBefore || null,
@@ -94,6 +102,8 @@ export class ClientDocumentIRToTiptap {
         if (node.lineSpacing) styleAttrs.push(`line-height: ${node.lineSpacing}`);
         if (node.spaceBefore) styleAttrs.push(`margin-top: ${node.spaceBefore}`);
         if (node.spaceAfter) styleAttrs.push(`margin-bottom: ${node.spaceAfter}`);
+        if (node.indentation?.firstLine) styleAttrs.push(`text-indent: ${node.indentation.firstLine}`);
+        if (node.indentation?.left) styleAttrs.push(`margin-left: ${node.indentation.left}`);
 
         const styleStr = styleAttrs.length > 0 ? ` style="${styleAttrs.join('; ')}"` : '';
         htmlPieces.push(`<p${styleStr}>${this.escapeHtml(textOnly)}</p>`);
@@ -267,6 +277,7 @@ export class ClientDocumentIRToTiptap {
       if (run.subscript) marks.push({ type: 'subscript' });
       if (run.superscript) marks.push({ type: 'superscript' });
 
+      // TextStyle mark (FontFamily, FontSize, Color, LineHeight)
       const textStyleAttrs = {};
       if (run.fontFamily) textStyleAttrs.fontFamily = run.fontFamily;
       if (run.fontSize) textStyleAttrs.fontSize = run.fontSize;
@@ -312,5 +323,6 @@ export class ClientDocumentIRToTiptap {
   }
 }
 
-export const clientDocumentIRToTiptap = new ClientDocumentIRToTiptap();
-export default clientDocumentIRToTiptap;
+export const documentIRToTiptap = new DocumentIRToTiptap();
+export const clientDocumentIRToTiptap = documentIRToTiptap;
+export default documentIRToTiptap;

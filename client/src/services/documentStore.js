@@ -230,19 +230,81 @@ export const documentStore = {
   },
 
   /**
+   * Real-time subscription to document changes in Firestore
+   */
+  subscribeDocument: (id, onUpdate, onError) => {
+    if (!id) return () => {};
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      return onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const docObj = {
+            id: snap.id,
+            title: data.title || 'Untitled Document',
+            ownerId: data.ownerId || '',
+            ownerName: data.ownerName || 'Researcher',
+            ownerRole: data.ownerRole || 'student',
+            groupId: data.groupId || '',
+            projectId: data.projectId || '',
+            content: data.content || null,
+            contentHtml: data.contentHtml || '',
+            plainText: data.plainText || '',
+            sourceType: data.sourceType || 'native',
+            editorSettings: {
+              ...DEFAULT_EDITOR_SETTINGS,
+              ...(data.editorSettings || {}),
+              page: {
+                ...DEFAULT_PAGE_SETTINGS,
+                ...(data.pageSettings || {}),
+                ...(data.editorSettings?.page || {})
+              }
+            },
+            createdAt: data.createdAt || new Date().toISOString(),
+            updatedAt: data.updatedAt || new Date().toISOString(),
+            updatedBy: data.updatedBy || '',
+            collaboratorCount: data.collaboratorCount || 1,
+          };
+          memoryDocCache.set(id, docObj);
+          if (onUpdate) onUpdate(docObj);
+        }
+      }, (err) => {
+        console.warn(`[documentStore] subscribeDocument error for ${id}:`, err.message);
+        if (onError) onError(err);
+      });
+    } catch (err) {
+      console.warn(`[documentStore] subscribeDocument exception:`, err.message);
+      return () => {};
+    }
+  },
+
+  /**
    * Save complete Tiptap content state in Firestore
    */
   saveDocumentContent: async (id, contentJson, contentHtml = '', plainText = '', userProfile = null) => {
     if (!id) return;
     const now = new Date().toISOString();
 
+    let cleanJson = null;
+    if (contentJson) {
+      if (typeof contentJson.getJSON === 'function') {
+        cleanJson = contentJson.getJSON();
+      } else if (typeof contentJson === 'object') {
+        try {
+          cleanJson = JSON.parse(JSON.stringify(contentJson));
+        } catch (e) {
+          cleanJson = null;
+        }
+      }
+    }
+
     const existing = memoryDocCache.get(id) || {};
     const updated = {
       ...existing,
       id,
-      content: contentJson,
-      contentHtml,
-      plainText,
+      content: cleanJson || existing.content || null,
+      contentHtml: typeof contentHtml === 'string' ? contentHtml : '',
+      plainText: typeof plainText === 'string' ? plainText : '',
       updatedAt: now,
       updatedBy: userProfile?.uid || existing.updatedBy || ''
     };
@@ -250,13 +312,15 @@ export const documentStore = {
 
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      await setDoc(docRef, {
-        content: contentJson,
-        contentHtml,
-        plainText,
+      const updateData = {
         updatedAt: now,
         updatedBy: userProfile?.uid || 'user'
-      }, { merge: true });
+      };
+      if (cleanJson) updateData.content = cleanJson;
+      if (typeof contentHtml === 'string') updateData.contentHtml = contentHtml;
+      if (typeof plainText === 'string') updateData.plainText = plainText;
+
+      await setDoc(docRef, updateData, { merge: true });
     } catch (error) {
       console.warn(`[documentStore] saveDocumentContent error for ${id}:`, error.message);
       throw error;

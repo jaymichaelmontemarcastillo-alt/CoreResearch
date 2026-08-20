@@ -164,6 +164,45 @@ export const ParagraphSpacing = Extension.create({
   },
 });
 
+// Custom ParagraphIndent Extension (textIndent & marginLeft)
+export const ParagraphIndent = Extension.create({
+  name: 'paragraphIndent',
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          textIndent: {
+            default: null,
+            parseHTML: (element) => element.style.textIndent || null,
+            renderHTML: (attributes) => {
+              if (!attributes.textIndent) return {};
+              return {
+                style: `text-indent: ${attributes.textIndent}`,
+              };
+            },
+          },
+          marginLeft: {
+            default: null,
+            parseHTML: (element) => element.style.marginLeft || null,
+            renderHTML: (attributes) => {
+              if (!attributes.marginLeft) return {};
+              return {
+                style: `margin-left: ${attributes.marginLeft}`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
 // Custom TableCell with background shading & border color support
 export const CustomTableCell = TableCell.extend({
   addAttributes() {
@@ -280,6 +319,7 @@ export const DocumentEditor = ({
       FontSize,
       LineHeight,
       ParagraphSpacing,
+      ParagraphIndent,
       Color,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),

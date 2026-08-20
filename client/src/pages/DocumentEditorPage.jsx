@@ -92,15 +92,27 @@ export const DocumentEditorPage = () => {
     error: null
   });
 
-  const autoSaveTimeoutRef = useRef(null);
-  const titleSaveTimeoutRef = useRef(null);
-
   const effectiveUserProfile = userProfile || {
     uid: currentUser?.uid || 'guest-user',
     fullName: userProfile?.fullName || userProfile?.first_name || 'Researcher',
     first_name: userProfile?.first_name || 'Researcher',
     role: userProfile?.role || 'student'
   };
+
+  const autoSaveTimeoutRef = useRef(null);
+  const titleSaveTimeoutRef = useRef(null);
+  const editorRef = useRef(null);
+  const myUidRef = useRef(effectiveUserProfile.uid);
+  const isTypingRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  useEffect(() => {
+    myUidRef.current = effectiveUserProfile.uid;
+  }, [effectiveUserProfile.uid]);
 
   // Keyboard shortcut listener for Escape to exit maximized mode
   useEffect(() => {
@@ -117,11 +129,13 @@ export const DocumentEditorPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isMaximized, isMaximizedSidebarOpen, showShareModal, showPageSettingsModal]);
 
-  // 1. Load authoritative document metadata, settings & content from Firestore
+  // 1. Load authoritative document metadata, settings & content from Firestore with real-time sync
   useEffect(() => {
     if (!documentId) return;
 
     let isMounted = true;
+    
+    // Initial fetch
     const loadDocumentData = async () => {
       try {
         const docData = await documentStore.fetchDocument(documentId);
@@ -145,8 +159,36 @@ export const DocumentEditorPage = () => {
 
     loadDocumentData();
 
+    // Subscribe to real-time updates from other group members (works seamlessly on Firebase Hosting!)
+    const unsubscribe = documentStore.subscribeDocument(documentId, (docData) => {
+      if (!isMounted || !docData) return;
+
+      if (docData.title) setTitle(docData.title);
+      if (docData.editorSettings?.page) {
+        setPageSettings(docData.editorSettings.page);
+      }
+
+      // Check if update originated from another collaborator
+      const isFromOtherUser = docData.updatedBy && docData.updatedBy !== myUidRef.current;
+      if (isFromOtherUser && docData.content) {
+        const activeEditor = editorRef.current;
+        if (activeEditor && !activeEditor.isDestroyed && !isTypingRef.current) {
+          try {
+            const currentStr = JSON.stringify(activeEditor.getJSON());
+            const remoteStr = JSON.stringify(docData.content);
+            if (currentStr !== remoteStr) {
+              activeEditor.commands.setContent(docData.content, false);
+            }
+          } catch (syncErr) {
+            console.warn('[RealtimeSync] Remote update application notice:', syncErr);
+          }
+        }
+      }
+    });
+
     return () => {
       isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [documentId]);
 
@@ -158,6 +200,20 @@ export const DocumentEditorPage = () => {
     let hocuspocusProvider = null;
     const newYdoc = new Y.Doc();
     
+    // Check if we have a valid WebSocket URL (or running in local HTTP)
+    let wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL;
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+    if (!wsUrl && isHttps) {
+      // In production HTTPS without explicit WSS endpoint, use real-time Firestore sync
+      setProviderState({ ydoc: newYdoc, provider: null, status: 'cloud-sync', error: null });
+      return () => {
+        isSubscribed = false;
+        try { newYdoc.destroy(); } catch (e) {}
+      };
+    }
+
+    wsUrl = wsUrl || 'ws://localhost:5000/collaboration';
     setProviderState({ ydoc: newYdoc, provider: null, status: 'connecting', error: null });
 
     const initProvider = async () => {
@@ -172,8 +228,6 @@ export const DocumentEditorPage = () => {
       }
 
       if (!isSubscribed) return;
-
-      const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || 'ws://localhost:5000/collaboration';
 
       try {
         const { HocuspocusProvider } = await import('@hocuspocus/provider');
@@ -198,14 +252,14 @@ export const DocumentEditorPage = () => {
             if (data.status === 'connected') {
               setProviderState(prev => ({ ...prev, status: 'connected', error: null }));
             } else if (data.status === 'disconnected') {
-              setProviderState(prev => ({ ...prev, status: 'disconnected' }));
+              setProviderState(prev => ({ ...prev, status: 'cloud-sync' }));
             } else if (data.status === 'connecting') {
               setProviderState(prev => ({ ...prev, status: 'connecting' }));
             }
           },
           onClose: () => {
             if (isSubscribed) {
-              setProviderState(prev => ({ ...prev, status: 'disconnected' }));
+              setProviderState(prev => ({ ...prev, status: 'cloud-sync' }));
             }
           },
           onMessage: () => {
@@ -239,9 +293,9 @@ export const DocumentEditorPage = () => {
           setProviderState(prev => ({ ...prev, provider: hocuspocusProvider }));
         }
       } catch (err) {
-        console.warn('Hocuspocus provider setup warning:', err);
+        console.warn('Hocuspocus provider setup notice (falling back to cloud sync):', err);
         if (isSubscribed) {
-          setProviderState(prev => ({ ...prev, status: 'disconnected', error: err.message }));
+          setProviderState(prev => ({ ...prev, status: 'cloud-sync', error: null }));
         }
       }
     };
@@ -277,7 +331,8 @@ export const DocumentEditorPage = () => {
   };
 
   // 4. Handle Editor Content Change & Firestore auto-save
-  const handleContentChange = useCallback((contentJson) => {
+  const handleContentChange = useCallback((editorOrJson) => {
+    isTypingRef.current = true;
     setSaveStatus('saving');
 
     if (autoSaveTimeoutRef.current) {
@@ -286,16 +341,21 @@ export const DocumentEditorPage = () => {
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
       try {
-        const html = editor?.getHTML?.() || '';
-        const plainText = editor?.getText?.() || '';
-        await documentStore.saveDocumentContent(documentId, contentJson, html, plainText, userProfile);
+        const activeEditor = editorOrJson?.getJSON ? editorOrJson : editor;
+        const json = activeEditor?.getJSON ? activeEditor.getJSON() : (editorOrJson && typeof editorOrJson === 'object' ? editorOrJson : null);
+        const html = activeEditor?.getHTML ? activeEditor.getHTML() : '';
+        const plainText = activeEditor?.getText ? activeEditor.getText() : '';
+        
+        await documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
         setSaveStatus('saved');
       } catch (err) {
         console.error('Failed to auto-save document:', err);
         setSaveStatus('error');
+      } finally {
+        isTypingRef.current = false;
       }
-    }, 2000);
-  }, [documentId, editor, userProfile]);
+    }, 1500);
+  }, [documentId, editor, effectiveUserProfile]);
 
   // 5. Handle Page Settings Save
   const handleSavePageSettings = async (newSettings) => {
