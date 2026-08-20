@@ -38,6 +38,7 @@ import {
   Eye,
   Check,
   Send,
+  Scissors,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -746,6 +747,15 @@ export const Manuscripts = () => {
               <ListOrdered className="w-4 h-4" />
             </button>
 
+            <button
+              onClick={() => executeCommand("insertHorizontalRule")}
+              className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-800 rounded text-gray-700 dark:text-gray-300 flex items-center gap-1 text-xs font-medium"
+              title="Insert Page Break (Separate into New Page)"
+            >
+              <Scissors className="w-4 h-4" />
+              <span className="hidden md:inline">Page Break</span>
+            </button>
+
             <div className="h-4 w-[1px] bg-gray-300 dark:bg-slate-700 mx-1" />
 
             {/* Export Options */}
@@ -774,7 +784,72 @@ export const Manuscripts = () => {
 
           {/* Paginated Paper Editor Canvas (Google Docs style page container) */}
           <div className="bg-gray-100 dark:bg-slate-950 p-6 sm:p-10 rounded-2xl border border-gray-200 dark:border-slate-800 flex justify-center min-h-[750px] shadow-inner overflow-x-auto">
-            <div className="w-full max-w-[850px] bg-white text-gray-900 shadow-xl rounded-sm p-10 sm:p-16 min-h-[900px] border border-gray-200 dark:border-slate-300 relative transition-all">
+            <style>{`
+              .manuscript-paper-canvas hr,
+              .manuscript-paper-canvas .page-break {
+                display: block;
+                box-sizing: content-box;
+                height: 48px;
+                background-color: #f3f4f6 !important;
+                margin: 2.5rem -2.5rem 2.5rem -2.5rem !important;
+                border: none !important;
+                border-top: 1px solid #cbd5e1 !important;
+                border-bottom: 1px solid #cbd5e1 !important;
+                box-shadow: 
+                  0 10px 15px -3px rgba(0, 0, 0, 0.08),
+                  0 4px 6px -4px rgba(0, 0, 0, 0.05),
+                  inset 0 6px 10px -3px rgba(0, 0, 0, 0.07), 
+                  inset 0 -6px 10px -3px rgba(0, 0, 0, 0.07) !important;
+                position: relative;
+                cursor: default;
+                user-select: none;
+              }
+
+              @media (min-width: 640px) {
+                .manuscript-paper-canvas hr,
+                .manuscript-paper-canvas .page-break {
+                  margin: 3rem -4rem 3rem -4rem !important;
+                }
+              }
+
+              .manuscript-paper-canvas hr::after,
+              .manuscript-paper-canvas .page-break::after {
+                content: "PAGE BREAK • NEXT PAGE";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #ffffff;
+                color: #475569;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                padding: 4px 14px;
+                border-radius: 9999px;
+                border: 1px solid #cbd5e1;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+                pointer-events: none;
+              }
+
+              :is(.dark) .manuscript-paper-canvas hr,
+              :is(.dark) .manuscript-paper-canvas .page-break {
+                background-color: #020617 !important;
+                border-top: 1px solid #334155 !important;
+                border-bottom: 1px solid #334155 !important;
+                box-shadow: 
+                  0 10px 15px -3px rgba(0, 0, 0, 0.5),
+                  inset 0 6px 10px -3px rgba(0, 0, 0, 0.5), 
+                  inset 0 -6px 10px -3px rgba(0, 0, 0, 0.5) !important;
+              }
+
+              :is(.dark) .manuscript-paper-canvas hr::after,
+              :is(.dark) .manuscript-paper-canvas .page-break::after {
+                background: #0f172a;
+                color: #94a3b8;
+                border: 1px solid #334155;
+              }
+            `}</style>
+            <div className="manuscript-paper-canvas w-full max-w-[850px] bg-white text-gray-900 shadow-xl rounded-sm p-10 sm:p-16 min-h-[900px] border border-gray-200 dark:border-slate-300 relative transition-all">
               {/* Floating selection tooltip helper */}
               <div className="mb-4 pb-2 border-b border-gray-200 flex items-center justify-between text-xs text-gray-400 select-none">
                 <span className="font-mono text-[11px] uppercase tracking-wider">

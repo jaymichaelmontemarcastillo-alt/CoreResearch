@@ -3,7 +3,7 @@ import {
   Bold, Italic, Underline, Strikethrough, Subscript, Superscript,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Undo, Redo, Image as ImageIcon, Table,
-  Layout, ChevronDown, Plus, Trash2, Rows, Columns
+  Layout, ChevronDown, Plus, Trash2, Rows, Columns, Scissors
 } from 'lucide-react';
 import { storageService } from '../../services/storage.service';
 
@@ -423,6 +423,15 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
           </div>
         )}
       </div>
+
+      {/* Insert Page Break Button */}
+      <ToolbarButton
+        icon={Scissors}
+        title="Insert Page Break (Split into New Page)"
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+      >
+        <span className="hidden xl:inline text-xs font-medium">Page Break</span>
+      </ToolbarButton>
 
       <Divider />
 

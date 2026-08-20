@@ -483,27 +483,63 @@ export const DocumentEditor = ({
           pointer-events: none;
         }
 
-        /* Visual Page Breaks */
-        .ProseMirror hr {
-          border: none;
-          border-top: 2px dashed #94a3b8;
-          margin: 2.5rem -${pageSettings?.marginLeft || '1in'} 2.5rem -${pageSettings?.marginRight || '1in'};
+        /* Real Physical Multi-Page Separation (Google Docs / MS Word Print Layout) */
+        .ProseMirror hr,
+        .ProseMirror .page-break {
+          display: block;
+          box-sizing: content-box;
+          height: 48px;
+          background-color: #f8f9fa !important;
+          margin: ${pageSettings?.marginBottom || '1in'} -${pageSettings?.marginRight || '1in'} ${pageSettings?.marginTop || '1in'} -${pageSettings?.marginLeft || '1in'} !important;
+          border: none !important;
+          border-top: 1px solid #cbd5e1 !important;
+          border-bottom: 1px solid #cbd5e1 !important;
+          box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.08),
+            0 4px 6px -4px rgba(0, 0, 0, 0.05),
+            inset 0 6px 10px -3px rgba(0, 0, 0, 0.07), 
+            inset 0 -6px 10px -3px rgba(0, 0, 0, 0.07) !important;
           position: relative;
+          cursor: default;
+          user-select: none;
+          z-index: 10;
         }
-        .ProseMirror hr::after {
-          content: "PAGE BREAK";
+
+        .ProseMirror hr::after,
+        .ProseMirror .page-break::after {
+          content: "PAGE BREAK • NEXT PAGE";
           position: absolute;
-          top: -10px;
+          top: 50%;
           left: 50%;
-          transform: translateX(-50%);
-          background: #f1f5f9;
-          color: #64748b;
+          transform: translate(-50%, -50%);
+          background: #ffffff;
+          color: #475569;
           font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.05em;
-          padding: 2px 8px;
-          border-radius: 4px;
+          letter-spacing: 0.08em;
+          padding: 4px 14px;
+          border-radius: 9999px;
           border: 1px solid #cbd5e1;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+          pointer-events: none;
+        }
+
+        :is(.dark) .ProseMirror hr,
+        :is(.dark) .ProseMirror .page-break {
+          background-color: #020617 !important;
+          border-top: 1px solid #334155 !important;
+          border-bottom: 1px solid #334155 !important;
+          box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.5),
+            inset 0 6px 10px -3px rgba(0, 0, 0, 0.5), 
+            inset 0 -6px 10px -3px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        :is(.dark) .ProseMirror hr::after,
+        :is(.dark) .ProseMirror .page-break::after {
+          background: #0f172a;
+          color: #94a3b8;
+          border: 1px solid #334155;
         }
 
         /* Image alignment helpers */
