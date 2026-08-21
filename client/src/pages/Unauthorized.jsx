@@ -10,7 +10,7 @@ export const Unauthorized = () => {
   const { role } = useAuth();
 
   return (
-    <AuthLayout title="Access Denied" cardWidthClass="lg:w-[480px] xl:w-[540px]">
+    <AuthLayout title="Access Denied">
       <div className="text-center space-y-5 py-6">
         <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center mx-auto">
           <HiShieldExclamation className="w-8 h-8" />

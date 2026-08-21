@@ -2,9 +2,18 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '../ui/Button';
 import { 
-  MessageSquare, Check, Send, Reply, Trash2, RotateCcw, Quote, X, 
-  ArrowRight, ChevronDown, ChevronUp, CornerDownRight
-} from 'lucide-react';
+  HiChatBubbleLeftRight, 
+  HiCheck, 
+  HiPaperAirplane, 
+  HiArrowUturnLeft, 
+  HiTrash, 
+  HiArrowPath, 
+  HiChatBubbleBottomCenterText, 
+  HiXMark, 
+  HiArrowRight, 
+  HiChevronDown, 
+  HiChevronUp 
+} from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 import { documentStore } from '../../services/documentStore';
 
@@ -146,12 +155,12 @@ const ReplyTreeNode = ({
               >
                 {isSubThreadExpanded ? (
                   <>
-                    <ChevronUp className="w-3 h-3" />
+                    <HiChevronUp className="w-3 h-3" />
                     <span>Hide {reply.children.length === 1 ? '1 reply' : `${reply.children.length} replies`}</span>
                   </>
                 ) : (
                   <>
-                    <ChevronDown className="w-3 h-3" />
+                    <HiChevronDown className="w-3 h-3" />
                     <span>{reply.children.length === 1 ? '1 reply' : `${reply.children.length} replies`}</span>
                   </>
                 )}
@@ -165,7 +174,7 @@ const ReplyTreeNode = ({
               onClick={() => onSelectReplyTarget(reply)}
               className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 py-0.5 px-1.5 rounded hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
             >
-              <Reply className="w-2.5 h-2.5" /> Reply
+              <HiArrowUturnLeft className="w-2.5 h-2.5" /> Reply
             </button>
           </div>
         )}
@@ -522,7 +531,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
-              <MessageSquare className="w-4 h-4" />
+              <HiChatBubbleLeftRight className="w-4 h-4" />
             </div>
             <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">
               Manuscript Feedback & Comments
@@ -535,7 +544,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
               className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
               title="Close panel"
             >
-              <X className="w-4 h-4" />
+              <HiXMark className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -579,7 +588,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
           </div>
         ) : sortedComments.length === 0 ? (
           <div className="py-12 text-center text-xs text-gray-400 bg-gray-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-gray-200 dark:border-slate-700 px-4">
-            <MessageSquare className="w-8 h-8 mx-auto mb-2.5 text-gray-300 dark:text-gray-600" />
+            <HiChatBubbleLeftRight className="w-8 h-8 mx-auto mb-2.5 text-gray-300 dark:text-gray-600" />
             <p className="font-medium text-gray-600 dark:text-gray-300 mb-1">
               {filter === 'active' ? 'No active comments' : 'No resolved comments'}
             </p>
@@ -613,7 +622,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                 {/* Quoted manuscript anchor if attached */}
                 {comment.selectedText && (
                   <div className="mb-2.5 bg-amber-50/80 dark:bg-amber-900/20 border-l-2 border-amber-500 px-2.5 py-1.5 rounded text-xs text-amber-900 dark:text-amber-200 italic line-clamp-3">
-                    <Quote className="w-3 h-3 inline mr-1 text-amber-600 shrink-0" />
+                    <HiChatBubbleBottomCenterText className="w-3 h-3 inline mr-1 text-amber-600 shrink-0" />
                     "{comment.selectedText}"
                   </div>
                 )}
@@ -631,7 +640,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                         <span className="truncate">{comment.authorName || 'Researcher'}</span>
                         {comment.replyToUserName && (
                           <>
-                            <ArrowRight className="w-3 h-3 text-gray-400 shrink-0 mx-0.5" />
+                            <HiArrowRight className="w-3 h-3 text-gray-400 shrink-0 mx-0.5" />
                             <span className="text-gray-600 dark:text-gray-300 font-medium truncate">
                               {comment.replyToUserName}
                             </span>
@@ -659,7 +668,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                       }`}
                       title={comment.resolved ? 'Re-open comment' : 'Resolve comment'}
                     >
-                      {comment.resolved ? <RotateCcw className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                      {comment.resolved ? <HiArrowPath className="w-3.5 h-3.5" /> : <HiCheck className="w-3.5 h-3.5" />}
                     </button>
 
                     <button
@@ -668,7 +677,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                       className="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                       title="Delete comment"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <HiTrash className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -708,12 +717,12 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                       >
                         {isThreadExpanded ? (
                           <>
-                            <ChevronUp className="w-3.5 h-3.5" />
+                            <HiChevronUp className="w-3.5 h-3.5" />
                             <span>Hide {repliesCount === 1 ? '1 reply' : `${repliesCount} replies`}</span>
                           </>
                         ) : (
                           <>
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <HiChevronDown className="w-3.5 h-3.5" />
                             <span>{repliesCount === 1 ? '1 reply' : `${repliesCount} replies`}</span>
                           </>
                         )}
@@ -743,7 +752,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                       }}
                       className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-semibold transition-colors py-1 px-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40"
                     >
-                      <Reply className="w-3 h-3" /> Reply
+                      <HiArrowUturnLeft className="w-3 h-3" /> Reply
                     </button>
                   )}
                 </div>
@@ -791,7 +800,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
         {selectedTextAnchor && !replyTarget && (
           <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border-l-2 border-amber-500 px-2.5 py-1.5 mb-2 rounded text-xs text-amber-900 dark:text-amber-300">
             <div className="flex items-center gap-1.5 truncate">
-              <Quote className="w-3 h-3 text-amber-600 shrink-0" />
+              <HiChatBubbleBottomCenterText className="w-3 h-3 text-amber-600 shrink-0" />
               <span className="truncate italic">"{selectedTextAnchor}"</span>
             </div>
             <button
@@ -800,7 +809,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
               className="text-amber-500 hover:text-amber-700 p-0.5"
               title="Clear quote"
             >
-              <X className="w-3 h-3" />
+              <HiXMark className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -809,7 +818,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
         {replyTarget && (
           <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 px-2.5 py-1.5 mb-2 rounded text-xs text-blue-900 dark:text-blue-300">
             <div className="flex items-center gap-1.5 truncate">
-              <Reply className="w-3 h-3 text-blue-600 shrink-0" />
+              <HiArrowUturnLeft className="w-3 h-3 text-blue-600 shrink-0" />
               <span>
                 Replying to <strong className="font-semibold text-blue-700 dark:text-blue-300">@{replyTarget.authorName}</strong>
               </span>
@@ -820,7 +829,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
               className="text-blue-500 hover:text-blue-700 p-0.5"
               title="Cancel reply"
             >
-              <X className="w-3 h-3" />
+              <HiXMark className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -852,7 +861,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
             title="Send comment (Ctrl+Enter)"
             className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100 text-white flex items-center justify-center shadow-sm transition-all shrink-0 mb-0.5"
           >
-            <Send className="w-4 h-4 ml-0.5" />
+            <HiPaperAirplane className="w-4 h-4 ml-0.5" />
           </button>
         </div>
 

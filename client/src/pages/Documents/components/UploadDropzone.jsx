@@ -1,6 +1,6 @@
 // src/pages/Documents/components/UploadDropzone.jsx
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileUp, FileText, AlertCircle } from 'lucide-react';
+import { HiArrowUpTray, HiDocumentText } from 'react-icons/hi2';
 import { ALLOWED_EXTENSIONS } from '../constants/documentConstants';
 
 export const UploadDropzone = ({ onFileSelected, disabled = false }) => {
@@ -66,7 +66,7 @@ export const UploadDropzone = ({ onFileSelected, disabled = false }) => {
       />
 
       <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3.5 shadow-xs">
-        <UploadCloud className="w-7 h-7" />
+        <HiArrowUpTray className="w-7 h-7" />
       </div>
 
       <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">
@@ -78,7 +78,7 @@ export const UploadDropzone = ({ onFileSelected, disabled = false }) => {
       </p>
 
       <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-slate-700">
-        <FileText className="w-3.5 h-3.5 text-blue-500" />
+        <HiDocumentText className="w-3.5 h-3.5 text-blue-500" />
         <span>Supported: <strong>PDF (.pdf)</strong> and <strong>Word (.docx)</strong></span>
       </div>
     </div>

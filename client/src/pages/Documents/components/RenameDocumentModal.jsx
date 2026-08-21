@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
-import { Edit3, X } from 'lucide-react';
+import { HiPencilSquare, HiXMark } from 'react-icons/hi2';
 
 export const RenameDocumentModal = ({
   isOpen,
@@ -44,7 +44,7 @@ export const RenameDocumentModal = ({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <Edit3 className="w-4 h-4 text-blue-600" />
+            <HiPencilSquare className="w-4 h-4 text-blue-600" />
             <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
               Rename Document
             </h3>
@@ -54,7 +54,7 @@ export const RenameDocumentModal = ({
             onClick={onClose}
             className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
-            <X className="w-4 h-4" />
+            <HiXMark className="w-4 h-4" />
           </button>
         </div>
 

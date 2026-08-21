@@ -9,7 +9,7 @@ export const AuthLayout = ({
   subtitle,
   quoteTitle = "From the first title proposal to the last published page.",
   quoteSubtitle = "Streamline student research, adviser reviews, defense scheduling, and institutional repository publication all in one unified workspace.",
-  cardWidthClass = "lg:w-[480px] xl:w-[530px]",
+  cardWidthClass = "lg:w-[48%] xl:w-[46%] 2xl:w-[44%] max-w-[650px] xl:max-w-[720px]",
 }) => {
   return (
     <div className="min-h-screen lg:h-screen w-full relative flex p-3 sm:p-5 lg:p-6 xl:p-8 bg-[#070c18] text-slate-100 overflow-y-auto lg:overflow-hidden selection:bg-blue-500 selection:text-white">
@@ -98,35 +98,40 @@ export const AuthLayout = ({
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Floating Tall White Card */}
-        <div className={`w-full ${cardWidthClass} h-full bg-white dark:bg-slate-900 rounded-[28px] sm:rounded-[36px] shadow-[0_25px_80px_-15px_rgba(0,0,0,0.7)] border border-white/80 dark:border-slate-800/90 flex flex-col justify-between p-6 sm:p-9 xl:p-12 z-20 shrink-0 overflow-y-auto text-gray-900 dark:text-gray-100 my-auto lg:my-0`}>
+        {/* RIGHT COLUMN: Floating Tall White Card (Takes ~half on desktop, sleek rounded edge, non-overlapping scroll) */}
+        <div className={`w-full ${cardWidthClass} h-full bg-white dark:bg-slate-900 rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.7)] border border-white/80 dark:border-slate-800/90 z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 my-auto lg:my-0 flex flex-col`}>
           
-          {/* Card Top & Body Container */}
-          <div className="w-full flex-1 flex flex-col justify-center">
-            {/* Header inside floating card */}
-            {(title || subtitle) && (
-              <div className="mb-6 xl:mb-8">
-                {title && (
-                  <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                    {title}
-                  </h2>
-                )}
-                {subtitle && (
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
-                    {subtitle}
-                  </p>
-                )}
-              </div>
-            )}
+          {/* Scrollable Inner Container with Clean Inset Scrollbar */}
+          <div className="w-full h-full overflow-y-auto p-6 sm:p-8 xl:p-11 flex flex-col justify-between custom-scrollbar">
+            
+            {/* Card Top & Body Container */}
+            <div className="w-full flex-1 flex flex-col justify-center py-2">
+              {/* Header inside floating card */}
+              {(title || subtitle) && (
+                <div className="mb-6 xl:mb-7">
+                  {title && (
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                      {title}
+                    </h2>
+                  )}
+                  {subtitle && (
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            {/* Form Content */}
-            {children}
+              {/* Form Content */}
+              {children}
+            </div>
+
+            {/* Card Bottom Footer */}
+            <div className="pt-4 text-center text-[11px] text-gray-400 dark:text-gray-500 shrink-0">
+              © 2026 CoreResearch
+            </div>
           </div>
 
-          {/* Card Bottom Footer */}
-          <div className="pt-4 text-center text-[11px] text-gray-400 dark:text-gray-500 shrink-0">
-            © 2026 CoreResearch
-          </div>
         </div>
 
       </div>

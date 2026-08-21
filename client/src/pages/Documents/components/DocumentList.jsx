@@ -1,4 +1,3 @@
-// src/pages/Documents/components/DocumentList.jsx
 import React from 'react';
 import { DocumentCardMenu } from './DocumentCardMenu';
 import { formatGoogleDocsDate, getDocumentTypeInfo } from '../utils/documentHelpers';

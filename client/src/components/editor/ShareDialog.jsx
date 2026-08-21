@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Share2, Link, Copy, Check } from 'lucide-react';
+import { HiLink, HiDocumentDuplicate, HiCheck } from 'react-icons/hi2';
 
 export const ShareDialog = ({ documentId, onClose }) => {
   const [copied, setCopied] = useState(false);
@@ -87,11 +87,11 @@ export const ShareDialog = ({ documentId, onClose }) => {
         {/* Copy Link */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-            <Link className="w-4 h-4" />
+            <HiLink className="w-4 h-4" />
             <span className="text-sm font-medium">Anyone with the link can edit</span>
           </div>
           <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-2">
-            {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+            {copied ? <HiCheck className="w-4 h-4 text-emerald-600" /> : <HiDocumentDuplicate className="w-4 h-4" />}
             {copied ? 'Copied' : 'Copy link'}
           </Button>
         </div>

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { BlankDocumentCard } from './BlankDocumentCard';
 import { ImportDocumentCard } from './ImportDocumentCard';
 import { Button } from '../../../components/ui/Button';
-import { Plus, ChevronDown, ChevronRight, UploadCloud } from 'lucide-react';
+import { HiPlus, HiChevronDown, HiChevronRight, HiArrowUpTray } from 'react-icons/hi2';
 
 export const NewDocumentSection = ({
   onCreateBlank,
@@ -48,9 +48,9 @@ export const NewDocumentSection = ({
               aria-label={isExpanded ? 'Collapse templates' : 'Expand templates'}
             >
               {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                <HiChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-300" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                <HiChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
               )}
             </button>
 
@@ -65,7 +65,7 @@ export const NewDocumentSection = ({
                   disabled={disabled}
                   className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-xs px-3.5 py-1.5 rounded-md shadow-2xs flex items-center gap-2 transition-all duration-150"
                 >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <HiPlus className="w-4 h-4" />
                   <span>New blank document</span>
                 </Button>
 
@@ -77,7 +77,7 @@ export const NewDocumentSection = ({
                   disabled={disabled}
                   className="text-xs border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-md"
                 >
-                  <UploadCloud className="w-3.5 h-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
+                  <HiArrowUpTray className="w-3.5 h-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
                   <span>Import document</span>
                 </Button>
               </div>

@@ -86,7 +86,6 @@ export const Login = () => {
     <AuthLayout
       title="Welcome Back!"
       subtitle="Log in to start managing your research projects with ease."
-      cardWidthClass="lg:w-[480px] xl:w-[540px]"
     >
       {error && (
         <div className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium">

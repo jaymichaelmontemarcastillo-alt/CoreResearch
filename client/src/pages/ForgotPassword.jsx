@@ -33,7 +33,6 @@ export const ForgotPassword = () => {
     <AuthLayout
       title="Reset your password"
       subtitle="Enter your email to receive a password reset link"
-      cardWidthClass="lg:w-[480px] xl:w-[540px]"
     >
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">

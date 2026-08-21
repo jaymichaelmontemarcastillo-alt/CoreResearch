@@ -1,6 +1,6 @@
 // src/pages/Documents/components/ImportDocumentCard.jsx
 import React from 'react';
-import { UploadCloud } from 'lucide-react';
+import { HiArrowUpTray } from 'react-icons/hi2';
 
 export const ImportDocumentCard = ({ onClick, disabled = false }) => {
   return (
@@ -14,7 +14,7 @@ export const ImportDocumentCard = ({ onClick, disabled = false }) => {
       >
         <div className="flex flex-col items-center justify-center p-3 text-center transition-transform duration-200 group-hover:scale-105">
           <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 border border-blue-100 dark:border-blue-900/60 shadow-2xs">
-            <UploadCloud className="w-6 h-6 stroke-[1.75]" />
+            <HiArrowUpTray className="w-6 h-6" />
           </div>
           <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 tracking-tight">
             Import Document

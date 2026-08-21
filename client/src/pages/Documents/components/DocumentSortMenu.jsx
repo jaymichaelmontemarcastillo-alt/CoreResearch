@@ -1,6 +1,6 @@
 // src/pages/Documents/components/DocumentSortMenu.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowUpDown, Check, ChevronDown } from 'lucide-react';
+import { HiArrowsUpDown, HiCheck, HiChevronDown } from 'react-icons/hi2';
 import { SORT_OPTIONS } from '../constants/documentConstants';
 
 export const DocumentSortMenu = ({ value, onChange }) => {
@@ -31,9 +31,9 @@ export const DocumentSortMenu = ({ value, onChange }) => {
         className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors shadow-2xs"
         title="Sort documents"
       >
-        <ArrowUpDown className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+        <HiArrowsUpDown className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
         <span className="hidden sm:inline">{currentOption.label}</span>
-        <ChevronDown className="w-3 h-3 text-gray-400" />
+        <HiChevronDown className="w-3 h-3 text-gray-400" />
       </button>
 
       {isOpen && (
@@ -58,7 +58,7 @@ export const DocumentSortMenu = ({ value, onChange }) => {
                 }`}
               >
                 <span>{opt.label}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                {isSelected && <HiCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
               </button>
             );
           })}
