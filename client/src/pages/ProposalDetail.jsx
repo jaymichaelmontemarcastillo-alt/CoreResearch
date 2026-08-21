@@ -129,6 +129,24 @@ export const ProposalDetail = () => {
     fetchProposal();
   }, [id]);
 
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmitDraft = async () => {
+    if (!proposal || !currentUser) return;
+    setSubmitting(true);
+    try {
+      const studentUid = currentUser.uid;
+      const studentName = userProfile?.fullName || currentUser.email?.split('@')[0] || 'Student';
+      await titleProposalService.submitProposal(proposal.id, studentUid, studentName);
+      setToast("Proposal submitted successfully to coordinator review queue!");
+      await fetchProposal();
+    } catch (err) {
+      alert(`Error submitting proposal: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!proposal) return;
     if (!window.confirm(`Delete proposal: "${proposal.title}"?`)) return;
@@ -191,6 +209,17 @@ export const ProposalDetail = () => {
 
         {isStudent && (
           <div className="flex items-center gap-2">
+            {proposal.status === "draft" && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSubmitDraft}
+                isLoading={submitting}
+              >
+                <Send className="w-4 h-4 mr-1.5" />
+                Submit for Review
+              </Button>
+            )}
             {canEdit && (
               <Button
                 variant="outline"
@@ -231,6 +260,33 @@ export const ProposalDetail = () => {
         <Toast message={toast} variant="success" onClose={() => setToast("")} />
       )}
 
+      {/* ── DRAFT BANNER ────────────────────────────────────────────────────── */}
+      {proposal.status === "draft" && isStudent && (
+        <div className="p-5 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <FileEdit className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">
+                Draft Proposal — Awaiting Submission
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                This title proposal is currently saved as a draft. Click "Submit for Review" to send it to the Coordinator evaluation queue.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSubmitDraft}
+            isLoading={submitting}
+            className="shrink-0"
+          >
+            <Send className="w-4 h-4 mr-1.5" />
+            Submit for Review
+          </Button>
+        </div>
+      )}
+
       {/* ── APPROVED BANNER ─────────────────────────────────────────────────── */}
       {isApproved && (
         <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-800/50">
@@ -251,6 +307,9 @@ export const ProposalDetail = () => {
                 <span className="text-sm font-semibold">
                   Next Stage: Chapter 1–3 Manuscript Development
                 </span>
+              </div>
+              <div className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg inline-block border border-emerald-200/60 dark:border-emerald-800/40">
+                Adviser Matching: Available in Phase 2 after proposal approval.
               </div>
               {proposal.coordinatorName && (
                 <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-2">
@@ -376,22 +435,52 @@ export const ProposalDetail = () => {
           </div>
         </div>
 
+        {/* Structured Text Content Sections */}
+        {(proposal.description || proposal.rationale || proposal.objectives || proposal.scopeAndDelimitation || proposal.methodology) && (
+          <div className="space-y-4 pt-2">
+            {(proposal.description || proposal.rationale) && (
+              <ContentSection
+                icon={FileText}
+                title="Research Purpose / Rationale"
+                content={proposal.description || proposal.rationale}
+              />
+            )}
+            {proposal.objectives && (
+              <ContentSection
+                icon={Target}
+                title="Research Objectives"
+                content={proposal.objectives}
+              />
+            )}
+            {proposal.scopeAndDelimitation && (
+              <ContentSection
+                icon={ShieldAlert}
+                title="Scope and Delimitation"
+                content={proposal.scopeAndDelimitation}
+              />
+            )}
+            {proposal.methodology && (
+              <ContentSection
+                icon={Compass}
+                title="Proposed Methodology"
+                content={proposal.methodology}
+              />
+            )}
+          </div>
+        )}
+
         {/* Document Viewer Section */}
-        <div className="pt-2">
-          {proposal.attachments && proposal.attachments.length > 0 ? (
+        {proposal.attachments && proposal.attachments.length > 0 && (
+          <div className="pt-4 border-t border-gray-100 dark:border-slate-800">
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
                 <FileText className="w-4 h-4 text-primary" />
-                Proposal Document
+                Attached Document
               </h3>
               <DocumentViewer attachment={proposal.attachments[0]} />
             </div>
-          ) : (
-            <div className="p-6 text-center border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl">
-              <p className="text-sm text-gray-500 font-medium">No document attached to this proposal.</p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
 
       {/* ── SUBMISSION INFO (meta card) ─────────────────────────────────────── */}

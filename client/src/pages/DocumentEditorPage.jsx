@@ -6,6 +6,7 @@ import { DocumentEditor } from '../components/editor/DocumentEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { EditorMenuBar } from '../components/editor/EditorMenuBar';
 import { CommentsPanel } from '../components/editor/CommentsPanel';
+import { FloatingCommentPopover } from '../components/editor/FloatingCommentPopover';
 import { ShareDialog } from '../components/editor/ShareDialog';
 import { PageSettingsModal } from '../components/editor/PageSettingsModal';
 import { Button } from '../components/ui/Button';
@@ -79,6 +80,8 @@ export const DocumentEditorPage = () => {
   const [initialContent, setInitialContent] = useState(null);
   const [documentLoaded, setDocumentLoaded] = useState(false);
   const [sourceType, setSourceType] = useState('native');
+  const [comments, setComments] = useState([]);
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
   
   // Fullscreen Maximize & Drawer Sidebar state
   const [isMaximized, setIsMaximized] = useState(false);
@@ -145,7 +148,16 @@ export const DocumentEditorPage = () => {
           if (docData.editorSettings?.page) {
             setPageSettings(docData.editorSettings.page);
           }
-          const contentToLoad = docData.content || docData.contentHtml || null;
+          let contentToLoad = docData.content || docData.contentHtml || null;
+          // Resilient fallback to localStorage if Firestore content is null or empty
+          if (!contentToLoad) {
+            try {
+              const cached = localStorage.getItem(`coreresearch_doc_content_${documentId}`);
+              if (cached) {
+                contentToLoad = JSON.parse(cached);
+              }
+            } catch (e) {}
+          }
           if (contentToLoad) {
             setInitialContent(contentToLoad);
           }
@@ -153,7 +165,15 @@ export const DocumentEditorPage = () => {
         }
       } catch (err) {
         console.warn('Failed to load document from Firestore:', err);
-        if (isMounted) setDocumentLoaded(true);
+        if (isMounted) {
+          try {
+            const cached = localStorage.getItem(`coreresearch_doc_content_${documentId}`);
+            if (cached) {
+              setInitialContent(JSON.parse(cached));
+            }
+          } catch (e) {}
+          setDocumentLoaded(true);
+        }
       }
     };
 
@@ -188,6 +208,17 @@ export const DocumentEditorPage = () => {
 
     return () => {
       isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [documentId]);
+
+  // 1b. Subscribe to comments in real-time for document text highlighting & vice-versa sync
+  useEffect(() => {
+    if (!documentId) return;
+    const unsubscribe = documentStore.subscribeComments(documentId, (fetched) => {
+      setComments(fetched || []);
+    });
+    return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [documentId]);
@@ -335,17 +366,24 @@ export const DocumentEditorPage = () => {
     isTypingRef.current = true;
     setSaveStatus('saving');
 
+    const activeEditor = editorOrJson?.getJSON ? editorOrJson : editor;
+    const json = activeEditor?.getJSON ? activeEditor.getJSON() : (editorOrJson && typeof editorOrJson === 'object' ? editorOrJson : null);
+    const html = activeEditor?.getHTML ? activeEditor.getHTML() : '';
+    const plainText = activeEditor?.getText ? activeEditor.getText() : '';
+
+    // Immediately cache in localStorage so reload never loses edits
+    if (json) {
+      try {
+        localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
+      } catch (e) {}
+    }
+
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
       try {
-        const activeEditor = editorOrJson?.getJSON ? editorOrJson : editor;
-        const json = activeEditor?.getJSON ? activeEditor.getJSON() : (editorOrJson && typeof editorOrJson === 'object' ? editorOrJson : null);
-        const html = activeEditor?.getHTML ? activeEditor.getHTML() : '';
-        const plainText = activeEditor?.getText ? activeEditor.getText() : '';
-        
         await documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
         setSaveStatus('saved');
       } catch (err) {
@@ -354,8 +392,26 @@ export const DocumentEditorPage = () => {
       } finally {
         isTypingRef.current = false;
       }
-    }, 1500);
+    }, 800);
   }, [documentId, editor, effectiveUserProfile]);
+
+  // Flush unsaved content on hard refresh or window close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const activeEditor = editorRef.current;
+      if (activeEditor && !activeEditor.isDestroyed) {
+        try {
+          const json = activeEditor.getJSON();
+          localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
+          const html = activeEditor.getHTML();
+          const plainText = activeEditor.getText();
+          documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [documentId, effectiveUserProfile]);
 
   // 5. Handle Page Settings Save
   const handleSavePageSettings = async (newSettings) => {
@@ -698,6 +754,13 @@ export const DocumentEditorPage = () => {
                   pageSettings={pageSettings}
                   initialContent={initialContent}
                   sourceType={sourceType}
+                  comments={comments}
+                  onCommentSelect={(commentId) => {
+                    setHighlightedCommentId(commentId);
+                    if (!showComments) {
+                      setShowComments(true);
+                    }
+                  }}
                   onEditorReady={handleEditorReady}
                   onContentChange={handleContentChange}
                 />
@@ -710,6 +773,20 @@ export const DocumentEditorPage = () => {
               )}
             </EditorErrorBoundary>
           </div>
+          
+          {/* Google Docs-Style Floating Contextual Comment Action & Composer */}
+          {editor && (
+            <FloatingCommentPopover
+              editor={editor}
+              documentId={documentId}
+              userProfile={effectiveUserProfile}
+              onCommentAdded={() => {
+                if (!showComments) {
+                  setShowComments(true);
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Right Sidebar - Comments Panel (Local Resizable) */}
@@ -737,6 +814,8 @@ export const DocumentEditorPage = () => {
             <CommentsPanel 
               documentId={documentId} 
               editor={editor} 
+              highlightedCommentId={highlightedCommentId}
+              onClearHighlight={() => setHighlightedCommentId(null)}
               onClose={() => setShowComments(false)}
             />
           </div>

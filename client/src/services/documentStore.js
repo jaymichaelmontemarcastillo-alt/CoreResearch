@@ -430,7 +430,7 @@ export const documentStore = {
    */
   addComment: async (documentId, commentData, userProfile = null) => {
     if (!documentId || !commentData.text) return null;
-    const commentId = `comm_${Date.now()}`;
+    const commentId = commentData.id || `comm_${Date.now()}`;
     const now = new Date().toISOString();
     const authorId = userProfile?.uid || 'unknown-user';
     const authorName = userProfile?.fullName || userProfile?.first_name || 'Researcher';

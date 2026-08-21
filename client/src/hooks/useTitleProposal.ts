@@ -56,8 +56,29 @@ export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
   }, [groupId, coordinatorMode, adviserGroupIds, fetchNone]);
 
   useEffect(() => {
+    if (fetchNone) {
+      setProposals([]);
+      setLoading(false);
+      return;
+    }
+
+    if (coordinatorMode) {
+      setLoading(true);
+      const unsubscribe = titleProposalService.subscribeSubmittedProposals(
+        (list) => {
+          setProposals(list);
+          setLoading(false);
+        },
+        (err) => {
+          setError(err.message || 'Failed to load coordinator queue');
+          setLoading(false);
+        }
+      );
+      return () => unsubscribe();
+    }
+
     fetchProposals();
-  }, [fetchProposals]);
+  }, [fetchProposals, coordinatorMode, fetchNone]);
 
   // ── Student Actions ────────────────────────────────────────────────────────
 

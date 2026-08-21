@@ -109,11 +109,39 @@ export const Dashboard = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
           {role === "student" && (
-            <Link to="/proposals/new">
+            <>
+              <Link to="/research/workspace">
+                <Button variant="secondary" size="md">
+                  <BookOpen className="w-4 h-4 mr-2" /> Research Workspace
+                </Button>
+              </Link>
+              <Link to="/proposals/new">
+                <Button variant="primary" size="md">
+                  <PlusCircle className="w-4 h-4 mr-2" /> Submit Proposal
+                </Button>
+              </Link>
+            </>
+          )}
+          {role === "adviser" && (
+            <>
+              <Link to="/advisees">
+                <Button variant="primary" size="md">
+                  <Users className="w-4 h-4 mr-2" /> My Advisees
+                </Button>
+              </Link>
+              <Link to="/reviews">
+                <Button variant="secondary" size="md">
+                  <MessageSquare className="w-4 h-4 mr-2" /> Feedback Threads
+                </Button>
+              </Link>
+            </>
+          )}
+          {role === "panelist" && (
+            <Link to="/reviews">
               <Button variant="primary" size="md">
-                <PlusCircle className="w-4 h-4 mr-2" /> Submit Proposal
+                <MessageSquare className="w-4 h-4 mr-2" /> View Feedback Threads
               </Button>
             </Link>
           )}
@@ -121,13 +149,6 @@ export const Dashboard = () => {
             <Link to="/admin/users">
               <Button variant="primary" size="md">
                 <Users className="w-4 h-4 mr-2" /> Manage Users
-              </Button>
-            </Link>
-          )}
-          {(role === "adviser" || role === "panelist") && (
-            <Link to="/reviews">
-              <Button variant="primary" size="md">
-                <MessageSquare className="w-4 h-4 mr-2" /> View Feedback Threads
               </Button>
             </Link>
           )}

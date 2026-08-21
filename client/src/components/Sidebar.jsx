@@ -60,14 +60,14 @@ export const Sidebar = ({
           icon: ClipboardList,
           roles: ["research_coordinator", "admin"],
         },
-        {
-          label: "Documents",
-          path: "/documents",
-          icon: FileText,
-          roles: ["student", "adviser", "admin", "research_coordinator"],
-        },
         ...(role === "student"
           ? [
+            {
+              label: "Research Workspace",
+              path: "/research/workspace",
+              icon: BookOpen,
+              roles: ["student"],
+            },
             {
               label: "My Group",
               path: "/my-group",
@@ -76,6 +76,22 @@ export const Sidebar = ({
             },
           ]
           : []),
+        ...(role === "adviser" || role === "research_coordinator" || role === "admin"
+          ? [
+            {
+              label: "My Advisees",
+              path: "/advisees",
+              icon: Users,
+              roles: ["adviser", "research_coordinator", "admin"],
+            },
+          ]
+          : []),
+        {
+          label: "Documents",
+          path: "/documents",
+          icon: FileText,
+          roles: ["student", "adviser", "admin", "research_coordinator"],
+        },
         {
           label: "Repository",
           path: "/repository",

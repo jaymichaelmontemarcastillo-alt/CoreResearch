@@ -1,9 +1,8 @@
 // src/components/editor/CommentsPanel.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Button } from '../ui/Button';
 import { 
   MessageSquare, Check, Send, Reply, Trash2, RotateCcw, Quote, X, 
-  ArrowRight, ChevronDown, ChevronUp, CornerDownRight
+  ArrowRight, ChevronDown, ChevronUp, MapPin
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { documentStore } from '../../services/documentStore';
@@ -77,6 +76,324 @@ const buildReplyTree = (replies = []) => {
   return rootReplies;
 };
 
+// Helper to locate and smoothly scroll to the commented text in the document editor
+export const locateCommentInEditor = (editor, comment) => {
+  if (!editor || editor.isDestroyed || !comment) return;
+
+  const commentId = comment.id;
+  const selectedText = (comment.selectedText || '').trim();
+
+  // 1. Try to find the DOM element with data-comment-id mark
+  let commentElem = null;
+  if (editor.view?.dom) {
+    commentElem = editor.view.dom.querySelector(`[data-comment-id="${commentId}"]`);
+  }
+
+  if (commentElem) {
+    // Scroll smoothly so the element is centered in the scroll container
+    commentElem.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+    // Flash visual active glow animation
+    commentElem.classList.remove('coreresearch-comment-active');
+    void commentElem.offsetWidth; // force DOM reflow
+    commentElem.classList.add('coreresearch-comment-active');
+    setTimeout(() => {
+      commentElem?.classList.remove('coreresearch-comment-active');
+    }, 2600);
+
+    // Also select the range in Tiptap
+    try {
+      const pos = editor.view.posAtDOM(commentElem, 0);
+      if (typeof pos === 'number') {
+        const textLen = commentElem.textContent?.length || 1;
+        editor.commands.setTextSelection({ from: pos, to: pos + textLen });
+      }
+    } catch (e) {
+      // ignore
+    }
+    return;
+  }
+
+  // 2. Fallback: Search the ProseMirror document for the matching text string
+  if (selectedText && editor.state?.doc) {
+    let foundRange = null;
+
+    // Search text nodes
+    editor.state.doc.descendants((node, pos) => {
+      if (foundRange !== null) return false;
+      if (node.isText && node.text) {
+        const idx = node.text.indexOf(selectedText);
+        if (idx !== -1) {
+          foundRange = { from: pos + idx, to: pos + idx + selectedText.length };
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // If not found in a single text node (e.g. multi-node selection), search text between
+    if (!foundRange) {
+      const fullText = editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ');
+      const matchIdx = fullText.indexOf(selectedText);
+      if (matchIdx !== -1) {
+        let currentOffset = 0;
+        let startPos = null;
+        let endPos = null;
+        editor.state.doc.descendants((node, pos) => {
+          if (node.isText && node.text) {
+            const nodeEnd = currentOffset + node.text.length;
+            if (startPos === null && matchIdx >= currentOffset && matchIdx < nodeEnd) {
+              startPos = pos + (matchIdx - currentOffset);
+            }
+            const matchEnd = matchIdx + selectedText.length;
+            if (endPos === null && matchEnd > currentOffset && matchEnd <= nodeEnd) {
+              endPos = pos + (matchEnd - currentOffset);
+            }
+            currentOffset = nodeEnd + 1; // +1 for the space separator
+          }
+          return startPos === null || endPos === null;
+        });
+
+        if (startPos !== null) {
+          foundRange = { from: startPos, to: endPos || (startPos + selectedText.length) };
+        }
+      }
+    }
+
+    if (foundRange) {
+      editor.commands.setTextSelection(foundRange);
+
+      try {
+        const coords = editor.view.coordsAtPos(foundRange.from);
+        if (coords) {
+          const scrollContainer = editor.view.dom.closest('.overflow-y-auto') || window;
+          if (scrollContainer === window) {
+            window.scrollTo({
+              top: coords.top + window.scrollY - window.innerHeight / 2,
+              behavior: 'smooth',
+            });
+          } else {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const relativeTop = coords.top - containerRect.top + scrollContainer.scrollTop;
+            scrollContainer.scrollTo({
+              top: Math.max(0, relativeTop - containerRect.height / 2),
+              behavior: 'smooth',
+            });
+          }
+        }
+      } catch (err) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          sel.getRangeAt(0).startContainer?.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }
+};
+
+// Inline Reply Composer Component (replaces the fixed bottom composer for replies)
+const InlineReplyComposer = ({
+  targetName,
+  eligibleUsers = [],
+  onCancel,
+  onSubmit,
+}) => {
+  const [replyText, setReplyText] = useState('');
+  const [mentionQuery, setMentionQuery] = useState(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [trackedMentions, setTrackedMentions] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleInputChange = (e) => {
+    const text = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setReplyText(text);
+
+    const textBeforeCursor = text.slice(0, cursorPos);
+    const atMatch = textBeforeCursor.match(/@([a-zA-Z0-9\s]*)$/);
+
+    if (atMatch && !textBeforeCursor.match(/@[a-zA-Z0-9\s]+(\s{2,})/)) {
+      setMentionQuery(atMatch[1]);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const filteredUsers = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase().trim();
+    if (!q) return eligibleUsers.slice(0, 5);
+    return eligibleUsers
+      .filter((u) =>
+        (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.role && u.role.toLowerCase().includes(q))
+      )
+      .slice(0, 5);
+  }, [eligibleUsers, mentionQuery]);
+
+  const selectMention = (user) => {
+    if (!textareaRef.current) return;
+    const cursorPos = textareaRef.current.selectionStart;
+    const textBeforeCursor = replyText.slice(0, cursorPos);
+    const textAfterCursor = replyText.slice(cursorPos);
+
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    if (atIndex !== -1) {
+      const newTextBefore = textBeforeCursor.slice(0, atIndex) + `@${user.fullName} `;
+      const newText = newTextBefore + textAfterCursor;
+      setReplyText(newText);
+      setTrackedMentions((prev) => [
+        ...prev.filter((m) => m.userId !== user.id),
+        { userId: user.id, userName: user.fullName },
+      ]);
+      setMentionQuery(null);
+
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newPos = newTextBefore.length;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+      }, 10);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (mentionQuery !== null && filteredUsers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % filteredUsers.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + filteredUsers.length) % filteredUsers.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        selectMention(filteredUsers[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleSend = async () => {
+    if (!replyText.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    const trimmed = replyText.trim();
+    const mentionsInText = trackedMentions.filter((m) =>
+      trimmed.includes(`@${m.userName}`)
+    );
+    try {
+      await onSubmit(trimmed, mentionsInText);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mt-2.5 p-2.5 bg-blue-50/70 dark:bg-slate-800/90 border border-blue-200/80 dark:border-blue-900/60 rounded-xl animate-fade-in text-xs">
+      <div className="flex items-center justify-between mb-1.5 text-[11px] text-blue-700 dark:text-blue-300">
+        <div className="flex items-center gap-1 font-medium truncate">
+          <Reply className="w-3 h-3 shrink-0" />
+          <span>Replying to <strong>@{targetName}</strong></span>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
+          title="Cancel reply"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Mention Dropdown */}
+      {mentionQuery !== null && filteredUsers.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg py-1 mb-2 max-h-36 overflow-y-auto animate-fade-in text-xs z-30">
+          <div className="px-2.5 py-0.5 text-[9px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-slate-700">
+            Mention Member (@)
+          </div>
+          {filteredUsers.map((user, idx) => (
+            <button
+              key={user.id || user.uid}
+              type="button"
+              onClick={() => selectMention(user)}
+              className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between gap-1.5 transition-colors ${
+                idx === mentionIndex
+                  ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium'
+                  : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[9px] font-bold shrink-0">
+                  {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span className="truncate text-[11px]">{user.fullName}</span>
+              </div>
+              <span className="text-[9px] text-gray-400 capitalize shrink-0 font-normal">
+                {user.role || 'Member'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500">
+        <textarea
+          ref={textareaRef}
+          rows={2}
+          value={replyText}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={`Reply to @${targetName}... (Type @ to mention)`}
+          className="w-full bg-transparent text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none resize-none min-h-[36px] max-h-28 custom-scrollbar"
+        />
+      </div>
+
+      <div className="flex items-center justify-between mt-2 pt-1">
+        <span className="text-[10px] text-gray-400">Ctrl+Enter to send</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!replyText.trim() || isSubmitting}
+            className="px-3 py-1 text-[11px] font-semibold rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-xs transition-all flex items-center gap-1"
+          >
+            <Send className="w-2.5 h-2.5" />
+            <span>{isSubmitting ? 'Sending...' : 'Reply'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Recursive Reply Tree Node Component with visual branch connectors
 const ReplyTreeNode = ({
   reply,
@@ -85,6 +402,9 @@ const ReplyTreeNode = ({
   comment,
   replyTarget,
   onSelectReplyTarget,
+  onCancelReply,
+  onSubmitReply,
+  eligibleUsers,
   expandedSubThreads,
   onToggleSubThread,
 }) => {
@@ -171,6 +491,16 @@ const ReplyTreeNode = ({
         )}
       </div>
 
+      {/* Inline Reply Composer for this child reply */}
+      {isReplyingThis && !comment.resolved && (
+        <InlineReplyComposer
+          targetName={replyTarget.authorName}
+          eligibleUsers={eligibleUsers}
+          onCancel={onCancelReply}
+          onSubmit={onSubmitReply}
+        />
+      )}
+
       {/* Recursive Render of Child Replies (Tree Branches) */}
       {hasChildren && isSubThreadExpanded && (
         <div className="relative">
@@ -183,6 +513,9 @@ const ReplyTreeNode = ({
               comment={comment}
               replyTarget={replyTarget}
               onSelectReplyTarget={onSelectReplyTarget}
+              onCancelReply={onCancelReply}
+              onSubmitReply={onSubmitReply}
+              eligibleUsers={eligibleUsers}
               expandedSubThreads={expandedSubThreads}
               onToggleSubThread={onToggleSubThread}
             />
@@ -193,25 +526,25 @@ const ReplyTreeNode = ({
   );
 };
 
-export const CommentsPanel = ({ documentId, editor, onClose }) => {
+export const CommentsPanel = ({ 
+  documentId, 
+  editor, 
+  onClose,
+  highlightedCommentId = null,
+  onClearHighlight,
+}) => {
   const { userProfile } = useAuth();
   const [comments, setComments] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [selectedTextAnchor, setSelectedTextAnchor] = useState('');
   const [filter, setFilter] = useState('active'); // 'active' | 'resolved'
   const [replyTarget, setReplyTarget] = useState(null); // { commentId, replyId, authorId, authorName }
   const [loading, setLoading] = useState(true);
 
-  // Social media style collapsible replies state { [commentId]: boolean }
+  // Collapsible replies state { [commentId]: boolean }
   const [expandedThreads, setExpandedThreads] = useState({});
   const [expandedSubThreads, setExpandedSubThreads] = useState({});
 
-  // Mention system state
+  // Eligible users for mention autocomplete
   const [eligibleUsers, setEligibleUsers] = useState([]);
-  const [mentionQuery, setMentionQuery] = useState(null); // string or null
-  const [mentionIndex, setMentionIndex] = useState(0);
-  const [trackedMentions, setTrackedMentions] = useState([]); // [{ userId, userName }]
-  const textareaRef = useRef(null);
   const commentsContainerRef = useRef(null);
 
   const effectiveUserProfile = useMemo(() => ({
@@ -265,121 +598,37 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
     };
   }, [documentId]);
 
-  // 3. Capture highlighted text selection from editor
+  const lastHighlightedRef = useRef(null);
+
+  // 3. Scroll to and highlight comment card when highlightedCommentId changes
   useEffect(() => {
-    if (!editor) return;
+    if (!highlightedCommentId) {
+      lastHighlightedRef.current = null;
+      return;
+    }
 
-    const handleSelectionUpdate = () => {
-      try {
-        const { from, to } = editor.state.selection;
-        if (from !== to) {
-          const text = editor.state.doc.textBetween(from, to, ' ');
-          if (text && text.trim().length > 0 && text.trim().length < 300) {
-            setSelectedTextAnchor(text.trim());
-          }
+    // Only switch tabs automatically when a NEW comment is clicked
+    if (lastHighlightedRef.current !== highlightedCommentId) {
+      lastHighlightedRef.current = highlightedCommentId;
+      const targetComment = comments.find((c) => c.id === highlightedCommentId);
+      if (targetComment) {
+        if (targetComment.resolved) {
+          setFilter('resolved');
+        } else {
+          setFilter('active');
         }
-      } catch (e) {
-        // ignore
-      }
-    };
-
-    editor.on('selectionUpdate', handleSelectionUpdate);
-    return () => {
-      editor.off('selectionUpdate', handleSelectionUpdate);
-    };
-  }, [editor]);
-
-  // 4. Handle textarea change & detect @mentions
-  const handleInputChange = (e) => {
-    const text = e.target.value;
-    const cursorPos = e.target.selectionStart;
-    setInputText(text);
-
-    // Look backward from cursor for @query
-    const textBeforeCursor = text.slice(0, cursorPos);
-    const atMatch = textBeforeCursor.match(/@([a-zA-Z0-9\s]*)$/);
-
-    if (atMatch && !textBeforeCursor.match(/@[a-zA-Z0-9\s]+(\s{2,})/)) {
-      setMentionQuery(atMatch[1]);
-      setMentionIndex(0);
-    } else {
-      setMentionQuery(null);
-    }
-  };
-
-  // Filter eligible users for mention dropdown
-  const filteredUsers = useMemo(() => {
-    if (mentionQuery === null) return [];
-    const q = mentionQuery.toLowerCase().trim();
-    if (!q) return eligibleUsers.slice(0, 6);
-    return eligibleUsers
-      .filter((u) => 
-        (u.fullName && u.fullName.toLowerCase().includes(q)) ||
-        (u.email && u.email.toLowerCase().includes(q)) ||
-        (u.role && u.role.toLowerCase().includes(q))
-      )
-      .slice(0, 6);
-  }, [eligibleUsers, mentionQuery]);
-
-  // Insert selected mention into textarea
-  const selectMention = (user) => {
-    if (!textareaRef.current) return;
-    const cursorPos = textareaRef.current.selectionStart;
-    const textBeforeCursor = inputText.slice(0, cursorPos);
-    const textAfterCursor = inputText.slice(cursorPos);
-
-    const atIndex = textBeforeCursor.lastIndexOf('@');
-    if (atIndex !== -1) {
-      const newTextBefore = textBeforeCursor.slice(0, atIndex) + `@${user.fullName} `;
-      const newText = newTextBefore + textAfterCursor;
-      setInputText(newText);
-      setTrackedMentions((prev) => [
-        ...prev.filter((m) => m.userId !== user.id),
-        { userId: user.id, userName: user.fullName }
-      ]);
-      setMentionQuery(null);
-
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          const newPos = newTextBefore.length;
-          textareaRef.current.setSelectionRange(newPos, newPos);
-        }
-      }, 10);
-    }
-  };
-
-  // Keyboard navigation for mention popup
-  const handleKeyDown = (e) => {
-    if (mentionQuery !== null && filteredUsers.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setMentionIndex((prev) => (prev + 1) % filteredUsers.length);
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setMentionIndex((prev) => (prev - 1 + filteredUsers.length) % filteredUsers.length);
-        return;
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        selectMention(filteredUsers[mentionIndex]);
-        return;
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setMentionQuery(null);
-        return;
       }
     }
 
-    // Ctrl+Enter or Cmd+Enter to send
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+    const timer = setTimeout(() => {
+      const cardElem = commentsContainerRef.current?.querySelector(`#comment-card-${highlightedCommentId}`);
+      if (cardElem) {
+        cardElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [highlightedCommentId, comments]);
 
   // Toggle thread expanded state
   const toggleThread = (commentId) => {
@@ -400,93 +649,62 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
   const handleSelectReplyTarget = (comment, reply) => {
     setReplyTarget({
       commentId: comment.id,
-      replyId: reply.id,
-      authorId: reply.authorId,
-      authorName: reply.authorName || 'Collaborator',
+      replyId: reply ? reply.id : null,
+      authorId: reply ? reply.authorId : comment.authorId,
+      authorName: reply ? (reply.authorName || 'Collaborator') : (comment.authorName || 'Researcher'),
     });
     setExpandedThreads((prev) => ({
       ...prev,
       [comment.id]: true,
     }));
-    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
-  // Submit comment or reply
-  const handleSend = async () => {
-    if (!inputText.trim() || !documentId) return;
+  // Submit reply from inline composer
+  const handleSendReply = async (trimmedText, mentionsInText) => {
+    if (!trimmedText || !documentId || !replyTarget) return;
 
-    const trimmedText = inputText.trim();
-
-    // Collect all mentions from text
-    const mentionsInText = trackedMentions.filter((m) =>
-      trimmedText.includes(`@${m.userName}`)
-    );
+    const parentCommentId = replyTarget.commentId;
+    const parentReplyId = replyTarget.replyId || null;
 
     try {
-      if (replyTarget) {
-        const parentCommentId = replyTarget.commentId;
-        const parentReplyId = replyTarget.replyId || null;
+      await documentStore.addCommentReply(
+        documentId,
+        parentCommentId,
+        {
+          parentReplyId: parentReplyId,
+          text: trimmedText,
+          replyToUserId: replyTarget.authorId,
+          replyToUserName: replyTarget.authorName,
+          mentions: mentionsInText,
+        },
+        effectiveUserProfile
+      );
 
-        // Send Nested Reply (directly under the parent reply or root comment)
-        await documentStore.addCommentReply(
-          documentId,
-          parentCommentId,
-          {
-            parentReplyId: parentReplyId,
-            text: trimmedText,
-            replyToUserId: replyTarget.authorId,
-            replyToUserName: replyTarget.authorName,
-            mentions: mentionsInText,
-          },
-          effectiveUserProfile
-        );
-
-        // Auto-expand thread and sub-thread
-        setExpandedThreads((prev) => ({
+      // Auto-expand thread and sub-thread
+      setExpandedThreads((prev) => ({
+        ...prev,
+        [parentCommentId]: true,
+      }));
+      if (parentReplyId) {
+        setExpandedSubThreads((prev) => ({
           ...prev,
-          [parentCommentId]: true,
+          [parentReplyId]: true,
         }));
-        if (parentReplyId) {
-          setExpandedSubThreads((prev) => ({
-            ...prev,
-            [parentReplyId]: true,
-          }));
-        }
-
-        setReplyTarget(null);
-      } else {
-        // Send Root Comment
-        await documentStore.addComment(
-          documentId,
-          {
-            text: trimmedText,
-            selectedText: selectedTextAnchor || '',
-            section: 'Manuscript Section',
-            mentions: mentionsInText,
-          },
-          effectiveUserProfile
-        );
-        setSelectedTextAnchor('');
       }
 
-      setInputText('');
-      setTrackedMentions([]);
-      setMentionQuery(null);
-
-      // Scroll to bottom of comments container
-      setTimeout(() => {
-        if (commentsContainerRef.current) {
-          commentsContainerRef.current.scrollTop = commentsContainerRef.current.scrollHeight;
-        }
-      }, 100);
+      setReplyTarget(null);
     } catch (err) {
-      console.error('Failed to post comment/reply:', err);
+      console.error('Failed to post reply:', err);
     }
   };
 
   // Toggle resolve status
   const handleResolve = async (commentId, currentResolved) => {
     try {
+      if (highlightedCommentId === commentId) {
+        lastHighlightedRef.current = null;
+        onClearHighlight?.();
+      }
       await documentStore.updateComment(documentId, commentId, { resolved: !currentResolved });
     } catch (err) {
       console.error('Failed to update comment status:', err);
@@ -497,6 +715,10 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm('Delete this comment and its replies?')) return;
     try {
+      if (highlightedCommentId === commentId) {
+        lastHighlightedRef.current = null;
+        onClearHighlight?.();
+      }
       await documentStore.deleteComment(documentId, commentId);
       if (replyTarget?.commentId === commentId) {
         setReplyTarget(null);
@@ -504,6 +726,14 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
     } catch (err) {
       console.error('Failed to delete comment:', err);
     }
+  };
+
+  // Card click handler: Locate commented text in manuscript editor
+  const handleCommentCardClick = (comment, e) => {
+    if (e.target.closest('button') || e.target.closest('textarea') || e.target.closest('input')) {
+      return;
+    }
+    locateCommentInEditor(editor, comment);
   };
 
   // 1. Sort Root Comments: Oldest on TOP, Newest at BOTTOM
@@ -544,7 +774,11 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setFilter('active')}
+            onClick={() => {
+              setFilter('active');
+              onClearHighlight?.();
+              lastHighlightedRef.current = null;
+            }}
             className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
               filter === 'active'
                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm border border-blue-200/60 dark:border-blue-800'
@@ -555,7 +789,11 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
           </button>
           <button
             type="button"
-            onClick={() => setFilter('resolved')}
+            onClick={() => {
+              setFilter('resolved');
+              onClearHighlight?.();
+              lastHighlightedRef.current = null;
+            }}
             className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
               filter === 'resolved'
                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shadow-sm border border-emerald-200/60 dark:border-emerald-800'
@@ -585,7 +823,7 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
             </p>
             <p className="text-gray-400">
               {filter === 'active' 
-                ? 'Highlight manuscript text or type in the composer below to leave academic feedback.' 
+                ? 'Highlight text in the document editor to add a contextual comment.' 
                 : 'Resolved comments will appear here for archive.'}
             </p>
           </div>
@@ -602,17 +840,22 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
               /* Single Visual Card Container */
               <div
                 key={comment.id}
-                className={`bg-white dark:bg-slate-800/90 border rounded-xl p-3.5 shadow-sm transition-all ${
-                  comment.resolved
-                    ? 'border-gray-200 dark:border-slate-800 opacity-80'
+                id={`comment-card-${comment.id}`}
+                onClick={(e) => handleCommentCardClick(comment, e)}
+                title="Click to locate commented text in manuscript"
+                className={`border rounded-xl p-3.5 shadow-sm transition-all cursor-pointer group hover:shadow-md ${
+                  comment.id === highlightedCommentId
+                    ? 'bg-blue-50/80 dark:bg-blue-950/60 border-blue-500 ring-2 ring-blue-500 shadow-md'
+                    : comment.resolved
+                    ? 'bg-white dark:bg-slate-800/90 border-gray-200 dark:border-slate-800 opacity-80 hover:border-gray-300'
                     : isReplyingComment
-                    ? 'border-blue-500 dark:border-blue-500 ring-2 ring-blue-500/10'
-                    : 'border-gray-200/90 dark:border-slate-700/80 hover:border-gray-300 dark:hover:border-slate-600'
+                    ? 'bg-white dark:bg-slate-800/90 border-blue-500 ring-2 ring-blue-500/10'
+                    : 'bg-white dark:bg-slate-800/90 border-gray-200/90 dark:border-slate-700/80 hover:border-blue-400 dark:hover:border-blue-500'
                 }`}
               >
                 {/* Quoted manuscript anchor if attached */}
                 {comment.selectedText && (
-                  <div className="mb-2.5 bg-amber-50/80 dark:bg-amber-900/20 border-l-2 border-amber-500 px-2.5 py-1.5 rounded text-xs text-amber-900 dark:text-amber-200 italic line-clamp-3">
+                  <div className="mb-2.5 bg-amber-50/80 dark:bg-amber-900/20 border-l-2 border-amber-500 px-2.5 py-1.5 rounded text-xs text-amber-900 dark:text-amber-200 italic line-clamp-3 group-hover:bg-amber-100/70 dark:group-hover:bg-amber-900/30 transition-colors">
                     <Quote className="w-3 h-3 inline mr-1 text-amber-600 shrink-0" />
                     "{comment.selectedText}"
                   </div>
@@ -678,6 +921,16 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                   <FormattedCommentContent text={comment.text} />
                 </div>
 
+                {/* Inline Reply Composer for Root Comment */}
+                {isReplyingComment && !comment.resolved && (
+                  <InlineReplyComposer
+                    targetName={comment.authorName || 'Researcher'}
+                    eligibleUsers={eligibleUsers}
+                    onCancel={() => setReplyTarget(null)}
+                    onSubmit={handleSendReply}
+                  />
+                )}
+
                 {/* Hierarchical Tree of Replies */}
                 {repliesCount > 0 && isThreadExpanded && (
                   <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-slate-700/60 pl-2.5 border-l-2 border-l-blue-200 dark:border-l-blue-900 animate-fade-in">
@@ -689,6 +942,9 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                         comment={comment}
                         replyTarget={replyTarget}
                         onSelectReplyTarget={(r) => handleSelectReplyTarget(comment, r)}
+                        onCancelReply={() => setReplyTarget(null)}
+                        onSubmitReply={handleSendReply}
+                        eligibleUsers={eligibleUsers}
                         expandedSubThreads={expandedSubThreads}
                         onToggleSubThread={toggleSubThread}
                       />
@@ -724,23 +980,10 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
                   </div>
 
                   {/* Right: Root Comment Reply Trigger */}
-                  {!comment.resolved && (
+                  {!comment.resolved && !isReplyingComment && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setReplyTarget({
-                          commentId: comment.id,
-                          replyId: null,
-                          authorId: comment.authorId,
-                          authorName: comment.authorName || 'Researcher',
-                        });
-                        // Automatically expand thread so user sees context when replying
-                        setExpandedThreads((prev) => ({
-                          ...prev,
-                          [comment.id]: true,
-                        }));
-                        setTimeout(() => textareaRef.current?.focus(), 50);
-                      }}
+                      onClick={() => handleSelectReplyTarget(comment, null)}
                       className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-semibold transition-colors py-1 px-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40"
                     >
                       <Reply className="w-3 h-3" /> Reply
@@ -751,115 +994,6 @@ export const CommentsPanel = ({ documentId, editor, onClose }) => {
             );
           })
         )}
-      </div>
-
-      {/* 3. Bottom Sticky Comment Composer */}
-      <div className="shrink-0 p-3 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 relative z-20">
-        
-        {/* Active Mention Autocomplete Dropdown Popup */}
-        {mentionQuery !== null && filteredUsers.length > 0 && (
-          <div className="absolute left-3 right-3 bottom-full mb-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 max-h-48 overflow-y-auto animate-fade-in text-xs">
-            <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-slate-700">
-              Mention Member (@)
-            </div>
-            {filteredUsers.map((user, idx) => (
-              <button
-                key={user.id || user.uid}
-                type="button"
-                onClick={() => selectMention(user)}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 transition-colors ${
-                  idx === mentionIndex
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium'
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
-                  </div>
-                  <span className="truncate">{user.fullName}</span>
-                </div>
-                <span className="text-[10px] text-gray-400 capitalize shrink-0 font-normal">
-                  {user.role || 'Member'}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Selected manuscript text quote badge preview */}
-        {selectedTextAnchor && !replyTarget && (
-          <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border-l-2 border-amber-500 px-2.5 py-1.5 mb-2 rounded text-xs text-amber-900 dark:text-amber-300">
-            <div className="flex items-center gap-1.5 truncate">
-              <Quote className="w-3 h-3 text-amber-600 shrink-0" />
-              <span className="truncate italic">"{selectedTextAnchor}"</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedTextAnchor('')}
-              className="text-amber-500 hover:text-amber-700 p-0.5"
-              title="Clear quote"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Replying target badge preview */}
-        {replyTarget && (
-          <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 px-2.5 py-1.5 mb-2 rounded text-xs text-blue-900 dark:text-blue-300">
-            <div className="flex items-center gap-1.5 truncate">
-              <Reply className="w-3 h-3 text-blue-600 shrink-0" />
-              <span>
-                Replying to <strong className="font-semibold text-blue-700 dark:text-blue-300">@{replyTarget.authorName}</strong>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplyTarget(null)}
-              className="text-blue-500 hover:text-blue-700 p-0.5"
-              title="Cancel reply"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Input Area with Circular Send Icon Button */}
-        <div className="flex items-end gap-2 bg-gray-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
-          <textarea
-            ref={textareaRef}
-            rows={2}
-            value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              replyTarget
-                ? `Reply to @${replyTarget.authorName}... (Type @ to mention)`
-                : selectedTextAnchor
-                ? "Comment on selected text... (Type @ to mention)"
-                : "Add a manuscript comment... (Type @ to mention)"
-            }
-            className="flex-1 bg-transparent text-xs sm:text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none resize-none min-h-[44px] max-h-32 custom-scrollbar"
-          />
-
-          {/* Compact Circular Send Icon Button */}
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!inputText.trim()}
-            aria-label="Send comment"
-            title="Send comment (Ctrl+Enter)"
-            className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100 text-white flex items-center justify-center shadow-sm transition-all shrink-0 mb-0.5"
-          >
-            <Send className="w-4 h-4 ml-0.5" />
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-400">
-          <span>Type <kbd className="font-mono bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700">@</kbd> to mention</span>
-          <span><kbd className="font-mono bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700">Ctrl</kbd> + <kbd className="font-mono bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700">Enter</kbd></span>
-        </div>
       </div>
     </div>
   );

@@ -24,6 +24,8 @@ import { ProposalDetail } from './pages/ProposalDetail';
 import { CoordinatorProposals } from './pages/CoordinatorProposals';
 import { CoordinatorProposalReview } from './pages/CoordinatorProposalReview';
 import { Projects } from './pages/Projects';
+import { StudentResearchWorkspace } from './pages/StudentResearchWorkspace';
+import { AdviserAdvisees } from './pages/AdviserAdvisees';
 import { Documents } from './pages/Documents';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { Reviews } from './pages/Reviews';
@@ -73,8 +75,11 @@ export default function App() {
                   <Route path="/coordinator/proposals/:id" element={<CoordinatorProposalReview />} />
                 </Route>
 
-                {/* Research Projects */}
+                {/* Research Projects & Workspace */}
                 <Route path="/projects" element={<Projects />} />
+                <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
+                <Route path="/workspace" element={<StudentResearchWorkspace />} />
+                <Route path="/advisees" element={<AdviserAdvisees />} />
 
                 {/* Real-time Documents Editor */}
                 <Route path="/documents" element={<Documents />} />
