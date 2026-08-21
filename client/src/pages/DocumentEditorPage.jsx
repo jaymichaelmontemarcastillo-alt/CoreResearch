@@ -521,9 +521,9 @@ export const DocumentEditorPage = () => {
           className="fixed left-2 sm:left-3 top-1/2 -translate-y-1/2 z-[75] w-9 h-9 rounded-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 focus:outline-none"
         >
           {isMaximizedSidebarOpen ? (
-            <ChevronLeft className="w-5 h-5" />
+            <HiChevronLeft className="w-5 h-5" />
           ) : (
-            <ChevronRight className="w-5 h-5 ml-0.5" />
+            <HiChevronRight className="w-5 h-5 ml-0.5" />
           )}
         </button>
       )}
