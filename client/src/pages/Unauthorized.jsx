@@ -3,7 +3,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/ui/Button";
-import { ShieldAlert, ArrowLeft } from "lucide-react";
+import { HiShieldExclamation, HiArrowLeft } from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 
 export const Unauthorized = () => {
@@ -13,7 +13,7 @@ export const Unauthorized = () => {
     <AuthLayout title="Access Denied">
       <div className="text-center space-y-5 py-6">
         <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center mx-auto">
-          <ShieldAlert className="w-8 h-8" />
+          <HiShieldExclamation className="w-8 h-8" />
         </div>
 
         <div>
@@ -29,7 +29,7 @@ export const Unauthorized = () => {
 
         <Link to="/dashboard">
           <Button variant="outline" className="w-full">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Return to Dashboard
+            <HiArrowLeft className="w-4 h-4 mr-2" /> Return to Dashboard
           </Button>
         </Link>
       </div>

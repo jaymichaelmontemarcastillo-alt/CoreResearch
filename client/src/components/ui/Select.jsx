@@ -1,6 +1,6 @@
 // src/components/ui/Select.jsx
 import React from "react";
-import { ChevronDown } from "lucide-react";
+import { HiChevronDown } from "react-icons/hi2";
 
 export const Select = ({
   label,
@@ -44,7 +44,7 @@ export const Select = ({
           {children}
         </select>
         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-          <ChevronDown className="w-4 h-4" />
+          <HiChevronDown className="w-4 h-4" />
         </div>
       </div>
       {error && (

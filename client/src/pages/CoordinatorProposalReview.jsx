@@ -7,34 +7,30 @@ import { Button } from "../components/ui/Button";
 import { Textarea } from "../components/ui/Textarea";
 import { Toast } from "../components/ui/Toast";
 import {
-  ArrowLeft,
-  FileText,
-  Target,
-  ShieldAlert,
-  Compass,
-  Users,
-  BookOpen,
-  Calendar,
-  Tag,
-  User,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Shield,
-  FileEdit,
-  MessageSquare,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
+  HiArrowLeft,
+  HiDocumentText,
+  HiUsers,
+  HiBookOpen,
+  HiCalendarDays,
+  HiTag,
+  HiUser,
+  HiClock,
+  HiCheckCircle,
+  HiExclamationTriangle,
+  HiShieldCheck,
+  HiDocumentDuplicate,
+  HiChatBubbleLeftRight,
+  HiArrowPath,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import titleProposalService from "../services/titleProposal.service";
 import { PROPOSAL_STATUS_CONFIG } from "../types/proposal.types";
 
 const STATUS_ICONS = {
-  submitted: Clock,
-  needs_revision: AlertTriangle,
-  approved: CheckCircle2,
-  draft: FileEdit,
+  submitted: HiClock,
+  needs_revision: HiExclamationTriangle,
+  approved: HiCheckCircle,
+  draft: HiDocumentDuplicate,
 };
 
 const DocumentViewer = ({ attachment }) => {
@@ -222,7 +218,7 @@ export const CoordinatorProposalReview = () => {
           to="/coordinator/proposals"
           className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-xs font-semibold"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Review Queue
+          <HiArrowLeft className="w-4 h-4" /> Back to Review Queue
         </Link>
       </div>
 
@@ -245,13 +241,13 @@ export const CoordinatorProposalReview = () => {
             </Badge>
             {proposal.researchCategory && (
               <span className="text-xs font-medium px-2.5 py-1 rounded bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                <Tag className="w-3 h-3 text-primary" />
+                <HiTag className="w-3 h-3 text-primary" />
                 {proposal.researchCategory}
               </span>
             )}
             {proposal.revisionCount > 0 && (
               <span className="text-xs font-medium px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40">
-                <RefreshCw className="w-3 h-3 inline mr-1" />
+                <HiArrowPath className="w-3 h-3 inline mr-1" />
                 Revision #{proposal.revisionCount}
               </span>
             )}
@@ -264,7 +260,7 @@ export const CoordinatorProposalReview = () => {
           {/* Meta info */}
           <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-primary shrink-0" />
+              <HiUsers className="w-4 h-4 text-primary shrink-0" />
               <span>
                 Group:{" "}
                 <strong className="text-gray-700 dark:text-gray-300">
@@ -274,7 +270,7 @@ export const CoordinatorProposalReview = () => {
             </div>
             {proposal.courseName && (
               <div className="flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-primary shrink-0" />
+                <HiBookOpen className="w-4 h-4 text-primary shrink-0" />
                 <strong className="text-gray-700 dark:text-gray-300">
                   {proposal.courseName}
                 </strong>
@@ -282,14 +278,14 @@ export const CoordinatorProposalReview = () => {
             )}
             {proposal.sectionName && (
               <div className="flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-primary shrink-0" />
+                <HiShieldCheck className="w-4 h-4 text-primary shrink-0" />
                 <strong className="text-gray-700 dark:text-gray-300">
                   {proposal.sectionName}
                 </strong>
               </div>
             )}
             <div className="flex items-center gap-1.5">
-              <User className="w-4 h-4 text-primary shrink-0" />
+              <HiUser className="w-4 h-4 text-primary shrink-0" />
               <span>
                 Submitted by:{" "}
                 <strong className="text-gray-700 dark:text-gray-300">
@@ -299,7 +295,7 @@ export const CoordinatorProposalReview = () => {
             </div>
             {(proposal.lastSubmittedAt ?? proposal.submittedAt) && (
               <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-primary shrink-0" />
+                <HiCalendarDays className="w-4 h-4 text-primary shrink-0" />
                 <span>
                   {new Date(
                     proposal.lastSubmittedAt ?? proposal.submittedAt
@@ -316,7 +312,7 @@ export const CoordinatorProposalReview = () => {
           {proposal.attachments && proposal.attachments.length > 0 ? (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
-                <FileText className="w-4 h-4 text-primary" />
+                <HiDocumentText className="w-4 h-4 text-primary" />
                 Proposal Document
               </h3>
               <DocumentViewer attachment={proposal.attachments[0]} />
@@ -333,7 +329,7 @@ export const CoordinatorProposalReview = () => {
       {alreadyReviewed && proposal.coordinatorFeedback && (
         <Card className="p-5 space-y-2 border-l-4 border-l-blue-400 dark:border-l-blue-600">
           <h3 className="text-xs uppercase font-bold text-gray-500 dark:text-gray-400 tracking-wider flex items-center gap-1.5">
-            <MessageSquare className="w-4 h-4" />
+            <HiChatBubbleLeftRight className="w-4 h-4" />
             Previous Evaluation
           </h3>
           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
@@ -353,7 +349,7 @@ export const CoordinatorProposalReview = () => {
         <Card className="space-y-5">
           <div className="pb-4 border-b border-gray-200 dark:border-slate-800">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
+              <HiShieldCheck className="w-5 h-5 text-primary" />
               Coordinator Evaluation
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -396,7 +392,7 @@ export const CoordinatorProposalReview = () => {
                   />
                   <div>
                     <p className="font-semibold text-sm text-gray-800 dark:text-white flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 text-blue-500" />
+                      <HiExclamationTriangle className="w-4 h-4 text-blue-500" />
                       Request Revision
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -422,7 +418,7 @@ export const CoordinatorProposalReview = () => {
                   />
                   <div>
                     <p className="font-semibold text-sm text-gray-800 dark:text-white flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <HiCheckCircle className="w-4 h-4 text-emerald-500" />
                       Approve Proposal
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -453,12 +449,12 @@ export const CoordinatorProposalReview = () => {
               >
                 {decision === "approved" ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    <HiCheckCircle className="w-4 h-4 mr-2" />
                     Approve Proposal
                   </>
                 ) : decision === "needs_revision" ? (
                   <>
-                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    <HiExclamationTriangle className="w-4 h-4 mr-2" />
                     Request Revision
                   </>
                 ) : (
@@ -472,7 +468,7 @@ export const CoordinatorProposalReview = () => {
         <Card className="p-5 text-center text-sm text-gray-500 dark:text-gray-400">
           {proposal.status === "approved" ? (
             <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-5 h-5" />
+              <HiCheckCircle className="w-5 h-5" />
               <span className="font-semibold">
                 This proposal has been approved.
               </span>

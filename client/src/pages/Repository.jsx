@@ -12,15 +12,15 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
 import {
-  BookOpen,
-  Search,
-  Download,
-  Eye,
-  Copy,
-  Check,
-  User,
-  PlusCircle,
-} from "lucide-react";
+  HiBookOpen,
+  HiMagnifyingGlass,
+  HiArrowDownTray,
+  HiEye,
+  HiDocumentDuplicate,
+  HiCheck,
+  HiUser,
+  HiPlusCircle,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 
 export const Repository = () => {
@@ -119,13 +119,13 @@ export const Repository = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={BookOpen}
+        icon={HiBookOpen}
         title="Institutional Research Repository"
         description="Search, cite, and download approved university thesis and dissertation publications."
         actions={
           role === "admin" && (
             <Button variant="primary" size="md" onClick={() => setPublishModalOpen(true)}>
-              <PlusCircle className="w-4 h-4 mr-2" /> Publish Research Paper
+              <HiPlusCircle className="w-4 h-4 mr-2" /> Publish Research Paper
             </Button>
           )
         }
@@ -140,7 +140,7 @@ export const Repository = () => {
         <form onSubmit={handleSearchSubmit} className="flex-1 w-full flex items-center gap-2">
           <Input
             placeholder="Search repository by title, abstract, keyword, or author name..."
-            icon={Search}
+            icon={HiMagnifyingGlass}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -174,7 +174,7 @@ export const Repository = () => {
       ) : publications.length === 0 ? (
         <Card className="p-8">
           <EmptyState
-            icon={BookOpen}
+            icon={HiBookOpen}
             title="No Publications Found"
             description="Try adjusting your search keywords or college department filter."
           />
@@ -196,7 +196,7 @@ export const Repository = () => {
                 </h3>
 
                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <User className="w-3.5 h-3.5 text-primary" />
+                  <HiUser className="w-3.5 h-3.5 text-primary" />
                   <span>
                     Authors:{" "}
                     <strong className="text-gray-700 dark:text-gray-300">
@@ -225,12 +225,12 @@ export const Repository = () => {
 
               <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
                 <Button size="sm" variant="outline" onClick={() => setSelectedPub(pub)}>
-                  <Eye className="w-3.5 h-3.5 mr-1.5" /> Read Abstract & Cite
+                  <HiEye className="w-3.5 h-3.5 mr-1.5" /> Read Abstract & Cite
                 </Button>
 
                 <a href={pub.pdfUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="secondary">
-                    <Download className="w-3.5 h-3.5 mr-1.5" /> PDF Paper
+                    <HiArrowDownTray className="w-3.5 h-3.5 mr-1.5" /> PDF Paper
                   </Button>
                 </a>
               </div>
@@ -275,7 +275,7 @@ export const Repository = () => {
                   onClick={() => handleCopyCitation(selectedPub.citation)}
                   className="text-xs text-primary dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <HiCheck className="w-3.5 h-3.5 text-emerald-500" /> : <HiDocumentDuplicate className="w-3.5 h-3.5" />}
                   {copied ? "Copied to Clipboard!" : "Copy Citation"}
                 </button>
               </div>
@@ -290,7 +290,7 @@ export const Repository = () => {
               </Button>
               <a href={selectedPub.pdfUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="primary">
-                  <Download className="w-4 h-4 mr-2" /> Download Full PDF
+                  <HiArrowDownTray className="w-4 h-4 mr-2" /> Download Full PDF
                 </Button>
               </a>
             </div>
@@ -303,7 +303,7 @@ export const Repository = () => {
         isOpen={publishModalOpen}
         onClose={() => setPublishModalOpen(false)}
         title="Publish Paper to Repository"
-        icon={BookOpen}
+        icon={HiBookOpen}
       >
         <form onSubmit={handlePublishSubmit} className="space-y-4">
           <Input

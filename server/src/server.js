@@ -19,6 +19,7 @@ import evaluationRoutes from './routes/evaluationRoutes.js';
 import repositoryRoutes from './routes/repositoryRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
+import workspaceRoutes from './routes/workspaceRoutes.js';
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/workspace', workspaceRoutes);
 app.use('/api/manuscripts', manuscriptRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/schedules', scheduleRoutes);

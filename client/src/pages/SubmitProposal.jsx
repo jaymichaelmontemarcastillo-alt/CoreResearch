@@ -6,19 +6,18 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Modal } from "../components/ui/Modal";
 import {
-  FileText,
-  ArrowLeft,
-  Send,
-  Save,
-  AlertCircle,
-  Loader2,
-  RefreshCw,
-  MessageSquare,
-  Paperclip,
-  X,
-  FileIcon,
-  Upload,
-} from "lucide-react";
+  HiDocumentText,
+  HiArrowLeft,
+  HiPaperAirplane,
+  HiDocumentCheck,
+  HiExclamationCircle,
+  HiArrowPath,
+  HiChatBubbleLeftRight,
+  HiPaperClip,
+  HiXMark,
+  HiDocument,
+  HiArrowUpTray,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import { groupService } from "../services/group.service";
 import { courseService } from "../services/course.service";
@@ -430,14 +429,14 @@ export const SubmitProposal = () => {
         to="/proposals"
         className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-xs font-semibold"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Proposals
+        <HiArrowLeft className="w-4 h-4" /> Back to Proposals
       </Link>
 
       {/* Coordinator Feedback Banner (revision mode) */}
       {isResubmitMode && existingProposal?.coordinatorFeedback && (
         <div className="p-5 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50">
           <div className="flex items-start gap-3">
-            <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <HiChatBubbleLeftRight className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-1">
                 Coordinator Feedback
@@ -462,7 +461,7 @@ export const SubmitProposal = () => {
         {/* Header */}
         <div className="border-b border-gray-200 dark:border-slate-800 pb-5">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-            <Upload className="w-6 h-6 text-primary" />
+            <HiArrowUpTray className="w-6 h-6 text-primary" />
             {pageTitle}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
@@ -483,14 +482,14 @@ export const SubmitProposal = () => {
 
         {error && (
           <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <HiExclamationCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {!group && !pageLoading && (
           <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <HiExclamationCircle className="w-4 h-4 shrink-0" />
             <span>
               You must be assigned to a research group before submitting a proposal.
               Please contact your Research Coordinator.
@@ -517,7 +516,7 @@ export const SubmitProposal = () => {
           <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                <Paperclip className="w-3.5 h-3.5" />
+                <HiPaperClip className="w-3.5 h-3.5" />
                 Import Proposal Document *
                 <span className="font-normal text-gray-400 normal-case tracking-normal ml-1">
                   (PDF, DOC, DOCX, PPT, PPTX · max {MAX_FILE_SIZE_MB}MB)
@@ -529,7 +528,7 @@ export const SubmitProposal = () => {
                 className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
                 disabled={isBusy}
               >
-                <Upload className="w-3.5 h-3.5" />
+                <HiArrowUpTray className="w-3.5 h-3.5" />
                 Browse File
               </button>
               <input
@@ -544,14 +543,14 @@ export const SubmitProposal = () => {
 
             {validationErrors.files && (
               <p className="text-xs text-red-500 font-medium flex items-center gap-1 mb-2">
-                <AlertCircle className="w-3.5 h-3.5" />
+                <HiExclamationCircle className="w-3.5 h-3.5" />
                 {validationErrors.files}
               </p>
             )}
 
             {fileError && (
               <p className="text-xs text-red-500 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
+                <HiExclamationCircle className="w-3.5 h-3.5" />
                 {fileError}
               </p>
             )}
@@ -567,7 +566,7 @@ export const SubmitProposal = () => {
                     key={i}
                     className="flex items-center gap-2.5 p-2.5 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
                   >
-                    <FileIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                    <HiDocument className="w-4 h-4 text-blue-500 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <a
                         href={att.downloadUrl}
@@ -587,7 +586,7 @@ export const SubmitProposal = () => {
                       className="p-1 rounded text-gray-400 hover:text-red-500 transition"
                       disabled={isBusy}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <HiXMark className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -607,7 +606,7 @@ export const SubmitProposal = () => {
                     key={i}
                     className="flex items-center gap-2.5 p-2.5 rounded-lg border border-blue-100 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-900/10"
                   >
-                    <FileIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                    <HiDocument className="w-4 h-4 text-blue-500 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
                         {file.name}
@@ -624,7 +623,7 @@ export const SubmitProposal = () => {
                       className="p-1 rounded text-gray-400 hover:text-red-500 transition"
                       disabled={isBusy}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <HiXMark className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -637,7 +636,7 @@ export const SubmitProposal = () => {
                 className="border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition"
               >
                 <div className="w-12 h-12 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                   <Upload className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                   <HiArrowUpTray className="w-5 h-5 text-gray-400 dark:text-slate-500" />
                 </div>
                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
                   Drop your document here or <span className="text-primary">browse</span>
@@ -665,7 +664,7 @@ export const SubmitProposal = () => {
                   onClick={handleSaveDraft}
                   disabled={isBusy || !group}
                 >
-                  <Save className="w-4 h-4 mr-2" />
+                  <HiDocumentCheck className="w-4 h-4 mr-2" />
                   Save Draft
                 </Button>
               )}
@@ -676,9 +675,9 @@ export const SubmitProposal = () => {
                 disabled={isBusy || !group}
               >
                 {isResubmitMode ? (
-                  <><RefreshCw className="w-4 h-4 mr-2" /> Resubmit Proposal</>
+                  <><HiArrowPath className="w-4 h-4 mr-2" /> Resubmit Proposal</>
                 ) : (
-                  <><Send className="w-4 h-4 mr-2" /> Submit Proposal</>
+                  <><HiPaperAirplane className="w-4 h-4 mr-2" /> Submit Proposal</>
                 )}
               </Button>
             </div>

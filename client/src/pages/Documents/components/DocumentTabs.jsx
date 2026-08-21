@@ -1,6 +1,6 @@
 // src/pages/Documents/components/DocumentTabs.jsx
 import React from 'react';
-import { Star, Clock } from 'lucide-react';
+import { HiStar, HiClock } from 'react-icons/hi2';
 
 export const DocumentTabs = ({
   activeTab = 'recent',
@@ -20,7 +20,7 @@ export const DocumentTabs = ({
             : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
         }`}
       >
-        <Clock className="w-4 h-4" />
+        <HiClock className="w-4 h-4" />
         <span>Recent</span>
         {recentCount > 0 && (
           <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 ml-1">
@@ -43,7 +43,7 @@ export const DocumentTabs = ({
             : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
         }`}
       >
-        <Star className="w-4 h-4" />
+        <HiStar className="w-4 h-4" />
         <span>Favorites</span>
         {favoritesCount > 0 && (
           <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-medium ml-1">

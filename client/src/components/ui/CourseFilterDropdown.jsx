@@ -1,6 +1,6 @@
-﻿// src/components/ui/CourseFilterDropdown.jsx
+// src/components/ui/CourseFilterDropdown.jsx
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, Check } from "lucide-react";
+import { HiChevronDown, HiChevronRight, HiCheck } from "react-icons/hi2";
 
 export const CourseFilterDropdown = ({
   courses = [],
@@ -83,7 +83,7 @@ export const CourseFilterDropdown = ({
         className="w-full h-10 flex items-center justify-between px-3.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 shadow-sm hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
       >
         <span className="truncate">{getLabel()}</span>
-        <ChevronDown className={"w-4 h-4 shrink-0 text-gray-400 ml-2 transition-transform duration-200 " + (open ? "rotate-180" : "")} />
+        <HiChevronDown className={"w-4 h-4 shrink-0 text-gray-400 ml-2 transition-transform duration-200 " + (open ? "rotate-180" : "")} />
       </button>
 
       {open && (
@@ -95,7 +95,7 @@ export const CourseFilterDropdown = ({
               onMouseEnter={() => { setHoveredCourse(null); setHoveredSpec(null); }}
             >
               <span className="flex-1">All Programs</span>
-              {!selectedCourse && <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+              {!selectedCourse && <HiCheck className="w-4 h-4 text-blue-500 shrink-0" />}
             </button>
 
             {courses.map((course) => {
@@ -113,8 +113,8 @@ export const CourseFilterDropdown = ({
                   onMouseEnter={() => { setHoveredCourse(course.id); setHoveredSpec(null); }}
                 >
                   <span className="flex-1 font-semibold">{course.code}</span>
-                  {isSelected && !isHovered && <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
-                  {hasFlyout && <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+                  {isSelected && !isHovered && <HiCheck className="w-4 h-4 text-blue-500 shrink-0" />}
+                  {hasFlyout && <HiChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
                 </button>
               );
             })}
@@ -137,7 +137,7 @@ export const CourseFilterDropdown = ({
                         <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate leading-tight mt-0.5">{spec.name}</div>
                       )}
                     </div>
-                    {specSecs.length > 0 && <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+                    {specSecs.length > 0 && <HiChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
                   </button>
                 );
               })}

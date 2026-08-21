@@ -1,6 +1,6 @@
 // src/pages/Documents/components/DocumentViewToggle.jsx
 import React from 'react';
-import { LayoutGrid, List } from 'lucide-react';
+import { HiSquares2X2, HiListBullet } from 'react-icons/hi2';
 import { VIEW_MODES } from '../constants/documentConstants';
 
 export const DocumentViewToggle = ({ viewMode, onChange }) => {
@@ -17,7 +17,7 @@ export const DocumentViewToggle = ({ viewMode, onChange }) => {
         title="Card view"
         aria-label="Card view"
       >
-        <LayoutGrid className="w-3.5 h-3.5" />
+        <HiSquares2X2 className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Card</span>
       </button>
 
@@ -32,7 +32,7 @@ export const DocumentViewToggle = ({ viewMode, onChange }) => {
         title="List view"
         aria-label="List view"
       >
-        <List className="w-3.5 h-3.5" />
+        <HiListBullet className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">List</span>
       </button>
     </div>

@@ -1,7 +1,7 @@
 // src/pages/Documents/components/DeleteDocumentModal.jsx
 import React, { useState } from 'react';
 import { Button } from '../../../components/ui/Button';
-import { Trash2, AlertTriangle, X } from 'lucide-react';
+import { HiTrash, HiExclamationTriangle, HiXMark } from 'react-icons/hi2';
 
 export const DeleteDocumentModal = ({
   isOpen,
@@ -33,7 +33,7 @@ export const DeleteDocumentModal = ({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-            <AlertTriangle className="w-5 h-5" />
+            <HiExclamationTriangle className="w-5 h-5" />
             <h3 className="text-sm font-bold">Delete Document</h3>
           </div>
           <button
@@ -41,7 +41,7 @@ export const DeleteDocumentModal = ({
             onClick={onClose}
             className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
-            <X className="w-4 h-4" />
+            <HiXMark className="w-4 h-4" />
           </button>
         </div>
 

@@ -8,7 +8,7 @@ import { Select } from "../components/ui/Select";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
-import { Search, Shield, Filter, RefreshCw } from "lucide-react";
+import { HiMagnifyingGlass, HiShieldCheck, HiFunnel, HiArrowPath } from "react-icons/hi2";
 import { userService } from "../services/user.service";
 
 export const UserDirectory = () => {
@@ -101,12 +101,12 @@ export const UserDirectory = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Shield}
+        icon={HiShieldCheck}
         title="User Directory & RBAC Management"
         description="Manage institutional user accounts, departments, and access roles."
         actions={
           <Button variant="outline" size="sm" onClick={fetchUsers} isLoading={loading}>
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh List
+            <HiArrowPath className="w-3.5 h-3.5 mr-1.5" /> Refresh List
           </Button>
         }
       />
@@ -120,14 +120,14 @@ export const UserDirectory = () => {
         <div className="flex-1 w-full flex items-center gap-2">
           <Input
             placeholder="Search by name, email, or ID number..."
-            icon={Search}
+            icon={HiMagnifyingGlass}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+          <HiFunnel className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
           {[
             { id: "all", label: "All" },
             { id: "student", label: "Student" },

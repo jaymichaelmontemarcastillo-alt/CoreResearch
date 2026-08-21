@@ -1,10 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { 
-  Bold, Italic, Underline, Strikethrough, Subscript, Superscript,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, Undo, Redo, Image as ImageIcon, Table,
-  Layout, ChevronDown, Plus, Trash2, Rows, Columns, Scissors
-} from 'lucide-react';
+  FaBold, FaItalic, FaUnderline, FaStrikethrough, FaSubscript, FaSuperscript,
+  FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify,
+  FaListUl, FaListOl, FaRotateLeft, FaRotateRight, FaImage, FaTable,
+  FaGripLines, FaGripLinesVertical
+} from 'react-icons/fa6';
+import { HiChevronDown, HiPlus, HiTrash, HiDocumentText } from 'react-icons/hi2';
+import { Scissors } from 'lucide-react';
 import { storageService } from '../../services/storage.service';
 
 const ToolbarButton = ({ onClick, isActive = false, disabled = false, icon: Icon, title, children }) => (
@@ -19,7 +21,7 @@ const ToolbarButton = ({ onClick, isActive = false, disabled = false, icon: Icon
         : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800'
     } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
   >
-    {Icon && <Icon className="w-4 h-4" />}
+    {Icon && <Icon className="w-3.5 h-3.5" />}
     {children}
   </button>
 );
@@ -61,33 +63,25 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploadingImage(true);
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
     try {
-      const folderPath = `document_images/${documentId || 'common'}`;
-      const uploadResult = await storageService.uploadFile(file, folderPath);
-      if (uploadResult?.downloadUrl) {
-        editor.chain().focus().setImage({ src: uploadResult.downloadUrl, alt: file.name }).run();
+      setIsUploadingImage(true);
+      const downloadURL = await storageService.uploadDocumentImage(documentId, file);
+      if (downloadURL) {
+        editor.chain().focus().setImage({ src: downloadURL }).run();
       }
     } catch (err) {
-      console.warn('Firebase Storage upload warning, falling back to FileReader base64:', err);
-      // Local fallback in case storage bucket is offline
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          editor.chain().focus().setImage({ src: event.target.result, alt: file.name }).run();
-        }
-      };
-      reader.readAsDataURL(file);
+      console.error('Failed to upload image:', err);
+      alert('Failed to upload image. Please try again.');
     } finally {
       setIsUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleInsertImageUrl = () => {
-    const url = window.prompt('Enter image web URL:');
-    if (url && url.trim()) {
-      editor.chain().focus().setImage({ src: url.trim() }).run();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -104,13 +98,13 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
       
       {/* Undo / Redo */}
       <ToolbarButton
-        icon={Undo}
+        icon={FaRotateLeft}
         title="Undo (Ctrl+Z)"
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
       />
       <ToolbarButton
-        icon={Redo}
+        icon={FaRotateRight}
         title="Redo (Ctrl+Y)"
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
@@ -199,38 +193,38 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
 
       {/* Text Styles */}
       <ToolbarButton
-        icon={Bold}
+        icon={FaBold}
         title="Bold (Ctrl+B)"
         isActive={editor.isActive('bold')}
         onClick={() => editor.chain().focus().toggleBold().run()}
       />
       <ToolbarButton
-        icon={Italic}
+        icon={FaItalic}
         title="Italic (Ctrl+I)"
         isActive={editor.isActive('italic')}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       />
       <ToolbarButton
-        icon={Underline}
+        icon={FaUnderline}
         title="Underline (Ctrl+U)"
         isActive={editor.isActive('underline')}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       />
       <ToolbarButton
-        icon={Strikethrough}
+        icon={FaStrikethrough}
         title="Strikethrough"
         isActive={editor.isActive('strike')}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       />
       
       <ToolbarButton
-        icon={Subscript}
+        icon={FaSubscript}
         title="Subscript"
         isActive={editor.isActive('subscript')}
         onClick={() => editor.chain().focus().toggleSubscript().run()}
       />
       <ToolbarButton
-        icon={Superscript}
+        icon={FaSuperscript}
         title="Superscript"
         isActive={editor.isActive('superscript')}
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
@@ -273,25 +267,25 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
 
       {/* Alignment */}
       <ToolbarButton
-        icon={AlignLeft}
+        icon={FaAlignLeft}
         title="Align Left"
         isActive={editor.isActive({ textAlign: 'left' })}
         onClick={() => editor.chain().focus().setTextAlign('left').run()}
       />
       <ToolbarButton
-        icon={AlignCenter}
+        icon={FaAlignCenter}
         title="Align Center"
         isActive={editor.isActive({ textAlign: 'center' })}
         onClick={() => editor.chain().focus().setTextAlign('center').run()}
       />
       <ToolbarButton
-        icon={AlignRight}
+        icon={FaAlignRight}
         title="Align Right"
         isActive={editor.isActive({ textAlign: 'right' })}
         onClick={() => editor.chain().focus().setTextAlign('right').run()}
       />
       <ToolbarButton
-        icon={AlignJustify}
+        icon={FaAlignJustify}
         title="Justify"
         isActive={editor.isActive({ textAlign: 'justify' })}
         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
@@ -301,13 +295,13 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
 
       {/* Lists */}
       <ToolbarButton
-        icon={List}
+        icon={FaListUl}
         title="Bullet List"
         isActive={editor.isActive('bulletList')}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       />
       <ToolbarButton
-        icon={ListOrdered}
+        icon={FaListOl}
         title="Numbered List"
         isActive={editor.isActive('orderedList')}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
@@ -324,7 +318,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
         className="hidden"
       />
       <ToolbarButton
-        icon={ImageIcon}
+        icon={FaImage}
         title="Upload Image to Manuscript (Firebase Storage)"
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploadingImage}
@@ -344,8 +338,8 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
               : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800'
           }`}
         >
-          <Table className="w-4 h-4" />
-          <ChevronDown className="w-3 h-3 text-gray-400" />
+          <FaTable className="w-3.5 h-3.5" />
+          <HiChevronDown className="w-3 h-3 text-gray-400" />
         </button>
 
         {showTableMenu && (
@@ -356,7 +350,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
                 onClick={handleInsertTable}
                 className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2 font-medium text-gray-700 dark:text-gray-200"
               >
-                <Plus className="w-3.5 h-3.5 text-blue-600" /> Insert Table (3×3)
+                <HiPlus className="w-3.5 h-3.5 text-blue-600" /> Insert Table (3×3)
               </button>
             ) : (
               <>
@@ -365,21 +359,21 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
                   onClick={() => { editor.chain().focus().addRowBefore().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
                 >
-                  <Rows className="w-3.5 h-3.5 text-gray-500" /> Add Row Above
+                  <FaGripLines className="w-3.5 h-3.5 text-gray-500" /> Add Row Above
                 </button>
                 <button
                   type="button"
                   onClick={() => { editor.chain().focus().addRowAfter().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
                 >
-                  <Rows className="w-3.5 h-3.5 text-gray-500" /> Add Row Below
+                  <FaGripLines className="w-3.5 h-3.5 text-gray-500" /> Add Row Below
                 </button>
                 <button
                   type="button"
                   onClick={() => { editor.chain().focus().deleteRow().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 text-red-600 flex items-center gap-2"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete Row
+                  <HiTrash className="w-3.5 h-3.5" /> Delete Row
                 </button>
                 <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
                 <button
@@ -387,21 +381,21 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
                   onClick={() => { editor.chain().focus().addColumnBefore().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
                 >
-                  <Columns className="w-3.5 h-3.5 text-gray-500" /> Add Column Left
+                  <FaGripLinesVertical className="w-3.5 h-3.5 text-gray-500" /> Add Column Left
                 </button>
                 <button
                   type="button"
                   onClick={() => { editor.chain().focus().addColumnAfter().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
                 >
-                  <Columns className="w-3.5 h-3.5 text-gray-500" /> Add Column Right
+                  <FaGripLinesVertical className="w-3.5 h-3.5 text-gray-500" /> Add Column Right
                 </button>
                 <button
                   type="button"
                   onClick={() => { editor.chain().focus().deleteColumn().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 text-red-600 flex items-center gap-2"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete Column
+                  <HiTrash className="w-3.5 h-3.5" /> Delete Column
                 </button>
                 <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
                 <button
@@ -416,7 +410,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
                   onClick={() => { editor.chain().focus().deleteTable().run(); setShowTableMenu(false); }}
                   className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 font-semibold flex items-center gap-2"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete Table
+                  <HiTrash className="w-3.5 h-3.5" /> Delete Table
                 </button>
               </>
             )}
@@ -438,7 +432,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
       {/* Page Setup & Margins Button */}
       {onOpenPageSettings && (
         <ToolbarButton
-          icon={Layout}
+          icon={HiDocumentText}
           title="Page Setup, Margins & Size"
           onClick={onOpenPageSettings}
         >

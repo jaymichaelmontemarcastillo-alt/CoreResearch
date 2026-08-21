@@ -1,6 +1,6 @@
 // src/pages/Documents/components/BlankDocumentCard.jsx
 import React from 'react';
-import { Plus, FileText } from 'lucide-react';
+import { HiPlus, HiDocumentText } from 'react-icons/hi2';
 
 export const BlankDocumentCard = ({ onClick, disabled = false }) => {
   return (
@@ -16,9 +16,9 @@ export const BlankDocumentCard = ({ onClick, disabled = false }) => {
         <div className="flex flex-col items-center justify-center p-3 text-center transition-transform duration-200 group-hover:scale-105">
           <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 border border-blue-100 dark:border-blue-900/60 shadow-2xs">
             <div className="relative flex items-center justify-center">
-              <FileText className="w-6 h-6 stroke-[1.75]" />
+              <HiDocumentText className="w-6 h-6" />
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                <Plus className="w-2.5 h-2.5 stroke-[2.5]" />
+                <HiPlus className="w-2.5 h-2.5" />
               </div>
             </div>
           </div>

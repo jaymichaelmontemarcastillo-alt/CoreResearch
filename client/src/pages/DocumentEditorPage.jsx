@@ -11,10 +11,24 @@ import { ShareDialog } from '../components/editor/ShareDialog';
 import { PageSettingsModal } from '../components/editor/PageSettingsModal';
 import { Button } from '../components/ui/Button';
 import { 
-  Users, Share2, MessageSquare, ChevronLeft, ChevronRight, Save, Cloud, 
-  CheckCircle2, Wifi, WifiOff, AlertCircle, Maximize2, Minimize2, X,
-  LayoutDashboard, FileSignature, FolderKanban, FileText, Library, CalendarDays, Award
-} from 'lucide-react';
+  HiChevronLeft, 
+  HiChevronRight, 
+  HiCloud, 
+  HiCheckCircle, 
+  HiExclamationCircle, 
+  HiArrowsPointingOut, 
+  HiArrowsPointingIn, 
+  HiXMark,
+  HiSquares2X2, 
+  HiDocumentCheck, 
+  HiFolder, 
+  HiDocumentText, 
+  HiBuildingLibrary, 
+  HiCalendar, 
+  HiAcademicCap,
+  HiChatBubbleLeftRight,
+  HiShare
+} from 'react-icons/hi2';
 
 import { documentStore, DEFAULT_PAGE_SETTINGS } from '../services/documentStore';
 import * as Y from 'yjs';
@@ -535,7 +549,7 @@ export const DocumentEditorPage = () => {
                 className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 title="Close sidebar"
               >
-                <X className="w-4 h-4" />
+                <HiXMark className="w-4 h-4" />
               </button>
             </div>
 
@@ -545,7 +559,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <LayoutDashboard className="w-4 h-4" />
+                <HiSquares2X2 className="w-4 h-4" />
                 <span>Dashboard</span>
               </Link>
               <Link
@@ -553,7 +567,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold transition-colors"
               >
-                <FileText className="w-4 h-4" />
+                <HiDocumentText className="w-4 h-4" />
                 <span>Documents</span>
               </Link>
               <Link
@@ -561,7 +575,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <FileSignature className="w-4 h-4" />
+                <HiDocumentCheck className="w-4 h-4" />
                 <span>Proposals</span>
               </Link>
               <Link
@@ -569,7 +583,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <FolderKanban className="w-4 h-4" />
+                <HiFolder className="w-4 h-4" />
                 <span>Manuscripts</span>
               </Link>
               <Link
@@ -577,7 +591,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <Award className="w-4 h-4" />
+                <HiAcademicCap className="w-4 h-4" />
                 <span>Reviews</span>
               </Link>
               <Link
@@ -585,7 +599,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <CalendarDays className="w-4 h-4" />
+                <HiCalendar className="w-4 h-4" />
                 <span>Schedules</span>
               </Link>
               <Link
@@ -593,7 +607,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <Library className="w-4 h-4" />
+                <HiBuildingLibrary className="w-4 h-4" />
                 <span>Repository</span>
               </Link>
             </div>
@@ -605,7 +619,7 @@ export const DocumentEditorPage = () => {
       <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10 shrink-0 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
-            <ChevronLeft className="w-5 h-5" />
+            <HiChevronLeft className="w-5 h-5" />
           </Button>
           
           <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
@@ -646,7 +660,7 @@ export const DocumentEditorPage = () => {
               </span>
             ) : (
               <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                <Cloud className="w-3.5 h-3.5 text-blue-500" />
+                <HiCloud className="w-3.5 h-3.5 text-blue-500" />
                 Cloud Saved
               </span>
             )}
@@ -661,12 +675,12 @@ export const DocumentEditorPage = () => {
               </span>
             ) : saveStatus === 'error' ? (
               <span className="flex items-center gap-1 text-red-500">
-                <AlertCircle className="w-3.5 h-3.5" />
+                <HiExclamationCircle className="w-3.5 h-3.5" />
                 Error saving
               </span>
             ) : (
               <span className="flex items-center gap-1 text-gray-400">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <HiCheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                 Saved
               </span>
             )}
@@ -694,7 +708,7 @@ export const DocumentEditorPage = () => {
             className={`rounded-lg ${showComments ? '' : 'text-gray-600 dark:text-gray-300'}`}
             title="Toggle comments"
           >
-            <MessageSquare className="w-4 h-4 sm:mr-1.5" />
+            <HiChatBubbleLeftRight className="w-4 h-4 sm:mr-1.5" />
             <span className="hidden sm:inline text-xs">Comments</span>
           </Button>
 
@@ -705,7 +719,7 @@ export const DocumentEditorPage = () => {
             onClick={() => setShowShareModal(true)} 
             className="rounded-full px-3 sm:px-5 shadow-sm"
           >
-            <Share2 className="w-4 h-4 sm:mr-1.5" />
+            <HiShare className="w-4 h-4 sm:mr-1.5" />
             <span className="hidden sm:inline text-xs font-semibold tracking-wide">Share</span>
           </Button>
 
@@ -723,9 +737,9 @@ export const DocumentEditorPage = () => {
             title={isMaximized ? "Exit full screen (Minimize)" : "Maximize editor (Full screen)"}
           >
             {isMaximized ? (
-              <Minimize2 className="w-4 h-4" />
+              <HiArrowsPointingIn className="w-4 h-4" />
             ) : (
-              <Maximize2 className="w-4 h-4" />
+              <HiArrowsPointingOut className="w-4 h-4" />
             )}
           </Button>
         </div>
