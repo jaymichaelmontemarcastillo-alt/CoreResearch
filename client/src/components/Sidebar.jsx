@@ -11,7 +11,6 @@ import {
   HiBuildingLibrary,
   HiChatBubbleLeftRight,
   HiCalendarDays,
-  HiTrophy,
   HiUsers,
   HiUserGroup,
   HiAcademicCap,
@@ -97,12 +96,6 @@ export const Sidebar = ({
           path: "/schedules",
           icon: HiCalendarDays,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
-        },
-        {
-          label: "Grading",
-          path: "/grading",
-          icon: HiTrophy,
-          roles: ["adviser", "panelist", "admin"], // STRICT: Students cannot access Grading
         },
       ],
     },

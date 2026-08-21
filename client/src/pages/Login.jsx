@@ -31,9 +31,23 @@ export const Login = () => {
       await login(email, password);
       navigate(returnTo);
     } catch (err) {
-      setError(
-        err.message || "Failed to sign in. Please check your credentials.",
-      );
+      if (
+        err.code === "auth/invalid-credential" ||
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/wrong-password" ||
+        err.code === "auth/invalid-email" ||
+        err.message?.includes("invalid-credential")
+      ) {
+        setError("Invalid email or password. If you haven't registered an account yet, please sign up or use Google Sign-In.");
+      } else if (err.code === "auth/too-many-requests") {
+        setError("Too many failed attempts. Access is temporarily disabled. Try again later or reset your password.");
+      } else if (err.code === "auth/user-disabled") {
+        setError("This account has been deactivated. Please contact support or your administrator.");
+      } else {
+        setError(
+          err.message || "Failed to sign in. Please check your credentials.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -156,11 +170,11 @@ export const Login = () => {
           </Link>
         </div>
 
-        {/* Submit / Login Button (Sleek Dark Pill) */}
+        {/* Submit / Login Button (Vibrant Blue) */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 sm:h-12 bg-[#18181b] hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-semibold text-sm rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md active:scale-[0.99] mt-2"
+          className="w-full h-11 sm:h-12 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-blue-500/20 active:scale-[0.99] mt-2"
         >
           {loading ? (
             <span className="flex items-center gap-2">

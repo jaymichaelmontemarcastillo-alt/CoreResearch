@@ -175,10 +175,10 @@ export const ResearchGroups = () => {
     if (!q) return true;
     
     // Match group name, member names, or title
-    const matchName = g.name.toLowerCase().includes(q);
-    const matchMember = g.members.some(m => m.fullName.toLowerCase().includes(q));
+    const matchName = (g.name || "").toLowerCase().includes(q);
+    const matchMember = (g.members || []).some(m => (m?.fullName || "").toLowerCase().includes(q));
     const proposal = proposals.find(p => p.groupId === g.id);
-    const matchTitle = proposal?.title?.toLowerCase().includes(q);
+    const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
     
     return matchName || matchMember || matchTitle;
   });
@@ -451,13 +451,13 @@ export const ResearchGroups = () => {
                     
                     <TableCell>
                       <div className="flex flex-col gap-1.5">
-                        {group.members.map(member => (
-                          <div key={member.uid} className="flex items-center gap-2">
+                        {(group.members || []).map(member => (
+                          <div key={member.uid || member.id} className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                              {member.fullName.charAt(0)}
+                              {(member.fullName || "U").charAt(0)}
                             </div>
                             <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                              {member.fullName}
+                              {member.fullName || "Student"}
                             </span>
                           </div>
                         ))}
@@ -500,7 +500,7 @@ export const ResearchGroups = () => {
           setSelectedStudentIds([]);
         }}
         title="Create Research Group"
-        icon={Users}
+        icon={HiUsers}
         maxWidth="max-w-2xl"
       >
         <div className="space-y-4">
@@ -534,7 +534,7 @@ export const ResearchGroups = () => {
                     <span className="text-xs text-gray-500">{student.studentIdOrEmployeeId || student.email}</span>
                   </div>
                   {selectedStudentIds.includes(student.uid) && (
-                    <CheckCircle className="w-5 h-5 text-blue-500" />
+                    <HiCheckCircle className="w-5 h-5 text-blue-500" />
                   )}
                 </div>
               ))}
@@ -551,7 +551,7 @@ export const ResearchGroups = () => {
               isLoading={creating}
               onClick={handleCreateGroup}
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <HiPlus className="w-4 h-4 mr-2" />
               Create Group
             </Button>
           </div>

@@ -68,7 +68,7 @@ export const ForgotPassword = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 bg-gray-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-semibold text-sm rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md active:scale-[0.99]"
+          className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-blue-500/20 active:scale-[0.99]"
         >
           {loading ? (
             <span className="flex items-center gap-2">

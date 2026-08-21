@@ -669,7 +669,7 @@ export const StudentDirectory = () => {
         isOpen={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         title="Delete Join Link"
-        icon={Trash2}
+        icon={HiTrash}
         maxWidth="max-w-md"
       >
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 font-medium">
