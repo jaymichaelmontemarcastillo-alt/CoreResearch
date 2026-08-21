@@ -63,7 +63,7 @@ export const Sidebar = ({
             {
               label: "Research Workspace",
               path: "/research/workspace",
-              icon: BookOpen,
+              icon: HiBookOpen,
               roles: ["student"],
             },
             {
@@ -79,7 +79,7 @@ export const Sidebar = ({
             {
               label: "My Advisees",
               path: "/advisees",
-              icon: Users,
+              icon: HiUsers,
               roles: ["adviser", "research_coordinator", "admin"],
             },
           ]
@@ -87,7 +87,7 @@ export const Sidebar = ({
         {
           label: "Documents",
           path: "/documents",
-          icon: FileText,
+          icon: HiDocumentDuplicate,
           roles: ["student", "adviser", "admin", "research_coordinator"],
         },
         {
