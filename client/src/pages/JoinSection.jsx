@@ -6,7 +6,8 @@ import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { GraduationCap, AlertCircle, CheckCircle2 } from "lucide-react";
+import { HiAcademicCap, HiExclamationCircle, HiCheckCircle } from "react-icons/hi2";
+import logoImg from "../assets/logo.png";
 
 export const JoinSection = () => {
   const { inviteId } = useParams();
@@ -101,7 +102,7 @@ export const JoinSection = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
         <Card className="max-w-md w-full p-8 text-center space-y-4">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8" />
+            <HiExclamationCircle className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Invitation Not Found</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
@@ -122,9 +123,11 @@ export const JoinSection = () => {
       <div className="w-full max-w-md">
         {/* Branding header */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            c
-          </div>
+          <img
+            src={logoImg}
+            alt="CoreResearch Logo"
+            className="w-10 h-10 object-contain"
+          />
           <span className="text-2xl tracking-tight">
             <span className="font-normal text-gray-900 dark:text-white">Core</span>
             <span className="font-semibold text-blue-600 dark:text-blue-400">Research</span>
@@ -138,7 +141,7 @@ export const JoinSection = () => {
 
           <div className="text-center mb-6 relative z-10">
             <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-              <GraduationCap className="w-8 h-8" />
+              <HiAcademicCap className="w-8 h-8" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
               Join Section
@@ -188,7 +191,7 @@ export const JoinSection = () => {
             ) : isNotStudent ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 justify-center text-red-600 dark:text-red-400 font-medium bg-red-50 dark:bg-red-500/10 p-3 rounded-lg">
-                  <AlertCircle className="w-5 h-5" />
+                  <HiExclamationCircle className="w-5 h-5" />
                   Only student accounts can join sections.
                 </div>
                 <Button 
@@ -202,7 +205,7 @@ export const JoinSection = () => {
             ) : isAlreadyEnrolled ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 justify-center text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5" />
+                  <HiCheckCircle className="w-5 h-5" />
                   You are already enrolled here.
                 </div>
                 <Button 

@@ -2,25 +2,24 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import logoImg from "../assets/logo.png";
 import {
-  LayoutDashboard,
-  FileSignature,
-  FolderKanban,
-  FileText,
-  Library,
-  MessageSquare,
-  CalendarDays,
-  Award,
-  UserCog,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  BookOpen,
-  Users,
-  GraduationCap,
-  Link as LinkIcon,
-  ClipboardList,
-} from "lucide-react";
+  HiSquares2X2,
+  HiDocumentText,
+  HiClipboardDocumentCheck,
+  HiDocumentDuplicate,
+  HiBuildingLibrary,
+  HiChatBubbleLeftRight,
+  HiCalendarDays,
+  HiTrophy,
+  HiUsers,
+  HiUserGroup,
+  HiAcademicCap,
+  HiBookOpen,
+  HiChevronLeft,
+  HiChevronRight,
+  HiArrowRightOnRectangle,
+} from "react-icons/hi2";
 
 export const Sidebar = ({
   collapsed,
@@ -45,25 +44,25 @@ export const Sidebar = ({
         {
           label: "Dashboard",
           path: "/dashboard",
-          icon: LayoutDashboard,
+          icon: HiSquares2X2,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Proposals",
           path: "/proposals",
-          icon: FileSignature,
+          icon: HiDocumentText,
           roles: ["student", "adviser"],
         },
         {
           label: "Proposal Review",
           path: "/coordinator/proposals",
-          icon: ClipboardList,
+          icon: HiClipboardDocumentCheck,
           roles: ["research_coordinator", "admin"],
         },
         {
           label: "Documents",
           path: "/documents",
-          icon: FileText,
+          icon: HiDocumentDuplicate,
           roles: ["student", "adviser", "admin", "research_coordinator"],
         },
         ...(role === "student"
@@ -71,7 +70,7 @@ export const Sidebar = ({
             {
               label: "My Group",
               path: "/my-group",
-              icon: Users,
+              icon: HiUserGroup,
               roles: ["student"],
             },
           ]
@@ -79,7 +78,7 @@ export const Sidebar = ({
         {
           label: "Repository",
           path: "/repository",
-          icon: Library,
+          icon: HiBuildingLibrary,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
       ],
@@ -90,19 +89,19 @@ export const Sidebar = ({
         {
           label: "Reviews",
           path: "/reviews",
-          icon: MessageSquare,
+          icon: HiChatBubbleLeftRight,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Schedules",
           path: "/schedules",
-          icon: CalendarDays,
+          icon: HiCalendarDays,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
         {
           label: "Grading",
           path: "/grading",
-          icon: Award,
+          icon: HiTrophy,
           roles: ["adviser", "panelist", "admin"], // STRICT: Students cannot access Grading
         },
       ],
@@ -113,25 +112,25 @@ export const Sidebar = ({
         {
           label: "User Directory",
           path: "/admin/users",
-          icon: UserCog,
+          icon: HiUsers,
           roles: ["admin"], // STRICT: Only Admin can access User Management
         },
         {
           label: "Students",
           path: "/admin/students",
-          icon: GraduationCap,
+          icon: HiAcademicCap,
           roles: ["admin", "research_coordinator"],
         },
         {
           label: "Research Groups",
           path: "/admin/groups",
-          icon: Users,
+          icon: HiUserGroup,
           roles: ["admin", "research_coordinator"],
         },
         {
           label: "Courses",
           path: "/admin/courses",
-          icon: BookOpen,
+          icon: HiBookOpen,
           roles: ["admin"], // STRICT: Only Admin can access Course Management
         },
       ],
@@ -168,16 +167,18 @@ export const Sidebar = ({
               className="w-10 h-10 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center transition-all shrink-0"
               title="Expand Sidebar"
             >
-              <ChevronRight className="w-5 h-5" />
+              <HiChevronRight className="w-5 h-5" />
             </button>
           </div>
         ) : (
-          /* Expanded Mode: Circular logo + CoreResearch text on left, chevron collapse button on right */
+          /* Expanded Mode: Logo + CoreResearch text on left, chevron collapse button on right */
           <div className="w-full flex items-center justify-between">
-            <Link to="/dashboard" className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-base shadow-sm shrink-0">
-                c
-              </div>
+            <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
+              <img
+                src={logoImg}
+                alt="CoreResearch Logo"
+                className="w-8 h-8 object-contain shrink-0"
+              />
               <span className="text-lg tracking-tight truncate">
                 <span className="font-normal text-gray-900 dark:text-white">Core</span>
                 <span className="font-semibold text-blue-600 dark:text-blue-400">Research</span>
@@ -189,7 +190,7 @@ export const Sidebar = ({
               className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-all hidden lg:flex items-center justify-center shrink-0"
               title="Collapse Sidebar"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <HiChevronLeft className="w-5 h-5" />
             </button>
           </div>
         )}
@@ -267,7 +268,7 @@ export const Sidebar = ({
               : "gap-3.5 h-11 px-3.5 w-full rounded-xl"
             }`}
         >
-          <LogOut className="w-5 h-5 shrink-0 text-red-500 dark:text-red-400" />
+          <HiArrowRightOnRectangle className="w-5 h-5 shrink-0 text-red-500 dark:text-red-400" />
           {!collapsed && <span>Logout</span>}
 
           {/* Floating Tooltip for Logout in Collapsed Mode */}

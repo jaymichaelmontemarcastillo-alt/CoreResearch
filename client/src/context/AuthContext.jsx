@@ -166,33 +166,68 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Google Auth flow. 
-  // Flow: 
-  // 1. Firebase Auth popup para sa Google Login.
-  // 2. Kukunin yung UID at i-check sa backend kung may existing profile na.
-  // 3. Kung bago yung user (wala pang 'studentIdOrEmployeeId'), ifa-flag natin na 'needsOnboarding = true'.
-  // 4. Ipupunta sila sa Onboarding page para kumpletuhin yung profile bago makapasok sa Dashboard.
-  const loginWithGoogle = async (defaultRole = 'student') => {
+  // Google Auth — Direct Log In
+  // Flow:
+  // 1. Popup Google authentication.
+  // 2. Checks Firestore 'users' collection to see if user has already registered.
+  // 3. If account does NOT exist, signs out immediately and throws an error asking user to register.
+  // 4. If account exists, logs in directly.
+  const loginWithGoogle = async () => {
     setLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       
-      // Try fetching profile from Firestore
-      try {
-        const userDocRef = doc(db, 'users', result.user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          const profile = userDoc.data();
-          // Check if profile needs onboarding (e.g. ID is default or missing)
-          if (!profile.studentIdOrEmployeeId || profile.studentIdOrEmployeeId === 'GOOGLE-USER') {
-            profile.needsOnboarding = true;
-          }
-          setUserProfile(profile);
-          return { ...result, needsOnboarding: profile.needsOnboarding };
+      const userDocRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const profile = userDoc.data();
+        if (!profile.studentIdOrEmployeeId || profile.studentIdOrEmployeeId === 'GOOGLE-USER') {
+          profile.needsOnboarding = true;
+        } else {
+          profile.needsOnboarding = false;
         }
-      } catch (syncErr) {
-        console.warn('[AuthContext] Firestore sync warning:', syncErr.message);
+        setUserProfile(profile);
+        return { ...result, profile, needsOnboarding: profile.needsOnboarding };
+      }
+
+      // No registered account in database: reject direct login & sign out
+      await signOut(auth);
+      setUserProfile(null);
+      setCurrentUser(null);
+      
+      const notFoundErr = new Error("No registered account found with this Google email. Please register first.");
+      notFoundErr.code = "auth/user-not-found";
+      throw notFoundErr;
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google Auth — Registration
+  // Flow:
+  // 1. Popup Google authentication.
+  // 2. If user already exists, logs them in directly.
+  // 3. If new user, creates an initial profile marked with needsOnboarding = true to proceed to Onboarding.
+  const registerWithGoogle = async (defaultRole = 'student') => {
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      const userDocRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const profile = userDoc.data();
+        if (!profile.studentIdOrEmployeeId || profile.studentIdOrEmployeeId === 'GOOGLE-USER') {
+          profile.needsOnboarding = true;
+        } else {
+          profile.needsOnboarding = false;
+        }
+        setUserProfile(profile);
+        return { ...result, profile, needsOnboarding: profile.needsOnboarding, alreadyRegistered: true };
       }
 
       // Default fallback profile marking needsOnboarding = true
@@ -205,8 +240,8 @@ export const AuthProvider = ({ children }) => {
         fullName: result.user.displayName || result.user.email.split('@')[0],
         role: defaultRole,
         role_id: defaultRole,
-        department: 'Computer Studies',
-        department_id: 'Computer Studies',
+        department: 'Information Technology',
+        department_id: 'Information Technology',
         studentIdOrEmployeeId: '',
         status: 'active',
         is_approved: true,
@@ -217,7 +252,7 @@ export const AuthProvider = ({ children }) => {
       };
 
       setUserProfile(newProfile);
-      return { ...result, needsOnboarding: true };
+      return { ...result, profile: newProfile, needsOnboarding: true };
     } catch (error) {
       throw error;
     } finally {
@@ -340,6 +375,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     loginWithGoogle,
+    registerWithGoogle,
     logout,
     resetPassword,
     selectDevRole,

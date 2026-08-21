@@ -1,9 +1,8 @@
-// src/pages/Documents/components/DocumentCard.jsx
 import React from 'react';
 import { DocumentPreview } from './DocumentPreview';
 import { DocumentCardMenu } from './DocumentCardMenu';
 import { formatGoogleDocsDate, getDocumentTypeInfo } from '../utils/documentHelpers';
-import { Star } from 'lucide-react';
+import { HiStar } from 'react-icons/hi2';
 
 export const DocumentCard = ({
   document,
@@ -84,7 +83,7 @@ export const DocumentCard = ({
               }`}
               title={document.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
-              <Star className={`w-3.5 h-3.5 ${document.isFavorite ? 'fill-amber-500' : ''}`} />
+              <HiStar className="w-3.5 h-3.5" />
             </button>
 
             {/* Three-dot context menu (Opens Upward) */}

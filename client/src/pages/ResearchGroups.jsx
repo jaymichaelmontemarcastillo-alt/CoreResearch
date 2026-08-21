@@ -9,12 +9,12 @@ import { Modal } from "../components/ui/Modal";
 import { CourseFilterDropdown } from "../components/ui/CourseFilterDropdown";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import {
-  Users,
-  CheckCircle,
-  Plus,
-  Search,
-  Filter,
-} from "lucide-react";
+  HiUsers,
+  HiCheckCircle,
+  HiPlus,
+  HiMagnifyingGlass,
+  HiFunnel,
+} from "react-icons/hi2";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
@@ -283,7 +283,7 @@ export const ResearchGroups = () => {
   return (
     <div className="space-y-6 font-inter">
       <PageHeader
-        icon={Users}
+        icon={HiUsers}
         title="Research Groups"
         description="View and manage research groups and title defense schedules."
       />
@@ -302,7 +302,7 @@ export const ResearchGroups = () => {
             </label>
             <Input
               placeholder="Search by name, student, or title..."
-              icon={Search}
+              icon={HiMagnifyingGlass}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-white dark:bg-slate-900 shadow-sm"
@@ -310,7 +310,7 @@ export const ResearchGroups = () => {
           </div>
 
           <div className="hidden md:flex h-10 items-center px-1">
-            <Filter className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-gray-600" />
           </div>
 
           {/* Program/Course Filter */}
@@ -384,7 +384,7 @@ export const ResearchGroups = () => {
             onClick={() => setIsCreateModalOpen(true)}
             disabled={!selectedCourse || !selectedSection}
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <HiPlus className="w-4 h-4 mr-2" />
             Create Research Group
           </Button>
         </div>

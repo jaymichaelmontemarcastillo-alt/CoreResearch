@@ -1,6 +1,6 @@
 // src/pages/Documents/components/DocumentFilterMenu.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, UserCheck } from 'lucide-react';
+import { HiChevronDown, HiCheck } from 'react-icons/hi2';
 import { FILTER_OPTIONS } from '../constants/documentConstants';
 
 export const DocumentFilterMenu = ({ value, onChange }) => {
@@ -32,7 +32,7 @@ export const DocumentFilterMenu = ({ value, onChange }) => {
         title="Filter by owner"
       >
         <span className="font-semibold">{currentOption.label}</span>
-        <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+        <HiChevronDown className="w-3.5 h-3.5 text-gray-400" />
       </button>
 
       {isOpen && (
@@ -54,7 +54,7 @@ export const DocumentFilterMenu = ({ value, onChange }) => {
                 }`}
               >
                 <span>{opt.label}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                {isSelected && <HiCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
               </button>
             );
           })}

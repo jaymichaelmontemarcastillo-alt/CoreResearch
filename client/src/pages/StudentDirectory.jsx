@@ -10,15 +10,15 @@ import { Toast } from "../components/ui/Toast";
 import { Modal } from "../components/ui/Modal";
 import { CourseFilterDropdown } from "../components/ui/CourseFilterDropdown";
 import {
-  GraduationCap,
-  CheckCircle,
-  Link as LinkIcon,
-  Search,
-  Filter,
-  Copy,
-  XCircle,
-  Trash2,
-} from "lucide-react";
+  HiAcademicCap,
+  HiCheckCircle,
+  HiLink as LinkIcon,
+  HiMagnifyingGlass,
+  HiFunnel,
+  HiDocumentDuplicate,
+  HiXCircle,
+  HiTrash,
+} from "react-icons/hi2";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
@@ -352,7 +352,7 @@ export const StudentDirectory = () => {
     <div className="space-y-6 font-inter">
       {/* Page Header (Preserved existing manual assign action) */}
       <PageHeader
-        icon={GraduationCap}
+        icon={HiAcademicCap}
         title="Students"
         description="Manage student directory and generate enrollment links."
         actions={
@@ -363,7 +363,7 @@ export const StudentDirectory = () => {
               onClick={() => setShowAssignForm(!showAssignForm)}
               disabled={!selectedCourse || !selectedSection}
             >
-              <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Manual Assign
+              <HiCheckCircle className="w-3.5 h-3.5 mr-1.5" /> Manual Assign
             </Button>
           </div>
         }
@@ -443,7 +443,7 @@ export const StudentDirectory = () => {
             </label>
             <Input
               placeholder="Search students..."
-              icon={Search}
+              icon={HiMagnifyingGlass}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-white dark:bg-slate-900 shadow-sm"
@@ -452,7 +452,7 @@ export const StudentDirectory = () => {
 
           {/* Filter Icon Indicator (visual only) */}
           <div className="hidden md:flex h-10 items-center px-1">
-            <Filter className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-gray-600" />
           </div>
 
           {/* Program/Course Filter - Custom flyout dropdown */}
@@ -559,7 +559,7 @@ export const StudentDirectory = () => {
                   </div>
                   <div className="flex items-center gap-1 shrink-0 ml-4">
                     <Button variant="ghost" size="sm" onClick={() => handleCopyLink(invite.id)} title="Copy Link">
-                      <Copy className="w-4 h-4 text-gray-500" />
+                      <HiDocumentDuplicate className="w-4 h-4 text-gray-500" />
                     </Button>
                     {invite.active ? (
                       <Button 
@@ -569,7 +569,7 @@ export const StudentDirectory = () => {
                         onClick={() => handleDeactivate(invite.id)}
                         title="Deactivate Link"
                       >
-                        <XCircle className="w-4 h-4" />
+                        <HiXCircle className="w-4 h-4" />
                       </Button>
                     ) : (
                       <Button 
@@ -579,7 +579,7 @@ export const StudentDirectory = () => {
                         onClick={() => confirmDelete(invite.id)}
                         title="Delete Link"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <HiTrash className="w-4 h-4" />
                       </Button>
                     )}
                   </div>

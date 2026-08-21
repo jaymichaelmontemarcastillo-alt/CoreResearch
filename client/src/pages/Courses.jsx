@@ -6,7 +6,14 @@ import { Input } from "../components/ui/Input";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
-import { BookOpen, Plus, Trash2, Edit2, RefreshCw, List } from "lucide-react";
+import {
+  HiBookOpen,
+  HiPlus,
+  HiTrash,
+  HiPencilSquare,
+  HiArrowPath,
+  HiQueueList,
+} from "react-icons/hi2";
 import { Link } from "react-router-dom";
 import { courseService } from "../services/course.service";
 
@@ -43,24 +50,27 @@ export const Courses = () => {
     fetchCourses();
   }, []);
 
-  const showToast = (msg, variant = "success") => {
-    setToastMessage(msg);
+  const showToast = (message, variant = "success") => {
+    setToastMessage(message);
     setToastVariant(variant);
   };
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
-    if (!newCourse.code || !newCourse.name) return;
-    
     setSaving(true);
     try {
-      await courseService.createCourse(newCourse);
-      showToast("Course added successfully.");
-      setNewCourse({ code: "", name: "", departmentId: "cs", active: true });
+      await courseService.createCourse({
+        code: newCourse.code.toUpperCase(),
+        name: newCourse.name,
+        departmentId: newCourse.departmentId,
+        active: true
+      });
+      showToast("Course created successfully.");
       setIsAdding(false);
+      setNewCourse({ code: "", name: "", departmentId: "cs", active: true });
       fetchCourses();
     } catch (error) {
-      showToast(error.message || "Failed to add course", "error");
+      showToast("Failed to create course.", "error");
     } finally {
       setSaving(false);
     }
@@ -68,8 +78,10 @@ export const Courses = () => {
 
   const handleToggleActive = async (course) => {
     try {
-      await courseService.updateCourse(course.id, { active: !course.active });
-      showToast(`Course ${course.code} is now ${!course.active ? 'Active' : 'Inactive'}`);
+      await courseService.updateCourse(course.id, {
+        active: !course.active
+      });
+      showToast(`Course marked as ${!course.active ? "Active" : "Inactive"}.`);
       fetchCourses();
     } catch (error) {
       showToast("Failed to update course status.", "error");
@@ -98,16 +110,16 @@ export const Courses = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={BookOpen}
+        icon={HiBookOpen}
         title="Course Management"
         description="Manage the academic hierarchy and degree programs offered."
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={fetchCourses} isLoading={loading}>
-              <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+              <HiArrowPath className="w-3.5 h-3.5 mr-1.5" /> Refresh
             </Button>
             <Button variant="primary" size="sm" onClick={() => setIsAdding(!isAdding)}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Course
+              <HiPlus className="w-3.5 h-3.5 mr-1.5" /> Add Course
             </Button>
           </div>
         }
@@ -203,7 +215,7 @@ export const Courses = () => {
                       className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                       title="View Sections"
                     >
-                      <List className="w-4 h-4" />
+                      <HiQueueList className="w-4 h-4" />
                     </Button>
                   </Link>
                   <Button
@@ -213,7 +225,7 @@ export const Courses = () => {
                     onClick={() => handleToggleActive(course)}
                     title="Toggle Status"
                   >
-                    <Edit2 className="w-4 h-4 text-gray-500" />
+                    <HiPencilSquare className="w-4 h-4 text-gray-500" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -222,7 +234,7 @@ export const Courses = () => {
                     onClick={() => handleDelete(course.id)}
                     title="Delete Course"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <HiTrash className="w-4 h-4" />
                   </Button>
                 </div>
               </TableCell>

@@ -1,12 +1,18 @@
 // src/components/ui/Toast.jsx
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, Info, X } from "lucide-react";
+import {
+  HiCheckCircle,
+  HiExclamationTriangle,
+  HiXCircle,
+  HiInformationCircle,
+  HiXMark,
+} from "react-icons/hi2";
 
 const icons = {
-  success: CheckCircle2,
-  warning: AlertTriangle,
-  error: XCircle,
-  info: Info,
+  success: HiCheckCircle,
+  warning: HiExclamationTriangle,
+  error: HiXCircle,
+  info: HiInformationCircle,
 };
 
 const styles = {
@@ -54,7 +60,7 @@ export const Toast = ({
           }}
           className="p-0.5 rounded hover:opacity-70 transition"
         >
-          <X className="w-3.5 h-3.5" />
+          <HiXMark className="w-4 h-4" />
         </button>
       )}
     </div>

@@ -10,21 +10,21 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import {
-  FileText,
-  PlusCircle,
-  Search,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Edit,
-  Trash2,
-  Eye,
-  Calendar,
-  Users,
-  Filter,
-  ArrowRight,
-  FileEdit,
-} from "lucide-react";
+  HiDocumentText,
+  HiPlusCircle,
+  HiMagnifyingGlass,
+  HiClock,
+  HiCheckCircle,
+  HiExclamationTriangle,
+  HiPencilSquare,
+  HiTrash,
+  HiEye,
+  HiCalendarDays,
+  HiUsers,
+  HiFunnel,
+  HiArrowRight,
+  HiDocumentDuplicate,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import { groupService } from "../services/group.service";
 import useTitleProposal from "../hooks/useTitleProposal";
@@ -32,10 +32,10 @@ import { PROPOSAL_STATUS_CONFIG } from "../types/proposal.types";
 
 // Badge variant mapping for our ui/Badge component
 const STATUS_ICON = {
-  draft: FileEdit,
-  submitted: Clock,
-  needs_revision: AlertTriangle,
-  approved: CheckCircle2,
+  draft: HiDocumentDuplicate,
+  submitted: HiClock,
+  needs_revision: HiExclamationTriangle,
+  approved: HiCheckCircle,
 };
 
 export const Proposals = () => {
@@ -158,7 +158,7 @@ export const Proposals = () => {
 
       {/* Page Header */}
       <PageHeader
-        icon={FileText}
+        icon={HiDocumentText}
         title="My Research Proposals"
         description={
           group
@@ -171,7 +171,7 @@ export const Proposals = () => {
           role === "student" && group && (
             <Link to="/proposals/new">
               <Button variant="primary" size="md">
-                <PlusCircle className="w-4 h-4 mr-2" />
+                <HiPlusCircle className="w-4 h-4 mr-2" />
                 New Proposal
               </Button>
             </Link>
@@ -189,7 +189,7 @@ export const Proposals = () => {
       {noGroupAssigned ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 md:p-16 flex flex-col items-center justify-center text-center shadow-sm">
           <div className="w-20 h-20 bg-blue-50 dark:bg-slate-800/60 rounded-full flex items-center justify-center mb-6">
-            <Users className="w-8 h-8 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
+            <HiUsers className="w-8 h-8 text-blue-500 dark:text-blue-400" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
             You're not in a research group yet
@@ -211,14 +211,14 @@ export const Proposals = () => {
             <div className="w-full md:max-w-md">
               <Input
                 placeholder="Search by title or category..."
-                icon={Search}
+                icon={HiMagnifyingGlass}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-white dark:bg-slate-900 shadow-sm"
               />
             </div>
             <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
-              <Filter className="w-4 h-4 text-gray-400 shrink-0 mr-1 hidden sm:block" />
+              <HiFunnel className="w-4 h-4 text-gray-400 shrink-0 mr-1 hidden sm:block" />
               {filterTabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -244,7 +244,7 @@ export const Proposals = () => {
           ) : filteredProposals.length === 0 ? (
             <div className="py-12 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 border-dashed">
               <EmptyState
-                icon={FileText}
+                icon={HiDocumentText}
                 title={filterStatus === "all" ? "No Proposals Yet" : `No ${PROPOSAL_STATUS_CONFIG[filterStatus]?.label ?? filterStatus} Proposals`}
                 description={
                   role === "student"
@@ -255,7 +255,7 @@ export const Proposals = () => {
                   role === "student" && filterStatus === "all" ? (
                     <Link to="/proposals/new">
                       <Button variant="primary" size="sm">
-                        <PlusCircle className="w-4 h-4 mr-1.5" />
+                        <HiPlusCircle className="w-4 h-4 mr-1.5" />
                         Create Proposal
                       </Button>
                     </Link>
@@ -270,7 +270,7 @@ export const Proposals = () => {
                   label: p.status,
                   variant: "gray",
                 };
-                const StatusIcon = STATUS_ICON[p.status] ?? Clock;
+                const StatusIcon = STATUS_ICON[p.status] ?? HiClock;
                 const editable = canStudentEdit(p.status);
                 const deletable = canStudentDelete(p.status);
 
@@ -302,7 +302,7 @@ export const Proposals = () => {
 
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                        <Users className="w-3.5 h-3.5 shrink-0" />
+                        <HiUsers className="w-3.5 h-3.5 shrink-0" />
                         <span className="font-medium truncate max-w-[120px]">
                           {p.groupName || "—"}
                         </span>
@@ -321,7 +321,7 @@ export const Proposals = () => {
 
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <HiCalendarDays className="w-3.5 h-3.5 shrink-0" />
                         <span>
                           {new Date(p.createdAt).toLocaleDateString(undefined, {
                             month: 'short',
@@ -332,7 +332,7 @@ export const Proposals = () => {
                       </div>
                       {p.revisionCount > 0 && (
                         <div className="flex items-center gap-1.5 text-[11px] text-amber-500 mt-1">
-                          <Clock className="w-3 h-3 shrink-0" />
+                          <HiClock className="w-3 h-3 shrink-0" />
                           <span>Rev #{p.revisionCount}</span>
                         </div>
                       )}
@@ -346,7 +346,7 @@ export const Proposals = () => {
                           className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
                           title="View Details"
                         >
-                          <Eye className="w-4 h-4" />
+                          <HiEye className="w-4 h-4" />
                         </Link>
 
                         {/* Edit */}
@@ -356,7 +356,7 @@ export const Proposals = () => {
                             className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
                             title="Edit Proposal"
                           >
-                            <Edit className="w-4 h-4" />
+                            <HiPencilSquare className="w-4 h-4" />
                           </button>
                         )}
 
@@ -368,7 +368,7 @@ export const Proposals = () => {
                             className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors"
                             title="Delete Draft"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <HiTrash className="w-4 h-4" />
                           </button>
                         )}
                       </div>

@@ -1,16 +1,15 @@
 // src/components/ui/ImageCropModal.jsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
-  RotateCcw,
-  Check,
-  X,
-  Move,
-  Crop,
-  Sparkles,
-} from "lucide-react";
+  HiMagnifyingGlassPlus,
+  HiMagnifyingGlassMinus,
+  HiArrowPath,
+  HiArrowUturnLeft,
+  HiCheck,
+  HiXMark,
+  HiArrowsPointingOut,
+  HiScissors,
+} from "react-icons/hi2";
 
 export const ImageCropModal = ({
   isOpen,
@@ -186,7 +185,7 @@ export const ImageCropModal = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Crop className="w-4 h-4" />
+              <HiScissors className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -202,7 +201,7 @@ export const ImageCropModal = ({
             onClick={onClose}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
           >
-            <X className="w-5 h-5" />
+            <HiXMark className="w-5 h-5" />
           </button>
         </div>
 
@@ -256,7 +255,7 @@ export const ImageCropModal = ({
 
             {/* Helper floating hint */}
             <div className="absolute bottom-2.5 px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[11px] text-white/80 pointer-events-none flex items-center gap-1.5 shadow-sm">
-              <Move className="w-3 h-3" />
+              <HiArrowsPointingOut className="w-3 h-3" />
               <span>Drag to move • Scroll to zoom</span>
             </div>
           </div>
@@ -271,7 +270,7 @@ export const ImageCropModal = ({
                 className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition"
                 title="Zoom Out"
               >
-                <ZoomOut className="w-4 h-4" />
+                <HiMagnifyingGlassMinus className="w-4 h-4" />
               </button>
 
               <input
@@ -290,7 +289,7 @@ export const ImageCropModal = ({
                 className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition"
                 title="Zoom In"
               >
-                <ZoomIn className="w-4 h-4" />
+                <HiMagnifyingGlassPlus className="w-4 h-4" />
               </button>
             </div>
 
@@ -301,7 +300,7 @@ export const ImageCropModal = ({
                 onClick={handleRotate}
                 className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-1.5 transition font-medium"
               >
-                <RotateCw className="w-3.5 h-3.5 text-gray-500" />
+                <HiArrowPath className="w-3.5 h-3.5 text-gray-500" />
                 <span>Rotate 90°</span>
               </button>
 
@@ -314,7 +313,7 @@ export const ImageCropModal = ({
                 onClick={handleReset}
                 className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-1.5 transition font-medium"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+                <HiArrowUturnLeft className="w-3.5 h-3.5 text-gray-500" />
                 <span>Reset</span>
               </button>
             </div>
@@ -336,7 +335,7 @@ export const ImageCropModal = ({
             onClick={handleConfirmCrop}
             className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-sm flex items-center gap-2"
           >
-            <Check className="w-4 h-4" />
+            <HiCheck className="w-4 h-4" />
             Apply & Use Photo
           </button>
         </div>

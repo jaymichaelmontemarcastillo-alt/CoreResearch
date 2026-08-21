@@ -11,11 +11,11 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
 import {
-  Award,
-  User,
-  PlusCircle,
-  Calculator,
-} from "lucide-react";
+  HiTrophy,
+  HiUser,
+  HiPlusCircle,
+  HiCalculator,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 
 export const Grading = () => {
@@ -43,13 +43,12 @@ export const Grading = () => {
   const fetchEvaluations = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/evaluations/proj-501");
-      if (res.data) {
-        setEvaluations(res.data.data || []);
-        setGradeSummary({
-          averageScore: res.data.averageScore || 0,
-          gradeLetter: res.data.gradeLetter || "N/A",
-        });
+      const res = await api.get("/evaluations/project/default-project-1");
+      if (res.data && res.data.data) {
+        setEvaluations(res.data.data);
+      }
+      if (res.data && res.data.summary) {
+        setGradeSummary(res.data.summary);
       }
     } catch (err) {
       console.error("[Grading] fetch error:", err);
@@ -67,13 +66,13 @@ export const Grading = () => {
     setSubmitting(true);
     try {
       await api.post("/evaluations", {
-        projectId: "proj-501",
-        projectTitle: "Smart IoT Moisture & Nutrient Sensing System for Urban Farming",
-        studentName: "Alex Rivera",
-        presentation: presentationScore,
-        methodology: methodologyScore,
-        results: resultsScore,
-        manuscriptQuality: manuscriptScore,
+        projectId: "default-project-1",
+        scores: {
+          presentation: Number(presentationScore),
+          methodology: Number(methodologyScore),
+          results: Number(resultsScore),
+          manuscriptQuality: Number(manuscriptScore),
+        },
         remarks,
       });
 
@@ -91,13 +90,13 @@ export const Grading = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Award}
+        icon={HiTrophy}
         title="Digital Rubric & Auto-Grading Engine"
         description="Multi-criteria defense evaluation forms, instant weighted score computation, and grade release."
         actions={
           (role === "panelist" || role === "admin") && (
             <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
-              <PlusCircle className="w-4 h-4 mr-2" /> Fill Evaluation Rubric
+              <HiPlusCircle className="w-4 h-4 mr-2" /> Fill Evaluation Rubric
             </Button>
           )
         }
@@ -111,7 +110,7 @@ export const Grading = () => {
       <Card className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6">
         <div className="space-y-1">
           <div className="text-xs uppercase font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-            <Calculator className="w-4 h-4" /> Composite Panel Evaluation Grade
+            <HiCalculator className="w-4 h-4" /> Composite Panel Evaluation Grade
           </div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Smart IoT Moisture & Nutrient Sensing System</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -142,7 +141,7 @@ export const Grading = () => {
       ) : evaluations.length === 0 ? (
         <Card className="p-8">
           <EmptyState
-            icon={Award}
+            icon={HiTrophy}
             title="No Rubrics Submitted Yet"
             description="Panelists will submit digital rubric evaluation forms during the defense presentation."
           />
@@ -154,7 +153,7 @@ export const Grading = () => {
               <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
                 <div>
                   <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-purple-500" /> {ev.panelistName}
+                    <HiUser className="w-3.5 h-3.5 text-purple-500" /> {ev.panelistName}
                   </div>
                   <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
                     Submitted {new Date(ev.submittedAt).toLocaleDateString()}

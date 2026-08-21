@@ -10,12 +10,12 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
 import {
-  MessageSquare,
-  Send,
-  UserCheck,
-  GraduationCap,
-  MessageCircle,
-} from "lucide-react";
+  HiChatBubbleLeftRight,
+  HiPaperAirplane,
+  HiCheckBadge,
+  HiAcademicCap,
+  HiChatBubbleBottomCenterText,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 
 export const Reviews = () => {
@@ -53,17 +53,16 @@ export const Reviews = () => {
 
   const handlePostReview = async (e) => {
     e.preventDefault();
-    if (!comment) return alert("Please enter review remarks.");
+    if (!comment.trim()) return;
 
     setSubmitting(true);
     try {
       await api.post("/reviews", {
-        manuscriptId: "ms-v1.1",
         chapter,
         comment,
       });
 
-      setToast("Review feedback posted successfully!");
+      setToast("Feedback annotation posted successfully!");
       setComment("");
       await fetchReviews();
     } catch (err) {
@@ -73,8 +72,10 @@ export const Reviews = () => {
     }
   };
 
-  const handleStudentResponseSubmit = async (reviewId) => {
-    if (!studentResponseText) return alert("Please enter response notes.");
+  const handleAddressReview = async (reviewId) => {
+    if (!studentResponseText.trim()) {
+      return alert("Please enter notes on how you revised the manuscript.");
+    }
 
     try {
       await api.patch(`/reviews/${reviewId}/status`, {
@@ -94,7 +95,7 @@ export const Reviews = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={MessageSquare}
+        icon={HiChatBubbleLeftRight}
         title="Review & Threaded Feedback Workspace"
         description="Adviser & Panelist chapter annotations, revision tracking, and student response threads."
       />
@@ -109,7 +110,7 @@ export const Reviews = () => {
           <div className="lg:col-span-5">
             <Card className="space-y-4 sticky top-20">
               <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-primary" /> Post Manuscript Review Feedback
+                <HiChatBubbleBottomCenterText className="w-5 h-5 text-primary" /> Post Manuscript Review Feedback
               </h2>
 
               <form onSubmit={handlePostReview} className="space-y-4">
@@ -135,7 +136,7 @@ export const Reviews = () => {
                 />
 
                 <Button type="submit" variant="primary" isLoading={submitting} className="w-full">
-                  <Send className="w-4 h-4 mr-2" /> Post Review Feedback
+                  <HiPaperAirplane className="w-4 h-4 mr-2" /> Post Review Feedback
                 </Button>
               </form>
             </Card>
@@ -149,7 +150,7 @@ export const Reviews = () => {
           ) : reviews.length === 0 ? (
             <Card className="p-8">
               <EmptyState
-                icon={MessageSquare}
+                icon={HiChatBubbleLeftRight}
                 title="No Review Comments Yet"
                 description="Advisers and panelists will post chapter feedback and revision requests here."
               />
@@ -167,7 +168,7 @@ export const Reviews = () => {
                       <span className="text-xs font-bold text-primary dark:text-blue-400">{rev.chapter}</span>
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-gray-400" />
+                      <HiCheckBadge className="w-3.5 h-3.5 text-gray-400" />
                       <span>
                         Posted by <strong className="text-gray-700 dark:text-gray-300">{rev.reviewerName}</strong> on{" "}
                         {new Date(rev.createdAt).toLocaleString()}
@@ -189,7 +190,7 @@ export const Reviews = () => {
                 {rev.studentResponse ? (
                   <div className="p-3.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 space-y-1 ml-4 border-l-4 border-l-primary">
                     <div className="text-xs font-bold text-primary dark:text-blue-400 flex items-center gap-1">
-                      <GraduationCap className="w-3.5 h-3.5" /> Student Revision Response:
+                      <HiAcademicCap className="w-3.5 h-3.5" /> Student Revision Response:
                     </div>
                     <p className="text-xs text-gray-700 dark:text-gray-300 italic">{rev.studentResponse}</p>
                   </div>
@@ -198,32 +199,27 @@ export const Reviews = () => {
                     <div className="space-y-2 pt-2">
                       <Textarea
                         rows={2}
-                        placeholder="Explain how you addressed this reviewer remark in your revised manuscript..."
+                        placeholder="Explain changes made in the latest revision manuscript..."
                         value={studentResponseText}
                         onChange={(e) => setStudentResponseText(e.target.value)}
                       />
-                      <div className="flex justify-end gap-2">
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="success" onClick={() => handleAddressReview(rev.id)}>
+                          Submit Revision & Resolve
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => setRespondingId(null)}>
                           Cancel
-                        </Button>
-                        <Button size="sm" variant="success" onClick={() => handleStudentResponseSubmit(rev.id)}>
-                          Submit Response
                         </Button>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex justify-end pt-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setRespondingId(rev.id);
-                          setStudentResponseText("");
-                        }}
-                      >
-                        Respond to Feedback
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setRespondingId(rev.id)}
+                    >
+                      Respond & Mark as Addressed
+                    </Button>
                   )
                 ) : null}
               </Card>

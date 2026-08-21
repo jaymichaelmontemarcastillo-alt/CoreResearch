@@ -8,7 +8,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
 import { Select } from "../components/ui/Select";
-import { FolderGit2, UserCheck, User, ArrowRight } from "lucide-react";
+import { HiFolder, HiCheckBadge, HiUser, HiArrowRight } from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 
@@ -62,7 +62,7 @@ export const Projects = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={FolderGit2}
+        icon={HiFolder}
         title="Research Projects & Adviser Assignment"
         description="Manage active research projects, assign faculty advisers, and monitor research progress."
       />
@@ -78,7 +78,7 @@ export const Projects = () => {
       ) : projects.length === 0 ? (
         <Card className="p-8">
           <EmptyState
-            icon={FolderGit2}
+            icon={HiFolder}
             title="No Active Research Projects"
             description="Once a title proposal is approved, a research project lifecycle is initiated."
           />
@@ -101,14 +101,14 @@ export const Projects = () => {
                 <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                   <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
                     <div className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                      <User className="w-3 h-3 text-primary" /> Student Researcher
+                      <HiUser className="w-3.5 h-3.5 text-primary" /> Student Researcher
                     </div>
                     <div className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">{p.studentName}</div>
                   </div>
 
                   <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
                     <div className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                      <UserCheck className="w-3 h-3 text-emerald-500" /> Assigned Adviser
+                      <HiCheckBadge className="w-3.5 h-3.5 text-emerald-500" /> Assigned Adviser
                     </div>
                     <div className="font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
                       {p.adviserName || "Unassigned"}
@@ -167,7 +167,7 @@ export const Projects = () => {
                   to="/manuscripts"
                   className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
                 >
-                  View Manuscripts & Files <ArrowRight className="w-3.5 h-3.5" />
+                  View Manuscripts & Files <HiArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </Card>

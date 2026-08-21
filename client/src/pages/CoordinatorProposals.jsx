@@ -8,28 +8,28 @@ import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import {
-  ClipboardList,
-  Search,
-  Filter,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  FileEdit,
-  Users,
-  BookOpen,
-  Calendar,
-  Shield,
-  ArrowRight,
-  Eye,
-} from "lucide-react";
+  HiClipboardDocumentList,
+  HiMagnifyingGlass,
+  HiFunnel,
+  HiClock,
+  HiExclamationTriangle,
+  HiCheckCircle,
+  HiDocumentDuplicate,
+  HiUsers,
+  HiBookOpen,
+  HiCalendarDays,
+  HiShieldCheck,
+  HiArrowRight,
+  HiEye,
+} from "react-icons/hi2";
 import useTitleProposal from "../hooks/useTitleProposal";
 import { PROPOSAL_STATUS_CONFIG } from "../types/proposal.types";
 
 const STATUS_ICONS = {
-  submitted: Clock,
-  needs_revision: AlertTriangle,
-  approved: CheckCircle2,
-  draft: FileEdit,
+  submitted: HiClock,
+  needs_revision: HiExclamationTriangle,
+  approved: HiCheckCircle,
+  draft: HiDocumentDuplicate,
 };
 
 export const CoordinatorProposals = () => {
@@ -68,7 +68,7 @@ export const CoordinatorProposals = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={ClipboardList}
+        icon={HiClipboardDocumentList}
         title="Title Proposal Review"
         description="Review and evaluate research title proposals submitted by student groups."
       />
@@ -79,19 +79,19 @@ export const CoordinatorProposals = () => {
             label: "Awaiting Review",
             count: counts.submitted,
             color: "amber",
-            icon: Clock,
+            icon: HiClock,
           },
           {
             label: "Needs Revision",
             count: counts.needs_revision,
             color: "blue",
-            icon: AlertTriangle,
+            icon: HiExclamationTriangle,
           },
           {
             label: "Approved",
             count: counts.approved,
             color: "emerald",
-            icon: CheckCircle2,
+            icon: HiCheckCircle,
           },
         ].map((stat) => {
           const Icon = stat.icon;
@@ -125,13 +125,13 @@ export const CoordinatorProposals = () => {
         <div className="flex-1 w-full">
           <Input
             placeholder="Search by proposal title, group, course, or section..."
-            icon={Search}
+            icon={HiMagnifyingGlass}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+          <HiFunnel className="w-4 h-4 text-gray-400 shrink-0" />
           {filterTabs.map((tab) => (
             <button
               key={tab.id}
@@ -155,7 +155,7 @@ export const CoordinatorProposals = () => {
       ) : filteredProposals.length === 0 ? (
         <Card className="p-8">
           <EmptyState
-            icon={ClipboardList}
+            icon={HiClipboardDocumentList}
             title="No Proposals Found"
             description="No proposals match the current filter. Proposals will appear here once students submit them."
           />
@@ -189,7 +189,7 @@ export const CoordinatorProposals = () => {
                     label: p.status,
                     variant: "gray",
                   };
-                  const StatusIcon = STATUS_ICONS[p.status] ?? Clock;
+                  const StatusIcon = STATUS_ICONS[p.status] ?? HiClock;
                   const canReview = p.status === "submitted";
                   const dateToShow = p.lastSubmittedAt ?? p.submittedAt;
 
@@ -226,11 +226,11 @@ export const CoordinatorProposals = () => {
                       <td className="px-6 py-4 align-top">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                            <Users className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <HiUsers className="w-3.5 h-3.5 text-primary shrink-0" />
                             {p.groupName || "—"}
                           </div>
                           <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <BookOpen className="w-3 h-3 shrink-0" />
+                            <HiBookOpen className="w-3 h-3 shrink-0" />
                             {p.courseName || "—"}
                           </div>
                         </div>
@@ -260,7 +260,7 @@ export const CoordinatorProposals = () => {
                             className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-800 transition"
                             title="View Details"
                           >
-                            <Eye className="w-4 h-4" />
+                            <HiEye className="w-4 h-4" />
                           </Link>
                           {canReview ? (
                             <Button
@@ -270,7 +270,7 @@ export const CoordinatorProposals = () => {
                                 navigate(`/coordinator/proposals/${p.id}`)
                               }
                             >
-                              <Shield className="w-3.5 h-3.5 mr-1.5" />
+                              <HiShieldCheck className="w-3.5 h-3.5 mr-1.5" />
                               Review
                             </Button>
                           ) : (
@@ -278,7 +278,7 @@ export const CoordinatorProposals = () => {
                               to={`/coordinator/proposals/${p.id}`}
                               className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 hover:text-primary transition"
                             >
-                              View <ArrowRight className="w-3 h-3" />
+                              View <HiArrowRight className="w-3 h-3" />
                             </Link>
                           )}
                         </div>

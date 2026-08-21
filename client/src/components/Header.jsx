@@ -5,17 +5,16 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Avatar } from "./ui/Avatar";
 import {
-  Menu,
-  Search,
-  Moon,
-  Sun,
-  Bell,
-  LogOut,
-  User,
-  Lock,
-  ChevronDown,
-  Sparkles,
-} from "lucide-react";
+  HiBars3,
+  HiMagnifyingGlass,
+  HiMoon,
+  HiSun,
+  HiBell,
+  HiArrowRightOnRectangle,
+  HiUserCircle,
+  HiLockClosed,
+  HiChevronDown,
+} from "react-icons/hi2";
 
 export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const { userProfile, currentUser, logout } = useAuth();
@@ -92,7 +91,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
           onClick={onOpenMobileMenu}
           className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition"
         >
-          <Menu className="w-5 h-5" />
+          <HiBars3 className="w-6 h-6" />
         </button>
 
         <h1 className="text-base font-semibold text-gray-900 dark:text-white tracking-tight">
@@ -103,7 +102,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
       {/* CENTER SECTION — Centered Search Bar */}
       <div className="hidden sm:flex flex-1 max-w-sm mx-6">
         <div className="relative w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+          <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
           <input
             type="text"
             placeholder="Search..."
@@ -121,15 +120,15 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
           title={theme === "dark" ? "Light Mode" : "Dark Mode"}
         >
           {theme === "dark" ? (
-            <Sun className="w-5 h-5" />
+            <HiSun className="w-5 h-5 text-amber-400" />
           ) : (
-            <Moon className="w-5 h-5" />
+            <HiMoon className="w-5 h-5" />
           )}
         </button>
 
         {/* 2. Notification Icon */}
         <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 relative transition">
-          <Bell className="w-5 h-5" />
+          <HiBell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
         </button>
 
@@ -147,7 +146,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
             <span className="hidden md:inline-block text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px] text-left">
               {displayName}
             </span>
-            <ChevronDown className={`hidden md:block w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+            <HiChevronDown className={`hidden md:block w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Profile Dropdown Menu */}
@@ -182,7 +181,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
                 >
-                  <User className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+                  <HiUserCircle className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
                   <span>Profile Settings</span>
                 </button>
 
@@ -193,7 +192,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
                 >
-                  <Lock className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+                  <HiLockClosed className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
                   <span>Password & Security</span>
                 </button>
               </div>
@@ -205,7 +204,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                 onClick={handleLogout}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition text-left"
               >
-                <LogOut className="w-4 h-4" />
+                <HiArrowRightOnRectangle className="w-4 h-4" />
                 <span>Log out</span>
               </button>
             </div>

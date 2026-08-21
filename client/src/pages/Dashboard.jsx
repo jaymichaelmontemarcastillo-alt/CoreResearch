@@ -6,23 +6,23 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { StatCard } from "../components/ui/StatCard";
 import {
-  FileText,
-  FolderGit2,
-  MessageSquare,
-  Calendar,
-  Award,
-  BookOpen,
-  Users,
-  ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  PlusCircle,
-  Shield,
-  GraduationCap,
-  UserCheck,
-  Activity,
-  ArrowRight,
-} from "lucide-react";
+  HiDocumentText,
+  HiFolder,
+  HiChatBubbleLeftRight,
+  HiCalendarDays,
+  HiTrophy,
+  HiBookOpen,
+  HiUsers,
+  HiArrowUpRight,
+  HiCheckCircle,
+  HiClock,
+  HiPlusCircle,
+  HiShieldCheck,
+  HiAcademicCap,
+  HiCheckBadge,
+  HiBolt,
+  HiArrowRight,
+} from "react-icons/hi2";
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { courseService } from "../services/course.service";
@@ -113,21 +113,21 @@ export const Dashboard = () => {
           {role === "student" && (
             <Link to="/proposals/new">
               <Button variant="primary" size="md">
-                <PlusCircle className="w-4 h-4 mr-2" /> Submit Proposal
+                <HiPlusCircle className="w-4 h-4 mr-2" /> Submit Proposal
               </Button>
             </Link>
           )}
           {role === "admin" && (
             <Link to="/admin/users">
               <Button variant="primary" size="md">
-                <Users className="w-4 h-4 mr-2" /> Manage Users
+                <HiUsers className="w-4 h-4 mr-2" /> Manage Users
               </Button>
             </Link>
           )}
           {(role === "adviser" || role === "panelist") && (
             <Link to="/reviews">
               <Button variant="primary" size="md">
-                <MessageSquare className="w-4 h-4 mr-2" /> View Feedback Threads
+                <HiChatBubbleLeftRight className="w-4 h-4 mr-2" /> View Feedback Threads
               </Button>
             </Link>
           )}
@@ -153,7 +153,7 @@ export const Dashboard = () => {
                 <Card className="p-5 border-blue-100 dark:border-blue-800 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
-                      <GraduationCap className="w-6 h-6" />
+                      <HiAcademicCap className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white">Academic Profile</h3>
@@ -210,7 +210,7 @@ export const Dashboard = () => {
                 <Card hover className="flex flex-col justify-between space-y-4">
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
-                      <FileText className="w-5 h-5" />
+                      <HiDocumentText className="w-5 h-5" />
                     </div>
                     <Badge variant="blue">Proposal Stage</Badge>
                   </div>
@@ -226,14 +226,14 @@ export const Dashboard = () => {
                     to="/proposals"
                     className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                   >
-                    View Proposals <ArrowUpRight className="w-3.5 h-3.5" />
+                    View Proposals <HiArrowUpRight className="w-3.5 h-3.5" />
                   </Link>
                 </Card>
 
                 <Card hover className="flex flex-col justify-between space-y-4">
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                      <FolderGit2 className="w-5 h-5" />
+                      <HiFolder className="w-5 h-5" />
                     </div>
                     <Badge variant="emerald">Versioning</Badge>
                   </div>
@@ -249,7 +249,7 @@ export const Dashboard = () => {
                     to="/manuscripts"
                     className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
                   >
-                    Open Manuscripts <ArrowUpRight className="w-3.5 h-3.5" />
+                    Open Manuscripts <HiArrowUpRight className="w-3.5 h-3.5" />
                   </Link>
                 </Card>
               </div>
@@ -283,7 +283,7 @@ export const Dashboard = () => {
               <Card hover className="flex flex-col justify-between space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                    <Users className="w-5 h-5" />
+                    <HiUsers className="w-5 h-5" />
                   </div>
                   <Badge variant="amber">Access Control</Badge>
                 </div>
@@ -299,14 +299,14 @@ export const Dashboard = () => {
                   to="/admin/users"
                   className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  Manage Users <ArrowUpRight className="w-3.5 h-3.5" />
+                  Manage Users <HiArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </Card>
 
               <Card hover className="flex flex-col justify-between space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                    <BookOpen className="w-5 h-5" />
+                    <HiBookOpen className="w-5 h-5" />
                   </div>
                   <Badge variant="emerald">Knowledge Base</Badge>
                 </div>
@@ -322,7 +322,7 @@ export const Dashboard = () => {
                   to="/repository"
                   className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  View Repository <ArrowUpRight className="w-3.5 h-3.5" />
+                  View Repository <HiArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </Card>
             </div>
@@ -334,7 +334,7 @@ export const Dashboard = () => {
               <Card hover className="flex flex-col justify-between space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
-                    <FileText className="w-5 h-5" />
+                    <HiDocumentText className="w-5 h-5" />
                   </div>
                   <Badge variant="blue">Pending Action</Badge>
                 </div>
@@ -350,14 +350,14 @@ export const Dashboard = () => {
                   to="/proposals"
                   className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  View Proposals <ArrowUpRight className="w-3.5 h-3.5" />
+                  View Proposals <HiArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </Card>
 
               <Card hover className="flex flex-col justify-between space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5" />
+                    <HiChatBubbleLeftRight className="w-5 h-5" />
                   </div>
                   <Badge variant="purple">Collaboration</Badge>
                 </div>
@@ -373,7 +373,7 @@ export const Dashboard = () => {
                   to="/reviews"
                   className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  View Reviews <ArrowUpRight className="w-3.5 h-3.5" />
+                  View Reviews <HiArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </Card>
             </div>
@@ -385,7 +385,7 @@ export const Dashboard = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-primary" /> RECENT ACTIVITY
+                <HiBolt className="w-4 h-4 text-primary" /> RECENT ACTIVITY
               </h3>
               <Link to="/reviews" className="text-xs text-primary font-semibold hover:underline">
                 View all
@@ -439,7 +439,7 @@ export const Dashboard = () => {
 
           <div className="pt-4 border-t border-gray-200 dark:border-slate-800 text-center">
             <Link to="/repository" className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-blue-400 flex items-center justify-center gap-1">
-              Browse University Research Repository <ArrowRight className="w-3.5 h-3.5" />
+              Browse University Research Repository <HiArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </Card>
@@ -451,39 +451,39 @@ export const Dashboard = () => {
 /* Student Metrics */
 const StudentDashboardMetrics = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={FileText} label="Proposal Status" value="Approved" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-    <StatCard icon={FolderGit2} label="Current Manuscript" value="Version v1.2" color="blue" />
-    <StatCard icon={MessageSquare} label="Adviser Comments" value="3 Pending" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-    <StatCard icon={Calendar} label="Defense Schedule" value="Aug 14, 2026" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
+    <StatCard icon={HiDocumentText} label="Proposal Status" value="Approved" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
+    <StatCard icon={HiFolder} label="Current Manuscript" value="Version v1.2" color="blue" />
+    <StatCard icon={HiChatBubbleLeftRight} label="Adviser Comments" value="3 Pending" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
+    <StatCard icon={HiCalendarDays} label="Defense Schedule" value="Aug 14, 2026" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
   </div>
 );
 
 /* Adviser Metrics */
 const AdviserDashboardMetrics = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={UserCheck} label="Assigned Teams" value="6 Research Groups" color="emerald" />
-    <StatCard icon={Clock} label="Pending Reviews" value="4 Manuscripts" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-    <StatCard icon={FileText} label="Title Proposals" value="2 Pending" color="blue" valueColor="text-primary dark:text-blue-400" />
-    <StatCard icon={Award} label="Upcoming Defenses" value="3 This Month" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
+    <StatCard icon={HiCheckBadge} label="Assigned Teams" value="6 Research Groups" color="emerald" />
+    <StatCard icon={HiClock} label="Pending Reviews" value="4 Manuscripts" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
+    <StatCard icon={HiDocumentText} label="Title Proposals" value="2 Pending" color="blue" valueColor="text-primary dark:text-blue-400" />
+    <StatCard icon={HiTrophy} label="Upcoming Defenses" value="3 This Month" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
   </div>
 );
 
 /* Panelist Metrics */
 const PanelistDashboardMetrics = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={Calendar} label="Assigned Defenses" value="5 Panels" color="purple" />
-    <StatCard icon={Award} label="Pending Rubrics" value="2 Forms" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-    <StatCard icon={CheckCircle2} label="Evaluations Done" value="8 Completed" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-    <StatCard icon={FolderGit2} label="Pre-Defense Papers" value="3 Available" color="blue" valueColor="text-primary dark:text-blue-400" />
+    <StatCard icon={HiCalendarDays} label="Assigned Defenses" value="5 Panels" color="purple" />
+    <StatCard icon={HiTrophy} label="Pending Rubrics" value="2 Forms" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
+    <StatCard icon={HiCheckCircle} label="Evaluations Done" value="8 Completed" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
+    <StatCard icon={HiFolder} label="Pre-Defense Papers" value="3 Available" color="blue" valueColor="text-primary dark:text-blue-400" />
   </div>
 );
 
 /* Admin Metrics */
 const AdminDashboardMetrics = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={Users} label="Total Users" value="128 Registered" color="amber" />
-    <StatCard icon={FileText} label="Active Proposals" value="42 Active" color="blue" valueColor="text-primary dark:text-blue-400" />
-    <StatCard icon={BookOpen} label="Published Papers" value="19 Repository" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-    <StatCard icon={Shield} label="System Health" value="100% Operational" color="blue" valueColor="text-emerald-600 dark:text-emerald-400" />
+    <StatCard icon={HiUsers} label="Total Users" value="128 Registered" color="amber" />
+    <StatCard icon={HiDocumentText} label="Active Proposals" value="42 Active" color="blue" valueColor="text-primary dark:text-blue-400" />
+    <StatCard icon={HiBookOpen} label="Published Papers" value="19 Repository" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
+    <StatCard icon={HiShieldCheck} label="System Health" value="100% Operational" color="blue" valueColor="text-emerald-600 dark:text-emerald-400" />
   </div>
 );
