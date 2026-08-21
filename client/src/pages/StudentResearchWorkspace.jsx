@@ -124,7 +124,7 @@ export const StudentResearchWorkspace = () => {
       unsubscribeTasks();
       unsubscribeFb();
     };
-  }, [currentUser, queryWorkspaceId, isStudent, userProfile]);
+  }, [currentUser?.uid, queryWorkspaceId, isStudent, userProfile?.groupId]);
 
   // 2. Open / Provision Manuscript Document via Adapter
   const handleOpenManuscript = async () => {

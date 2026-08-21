@@ -64,10 +64,10 @@ export const AdviserAdvisees = () => {
   };
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser?.uid) {
       fetchAdviseeData();
     }
-  }, [currentUser, role]);
+  }, [currentUser?.uid, role]);
 
   const handleOpenManuscript = async (ws) => {
     try {

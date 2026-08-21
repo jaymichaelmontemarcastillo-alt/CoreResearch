@@ -61,30 +61,39 @@ export const Dashboard = () => {
   const [academicInfo, setAcademicInfo] = useState(null);
 
   useEffect(() => {
-    if (role === "student" && userProfile?.courseId) {
+    const studentUid = userProfile?.uid || currentUser?.uid;
+    const courseId = userProfile?.courseId;
+    const sectionId = userProfile?.sectionId;
+
+    if (role === "student" && (courseId || studentUid)) {
+      let isMounted = true;
       const fetchAcademicInfo = async () => {
         try {
-          const courses = await courseService.getAllCourses();
-          const course = courses.find((c) => c.id === userProfile.courseId);
-          let sectionName = userProfile.sectionId;
-          
-          if (course && userProfile.sectionId) {
+          const [courses, group] = await Promise.all([
+            courseId ? courseService.getAllCourses() : Promise.resolve([]),
+            studentUid ? groupService.getGroupByStudentId(studentUid) : Promise.resolve(null),
+          ]);
+
+          const course = courses.find((c) => c.id === courseId);
+          let sectionName = sectionId || "";
+
+          if (course && sectionId) {
             const sections = await sectionService.getSectionsByCourseId(course.id);
-            const sec = sections.find((s) => s.id === userProfile.sectionId);
+            const sec = sections.find((s) => s.id === sectionId);
             if (sec) sectionName = sec.name;
           }
 
-          // Fetch Group Info
-          const group = await groupService.getGroupByStudentId(userProfile.uid);
-          
-          setAcademicInfo({ course, sectionName, group });
+          if (isMounted) {
+            setAcademicInfo({ course, sectionName, group });
+          }
         } catch (error) {
           console.error("Failed to load academic info", error);
         }
       };
       fetchAcademicInfo();
+      return () => { isMounted = false; };
     }
-  }, [role, userProfile]);
+  }, [role, userProfile?.uid, userProfile?.courseId, userProfile?.sectionId, currentUser?.uid]);
 
   return (
     <div className="space-y-6">
