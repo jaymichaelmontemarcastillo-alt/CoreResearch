@@ -14,6 +14,8 @@ import { Course, CreateCourseInput, UpdateCourseInput } from '../types/course.ty
 
 const COLLECTION_NAME = 'courses';
 
+let coursesCache: Course[] | null = null;
+
 export const courseService = {
   /**
    * Create a new course.
@@ -38,6 +40,7 @@ export const courseService = {
     };
     
     await setDoc(courseRef, newCourse);
+    coursesCache = null; // Invalidate cache
     return newCourse;
   },
 
@@ -45,6 +48,10 @@ export const courseService = {
    * Fetch a single course by ID.
    */
   async getCourseById(id: string): Promise<Course | null> {
+    if (coursesCache) {
+      const found = coursesCache.find(c => c.id === id);
+      if (found) return found;
+    }
     const courseRef = doc(db, COLLECTION_NAME, id);
     const docSnap = await getDoc(courseRef);
     if (!docSnap.exists()) return null;
@@ -54,10 +61,14 @@ export const courseService = {
   /**
    * Fetch all courses.
    */
-  async getAllCourses(): Promise<Course[]> {
+  async getAllCourses(forceRefresh = false): Promise<Course[]> {
+    if (coursesCache && !forceRefresh) {
+      return coursesCache;
+    }
     const q = query(collection(db, COLLECTION_NAME), orderBy('name', 'asc'));
     const querySnap = await getDocs(q);
-    return querySnap.docs.map((docSnap) => docSnap.data() as Course);
+    coursesCache = querySnap.docs.map((docSnap) => docSnap.data() as Course);
+    return coursesCache;
   },
 
   /**

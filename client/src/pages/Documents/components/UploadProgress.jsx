@@ -1,7 +1,7 @@
 // src/pages/Documents/components/UploadProgress.jsx
 import React from 'react';
 import { UPLOAD_STAGES } from '../constants/documentConstants';
-import { CheckCircle2, AlertCircle, Loader2, FileCode, FileText } from 'lucide-react';
+import { HiCheckCircle, HiExclamationCircle, HiArrowPath, HiDocumentText, HiDocument } from 'react-icons/hi2';
 import { Button } from '../../../components/ui/Button';
 
 export const UploadProgress = ({
@@ -23,7 +23,7 @@ export const UploadProgress = ({
         <div className={`w-10 h-10 rounded-md flex items-center justify-center shrink-0 ${
           isDocx ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400' : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
         }`}>
-          {isDocx ? <FileCode className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+          {isDocx ? <HiDocument className="w-5 h-5" /> : <HiDocumentText className="w-5 h-5" />}
         </div>
         <div className="min-w-0 flex-1">
           <h5 className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">
@@ -40,7 +40,7 @@ export const UploadProgress = ({
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              <HiArrowPath className="w-3.5 h-3.5 animate-spin text-blue-600" />
               Uploading document...
             </span>
             <span className="font-bold text-blue-600 dark:text-blue-400">{progress}%</span>
@@ -59,7 +59,7 @@ export const UploadProgress = ({
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+              <HiArrowPath className="w-3.5 h-3.5 animate-spin text-purple-600" />
               {isDocx ? 'Converting Word content for Document Editor...' : 'Extracting PDF document data...'}
             </span>
             <span className="font-bold text-purple-600">Processing</span>
@@ -75,7 +75,7 @@ export const UploadProgress = ({
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+              <HiArrowPath className="w-3.5 h-3.5 animate-spin text-indigo-600" />
               Creating CoreResearch document record...
             </span>
             <span className="font-bold text-indigo-600">Finalizing</span>
@@ -90,7 +90,7 @@ export const UploadProgress = ({
       {stage === UPLOAD_STAGES.COMPLETED && (
         <div className="text-center py-3 space-y-3">
           <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
-            <CheckCircle2 className="w-6 h-6" />
+            <HiCheckCircle className="w-6 h-6" />
           </div>
           <div>
             <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
@@ -122,7 +122,7 @@ export const UploadProgress = ({
       {stage === UPLOAD_STAGES.ERROR && (
         <div className="text-center py-3 space-y-3">
           <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto shadow-xs">
-            <AlertCircle className="w-6 h-6" />
+            <HiExclamationCircle className="w-6 h-6" />
           </div>
           <div>
             <h4 className="text-sm font-bold text-red-600 dark:text-red-400">

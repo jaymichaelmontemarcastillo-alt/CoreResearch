@@ -9,8 +9,10 @@
 export type ProposalStatus =
   | 'draft'
   | 'submitted'
+  | 'under_review'
   | 'needs_revision'
-  | 'approved';
+  | 'approved'
+  | 'rejected';
 
 // ─── Attachment ───────────────────────────────────────────────────────────────
 
@@ -30,7 +32,8 @@ export interface TitleProposal {
 
   // ── Content (required fields from the proposal form) ──
   title: string;
-  researchCategory?: string;      // now optional — removed from form
+  description?: string;           // overview / purpose / scope
+  researchCategory?: string;      // optional ref/category
   categoryId?: string;            // optional ref to research_categories/{id}
   rationale: string;              // Rationale / Background
   objectives: string;             // Specific Research Objectives
@@ -40,7 +43,9 @@ export interface TitleProposal {
   // ── Supporting documents ──
   attachments?: ProposalAttachment[];  // uploaded files (PDF, DOCX, PPT)
 
-  // ── Ownership — belongs to the RESEARCH GROUP ──
+  // ── Ownership — belongs to student & research group ──
+  studentId?: string;
+  studentName?: string;
   groupId: string;                // research_groups/{id}
   groupName: string;              // denormalized for display (e.g. "Group 01")
 
@@ -68,6 +73,7 @@ export interface TitleProposal {
   coordinatorId?: string;         // uid of the reviewing coordinator
   coordinatorName?: string;
   coordinatorFeedback?: string;   // written feedback for the group
+  adviserComment?: string;
   reviewedAt?: string;            // when coordinator submitted their evaluation
 
   // ── Revision tracking ──
@@ -84,6 +90,7 @@ export interface TitleProposal {
  */
 export interface CreateProposalInput {
   title: string;
+  description?: string;
   researchCategory?: string;
   categoryId?: string;
   rationale: string;
@@ -120,7 +127,7 @@ export interface CoordinatorEvaluationInput {
   coordinatorId: string;
   coordinatorName: string;
   coordinatorFeedback: string;
-  decision: 'needs_revision' | 'approved';
+  decision: 'needs_revision' | 'approved' | 'rejected' | 'under_review';
 }
 
 // ─── Status Display Helpers ───────────────────────────────────────────────────
@@ -142,14 +149,24 @@ export const PROPOSAL_STATUS_CONFIG: Record<ProposalStatus, ProposalStatusConfig
     variant: 'amber',
     description: 'Awaiting coordinator review.',
   },
+  under_review: {
+    label: 'Under Review',
+    variant: 'blue',
+    description: 'Currently undergoing committee evaluation.',
+  },
   needs_revision: {
     label: 'Needs Revision',
-    variant: 'blue',
+    variant: 'amber',
     description: 'The coordinator has requested changes.',
   },
   approved: {
     label: 'Approved',
     variant: 'emerald',
     description: 'Approved. Ready for Chapter 1–3 manuscript development.',
+  },
+  rejected: {
+    label: 'Rejected',
+    variant: 'rose',
+    description: 'The proposal was not approved by the committee.',
   },
 };

@@ -10,13 +10,13 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Toast } from "../components/ui/Toast";
 import {
-  Calendar,
-  Clock,
-  MapPin,
-  Users,
-  PlusCircle,
-  GraduationCap,
-} from "lucide-react";
+  HiCalendarDays,
+  HiClock,
+  HiMapPin,
+  HiUsers,
+  HiPlusCircle,
+  HiAcademicCap,
+} from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import { scheduleService } from "../services/schedule.service";
 import { userService } from "../services/user.service";
@@ -43,19 +43,8 @@ export const Schedules = () => {
   const fetchSchedules = async () => {
     setLoading(true);
     try {
-      // Fetch directly from Firestore instead of Express API
-      const list = await scheduleService.getAllSchedules();
-      
-      // Sort by date/time client-side just to be safe
-      const sorted = list.sort((a, b) => {
-        return new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`);
-      });
-      setSchedules(sorted);
-
-      if (role === "admin" || role === "research_coordinator") {
-        const panRes = await userService.getUsersByRole("panelist");
-        setPanelists(panRes || []);
-      }
+      const data = await scheduleService.getAllSchedules();
+      setSchedules(data);
     } catch (err) {
       console.error("[Schedules] fetch error:", err);
     } finally {
@@ -63,24 +52,34 @@ export const Schedules = () => {
     }
   };
 
+  const fetchPanelists = async () => {
+    try {
+      const allUsers = await userService.getAllUsers();
+      const eligible = allUsers.filter((u) => u.role === "panelist" || u.role === "adviser");
+      setPanelists(eligible);
+    } catch (err) {
+      console.error("[Schedules] fetch panelists error:", err);
+    }
+  };
+
   useEffect(() => {
     fetchSchedules();
+    if (role === "admin") {
+      fetchPanelists();
+    }
   }, [role]);
 
   const handleScheduleSubmit = async (e) => {
     e.preventDefault();
-    if (!projectTitle || !date || !startTime) return alert("Please complete required schedule fields.");
+    if (!projectTitle || !studentName) return alert("Please fill all required fields.");
 
     setSubmitting(true);
     try {
-      // Resolve names for the selected IDs
-      const panelistNames = selectedPanelistIds.map(id => {
-        const match = panelists.find(p => p.uid === id);
-        return match ? match.fullName : "Panelist";
-      });
+      const panelistNames = panelists
+        .filter((p) => selectedPanelistIds.includes(p.uid))
+        .map((p) => p.fullName);
 
       await scheduleService.createSchedule({
-        projectId: `proj-${Date.now()}`, // placeholder if not linked
         projectTitle,
         studentName,
         defenseType,
@@ -90,37 +89,40 @@ export const Schedules = () => {
         venue,
         panelistIds: selectedPanelistIds,
         panelistNames,
+        status: "scheduled",
       });
 
-      setToast("Defense presentation scheduled successfully!");
+      setToast("Defense schedule published successfully!");
       setModalOpen(false);
       setProjectTitle("");
       setStudentName("");
       setSelectedPanelistIds([]);
       await fetchSchedules();
     } catch (err) {
-      alert(`Schedule creation error: ${err.message}`);
+      alert(`Scheduling failed: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const togglePanelistSelection = (pid) => {
-    setSelectedPanelistIds((prev) =>
-      prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
-    );
+  const togglePanelist = (uid) => {
+    if (selectedPanelistIds.includes(uid)) {
+      setSelectedPanelistIds(selectedPanelistIds.filter((id) => id !== uid));
+    } else {
+      setSelectedPanelistIds([...selectedPanelistIds, uid]);
+    }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Calendar}
-        title="Defense Presentation Calendar & Schedules"
-        description="Schedule research defenses, assign panel evaluation committees, and view presentation venues."
+        icon={HiCalendarDays}
+        title="Oral Defense Schedules"
+        description="Public schedule for proposal defenses, final oral presentations, panel venues, and committee assignments."
         actions={
-          (role === "admin" || role === "research_coordinator") && (
+          role === "admin" && (
             <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
-              <PlusCircle className="w-4 h-4 mr-2" /> Schedule Defense Presentation
+              <HiPlusCircle className="w-4 h-4 mr-2" /> Schedule Defense
             </Button>
           )
         }
@@ -137,7 +139,7 @@ export const Schedules = () => {
       ) : schedules.length === 0 ? (
         <Card className="p-8">
           <EmptyState
-            icon={Calendar}
+            icon={HiCalendarDays}
             title="No Defenses Scheduled"
             description="Upcoming proposal and final defense presentations will be displayed on this calendar."
           />
@@ -158,17 +160,17 @@ export const Schedules = () => {
 
                 <div className="space-y-2 text-xs text-gray-600 dark:text-gray-300">
                   <div className="flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-primary shrink-0" />
+                    <HiAcademicCap className="w-4 h-4 text-primary shrink-0" />
                     <span>Candidate: <strong className="text-gray-800 dark:text-gray-200">{sch.studentName}</strong></span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-purple-500 shrink-0" />
+                    <HiClock className="w-4 h-4 text-purple-500 shrink-0" />
                     <span>{sch.date} ({sch.startTime} - {sch.endTime})</span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+                    <HiMapPin className="w-4 h-4 text-amber-500 shrink-0" />
                     <span className="truncate">{sch.venue}</span>
                   </div>
                 </div>
@@ -176,7 +178,7 @@ export const Schedules = () => {
                 {sch.panelistNames && sch.panelistNames.length > 0 && (
                   <div className="p-3 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 space-y-1">
                     <div className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5 text-purple-500" /> Defense Panel Committee:
+                      <HiUsers className="w-3.5 h-3.5 text-purple-500" /> Defense Panel Committee:
                     </div>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {sch.panelistNames.map((pname, idx) => (
@@ -201,7 +203,7 @@ export const Schedules = () => {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title="Schedule Defense Event"
-        icon={Calendar}
+        icon={HiCalendarDays}
       >
         <form onSubmit={handleScheduleSubmit} className="space-y-4">
           <Input

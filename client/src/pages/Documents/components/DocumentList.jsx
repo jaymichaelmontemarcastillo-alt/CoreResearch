@@ -1,8 +1,7 @@
-// src/pages/Documents/components/DocumentList.jsx
 import React from 'react';
 import { DocumentCardMenu } from './DocumentCardMenu';
 import { formatGoogleDocsDate, getDocumentTypeInfo } from '../utils/documentHelpers';
-import { Star } from 'lucide-react';
+import { HiStar } from 'react-icons/hi2';
 
 export const DocumentList = ({
   documents = [],
@@ -91,7 +90,7 @@ export const DocumentList = ({
                     }`}
                     title={doc.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                   >
-                    <Star className={`w-4 h-4 ${doc.isFavorite ? 'fill-amber-500' : ''}`} />
+                    <HiStar className="w-4 h-4" />
                   </button>
                 </td>
 

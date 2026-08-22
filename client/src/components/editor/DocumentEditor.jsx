@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo } from 'react';
-import { useEditor, EditorContent, Extension } from '@tiptap/react';
+import React, { useEffect, useMemo, useRef, useCallback } from 'react';
+import { useEditor, EditorContent, Extension, Mark, mergeAttributes } from '@tiptap/react';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import { Collaboration } from '@tiptap/extension-collaboration';
 import { CollaborationCursor } from '@tiptap/extension-collaboration-cursor';
@@ -17,6 +19,154 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import * as Y from 'yjs';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
+
+// Custom CommentMark Extension for Google Docs style anchored manuscript comments
+export const CommentMark = Mark.create({
+  name: 'comment',
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+    };
+  },
+  addAttributes() {
+    return {
+      commentId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-comment-id'),
+        renderHTML: (attributes) => {
+          if (!attributes.commentId) return {};
+          return {
+            'data-comment-id': attributes.commentId,
+            class: 'coreresearch-comment-highlight',
+          };
+        },
+      },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-comment-id]',
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { class: 'coreresearch-comment-highlight' }), 0];
+  },
+});
+
+export const activeCommentsPluginKey = new PluginKey('activeCommentsPlugin');
+
+function buildCommentDecorations(doc, comments = []) {
+  if (!doc || !comments || comments.length === 0) {
+    return DecorationSet.empty;
+  }
+
+  const activeComments = comments.filter(
+    (c) => !c.resolved && c.selectedText && c.selectedText.trim().length > 0
+  );
+
+  if (activeComments.length === 0) {
+    return DecorationSet.empty;
+  }
+
+  const decorations = [];
+  const fullDocText = doc.textBetween(0, doc.content.size, ' ');
+
+  activeComments.forEach((comment) => {
+    const textToFind = comment.selectedText.trim();
+    if (!textToFind) return;
+
+    let foundRange = null;
+
+    // 1. Search text nodes
+    doc.descendants((node, pos) => {
+      if (foundRange !== null) return false;
+      if (node.isText && node.text) {
+        const idx = node.text.indexOf(textToFind);
+        if (idx !== -1) {
+          foundRange = { from: pos + idx, to: pos + idx + textToFind.length };
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // 2. Fallback: Search cross-node text
+    if (!foundRange) {
+      const matchIdx = fullDocText.indexOf(textToFind);
+      if (matchIdx !== -1) {
+        let currentOffset = 0;
+        let startPos = null;
+        let endPos = null;
+        doc.descendants((node, pos) => {
+          if (node.isText && node.text) {
+            const nodeEnd = currentOffset + node.text.length;
+            if (startPos === null && matchIdx >= currentOffset && matchIdx < nodeEnd) {
+              startPos = pos + (matchIdx - currentOffset);
+            }
+            const matchEnd = matchIdx + textToFind.length;
+            if (endPos === null && matchEnd > currentOffset && matchEnd <= nodeEnd) {
+              endPos = pos + (matchEnd - currentOffset);
+            }
+            currentOffset = nodeEnd + 1;
+          }
+          return startPos === null || endPos === null;
+        });
+
+        if (startPos !== null && endPos !== null && startPos < endPos) {
+          foundRange = { from: startPos, to: endPos };
+        }
+      }
+    }
+
+    if (foundRange && foundRange.from < foundRange.to && foundRange.to <= doc.content.size) {
+      decorations.push(
+        Decoration.inline(foundRange.from, foundRange.to, {
+          class: 'coreresearch-comment-highlight',
+          'data-comment-id': comment.id,
+          style: 'cursor: pointer;',
+        })
+      );
+    }
+  });
+
+  try {
+    return DecorationSet.create(doc, decorations);
+  } catch (e) {
+    console.warn('[ActiveCommentsPlugin] DecorationSet creation warning:', e);
+    return DecorationSet.empty;
+  }
+}
+
+export const createActiveCommentsExtension = (getComments) => {
+  return Extension.create({
+    name: 'activeComments',
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: activeCommentsPluginKey,
+          state: {
+            init(_, { doc }) {
+              return buildCommentDecorations(doc, getComments());
+            },
+            apply(tr, oldDecos, oldState, newState) {
+              if (tr.docChanged || tr.getMeta(activeCommentsPluginKey)) {
+                return buildCommentDecorations(newState.doc, getComments());
+              }
+              return oldDecos.map(tr.mapping, tr.doc);
+            },
+          },
+          props: {
+            decorations(state) {
+              return this.getState(state);
+            },
+          },
+        }),
+      ];
+    },
+  });
+};
 
 // Custom Tiptap 2 Font Family Extension using TextStyle mark
 export const FontFamily = Extension.create({
@@ -164,6 +314,45 @@ export const ParagraphSpacing = Extension.create({
   },
 });
 
+// Custom ParagraphIndent Extension (textIndent & marginLeft)
+export const ParagraphIndent = Extension.create({
+  name: 'paragraphIndent',
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          textIndent: {
+            default: null,
+            parseHTML: (element) => element.style.textIndent || null,
+            renderHTML: (attributes) => {
+              if (!attributes.textIndent) return {};
+              return {
+                style: `text-indent: ${attributes.textIndent}`,
+              };
+            },
+          },
+          marginLeft: {
+            default: null,
+            parseHTML: (element) => element.style.marginLeft || null,
+            renderHTML: (attributes) => {
+              if (!attributes.marginLeft) return {};
+              return {
+                style: `margin-left: ${attributes.marginLeft}`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
 // Custom TableCell with background shading & border color support
 export const CustomTableCell = TableCell.extend({
   addAttributes() {
@@ -258,14 +447,23 @@ export const DocumentEditor = ({
   pageSettings = DEFAULT_PAGE_SETTINGS,
   initialContent = null,
   sourceType = 'native',
+  comments = [],
   onEditorReady,
   onContentChange,
+  onCommentSelect,
 }) => {
+  const commentsRef = useRef(comments);
+  commentsRef.current = comments;
+
   const effectiveUser = useMemo(() => ({
     name: userProfile?.fullName || userProfile?.first_name || 'Researcher',
     id: userProfile?.uid || 'user-1',
     color: getUserColor(userProfile?.uid || 'user-1'),
   }), [userProfile]);
+
+  const activeCommentsExt = useMemo(() => {
+    return createActiveCommentsExtension(() => commentsRef.current);
+  }, []);
 
   const extensions = useMemo(() => {
     const list = [
@@ -280,8 +478,10 @@ export const DocumentEditor = ({
       FontSize,
       LineHeight,
       ParagraphSpacing,
+      ParagraphIndent,
       Color,
       Highlight.configure({ multicolor: true }),
+      activeCommentsExt,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       CustomImage.configure({ inline: true, allowBase64: true }),
       Table.configure({ resizable: true }),
@@ -312,7 +512,7 @@ export const DocumentEditor = ({
     }
 
     return list;
-  }, [ydoc, provider, effectiveUser]);
+  }, [ydoc, provider, effectiveUser, activeCommentsExt]);
 
   const editor = useEditor({
     extensions,
@@ -328,6 +528,43 @@ export const DocumentEditor = ({
     },
   }, [documentId, extensions]);
 
+  // Update decorations when comments change
+  useEffect(() => {
+    commentsRef.current = comments;
+    if (editor && !editor.isDestroyed && editor.view) {
+      try {
+        const { state, dispatch } = editor.view;
+        const tr = state.tr.setMeta(activeCommentsPluginKey, { comments });
+        dispatch(tr);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [editor, comments]);
+
+  // Detect click on commented text highlight to focus comment in sidebar
+  useEffect(() => {
+    if (!editor || !editor.view?.dom) return;
+
+    const handleEditorClick = (e) => {
+      const highlightElem = e.target.closest('[data-comment-id]');
+      if (highlightElem) {
+        const commentId = highlightElem.getAttribute('data-comment-id');
+        if (commentId && onCommentSelect) {
+          onCommentSelect(commentId);
+        }
+      }
+    };
+
+    const dom = editor.view.dom;
+    dom.addEventListener('click', handleEditorClick);
+    return () => {
+      dom.removeEventListener('click', handleEditorClick);
+    };
+  }, [editor, onCommentSelect]);
+
+  const initializedContentRef = useRef(false);
+
   useEffect(() => {
     if (!editor) return;
 
@@ -336,13 +573,17 @@ export const DocumentEditor = ({
     }
 
     try {
-      if (ydoc) {
+      if (initialContent && !initializedContentRef.current) {
+        editor.commands.setContent(initialContent, false);
+        initializedContentRef.current = true;
+      } else if (ydoc) {
         const fragment = ydoc.getXmlFragment('default');
         const isFragmentEmpty = fragment.length === 0;
 
         if (initialContent && (isFragmentEmpty || editor.isEmpty)) {
-          editor.commands.setContent(initialContent);
-        } else if (isFragmentEmpty && editor.isEmpty && sourceType === 'native' && !initialContent) {
+          editor.commands.setContent(initialContent, false);
+          initializedContentRef.current = true;
+        } else if (isFragmentEmpty && editor.isEmpty && sourceType === 'native' && !initialContent && !initializedContentRef.current) {
           editor.commands.setContent(`
             <h1>Research Manuscript Title</h1>
             <p>Welcome to the CoreResearch collaborative manuscript editor. Start drafting your research proposal or manuscript chapters here...</p>
@@ -350,7 +591,27 @@ export const DocumentEditor = ({
             <p>State your research rationale, problem formulation, and objectives.</p>
             <h2>2. Methodology</h2>
             <p>Describe your system architecture, data collection procedures, and evaluation metrics.</p>
-          `);
+          `, false);
+          initializedContentRef.current = true;
+        }
+      }
+
+      // Clean up any legacy baked comment marks from document content
+      if (editor.state?.schema?.marks?.comment) {
+        const { tr } = editor.state;
+        let hasCommentMarks = false;
+        editor.state.doc.descendants((node, pos) => {
+          if (node.isText && node.marks) {
+            node.marks.forEach((mark) => {
+              if (mark.type.name === 'comment') {
+                hasCommentMarks = true;
+                tr.removeMark(pos, pos + node.nodeSize, mark.type);
+              }
+            });
+          }
+        });
+        if (hasCommentMarks) {
+          editor.view.dispatch(tr);
         }
       }
     } catch (e) {
@@ -412,6 +673,49 @@ export const DocumentEditor = ({
 
         .ProseMirror:focus {
           outline: none;
+        }
+
+        /* Google Docs style Comment Highlight & Hover */
+        .ProseMirror .coreresearch-comment-highlight {
+          background-color: rgba(254, 240, 138, 0.75);
+          border-bottom: 2px solid #eab308;
+          border-radius: 2px;
+          padding: 1px 0;
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+
+        :is(.dark) .ProseMirror .coreresearch-comment-highlight {
+          background-color: rgba(113, 63, 18, 0.45);
+          border-bottom: 2px solid #ca8a04;
+        }
+
+        .ProseMirror .coreresearch-comment-highlight:hover {
+          background-color: rgba(253, 224, 71, 0.95);
+        }
+
+        /* Active Comment Highlight Glow when navigated to from sidebar */
+        .ProseMirror .coreresearch-comment-active {
+          background-color: rgba(251, 191, 36, 0.95) !important;
+          outline: 2px solid #f59e0b;
+          outline-offset: 1px;
+          border-radius: 2px;
+          animation: commentGlow 2.5s ease-out;
+        }
+
+        @keyframes commentGlow {
+          0% {
+            background-color: rgba(251, 191, 36, 1);
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.85);
+          }
+          40% {
+            background-color: rgba(253, 230, 138, 0.95);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+          }
+          100% {
+            background-color: rgba(254, 240, 138, 0.75);
+            box-shadow: none;
+          }
         }
 
         /* Real-time Collaboration Carets & Labels */
@@ -483,27 +787,63 @@ export const DocumentEditor = ({
           pointer-events: none;
         }
 
-        /* Visual Page Breaks */
-        .ProseMirror hr {
-          border: none;
-          border-top: 2px dashed #94a3b8;
-          margin: 2.5rem -${pageSettings?.marginLeft || '1in'} 2.5rem -${pageSettings?.marginRight || '1in'};
+        /* Real Physical Multi-Page Separation (Google Docs / MS Word Print Layout) */
+        .ProseMirror hr,
+        .ProseMirror .page-break {
+          display: block;
+          box-sizing: content-box;
+          height: 48px;
+          background-color: #f8f9fa !important;
+          margin: ${pageSettings?.marginBottom || '1in'} -${pageSettings?.marginRight || '1in'} ${pageSettings?.marginTop || '1in'} -${pageSettings?.marginLeft || '1in'} !important;
+          border: none !important;
+          border-top: 1px solid #cbd5e1 !important;
+          border-bottom: 1px solid #cbd5e1 !important;
+          box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.08),
+            0 4px 6px -4px rgba(0, 0, 0, 0.05),
+            inset 0 6px 10px -3px rgba(0, 0, 0, 0.07), 
+            inset 0 -6px 10px -3px rgba(0, 0, 0, 0.07) !important;
           position: relative;
+          cursor: default;
+          user-select: none;
+          z-index: 10;
         }
-        .ProseMirror hr::after {
-          content: "PAGE BREAK";
+
+        .ProseMirror hr::after,
+        .ProseMirror .page-break::after {
+          content: "PAGE BREAK • NEXT PAGE";
           position: absolute;
-          top: -10px;
+          top: 50%;
           left: 50%;
-          transform: translateX(-50%);
-          background: #f1f5f9;
-          color: #64748b;
+          transform: translate(-50%, -50%);
+          background: #ffffff;
+          color: #475569;
           font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.05em;
-          padding: 2px 8px;
-          border-radius: 4px;
+          letter-spacing: 0.08em;
+          padding: 4px 14px;
+          border-radius: 9999px;
           border: 1px solid #cbd5e1;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+          pointer-events: none;
+        }
+
+        :is(.dark) .ProseMirror hr,
+        :is(.dark) .ProseMirror .page-break {
+          background-color: #020617 !important;
+          border-top: 1px solid #334155 !important;
+          border-bottom: 1px solid #334155 !important;
+          box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.5),
+            inset 0 6px 10px -3px rgba(0, 0, 0, 0.5), 
+            inset 0 -6px 10px -3px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        :is(.dark) .ProseMirror hr::after,
+        :is(.dark) .ProseMirror .page-break::after {
+          background: #0f172a;
+          color: #94a3b8;
+          border: 1px solid #334155;
         }
 
         /* Image alignment helpers */

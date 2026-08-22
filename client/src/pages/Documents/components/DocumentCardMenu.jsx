@@ -1,15 +1,14 @@
 // src/pages/Documents/components/DocumentCardMenu.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  MoreVertical, 
-  ExternalLink, 
-  Edit3, 
-  FileDown, 
-  Trash2, 
-  Download,
-  Star,
-  FileCode
-} from 'lucide-react';
+  HiEllipsisVertical, 
+  HiArrowTopRightOnSquare, 
+  HiPencilSquare, 
+  HiArrowDownTray, 
+  HiTrash, 
+  HiStar,
+  HiDocument
+} from 'react-icons/hi2';
 import { documentService } from '../services/documentService';
 
 export const DocumentCardMenu = ({ 
@@ -88,7 +87,7 @@ export const DocumentCardMenu = ({
         title="Document actions"
         aria-label="Document actions"
       >
-        <MoreVertical className="w-4 h-4" />
+        <HiEllipsisVertical className="w-4 h-4" />
       </button>
 
       {isOpen && (
@@ -106,7 +105,7 @@ export const DocumentCardMenu = ({
             }}
             className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <ExternalLink className="w-4 h-4 text-blue-500" />
+            <HiArrowTopRightOnSquare className="w-4 h-4 text-blue-500" />
             <span>Open in Editor</span>
           </button>
 
@@ -117,7 +116,7 @@ export const DocumentCardMenu = ({
               onClick={handleFavoriteClick}
               className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
             >
-              <Star className={`w-4 h-4 ${document.isFavorite ? 'text-amber-500 fill-amber-500' : 'text-gray-400'}`} />
+              <HiStar className={`w-4 h-4 ${document.isFavorite ? 'text-amber-500' : 'text-gray-400'}`} />
               <span>{document.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}</span>
             </button>
           )}
@@ -132,7 +131,7 @@ export const DocumentCardMenu = ({
               }}
               className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
             >
-              <Edit3 className="w-4 h-4 text-gray-400" />
+              <HiPencilSquare className="w-4 h-4 text-gray-400" />
               <span>Rename</span>
             </button>
           )}
@@ -145,7 +144,7 @@ export const DocumentCardMenu = ({
             onClick={handleExportDocx}
             className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <FileCode className="w-4 h-4 text-blue-600" />
+            <HiDocument className="w-4 h-4 text-blue-600" />
             <span>Export as Word (.docx)</span>
           </button>
 
@@ -155,7 +154,7 @@ export const DocumentCardMenu = ({
             onClick={handleExportPdf}
             className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <FileDown className="w-4 h-4 text-red-500" />
+            <HiArrowDownTray className="w-4 h-4 text-red-500" />
             <span>Export as PDF (.pdf)</span>
           </button>
 
@@ -166,7 +165,7 @@ export const DocumentCardMenu = ({
               onClick={handleDownloadOriginal}
               className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
             >
-              <Download className="w-4 h-4 text-emerald-500" />
+              <HiArrowDownTray className="w-4 h-4 text-emerald-500" />
               <span>Download Original</span>
             </button>
           )}
@@ -183,7 +182,7 @@ export const DocumentCardMenu = ({
                 }}
                 className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
+                <HiTrash className="w-4 h-4" />
                 <span>Delete</span>
               </button>
             </>

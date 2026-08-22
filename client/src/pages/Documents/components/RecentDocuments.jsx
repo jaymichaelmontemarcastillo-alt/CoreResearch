@@ -9,7 +9,7 @@ import { DocumentList } from './DocumentList';
 import { VIEW_MODES } from '../constants/documentConstants';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Button } from '../../../components/ui/Button';
-import { FileText, Plus, UploadCloud, Search, Star } from 'lucide-react';
+import { HiDocumentText, HiPlus, HiArrowUpTray, HiMagnifyingGlass, HiStar } from 'react-icons/hi2';
 
 export const RecentDocuments = ({
   documents = [],
@@ -70,7 +70,7 @@ export const RecentDocuments = ({
       ) : documents.length === 0 ? (
         searchQuery ? (
           <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-[5px] border border-gray-200 dark:border-slate-800 p-6">
-            <Search className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+            <HiMagnifyingGlass className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
             <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
               No matching documents
             </h4>
@@ -80,7 +80,7 @@ export const RecentDocuments = ({
           </div>
         ) : activeTab === 'favorites' ? (
           <div className="py-16 bg-white dark:bg-slate-900 rounded-[5px] border border-gray-200 dark:border-slate-800 border-dashed text-center p-8">
-            <Star className="w-10 h-10 text-amber-400 mx-auto mb-2.5 stroke-[1.5]" />
+            <HiStar className="w-10 h-10 text-amber-400 mx-auto mb-2.5" />
             <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               No Favorite Documents
             </h4>
@@ -91,18 +91,18 @@ export const RecentDocuments = ({
         ) : (
           <div className="py-16 bg-white dark:bg-slate-900 rounded-[5px] border border-gray-200 dark:border-slate-800 border-dashed">
             <EmptyState
-              icon={FileText}
+              icon={HiDocumentText}
               title="No Documents Yet"
               description="Create a blank manuscript or import an existing Word (.docx) or PDF file."
               action={
                 canEdit ? (
                   <div className="flex items-center gap-3 mt-4 justify-center">
                     <Button variant="outline" size="sm" onClick={onCreateBlank}>
-                      <Plus className="w-3.5 h-3.5 mr-1.5" />
+                      <HiPlus className="w-3.5 h-3.5 mr-1.5" />
                       Blank Document
                     </Button>
                     <Button variant="primary" size="sm" onClick={onImportDocument}>
-                      <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
+                      <HiArrowUpTray className="w-3.5 h-3.5 mr-1.5" />
                       Import Document
                     </Button>
                   </div>

@@ -3,25 +3,24 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
-  User,
-  Lock,
-  Bell,
-  ShieldCheck,
-  Camera,
-  CheckCircle2,
-  AlertCircle,
-  Eye,
-  EyeOff,
-  Save,
-  Trash2,
-  Upload,
-  Building2,
-  GraduationCap,
-  Mail,
-  KeyRound,
-  Check,
-  Sparkles,
-} from "lucide-react";
+  HiUser,
+  HiLockClosed,
+  HiBell,
+  HiShieldCheck,
+  HiCamera,
+  HiCheckCircle,
+  HiExclamationCircle,
+  HiEye,
+  HiEyeSlash,
+  HiTrash,
+  HiArrowUpTray,
+  HiBuildingOffice2,
+  HiAcademicCap,
+  HiEnvelope,
+  HiKey,
+  HiCheck,
+  HiSparkles,
+} from "react-icons/hi2";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth } from "../services/firebase";
 import api from "../services/api";
@@ -374,11 +373,11 @@ export const ProfileSettings = () => {
                 }`}
             >
               <div className="flex items-center gap-3">
-                <User className="w-4 h-4 shrink-0" />
+                <HiUser className="w-4 h-4 shrink-0" />
                 <span>Profile Settings</span>
               </div>
               {activeTab === "profile" && (
-                <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                 <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
               )}
             </button>
 
@@ -391,7 +390,7 @@ export const ProfileSettings = () => {
                 }`}
             >
               <div className="flex items-center gap-3">
-                <Lock className="w-4 h-4 shrink-0" />
+                <HiLockClosed className="w-4 h-4 shrink-0" />
                 <span>Password</span>
               </div>
               {activeTab === "password" && (
@@ -408,7 +407,7 @@ export const ProfileSettings = () => {
                 }`}
             >
               <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4 shrink-0" />
+                <HiBell className="w-4 h-4 shrink-0" />
                 <span>Notifications</span>
               </div>
               {activeTab === "notifications" && (
@@ -425,7 +424,7 @@ export const ProfileSettings = () => {
                 }`}
             >
               <div className="flex items-center gap-3">
-                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <HiShieldCheck className="w-4 h-4 shrink-0" />
                 <span>Verification</span>
               </div>
               {activeTab === "verification" && (
@@ -437,7 +436,7 @@ export const ProfileSettings = () => {
           {/* Institutional Badge Card */}
           <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-slate-800/70 dark:to-slate-800/30 border border-blue-100/80 dark:border-slate-700/60">
             <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-semibold text-xs uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
+              <HiSparkles className="w-3.5 h-3.5" />
               Institutional Account
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-300 mt-1.5 font-medium">
@@ -463,9 +462,9 @@ export const ProfileSettings = () => {
                     }`}
                 >
                   {profileFeedback.type === "success" ? (
-                    <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <HiCheckCircle className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
+                    <HiExclamationCircle className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
                   )}
                   <span>{profileFeedback.message}</span>
                 </div>
@@ -496,7 +495,7 @@ export const ProfileSettings = () => {
                     className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white dark:border-slate-900 transition transform hover:scale-105"
                     title="Change picture"
                   >
-                    <Camera className="w-4 h-4" />
+                    <HiCamera className="w-4 h-4" />
                   </button>
                 </div>
 
@@ -517,7 +516,7 @@ export const ProfileSettings = () => {
                       onClick={() => fileInputRef.current?.click()}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-xs flex items-center gap-2"
                     >
-                      <Upload className="w-4 h-4" />
+                      <HiArrowUpTray className="w-4 h-4" />
                       Upload New
                     </button>
 
@@ -527,7 +526,7 @@ export const ProfileSettings = () => {
                       disabled={!avatarPreview}
                       className="px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 font-medium text-sm rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      <Trash2 className="w-4 h-4 text-gray-500" />
+                      <HiTrash className="w-4 h-4 text-gray-500" />
                       Delete avatar
                     </button>
                   </div>
@@ -577,7 +576,7 @@ export const ProfileSettings = () => {
                       Email
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                      <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                       <input
                         type="email"
                         value={email}
@@ -596,7 +595,7 @@ export const ProfileSettings = () => {
                       {userProfile?.role === "student" ? "Student ID Number" : "Employee ID Number"}
                     </label>
                     <div className="relative">
-                      <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                      <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                       <input
                         type="text"
                         placeholder="e.g. 2022-10482 or ADM-0001"
@@ -615,7 +614,7 @@ export const ProfileSettings = () => {
                       College
                     </label>
                     <div className="relative">
-                      <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                      <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
                       <select
                         value={college}
                         onChange={handleCollegeChange}
@@ -635,7 +634,7 @@ export const ProfileSettings = () => {
                       Department
                     </label>
                     <div className="relative">
-                      <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                      <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
                       <select
                         value={department}
                         onChange={(e) => setDepartment(e.target.value)}
@@ -689,7 +688,7 @@ export const ProfileSettings = () => {
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4" />
+                      <HiCheck className="w-4 h-4" />
                       Save Changes
                     </>
                   )}
@@ -720,9 +719,9 @@ export const ProfileSettings = () => {
                     }`}
                 >
                   {passwordFeedback.type === "success" ? (
-                    <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <HiCheckCircle className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
+                    <HiExclamationCircle className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
                   )}
                   <span>{passwordFeedback.message}</span>
                 </div>
@@ -736,7 +735,7 @@ export const ProfileSettings = () => {
                     Current Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <HiKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                     <input
                       type={showCurrentPassword ? "text" : "password"}
                       placeholder="Enter your current password"
@@ -750,7 +749,7 @@ export const ProfileSettings = () => {
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
                     >
-                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showCurrentPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -761,7 +760,7 @@ export const ProfileSettings = () => {
                     New Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                     <input
                       type={showNewPassword ? "text" : "password"}
                       placeholder="Enter new password (min 6 chars)"
@@ -775,7 +774,7 @@ export const ProfileSettings = () => {
                       onClick={() => setShowNewPassword(!showNewPassword)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
                     >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showNewPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -786,7 +785,7 @@ export const ProfileSettings = () => {
                     Confirm New password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                     <input
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder="Re-enter new password"
@@ -800,7 +799,7 @@ export const ProfileSettings = () => {
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
                     >
-                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -814,7 +813,7 @@ export const ProfileSettings = () => {
                           : "bg-gray-200 text-gray-400 dark:bg-slate-700 dark:text-gray-500"
                         }`}
                     >
-                      <Check className="w-3 h-3" />
+                      <HiCheck className="w-3 h-3" />
                     </div>
                     <span
                       className={
@@ -834,7 +833,7 @@ export const ProfileSettings = () => {
                           : "bg-gray-200 text-gray-400 dark:bg-slate-700 dark:text-gray-500"
                         }`}
                     >
-                      <Check className="w-3 h-3" />
+                      <HiCheck className="w-3 h-3" />
                     </div>
                     <span
                       className={
@@ -882,7 +881,7 @@ export const ProfileSettings = () => {
                     </>
                   ) : (
                     <>
-                      <Lock className="w-4 h-4" />
+                      <HiLockClosed className="w-4 h-4" />
                       Update Password
                     </>
                   )}
@@ -905,7 +904,7 @@ export const ProfileSettings = () => {
 
               {notificationFeedback && (
                 <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-sm flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <HiCheckCircle className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span>{notificationFeedback}</span>
                 </div>
               )}
@@ -1014,7 +1013,7 @@ export const ProfileSettings = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-                      <ShieldCheck className="w-6 h-6" />
+                      <HiShieldCheck className="w-6 h-6" />
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">

@@ -29,7 +29,7 @@ export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const adviserGroupIdsKey = adviserGroupIds ? adviserGroupIds.join(',') : '';
 
   const fetchProposals = useCallback(async () => {
     setLoading(true);
@@ -40,7 +40,7 @@ export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
         data = [];
       } else if (coordinatorMode) {
         data = await titleProposalService.getSubmittedProposals();
-      } else if (adviserGroupIds) {
+      } else if (adviserGroupIds && adviserGroupIds.length > 0) {
         data = await titleProposalService.getProposalsByGroupIds(adviserGroupIds);
       } else if (groupId) {
         data = await titleProposalService.getProposalsByGroup(groupId);
@@ -53,11 +53,32 @@ export const useTitleProposal = (options: UseTitleProposalOptions = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [groupId, coordinatorMode, adviserGroupIds, fetchNone]);
+  }, [groupId, coordinatorMode, adviserGroupIdsKey, fetchNone]);
 
   useEffect(() => {
+    if (fetchNone) {
+      setProposals([]);
+      setLoading(false);
+      return;
+    }
+
+    if (coordinatorMode) {
+      setLoading(true);
+      const unsubscribe = titleProposalService.subscribeSubmittedProposals(
+        (list) => {
+          setProposals(list);
+          setLoading(false);
+        },
+        (err) => {
+          setError(err.message || 'Failed to load coordinator queue');
+          setLoading(false);
+        }
+      );
+      return () => unsubscribe();
+    }
+
     fetchProposals();
-  }, [fetchProposals]);
+  }, [fetchProposals, coordinatorMode, fetchNone]);
 
   // ── Student Actions ────────────────────────────────────────────────────────
 

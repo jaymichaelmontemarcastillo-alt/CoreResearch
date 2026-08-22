@@ -24,11 +24,12 @@ import { ProposalDetail } from './pages/ProposalDetail';
 import { CoordinatorProposals } from './pages/CoordinatorProposals';
 import { CoordinatorProposalReview } from './pages/CoordinatorProposalReview';
 import { Projects } from './pages/Projects';
+import { StudentResearchWorkspace } from './pages/StudentResearchWorkspace';
+import { AdviserAdvisees } from './pages/AdviserAdvisees';
 import { Documents } from './pages/Documents';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { Reviews } from './pages/Reviews';
 import { Schedules } from './pages/Schedules';
-import { Grading } from './pages/Grading';
 import { Repository } from './pages/Repository';
 import { ProfileSettings } from './pages/ProfileSettings';
 
@@ -73,8 +74,11 @@ export default function App() {
                   <Route path="/coordinator/proposals/:id" element={<CoordinatorProposalReview />} />
                 </Route>
 
-                {/* Research Projects */}
+                {/* Research Projects & Workspace */}
                 <Route path="/projects" element={<Projects />} />
+                <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
+                <Route path="/workspace" element={<StudentResearchWorkspace />} />
+                <Route path="/advisees" element={<AdviserAdvisees />} />
 
                 {/* Real-time Documents Editor */}
                 <Route path="/documents" element={<Documents />} />
@@ -86,15 +90,15 @@ export default function App() {
                 {/* Schedules */}
                 <Route path="/schedules" element={<Schedules />} />
 
-                {/* Grading */}
-                <Route path="/grading" element={<Grading />} />
-
                 {/* Repository */}
                 <Route path="/repository" element={<Repository />} />
 
-                {/* Admin User Management */}
-                <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator']} />}>
+                {/* Student & Groups Management */}
+                <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator', 'adviser']} />}>
+                  <Route path="/students" element={<StudentDirectory />} />
                   <Route path="/admin/students" element={<StudentDirectory />} />
+                  <Route path="/research-groups" element={<ResearchGroups />} />
+                  <Route path="/groups" element={<ResearchGroups />} />
                   <Route path="/admin/groups" element={<ResearchGroups />} />
                 </Route>
 

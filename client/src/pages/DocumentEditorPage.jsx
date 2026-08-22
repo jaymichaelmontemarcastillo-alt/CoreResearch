@@ -6,14 +6,29 @@ import { DocumentEditor } from '../components/editor/DocumentEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { EditorMenuBar } from '../components/editor/EditorMenuBar';
 import { CommentsPanel } from '../components/editor/CommentsPanel';
+import { FloatingCommentPopover } from '../components/editor/FloatingCommentPopover';
 import { ShareDialog } from '../components/editor/ShareDialog';
 import { PageSettingsModal } from '../components/editor/PageSettingsModal';
 import { Button } from '../components/ui/Button';
 import { 
-  Users, Share2, MessageSquare, ChevronLeft, ChevronRight, Save, Cloud, 
-  CheckCircle2, Wifi, WifiOff, AlertCircle, Maximize2, Minimize2, X,
-  LayoutDashboard, FileSignature, FolderKanban, FileText, Library, CalendarDays, Award
-} from 'lucide-react';
+  HiChevronLeft, 
+  HiChevronRight, 
+  HiCloud, 
+  HiCheckCircle, 
+  HiExclamationCircle, 
+  HiArrowsPointingOut, 
+  HiArrowsPointingIn, 
+  HiXMark,
+  HiSquares2X2, 
+  HiDocumentCheck, 
+  HiFolder, 
+  HiDocumentText, 
+  HiBuildingLibrary, 
+  HiCalendar, 
+  HiAcademicCap,
+  HiChatBubbleLeftRight,
+  HiShare
+} from 'react-icons/hi2';
 
 import { documentStore, DEFAULT_PAGE_SETTINGS } from '../services/documentStore';
 import * as Y from 'yjs';
@@ -79,6 +94,8 @@ export const DocumentEditorPage = () => {
   const [initialContent, setInitialContent] = useState(null);
   const [documentLoaded, setDocumentLoaded] = useState(false);
   const [sourceType, setSourceType] = useState('native');
+  const [comments, setComments] = useState([]);
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
   
   // Fullscreen Maximize & Drawer Sidebar state
   const [isMaximized, setIsMaximized] = useState(false);
@@ -92,15 +109,27 @@ export const DocumentEditorPage = () => {
     error: null
   });
 
-  const autoSaveTimeoutRef = useRef(null);
-  const titleSaveTimeoutRef = useRef(null);
-
   const effectiveUserProfile = userProfile || {
     uid: currentUser?.uid || 'guest-user',
     fullName: userProfile?.fullName || userProfile?.first_name || 'Researcher',
     first_name: userProfile?.first_name || 'Researcher',
     role: userProfile?.role || 'student'
   };
+
+  const autoSaveTimeoutRef = useRef(null);
+  const titleSaveTimeoutRef = useRef(null);
+  const editorRef = useRef(null);
+  const myUidRef = useRef(effectiveUserProfile.uid);
+  const isTypingRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  useEffect(() => {
+    myUidRef.current = effectiveUserProfile.uid;
+  }, [effectiveUserProfile.uid]);
 
   // Keyboard shortcut listener for Escape to exit maximized mode
   useEffect(() => {
@@ -117,11 +146,13 @@ export const DocumentEditorPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isMaximized, isMaximizedSidebarOpen, showShareModal, showPageSettingsModal]);
 
-  // 1. Load authoritative document metadata, settings & content from Firestore
+  // 1. Load authoritative document metadata, settings & content from Firestore with real-time sync
   useEffect(() => {
     if (!documentId) return;
 
     let isMounted = true;
+    
+    // Initial fetch
     const loadDocumentData = async () => {
       try {
         const docData = await documentStore.fetchDocument(documentId);
@@ -131,7 +162,16 @@ export const DocumentEditorPage = () => {
           if (docData.editorSettings?.page) {
             setPageSettings(docData.editorSettings.page);
           }
-          const contentToLoad = docData.content || docData.contentHtml || null;
+          let contentToLoad = docData.content || docData.contentHtml || null;
+          // Resilient fallback to localStorage if Firestore content is null or empty
+          if (!contentToLoad) {
+            try {
+              const cached = localStorage.getItem(`coreresearch_doc_content_${documentId}`);
+              if (cached) {
+                contentToLoad = JSON.parse(cached);
+              }
+            } catch (e) {}
+          }
           if (contentToLoad) {
             setInitialContent(contentToLoad);
           }
@@ -139,14 +179,61 @@ export const DocumentEditorPage = () => {
         }
       } catch (err) {
         console.warn('Failed to load document from Firestore:', err);
-        if (isMounted) setDocumentLoaded(true);
+        if (isMounted) {
+          try {
+            const cached = localStorage.getItem(`coreresearch_doc_content_${documentId}`);
+            if (cached) {
+              setInitialContent(JSON.parse(cached));
+            }
+          } catch (e) {}
+          setDocumentLoaded(true);
+        }
       }
     };
 
     loadDocumentData();
 
+    // Subscribe to real-time updates from other group members (works seamlessly on Firebase Hosting!)
+    const unsubscribe = documentStore.subscribeDocument(documentId, (docData) => {
+      if (!isMounted || !docData) return;
+
+      if (docData.title) setTitle(docData.title);
+      if (docData.editorSettings?.page) {
+        setPageSettings(docData.editorSettings.page);
+      }
+
+      // Check if update originated from another collaborator
+      const isFromOtherUser = docData.updatedBy && docData.updatedBy !== myUidRef.current;
+      if (isFromOtherUser && docData.content) {
+        const activeEditor = editorRef.current;
+        if (activeEditor && !activeEditor.isDestroyed && !isTypingRef.current) {
+          try {
+            const currentStr = JSON.stringify(activeEditor.getJSON());
+            const remoteStr = JSON.stringify(docData.content);
+            if (currentStr !== remoteStr) {
+              activeEditor.commands.setContent(docData.content, false);
+            }
+          } catch (syncErr) {
+            console.warn('[RealtimeSync] Remote update application notice:', syncErr);
+          }
+        }
+      }
+    });
+
     return () => {
       isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [documentId]);
+
+  // 1b. Subscribe to comments in real-time for document text highlighting & vice-versa sync
+  useEffect(() => {
+    if (!documentId) return;
+    const unsubscribe = documentStore.subscribeComments(documentId, (fetched) => {
+      setComments(fetched || []);
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [documentId]);
 
@@ -158,6 +245,20 @@ export const DocumentEditorPage = () => {
     let hocuspocusProvider = null;
     const newYdoc = new Y.Doc();
     
+    // Check if we have a valid WebSocket URL (or running in local HTTP)
+    let wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL;
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+    if (!wsUrl && isHttps) {
+      // In production HTTPS without explicit WSS endpoint, use real-time Firestore sync
+      setProviderState({ ydoc: newYdoc, provider: null, status: 'cloud-sync', error: null });
+      return () => {
+        isSubscribed = false;
+        try { newYdoc.destroy(); } catch (e) {}
+      };
+    }
+
+    wsUrl = wsUrl || 'ws://localhost:5000/collaboration';
     setProviderState({ ydoc: newYdoc, provider: null, status: 'connecting', error: null });
 
     const initProvider = async () => {
@@ -172,8 +273,6 @@ export const DocumentEditorPage = () => {
       }
 
       if (!isSubscribed) return;
-
-      const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || 'ws://localhost:5000/collaboration';
 
       try {
         const { HocuspocusProvider } = await import('@hocuspocus/provider');
@@ -198,14 +297,14 @@ export const DocumentEditorPage = () => {
             if (data.status === 'connected') {
               setProviderState(prev => ({ ...prev, status: 'connected', error: null }));
             } else if (data.status === 'disconnected') {
-              setProviderState(prev => ({ ...prev, status: 'disconnected' }));
+              setProviderState(prev => ({ ...prev, status: 'cloud-sync' }));
             } else if (data.status === 'connecting') {
               setProviderState(prev => ({ ...prev, status: 'connecting' }));
             }
           },
           onClose: () => {
             if (isSubscribed) {
-              setProviderState(prev => ({ ...prev, status: 'disconnected' }));
+              setProviderState(prev => ({ ...prev, status: 'cloud-sync' }));
             }
           },
           onMessage: () => {
@@ -239,9 +338,9 @@ export const DocumentEditorPage = () => {
           setProviderState(prev => ({ ...prev, provider: hocuspocusProvider }));
         }
       } catch (err) {
-        console.warn('Hocuspocus provider setup warning:', err);
+        console.warn('Hocuspocus provider setup notice (falling back to cloud sync):', err);
         if (isSubscribed) {
-          setProviderState(prev => ({ ...prev, status: 'disconnected', error: err.message }));
+          setProviderState(prev => ({ ...prev, status: 'cloud-sync', error: null }));
         }
       }
     };
@@ -277,8 +376,21 @@ export const DocumentEditorPage = () => {
   };
 
   // 4. Handle Editor Content Change & Firestore auto-save
-  const handleContentChange = useCallback((contentJson) => {
+  const handleContentChange = useCallback((editorOrJson) => {
+    isTypingRef.current = true;
     setSaveStatus('saving');
+
+    const activeEditor = editorOrJson?.getJSON ? editorOrJson : editor;
+    const json = activeEditor?.getJSON ? activeEditor.getJSON() : (editorOrJson && typeof editorOrJson === 'object' ? editorOrJson : null);
+    const html = activeEditor?.getHTML ? activeEditor.getHTML() : '';
+    const plainText = activeEditor?.getText ? activeEditor.getText() : '';
+
+    // Immediately cache in localStorage so reload never loses edits
+    if (json) {
+      try {
+        localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
+      } catch (e) {}
+    }
 
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
@@ -286,16 +398,34 @@ export const DocumentEditorPage = () => {
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
       try {
-        const html = editor?.getHTML?.() || '';
-        const plainText = editor?.getText?.() || '';
-        await documentStore.saveDocumentContent(documentId, contentJson, html, plainText, userProfile);
+        await documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
         setSaveStatus('saved');
       } catch (err) {
         console.error('Failed to auto-save document:', err);
         setSaveStatus('error');
+      } finally {
+        isTypingRef.current = false;
       }
-    }, 2000);
-  }, [documentId, editor, userProfile]);
+    }, 800);
+  }, [documentId, editor, effectiveUserProfile]);
+
+  // Flush unsaved content on hard refresh or window close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const activeEditor = editorRef.current;
+      if (activeEditor && !activeEditor.isDestroyed) {
+        try {
+          const json = activeEditor.getJSON();
+          localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
+          const html = activeEditor.getHTML();
+          const plainText = activeEditor.getText();
+          documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [documentId, effectiveUserProfile]);
 
   // 5. Handle Page Settings Save
   const handleSavePageSettings = async (newSettings) => {
@@ -391,9 +521,9 @@ export const DocumentEditorPage = () => {
           className="fixed left-2 sm:left-3 top-1/2 -translate-y-1/2 z-[75] w-9 h-9 rounded-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-slate-700 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 focus:outline-none"
         >
           {isMaximizedSidebarOpen ? (
-            <ChevronLeft className="w-5 h-5" />
+            <HiChevronLeft className="w-5 h-5" />
           ) : (
-            <ChevronRight className="w-5 h-5 ml-0.5" />
+            <HiChevronRight className="w-5 h-5 ml-0.5" />
           )}
         </button>
       )}
@@ -419,7 +549,7 @@ export const DocumentEditorPage = () => {
                 className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 title="Close sidebar"
               >
-                <X className="w-4 h-4" />
+                <HiXMark className="w-4 h-4" />
               </button>
             </div>
 
@@ -429,7 +559,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <LayoutDashboard className="w-4 h-4" />
+                <HiSquares2X2 className="w-4 h-4" />
                 <span>Dashboard</span>
               </Link>
               <Link
@@ -437,7 +567,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold transition-colors"
               >
-                <FileText className="w-4 h-4" />
+                <HiDocumentText className="w-4 h-4" />
                 <span>Documents</span>
               </Link>
               <Link
@@ -445,7 +575,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <FileSignature className="w-4 h-4" />
+                <HiDocumentCheck className="w-4 h-4" />
                 <span>Proposals</span>
               </Link>
               <Link
@@ -453,7 +583,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <FolderKanban className="w-4 h-4" />
+                <HiFolder className="w-4 h-4" />
                 <span>Manuscripts</span>
               </Link>
               <Link
@@ -461,7 +591,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <Award className="w-4 h-4" />
+                <HiAcademicCap className="w-4 h-4" />
                 <span>Reviews</span>
               </Link>
               <Link
@@ -469,7 +599,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <CalendarDays className="w-4 h-4" />
+                <HiCalendar className="w-4 h-4" />
                 <span>Schedules</span>
               </Link>
               <Link
@@ -477,7 +607,7 @@ export const DocumentEditorPage = () => {
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
-                <Library className="w-4 h-4" />
+                <HiBuildingLibrary className="w-4 h-4" />
                 <span>Repository</span>
               </Link>
             </div>
@@ -489,7 +619,7 @@ export const DocumentEditorPage = () => {
       <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10 shrink-0 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
-            <ChevronLeft className="w-5 h-5" />
+            <HiChevronLeft className="w-5 h-5" />
           </Button>
           
           <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
@@ -530,7 +660,7 @@ export const DocumentEditorPage = () => {
               </span>
             ) : (
               <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                <Cloud className="w-3.5 h-3.5 text-blue-500" />
+                <HiCloud className="w-3.5 h-3.5 text-blue-500" />
                 Cloud Saved
               </span>
             )}
@@ -545,12 +675,12 @@ export const DocumentEditorPage = () => {
               </span>
             ) : saveStatus === 'error' ? (
               <span className="flex items-center gap-1 text-red-500">
-                <AlertCircle className="w-3.5 h-3.5" />
+                <HiExclamationCircle className="w-3.5 h-3.5" />
                 Error saving
               </span>
             ) : (
               <span className="flex items-center gap-1 text-gray-400">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <HiCheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                 Saved
               </span>
             )}
@@ -578,7 +708,7 @@ export const DocumentEditorPage = () => {
             className={`rounded-lg ${showComments ? '' : 'text-gray-600 dark:text-gray-300'}`}
             title="Toggle comments"
           >
-            <MessageSquare className="w-4 h-4 sm:mr-1.5" />
+            <HiChatBubbleLeftRight className="w-4 h-4 sm:mr-1.5" />
             <span className="hidden sm:inline text-xs">Comments</span>
           </Button>
 
@@ -589,7 +719,7 @@ export const DocumentEditorPage = () => {
             onClick={() => setShowShareModal(true)} 
             className="rounded-full px-3 sm:px-5 shadow-sm"
           >
-            <Share2 className="w-4 h-4 sm:mr-1.5" />
+            <HiShare className="w-4 h-4 sm:mr-1.5" />
             <span className="hidden sm:inline text-xs font-semibold tracking-wide">Share</span>
           </Button>
 
@@ -607,9 +737,9 @@ export const DocumentEditorPage = () => {
             title={isMaximized ? "Exit full screen (Minimize)" : "Maximize editor (Full screen)"}
           >
             {isMaximized ? (
-              <Minimize2 className="w-4 h-4" />
+              <HiArrowsPointingIn className="w-4 h-4" />
             ) : (
-              <Maximize2 className="w-4 h-4" />
+              <HiArrowsPointingOut className="w-4 h-4" />
             )}
           </Button>
         </div>
@@ -638,6 +768,13 @@ export const DocumentEditorPage = () => {
                   pageSettings={pageSettings}
                   initialContent={initialContent}
                   sourceType={sourceType}
+                  comments={comments}
+                  onCommentSelect={(commentId) => {
+                    setHighlightedCommentId(commentId);
+                    if (!showComments) {
+                      setShowComments(true);
+                    }
+                  }}
                   onEditorReady={handleEditorReady}
                   onContentChange={handleContentChange}
                 />
@@ -650,6 +787,20 @@ export const DocumentEditorPage = () => {
               )}
             </EditorErrorBoundary>
           </div>
+          
+          {/* Google Docs-Style Floating Contextual Comment Action & Composer */}
+          {editor && (
+            <FloatingCommentPopover
+              editor={editor}
+              documentId={documentId}
+              userProfile={effectiveUserProfile}
+              onCommentAdded={() => {
+                if (!showComments) {
+                  setShowComments(true);
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Right Sidebar - Comments Panel (Local Resizable) */}
@@ -677,6 +828,8 @@ export const DocumentEditorPage = () => {
             <CommentsPanel 
               documentId={documentId} 
               editor={editor} 
+              highlightedCommentId={highlightedCommentId}
+              onClearHighlight={() => setHighlightedCommentId(null)}
               onClose={() => setShowComments(false)}
             />
           </div>

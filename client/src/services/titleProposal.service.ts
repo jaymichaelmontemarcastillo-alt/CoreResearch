@@ -11,6 +11,7 @@ import {
   collection,
   query,
   where,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import {
@@ -48,13 +49,17 @@ export const titleProposalService = {
     const newProposal: TitleProposal = {
       id: ref.id,
       title: input.title,
+      description: input.description || input.rationale || '',
       researchCategory: input.researchCategory,
       categoryId: input.categoryId,
       rationale: input.rationale,
       objectives: input.objectives,
       scopeAndDelimitation: input.scopeAndDelimitation,
       methodology: input.methodology,
+      attachments: input.attachments || [],
 
+      studentId: input.submittedByUid,
+      studentName: input.submittedByName,
       groupId: input.groupId,
       groupName: input.groupName,
 
@@ -70,6 +75,7 @@ export const titleProposalService = {
       createdAt: now,
       updatedAt: now,
       revisionCount: 0,
+      ...(input.status === 'submitted' ? { submittedAt: now, lastSubmittedAt: now } : {})
     };
 
     await setDoc(ref, stripUndefined(newProposal) as TitleProposal);
@@ -116,6 +122,35 @@ export const titleProposalService = {
       (a, b) =>
         new Date(b.lastSubmittedAt ?? b.submittedAt ?? b.createdAt).getTime() -
         new Date(a.lastSubmittedAt ?? a.submittedAt ?? a.createdAt).getTime()
+    );
+  },
+
+  /**
+   * Real-time subscription to coordinator queue
+   */
+  subscribeSubmittedProposals(
+    onUpdate: (proposals: TitleProposal[]) => void,
+    onError?: (err: Error) => void
+  ): () => void {
+    const q = query(
+      collection(db, COLLECTION),
+      where('status', 'in', ['submitted', 'needs_revision', 'approved'])
+    );
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => d.data() as TitleProposal);
+        list.sort(
+          (a, b) =>
+            new Date(b.lastSubmittedAt ?? b.submittedAt ?? b.createdAt).getTime() -
+            new Date(a.lastSubmittedAt ?? a.submittedAt ?? a.createdAt).getTime()
+        );
+        onUpdate(list);
+      },
+      (err) => {
+        console.warn('[titleProposalService] subscribeSubmittedProposals error:', err);
+        if (onError) onError(err);
+      }
     );
   },
 
@@ -263,6 +298,22 @@ export const titleProposalService = {
       coordinatorFeedback: evaluation.coordinatorFeedback,
       reviewedAt: now,
       approvedAt: now,
+      updatedAt: now,
+    }));
+  },
+
+  /**
+   * Coordinator rejects the proposal.
+   */
+  async rejectProposal(proposalId: string, evaluation: CoordinatorEvaluationInput): Promise<void> {
+    const ref = doc(db, COLLECTION, proposalId);
+    const now = new Date().toISOString();
+    await updateDoc(ref, stripUndefined({
+      status: 'rejected',
+      coordinatorId: evaluation.coordinatorId,
+      coordinatorName: evaluation.coordinatorName,
+      coordinatorFeedback: evaluation.coordinatorFeedback,
+      reviewedAt: now,
       updatedAt: now,
     }));
   },

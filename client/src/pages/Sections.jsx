@@ -7,7 +7,15 @@ import { Input } from "../components/ui/Input";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
-import { LayoutGrid, Plus, Trash2, Edit2, ArrowLeft, RefreshCw, Search } from "lucide-react";
+import {
+  HiSquares2X2,
+  HiPlus,
+  HiTrash,
+  HiPencilSquare,
+  HiArrowLeft,
+  HiArrowPath,
+  HiMagnifyingGlass,
+} from "react-icons/hi2";
 import { sectionService } from "../services/section.service";
 import { courseService } from "../services/course.service";
 
@@ -169,14 +177,14 @@ export const Sections = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={LayoutGrid}
+        icon={HiSquares2X2}
         title={course ? `Sections for ${course.name}` : "Section Management"}
         description={course ? `Managing sections for ${course.code}` : "Loading..."}
       />
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search sections..."
             className="pl-9"
@@ -186,7 +194,7 @@ export const Sections = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate("/admin/courses")}>
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Courses
+            <HiArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Courses
           </Button>
           <Button
             variant="outline"
@@ -194,7 +202,7 @@ export const Sections = () => {
             onClick={fetchCourseAndSections}
             isLoading={loading}
           >
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+            <HiArrowPath className="w-3.5 h-3.5 mr-1.5" /> Refresh
           </Button>
           <Button
             variant="outline"
@@ -202,7 +210,7 @@ export const Sections = () => {
             onClick={() => setIsAddingSpec(!isAddingSpec)}
             disabled={!course}
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Specialization
+            <HiPlus className="w-3.5 h-3.5 mr-1.5" /> Add Specialization
           </Button>
           <Button
             variant="primary"
@@ -210,7 +218,7 @@ export const Sections = () => {
             onClick={() => setIsAdding(!isAdding)}
             disabled={!course}
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Section
+            <HiPlus className="w-3.5 h-3.5 mr-1.5" /> Add Section
           </Button>
         </div>
       </div>
@@ -366,7 +374,7 @@ export const Sections = () => {
                     onClick={() => handleToggleActive(section)}
                     title="Toggle Status"
                   >
-                    <Edit2 className="w-4 h-4 text-gray-500" />
+                    <HiPencilSquare className="w-4 h-4 text-gray-500" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -375,7 +383,7 @@ export const Sections = () => {
                     onClick={() => handleDelete(section.id)}
                     title="Delete Section"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <HiTrash className="w-4 h-4" />
                   </Button>
                 </div>
               </TableCell>

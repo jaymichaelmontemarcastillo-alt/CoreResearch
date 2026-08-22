@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { X, FileText, Check } from 'lucide-react';
+import { HiXMark, HiDocumentText, HiCheck } from 'react-icons/hi2';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
 
 const MARGIN_PRESETS = [
@@ -87,7 +87,7 @@ export const PageSettingsModal = ({ isOpen, onClose, pageSettings, onSaveSetting
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
-              <FileText className="w-4 h-4" />
+              <HiDocumentText className="w-4 h-4" />
             </div>
             <h3 className="font-bold text-gray-900 dark:text-white text-base">Page Setup & Margins</h3>
           </div>
@@ -96,7 +96,7 @@ export const PageSettingsModal = ({ isOpen, onClose, pageSettings, onSaveSetting
             onClick={onClose}
             className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <HiXMark className="w-5 h-5" />
           </button>
         </div>
 
@@ -172,7 +172,7 @@ export const PageSettingsModal = ({ isOpen, onClose, pageSettings, onSaveSetting
                   >
                     <div className="flex items-center justify-between">
                       <span>{preset.name}</span>
-                      {isSelected && <Check className="w-3 h-3 text-blue-600 dark:text-blue-400" />}
+                      {isSelected && <HiCheck className="w-3 h-3 text-blue-600 dark:text-blue-400" />}
                     </div>
                     <span className="text-[10px] text-gray-400 block truncate">{preset.desc}</span>
                   </button>
