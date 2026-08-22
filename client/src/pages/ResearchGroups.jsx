@@ -9,25 +9,16 @@ import { Modal } from "../components/ui/Modal";
 import { CourseFilterDropdown } from "../components/ui/CourseFilterDropdown";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import {
-<<<<<<< HEAD
-  Users,
-  CheckCircle,
-  Plus,
-  Search,
-  Filter,
-  Edit,
-  Trash2,
-  Save,
-  X,
-} from "lucide-react";
-=======
   HiUsers,
   HiCheckCircle,
   HiPlus,
   HiMagnifyingGlass,
   HiFunnel,
+  HiPencil,
+  HiTrash,
+  HiCheck,
+  HiXMark,
 } from "react-icons/hi2";
->>>>>>> 09ff0441d048dea38e6ce711d4089b9eb185d21a
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
@@ -192,14 +183,8 @@ export const ResearchGroups = () => {
     const q = searchQuery.toLowerCase();
     if (!q) return true;
     
-<<<<<<< HEAD
-    const matchName = g.name.toLowerCase().includes(q);
-    const matchMember = g.members.some(m => m.fullName.toLowerCase().includes(q));
-=======
-    // Match group name, member names, or title
     const matchName = (g.name || "").toLowerCase().includes(q);
     const matchMember = (g.members || []).some(m => (m?.fullName || "").toLowerCase().includes(q));
->>>>>>> 09ff0441d048dea38e6ce711d4089b9eb185d21a
     const proposal = proposals.find(p => p.groupId === g.id);
     const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
     
@@ -281,10 +266,10 @@ export const ResearchGroups = () => {
     setEditData({
       title: proposal?.title || "",
       adviserName: group.adviserName || "",
-      members: [...group.members]
+      members: [...(group.members || [])]
     });
     const memberEditState = {};
-    group.members.forEach((member, index) => {
+    (group.members || []).forEach((member, index) => {
       memberEditState[index] = member.fullName;
     });
     setEditingMembers(memberEditState);
@@ -580,13 +565,12 @@ export const ResearchGroups = () => {
                 return (
                   <TableRow key={group.id}>
                     <TableCell>
-<<<<<<< HEAD
                       {isEditing ? (
                         <div className="flex flex-col gap-2">
-                          {group.members.map((member, index) => (
+                          {(group.members || []).map((member, index) => (
                             <div key={member.uid} className="flex items-center gap-2">
                               <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                {member.fullName.charAt(0)}
+                                {(member.fullName || "U").charAt(0)}
                               </div>
                               <Input
                                 value={editingMembers[index] || member.fullName}
@@ -596,36 +580,16 @@ export const ResearchGroups = () => {
                               />
                             </div>
                           ))}
-=======
-                      <div className="flex flex-col gap-1.5">
-                        {(group.members || []).map(member => (
-                          <div key={member.uid || member.id} className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                              {(member.fullName || "U").charAt(0)}
-                            </div>
-                            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                              {member.fullName || "Student"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      {proposal ? (
-                        <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
-                          {proposal.title}
->>>>>>> 09ff0441d048dea38e6ce711d4089b9eb185d21a
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1.5">
-                          {group.members.map(member => (
-                            <div key={member.uid} className="flex items-center gap-2">
+                          {(group.members || []).map(member => (
+                            <div key={member.uid || member.id} className="flex items-center gap-2">
                               <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                {member.fullName.charAt(0)}
+                                {(member.fullName || "U").charAt(0)}
                               </div>
                               <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                                {member.fullName}
+                                {member.fullName || "Student"}
                               </span>
                             </div>
                           ))}
@@ -684,7 +648,7 @@ export const ResearchGroups = () => {
                               disabled={saving}
                               isLoading={saving}
                             >
-                              <Save className="w-3.5 h-3.5 mr-1" />
+                              <HiCheck className="w-3.5 h-3.5 mr-1" />
                               Save
                             </Button>
                             <Button
@@ -694,7 +658,7 @@ export const ResearchGroups = () => {
                               className="h-8 px-3"
                               disabled={saving}
                             >
-                              <X className="w-3.5 h-3.5 mr-1" />
+                              <HiXMark className="w-3.5 h-3.5 mr-1" />
                               Cancel
                             </Button>
                           </>
@@ -706,7 +670,7 @@ export const ResearchGroups = () => {
                               onClick={() => startEditing(group)}
                               className="h-8 px-3"
                             >
-                              <Edit className="w-3.5 h-3.5 mr-1" />
+                              <HiPencil className="w-3.5 h-3.5 mr-1" />
                               Edit
                             </Button>
                             <Button
@@ -715,7 +679,7 @@ export const ResearchGroups = () => {
                               onClick={() => handleDeleteGroup(group.id)}
                               className="h-8 px-3"
                             >
-                              <Trash2 className="w-3.5 h-3.5 mr-1" />
+                              <HiTrash className="w-3.5 h-3.5 mr-1" />
                               Delete
                             </Button>
                           </>
