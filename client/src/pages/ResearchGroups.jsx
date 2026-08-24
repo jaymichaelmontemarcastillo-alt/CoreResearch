@@ -14,6 +14,10 @@ import {
   HiPlus,
   HiMagnifyingGlass,
   HiFunnel,
+  HiPencil,
+  HiTrash,
+  HiCheck,
+  HiXMark,
 } from "react-icons/hi2";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
@@ -46,6 +50,16 @@ export const ResearchGroups = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [creating, setCreating] = useState(false);
+
+  // --- Edit State ---
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [editData, setEditData] = useState({
+    title: "",
+    adviserName: "",
+    members: []
+  });
+  const [editingMembers, setEditingMembers] = useState({});
+  const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
   // 1. Data Fetching Effects
@@ -82,7 +96,6 @@ export const ResearchGroups = () => {
       ]);
       setCourses(coursesData);
       setStudents(studentsData);
-      // Pre-fetch sections for all courses
       const sectionMap = {};
       await Promise.all(
         coursesData.map(async (course) => {
@@ -118,19 +131,16 @@ export const ResearchGroups = () => {
     try {
       const sectionGroups = await groupService.getGroupsBySection(selectedSection);
       
-      // Fetch proposals for these groups to get the Title
       const groupIds = sectionGroups.map(g => g.id);
       let sectionProposals = [];
       if (groupIds.length > 0) {
         sectionProposals = await titleProposalService.getProposalsByGroupIds(groupIds);
       }
       
-      // Filter students who belong to this course & section
       const sectionStudents = students.filter(
         s => s.courseId === selectedCourse && s.sectionId === selectedSection
       );
 
-      // Find students who are NOT in any of the sectionGroups
       const assignedIds = new Set();
       sectionGroups.forEach(g => {
         g.memberIds.forEach(uid => assignedIds.add(uid));
@@ -169,12 +179,10 @@ export const ResearchGroups = () => {
     (!hasSpecializations && selectedCourse) || 
     (hasSpecializations && selectedSpecialization && specHasSections);
 
-  // Filter groups based on search query
   const filteredGroups = groups.filter((g) => {
     const q = searchQuery.toLowerCase();
     if (!q) return true;
     
-    // Match group name, member names, or title
     const matchName = (g.name || "").toLowerCase().includes(q);
     const matchMember = (g.members || []).some(m => (m?.fullName || "").toLowerCase().includes(q));
     const proposal = proposals.find(p => p.groupId === g.id);
@@ -251,6 +259,134 @@ export const ResearchGroups = () => {
     }
   };
 
+  // --- Edit Handlers ---
+  const startEditing = (group) => {
+    const proposal = proposals.find(p => p.groupId === group.id);
+    setEditingGroupId(group.id);
+    setEditData({
+      title: proposal?.title || "",
+      adviserName: group.adviserName || "",
+      members: [...(group.members || [])]
+    });
+    const memberEditState = {};
+    (group.members || []).forEach((member, index) => {
+      memberEditState[index] = member.fullName;
+    });
+    setEditingMembers(memberEditState);
+  };
+
+  const cancelEditing = () => {
+    setEditingGroupId(null);
+    setEditData({ title: "", adviserName: "", members: [] });
+    setEditingMembers({});
+  };
+
+  const handleMemberNameChange = (index, value) => {
+    setEditingMembers(prev => ({
+      ...prev,
+      [index]: value
+    }));
+  };
+
+  const handleSaveEdit = async (groupId) => {
+    // Validate inputs
+    if (!editData.title.trim()) {
+      showToast("Please enter a title.", "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Get the current group
+      const group = groups.find(g => g.id === groupId);
+      if (!group) {
+        showToast("Group not found.", "error");
+        return;
+      }
+
+      // Update member names
+      const updatedMembers = editData.members.map((member, index) => ({
+        uid: member.uid,
+        fullName: editingMembers[index] || member.fullName,
+        email: member.email || ''
+      }));
+
+      // Update the group using Firestore
+      const groupUpdateData = {
+        adviserName: editData.adviserName || '',
+        members: updatedMembers,
+        memberIds: updatedMembers.map(m => m.uid)
+      };
+      
+      console.log("Updating group with data:", groupUpdateData);
+      await groupService.updateGroup(groupId, groupUpdateData);
+
+      // Update proposal title
+      const existingProposal = proposals.find(p => p.groupId === groupId);
+      
+      if (existingProposal) {
+        // Update existing proposal
+        console.log("Updating existing proposal:", existingProposal.id, { title: editData.title });
+        await titleProposalService.updateProposal(existingProposal.id, {
+          title: editData.title
+        });
+        
+        // Update local proposals state
+        setProposals(prevProposals => 
+          prevProposals.map(p => 
+            p.id === existingProposal.id 
+              ? { ...p, title: editData.title, updatedAt: new Date().toISOString() }
+              : p
+          )
+        );
+      } else {
+        // Create new proposal
+        console.log("Creating new proposal for group:", groupId);
+        const newProposal = await titleProposalService.createProposal({
+          groupId: groupId,
+          title: editData.title,
+          groupName: group.name || '',
+          courseId: group.courseId || '',
+          courseName: group.courseName || '',
+          sectionId: group.sectionId || '',
+          sectionName: group.sectionName || '',
+          submittedByUid: group.members?.[0]?.uid || '',
+          submittedByName: group.members?.[0]?.fullName || '',
+          status: 'draft'
+        });
+        
+        // Add new proposal to local state
+        setProposals(prev => [...prev, newProposal]);
+      }
+
+      showToast("Group updated successfully!");
+      cancelEditing();
+      
+      // Refresh data to ensure everything is in sync
+      await fetchGroupsAndStudents();
+      
+    } catch (error) {
+      console.error("Error updating group:", error);
+      showToast(error.message || "Failed to update group", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // --- Delete Handler ---
+  const handleDeleteGroup = async (groupId) => {
+    if (window.confirm("Are you sure you want to delete this research group?")) {
+      try {
+        await groupService.deleteGroup(groupId);
+        showToast("Group deleted successfully!");
+        await fetchGroupsAndStudents();
+      } catch (error) {
+        console.error("Error deleting group:", error);
+        showToast(error.message || "Failed to delete group", "error");
+      }
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // 4. Helpers for Schedule Header
   // ---------------------------------------------------------------------------
@@ -263,21 +399,12 @@ export const ResearchGroups = () => {
   const getProposalForGroup = (groupId) => {
     return proposals.find(p => p.groupId === groupId);
   };
-  
-  const getMockTime = (index) => {
-    const startMinutes = 8 * 60 + 30; // 8:30 in minutes
-    const currentMinutes = startMinutes + (index * 10);
-    const hours = Math.floor(currentMinutes / 60);
-    const mins = currentMinutes % 60;
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${mins.toString().padStart(2, '0')}`;
-  };
 
   const tableColumns = [
-    { label: "Time", className: "w-[100px] text-center whitespace-nowrap" },
     { label: "Name of Students", className: "min-w-[200px]" },
     { label: "Title", className: "min-w-[250px]" },
-    { label: "Adviser", className: "min-w-[200px]" },
+    { label: "Adviser", className: "min-w-[150px]" },
+    { label: "Actions", className: "min-w-[120px] text-center" },
   ];
 
   return (
@@ -292,10 +419,8 @@ export const ResearchGroups = () => {
         <Toast message={toastMessage} variant={toastVariant} onClose={() => setToastMessage("")} />
       )}
 
-      {/* Filter Row */}
       <div className="flex flex-col md:flex-row items-end justify-between gap-4 pb-2">
         <div className="flex flex-col md:flex-row items-end gap-3 flex-1 w-full">
-          {/* Search Bar */}
           <div className="w-full md:max-w-xs">
             <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
               Search Groups
@@ -313,7 +438,6 @@ export const ResearchGroups = () => {
             <HiFunnel className="w-4 h-4 text-gray-300 dark:text-gray-600" />
           </div>
 
-          {/* Program/Course Filter */}
           <div className="w-full md:w-48">
             <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
               Program
@@ -329,7 +453,6 @@ export const ResearchGroups = () => {
             />
           </div>
 
-          {/* Specialization Filter */}
           {hasSpecializations && (
             <div className="w-full md:w-56 animate-in fade-in slide-in-from-left-2 duration-200">
               <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
@@ -353,7 +476,6 @@ export const ResearchGroups = () => {
             </div>
           )}
 
-          {/* Section Filter */}
           {showSectionFilter && (
             <div className="w-full md:w-40 animate-in fade-in slide-in-from-left-2 duration-200">
               <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
@@ -375,7 +497,6 @@ export const ResearchGroups = () => {
           )}
         </div>
 
-        {/* Create Group Button */}
         <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0">
           <Button
             variant="primary"
@@ -390,10 +511,8 @@ export const ResearchGroups = () => {
         </div>
       </div>
 
-      {/* Schedule Table View */}
       {selectedCourse && selectedSection && (
         <div className="space-y-6">
-          {/* Header styling to look like a clean web dashboard section */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
@@ -439,48 +558,131 @@ export const ResearchGroups = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredGroups.map((group, index) => {
+              filteredGroups.map((group) => {
                 const proposal = getProposalForGroup(group.id);
+                const isEditing = editingGroupId === group.id;
+                
                 return (
                   <TableRow key={group.id}>
-                    <TableCell className="text-center">
-                      <Badge variant="gray" className="font-semibold text-[13px]">
-                        {getMockTime(index)}
-                      </Badge>
-                    </TableCell>
-                    
                     <TableCell>
-                      <div className="flex flex-col gap-1.5">
-                        {(group.members || []).map(member => (
-                          <div key={member.uid || member.id} className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                              {(member.fullName || "U").charAt(0)}
+                      {isEditing ? (
+                        <div className="flex flex-col gap-2">
+                          {(group.members || []).map((member, index) => (
+                            <div key={member.uid} className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {(member.fullName || "U").charAt(0)}
+                              </div>
+                              <Input
+                                value={editingMembers[index] || member.fullName}
+                                onChange={(e) => handleMemberNameChange(index, e.target.value)}
+                                className="text-sm h-8"
+                                placeholder="Enter student name"
+                              />
                             </div>
-                            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                              {member.fullName || "Student"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      {proposal ? (
-                        <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
-                          {proposal.title}
+                          ))}
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400 italic">No approved title yet</span>
+                        <div className="flex flex-col gap-1.5">
+                          {(group.members || []).map(member => (
+                            <div key={member.uid || member.id} className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {(member.fullName || "U").charAt(0)}
+                              </div>
+                              <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                {member.fullName || "Student"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </TableCell>
 
                     <TableCell>
-                      <div className="flex flex-col space-y-1">
-                        <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                          {group.adviserName || "Pending Adviser"}
-                        </span>
-                        {group.adviserName && (
-                          <span className="text-xs text-gray-400">Scheduled: May 18, 2026</span>
+                      {isEditing ? (
+                        <Input
+                          value={editData.title}
+                          onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                          className="text-sm"
+                          placeholder="Enter title"
+                        />
+                      ) : (
+                        proposal ? (
+                          <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
+                            {proposal.title}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">No approved title yet</span>
+                        )
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      {isEditing ? (
+                        <Input
+                          value={editData.adviserName}
+                          onChange={(e) => setEditData(prev => ({ ...prev, adviserName: e.target.value }))}
+                          className="text-sm"
+                          placeholder="Enter adviser name"
+                        />
+                      ) : (
+                        <div className="flex flex-col space-y-1">
+                          <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                            {group.adviserName || "Pending Adviser"}
+                          </span>
+                          {group.adviserName && (
+                            <span className="text-xs text-gray-400">Scheduled: May 18, 2026</span>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-2">
+                        {isEditing ? (
+                          <>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleSaveEdit(group.id)}
+                              className="h-8 px-3"
+                              disabled={saving}
+                              isLoading={saving}
+                            >
+                              <HiCheck className="w-3.5 h-3.5 mr-1" />
+                              Save
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={cancelEditing}
+                              className="h-8 px-3"
+                              disabled={saving}
+                            >
+                              <HiXMark className="w-3.5 h-3.5 mr-1" />
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => startEditing(group)}
+                              className="h-8 px-3"
+                            >
+                              <HiPencil className="w-3.5 h-3.5 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleDeleteGroup(group.id)}
+                              className="h-8 px-3"
+                            >
+                              <HiTrash className="w-3.5 h-3.5 mr-1" />
+                              Delete
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
@@ -492,7 +694,6 @@ export const ResearchGroups = () => {
         </div>
       )}
 
-      {/* Create Group Modal */}
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => {
@@ -562,4 +763,3 @@ export const ResearchGroups = () => {
 };
 
 export default ResearchGroups;
-

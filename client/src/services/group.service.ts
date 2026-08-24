@@ -1,9 +1,11 @@
+// src/services/group.service.ts
 import {
   doc,
   getDoc,
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -50,11 +52,9 @@ export const groupService = {
       collection(db, COLLECTION_NAME),
       where('sectionId', '==', sectionId)
     );
-    // Note: If orderBy('createdAt', 'asc') requires an index, we fetch and sort in memory for simplicity.
     const querySnap = await getDocs(q);
     const groups = querySnap.docs.map((docSnap) => docSnap.data() as ResearchGroup);
     
-    // Sort by createdAt ascending to ensure Group 01, Group 02 order
     return groups.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   },
 
@@ -101,14 +101,94 @@ export const groupService = {
   },
 
   /**
-   * Generic update group
+   * Update a research group with new data.
+   * Used for editing group details like adviser, members, etc.
    */
-  async updateGroup(groupId: string, updates: Partial<ResearchGroup>): Promise<void> {
+  async updateGroup(
+    groupId: string,
+    data: {
+      adviserName?: string;
+      members?: Array<{ uid: string; fullName: string; email?: string }>;
+      memberIds?: string[];
+      status?: string;
+      name?: string;
+      courseId?: string;
+      courseName?: string;
+      sectionId?: string;
+      sectionName?: string;
+    }
+  ): Promise<void> {
     const ref = doc(db, COLLECTION_NAME, groupId);
-    await updateDoc(ref, {
-      ...updates,
+    const updateData: any = {
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    if (data.name !== undefined) {
+      updateData.name = data.name;
+    }
+    
+    if (data.adviserName !== undefined) {
+      updateData.adviserName = data.adviserName;
+    }
+    
+    if (data.members !== undefined) {
+      updateData.members = data.members;
+      // Also update memberIds array for querying
+      updateData.memberIds = data.members.map(m => m.uid);
+    }
+    
+    if (data.memberIds !== undefined) {
+      updateData.memberIds = data.memberIds;
+    }
+    
+    if (data.status !== undefined) {
+      updateData.status = data.status;
+    }
+    
+    if (data.courseId !== undefined) {
+      updateData.courseId = data.courseId;
+    }
+    
+    if (data.courseName !== undefined) {
+      updateData.courseName = data.courseName;
+    }
+    
+    if (data.sectionId !== undefined) {
+      updateData.sectionId = data.sectionId;
+    }
+    
+    if (data.sectionName !== undefined) {
+      updateData.sectionName = data.sectionName;
+    }
+    
+    await updateDoc(ref, updateData);
+  },
+
+  /**
+   * Delete a research group by ID.
+   */
+  async deleteGroup(groupId: string): Promise<void> {
+    const ref = doc(db, COLLECTION_NAME, groupId);
+    await deleteDoc(ref);
+  },
+
+  /**
+   * Fetch a single research group by ID.
+   */
+  async getGroupById(groupId: string): Promise<ResearchGroup | null> {
+    const ref = doc(db, COLLECTION_NAME, groupId);
+    const docSnap = await getDoc(ref);
+    if (!docSnap.exists()) return null;
+    return docSnap.data() as ResearchGroup;
+  },
+
+  /**
+   * Fetch all research groups.
+   */
+  async getAllGroups(): Promise<ResearchGroup[]> {
+    const q = query(collection(db, COLLECTION_NAME));
+    const querySnap = await getDocs(q);
+    return querySnap.docs.map((docSnap) => docSnap.data() as ResearchGroup);
   }
 };
 
