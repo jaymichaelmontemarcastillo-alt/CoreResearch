@@ -78,12 +78,12 @@ export const DocumentsPage = () => {
 
   // Navigation handlers
   const handleOpenDocument = async (doc) => {
-    if (doc.isEditorDraft) {
+    if (doc.isProposalAttachment && (doc.downloadUrl || doc.originalFileUrl)) {
+      window.open(doc.downloadUrl || doc.originalFileUrl, '_blank');
+    } else if (doc.id) {
       // Record last opened timestamp asynchronously
       documentService.recordLastOpened(doc.id);
       navigate(`/documents/${doc.id}`);
-    } else if (doc.downloadUrl || doc.originalFileUrl) {
-      window.open(doc.downloadUrl || doc.originalFileUrl, '_blank');
     }
   };
 

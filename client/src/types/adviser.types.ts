@@ -5,6 +5,9 @@ export interface AdviserProfile {
   email: string;
   department: string;
   specialization?: string[];
+  expertise?: string[];
+  researchInterests?: string[];
+  keywords?: string[];
   maxCapacity: number;
   activeGroupsCount: number;
   isAvailable: boolean;

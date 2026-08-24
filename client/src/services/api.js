@@ -14,17 +14,22 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const token = await currentUser.getIdToken();
-        config.headers.Authorization = `Bearer ${token}`;
-      } else {
-        // Fallback check for dev mode token stored in localStorage
-        if (typeof localStorage !== 'undefined') {
-          const devToken = localStorage.getItem('core_research_dev_token');
-          if (devToken) {
-            config.headers.Authorization = `Bearer ${devToken}`;
-          }
+      // 1. Check for dev mode token first
+      let usingDevToken = false;
+      if (typeof localStorage !== 'undefined') {
+        const devToken = localStorage.getItem('core_research_dev_token');
+        if (devToken && devToken !== 'undefined' && devToken !== 'null') {
+          config.headers.Authorization = `Bearer ${devToken}`;
+          usingDevToken = true;
+        }
+      }
+
+      // 2. Fallback to Firebase Auth Token if not in dev mode
+      if (!usingDevToken) {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const token = await currentUser.getIdToken(true);
+          config.headers.Authorization = `Bearer ${token}`;
         }
       }
     } catch (error) {

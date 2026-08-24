@@ -120,21 +120,12 @@ export const documentStore = {
       console.warn(`[documentStore] fetchDocument error for ${id}:`, error.message);
     }
 
-    // Fallback to cache or minimal default
+    // Fallback to cache if present
     if (memoryDocCache.has(id)) {
       return memoryDocCache.get(id);
     }
 
-    const fallbackDoc = {
-      id,
-      title: 'Untitled Document',
-      ownerName: 'Researcher',
-      editorSettings: DEFAULT_EDITOR_SETTINGS,
-      updatedAt: new Date().toISOString(),
-      collaboratorCount: 1
-    };
-    memoryDocCache.set(id, fallbackDoc);
-    return fallbackDoc;
+    return null;
   },
 
   /**

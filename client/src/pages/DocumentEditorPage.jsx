@@ -1,6 +1,6 @@
 // src/pages/DocumentEditorPage.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { DocumentEditor } from '../components/editor/DocumentEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
@@ -80,8 +80,11 @@ class EditorErrorBoundary extends React.Component {
 
 export const DocumentEditorPage = () => {
   const { id: documentId } = useParams();
-  const { userProfile, currentUser } = useAuth();
+  const { userProfile, currentUser, role, currentFacultyMode } = useAuth();
+  const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
+  const isFaculty = effectiveRole === 'adviser' || effectiveRole === 'panelist';
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [editor, setEditor] = useState(null);
   const [collaborators, setCollaborators] = useState([]);
@@ -101,11 +104,13 @@ export const DocumentEditorPage = () => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMaximizedSidebarOpen, setIsMaximizedSidebarOpen] = useState(false);
 
+  // Stable Yjs Document per documentId
+  const ydoc = useMemo(() => new Y.Doc(), [documentId]);
+
   // Collaborative Provider State
   const [providerState, setProviderState] = useState({
-    ydoc: null,
     provider: null,
-    status: 'connecting', // 'connecting', 'connected', 'disconnected'
+    status: 'connecting', // 'connecting', 'connected', 'disconnected', 'cloud-sync'
     error: null
   });
 
@@ -121,6 +126,7 @@ export const DocumentEditorPage = () => {
   const editorRef = useRef(null);
   const myUidRef = useRef(effectiveUserProfile.uid);
   const isTypingRef = useRef(false);
+  const providerStatusRef = useRef(providerState.status);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -130,6 +136,10 @@ export const DocumentEditorPage = () => {
   useEffect(() => {
     myUidRef.current = effectiveUserProfile.uid;
   }, [effectiveUserProfile.uid]);
+
+  useEffect(() => {
+    providerStatusRef.current = providerState.status;
+  }, [providerState.status]);
 
   // Keyboard shortcut listener for Escape to exit maximized mode
   useEffect(() => {
@@ -155,9 +165,17 @@ export const DocumentEditorPage = () => {
     // Initial fetch
     const loadDocumentData = async () => {
       try {
-        const docData = await documentStore.fetchDocument(documentId);
+        let docData = await documentStore.fetchDocument(documentId);
+
+        // Auto-create document in Firestore if opening newly
+        if (!docData) {
+          docData = await documentStore.createDocument('Research Manuscript', effectiveUserProfile, {
+            id: documentId,
+          });
+        }
+
         if (isMounted && docData) {
-          setTitle(docData.title || 'Untitled Document');
+          setTitle(docData.title || 'Research Manuscript');
           setSourceType(docData.sourceType || 'native');
           if (docData.editorSettings?.page) {
             setPageSettings(docData.editorSettings.page);
@@ -202,6 +220,12 @@ export const DocumentEditorPage = () => {
         setPageSettings(docData.editorSettings.page);
       }
 
+      // If Hocuspocus is active, ignore incoming document content updates from Firestore
+      // to avoid dual-sync race conditions. Firestore is just a 1-way backup at this point.
+      if (providerStatusRef.current === 'connected') {
+        return;
+      }
+
       // Check if update originated from another collaborator
       const isFromOtherUser = docData.updatedBy && docData.updatedBy !== myUidRef.current;
       if (isFromOtherUser && docData.content) {
@@ -239,27 +263,16 @@ export const DocumentEditorPage = () => {
 
   // 2. Setup stable Hocuspocus collaboration provider lifecycle
   useEffect(() => {
-    if (!documentId) return;
+    if (!documentId || !ydoc) return;
     
     let isSubscribed = true;
     let hocuspocusProvider = null;
-    const newYdoc = new Y.Doc();
     
-    // Check if we have a valid WebSocket URL (or running in local HTTP)
-    let wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL;
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-
-    if (!wsUrl && isHttps) {
-      // In production HTTPS without explicit WSS endpoint, use real-time Firestore sync
-      setProviderState({ ydoc: newYdoc, provider: null, status: 'cloud-sync', error: null });
-      return () => {
-        isSubscribed = false;
-        try { newYdoc.destroy(); } catch (e) {}
-      };
-    }
-
-    wsUrl = wsUrl || 'ws://localhost:5000/collaboration';
-    setProviderState({ ydoc: newYdoc, provider: null, status: 'connecting', error: null });
+    const isProduction = import.meta.env.PROD;
+    const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || (isProduction 
+      ? 'wss://coreresearch-alt-lspusys-4030.onrender.com/collaboration' 
+      : 'ws://localhost:5000/collaboration');
+    setProviderState({ provider: null, status: 'connecting', error: null });
 
     const initProvider = async () => {
       let token = `dev-token-${effectiveUserProfile.uid}-${effectiveUserProfile.role}`;
@@ -282,7 +295,7 @@ export const DocumentEditorPage = () => {
         hocuspocusProvider = new HocuspocusProvider({
           url: wsUrl,
           name: `document-${documentId}`,
-          document: newYdoc,
+          document: ydoc,
           token: token,
           broadcast: false,
           maxAttempts: 3,
@@ -329,9 +342,9 @@ export const DocumentEditorPage = () => {
           }
         });
 
-        hocuspocusProvider.doc = newYdoc;
+        hocuspocusProvider.doc = ydoc;
         if (hocuspocusProvider.awareness) {
-          hocuspocusProvider.awareness.doc = newYdoc;
+          hocuspocusProvider.awareness.doc = ydoc;
         }
 
         if (isSubscribed) {
@@ -352,11 +365,8 @@ export const DocumentEditorPage = () => {
       if (hocuspocusProvider) {
         try { hocuspocusProvider.destroy(); } catch (e) {}
       }
-      if (newYdoc) {
-        try { newYdoc.destroy(); } catch (e) {}
-      }
     };
-  }, [documentId, currentUser]);
+  }, [documentId, ydoc, effectiveUserProfile.uid]);
 
   // 3. Handle Title Editing & Firestore sync
   const handleTitleChange = (e) => {
@@ -618,7 +628,7 @@ export const DocumentEditorPage = () => {
       {/* Top Header Row (Google Docs style) */}
       <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10 shrink-0 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
+          <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || '/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
             <HiChevronLeft className="w-5 h-5" />
           </Button>
           
@@ -636,12 +646,14 @@ export const DocumentEditorPage = () => {
               placeholder="Document Title"
               className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate max-w-[200px] sm:max-w-xs transition-colors"
             />
-            <EditorMenuBar 
-              editor={editor} 
-              title={title}
-              onOpenPageSettings={() => setShowPageSettingsModal(true)}
-              onNewDocument={handleNewDocument}
-            />
+            {!isFaculty && (
+              <EditorMenuBar 
+                editor={editor} 
+                title={title}
+                onOpenPageSettings={() => setShowPageSettingsModal(true)}
+                onNewDocument={handleNewDocument}
+              />
+            )}
           </div>
         </div>
 
@@ -713,15 +725,17 @@ export const DocumentEditorPage = () => {
           </Button>
 
           {/* Share Dialog Button */}
-          <Button 
-            variant="primary" 
-            size="sm" 
-            onClick={() => setShowShareModal(true)} 
-            className="rounded-full px-3 sm:px-5 shadow-sm"
-          >
-            <HiShare className="w-4 h-4 sm:mr-1.5" />
-            <span className="hidden sm:inline text-xs font-semibold tracking-wide">Share</span>
-          </Button>
+          {!isFaculty && (
+            <Button 
+              variant="primary" 
+              size="sm" 
+              onClick={() => setShowShareModal(true)} 
+              className="rounded-full px-3 sm:px-5 shadow-sm"
+            >
+              <HiShare className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline text-xs font-semibold tracking-wide">Share</span>
+            </Button>
+          )}
 
           {/* Maximize / Minimize Fullscreen Toggle Button */}
           <Button 
@@ -746,13 +760,15 @@ export const DocumentEditorPage = () => {
       </div>
 
       {/* Editor Toolbar */}
-      <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 p-1 flex justify-center z-10 shrink-0">
-        <EditorToolbar 
-          editor={editor} 
-          documentId={documentId}
-          onOpenPageSettings={() => setShowPageSettingsModal(true)}
-        />
-      </div>
+      {!isFaculty && (
+        <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 p-1 flex justify-center z-10 shrink-0">
+          <EditorToolbar 
+            editor={editor} 
+            documentId={documentId}
+            onOpenPageSettings={() => setShowPageSettingsModal(true)}
+          />
+        </div>
+      )}
 
       {/* Main Document Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
@@ -763,12 +779,14 @@ export const DocumentEditorPage = () => {
                 <DocumentEditor 
                   documentId={documentId} 
                   userProfile={effectiveUserProfile} 
-                  ydoc={providerState.ydoc}
+                  ydoc={ydoc}
                   provider={providerState.provider}
                   pageSettings={pageSettings}
                   initialContent={initialContent}
                   sourceType={sourceType}
+                  title={title}
                   comments={comments}
+                  isReadOnly={isFaculty}
                   onCommentSelect={(commentId) => {
                     setHighlightedCommentId(commentId);
                     if (!showComments) {

@@ -13,6 +13,7 @@ import {
   HiChevronDown, 
   HiChevronUp 
 } from 'react-icons/hi2';
+import { Reply, X, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { documentStore } from '../../services/documentStore';
 
@@ -447,7 +448,7 @@ const ReplyTreeNode = ({
             <span className="truncate">{reply.authorName || 'Collaborator'}</span>
             {reply.replyToUserName && (
               <>
-                <ArrowRight className="w-2.5 h-2.5 text-gray-400 shrink-0 mx-0.5" />
+                <HiArrowRight className="w-2.5 h-2.5 text-gray-400 shrink-0 mx-0.5" />
                 <span className="text-blue-600 dark:text-blue-400 font-medium truncate">
                   @{reply.replyToUserName}
                 </span>
@@ -1002,115 +1003,6 @@ export const CommentsPanel = ({
             );
           })
         )}
-      </div>
-
-      {/* 3. Bottom Sticky Comment Composer */}
-      <div className="shrink-0 p-3 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 relative z-20">
-        
-        {/* Active Mention Autocomplete Dropdown Popup */}
-        {mentionQuery !== null && filteredUsers.length > 0 && (
-          <div className="absolute left-3 right-3 bottom-full mb-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 max-h-48 overflow-y-auto animate-fade-in text-xs">
-            <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-slate-700">
-              Mention Member (@)
-            </div>
-            {filteredUsers.map((user, idx) => (
-              <button
-                key={user.id || user.uid}
-                type="button"
-                onClick={() => selectMention(user)}
-                className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 transition-colors ${
-                  idx === mentionIndex
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium'
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
-                  </div>
-                  <span className="truncate">{user.fullName}</span>
-                </div>
-                <span className="text-[10px] text-gray-400 capitalize shrink-0 font-normal">
-                  {user.role || 'Member'}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Selected manuscript text quote badge preview */}
-        {selectedTextAnchor && !replyTarget && (
-          <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border-l-2 border-amber-500 px-2.5 py-1.5 mb-2 rounded text-xs text-amber-900 dark:text-amber-300">
-            <div className="flex items-center gap-1.5 truncate">
-              <HiChatBubbleBottomCenterText className="w-3 h-3 text-amber-600 shrink-0" />
-              <span className="truncate italic">"{selectedTextAnchor}"</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedTextAnchor('')}
-              className="text-amber-500 hover:text-amber-700 p-0.5"
-              title="Clear quote"
-            >
-              <HiXMark className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Replying target badge preview */}
-        {replyTarget && (
-          <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 px-2.5 py-1.5 mb-2 rounded text-xs text-blue-900 dark:text-blue-300">
-            <div className="flex items-center gap-1.5 truncate">
-              <HiArrowUturnLeft className="w-3 h-3 text-blue-600 shrink-0" />
-              <span>
-                Replying to <strong className="font-semibold text-blue-700 dark:text-blue-300">@{replyTarget.authorName}</strong>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplyTarget(null)}
-              className="text-blue-500 hover:text-blue-700 p-0.5"
-              title="Cancel reply"
-            >
-              <HiXMark className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Input Area with Circular Send Icon Button */}
-        <div className="flex items-end gap-2 bg-gray-50 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
-          <textarea
-            ref={textareaRef}
-            rows={2}
-            value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              replyTarget
-                ? `Reply to @${replyTarget.authorName}... (Type @ to mention)`
-                : selectedTextAnchor
-                ? "Comment on selected text... (Type @ to mention)"
-                : "Add a manuscript comment... (Type @ to mention)"
-            }
-            className="flex-1 bg-transparent text-xs sm:text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none resize-none min-h-[44px] max-h-32 custom-scrollbar"
-          />
-
-          {/* Compact Circular Send Icon Button */}
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!inputText.trim()}
-            aria-label="Send comment"
-            title="Send comment (Ctrl+Enter)"
-            className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100 text-white flex items-center justify-center shadow-sm transition-all shrink-0 mb-0.5"
-          >
-            <HiPaperAirplane className="w-4 h-4 ml-0.5" />
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-400">
-          <span>Type <kbd className="font-mono bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700">@</kbd> to mention</span>
-          <span><kbd className="font-mono bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700">Ctrl</kbd> + <kbd className="font-mono bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700">Enter</kbd></span>
-        </div>
       </div>
     </div>
   );

@@ -27,6 +27,9 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [devMode, setDevMode] = useState(false);
+  const [currentFacultyMode, setCurrentFacultyMode] = useState(
+    localStorage.getItem('core_research_faculty_mode') || 'adviser'
+  );
 
   // Sync profile with Express backend API
   // Kapag nag-login o register ang user via Firebase Auth (email man o Google), 
@@ -318,13 +321,45 @@ export const AuthProvider = ({ children }) => {
         department: 'Computer Science',
         studentIdOrEmployeeId: '2022-10482'
       },
-      adviser: {
+      adviser1: {
         uid: 'dev-adviser-01',
-        email: 'dr.vance@university.edu',
-        fullName: 'Dr. Eleanor Vance',
+        email: 'maria.santos.adv@university.edu',
+        fullName: 'Dr. Maria Santos',
         role: 'adviser',
         department: 'Computer Science',
         studentIdOrEmployeeId: 'EMP-8821'
+      },
+      adviser2: {
+        uid: 'dev-adviser-02',
+        email: 'juan.cruz@university.edu',
+        fullName: 'Dr. Juan Cruz',
+        role: 'adviser',
+        department: 'Information Technology',
+        studentIdOrEmployeeId: 'EMP-4401'
+      },
+      adviser3: {
+        uid: 'dev-adviser-03',
+        email: 'ana.reyes@university.edu',
+        fullName: 'Dr. Ana Reyes',
+        role: 'adviser',
+        department: 'Computer Science',
+        studentIdOrEmployeeId: 'EMP-5502'
+      },
+      adviser4: {
+        uid: 'dev-adviser-04',
+        email: 'mark.garcia@university.edu',
+        fullName: 'Dr. Mark Garcia',
+        role: 'adviser',
+        department: 'Information Technology',
+        studentIdOrEmployeeId: 'EMP-6603'
+      },
+      adviser5: {
+        uid: 'dev-adviser-05',
+        email: 'carlo.mendoza@university.edu',
+        fullName: 'Dr. Carlo Mendoza',
+        role: 'adviser',
+        department: 'Computer Science',
+        studentIdOrEmployeeId: 'EMP-7704'
       },
       panelist: {
         uid: 'dev-panelist-01',
@@ -367,6 +402,11 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     userProfile,
     role: userProfile?.role || null,
+    currentFacultyMode: userProfile?.role === 'faculty' ? currentFacultyMode : null,
+    setFacultyMode: (mode) => {
+      setCurrentFacultyMode(mode);
+      localStorage.setItem('core_research_faculty_mode', mode);
+    },
     department: userProfile?.department || null,
     isApproved: userProfile?.is_approved || false,
     status: userProfile?.status || null,

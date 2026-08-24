@@ -1,7 +1,7 @@
 // src/pages/StudentResearchWorkspace.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -16,9 +16,9 @@ import {
   FileEdit,
   ExternalLink,
   PlusCircle,
-  FolderGit2,
   Calendar,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
@@ -26,6 +26,7 @@ import researchFeedbackService from '../services/researchFeedback.service';
 import progressService from '../services/progress.service';
 import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
 import titleProposalService from '../services/titleProposal.service';
+import { adviserRequestService } from '../services/adviserRequest.service';
 import groupService from '../services/group.service';
 import { ResearchProgressCircle } from '../components/research/ResearchProgressCircle';
 import { MilestonesTracker } from '../components/research/MilestonesTracker';
@@ -36,6 +37,7 @@ import { ResearchFeedbackSection } from '../components/research/ResearchFeedback
 export const StudentResearchWorkspace = () => {
   const { currentUser, userProfile, role } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const queryWorkspaceId = searchParams.get('id');
 
@@ -74,15 +76,18 @@ export const StudentResearchWorkspace = () => {
             group?.id
           );
 
-          // If no workspace yet, check if student has an approved proposal to auto-provision
-          if (!targetWorkspace && group) {
-            const groupProposals = await titleProposalService.getProposalsByGroup(group.id);
-            const approved = groupProposals.find((p) => p.status === 'approved' || p.status === 'submitted');
-            if (approved) {
-              targetWorkspace = await researchWorkspaceService.getOrCreateWorkspaceForProposal(
-                approved,
+          // If no workspace yet, check if student has an accepted Adviser Request to auto-provision
+          if (!targetWorkspace) {
+            const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
+            const accepted = requests.find((r) => r.status === 'accepted');
+            if (accepted) {
+              targetWorkspace = await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(
+                accepted,
                 userProfile
               );
+            } else {
+              navigate('/submit-title');
+              return;
             }
           }
         }
@@ -141,11 +146,42 @@ export const StudentResearchWorkspace = () => {
         await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
       }
 
-      navigate(editorUrl);
+      navigate(editorUrl, { state: { from: location.pathname + location.search } });
     } catch (err) {
       console.error('Failed to open manuscript document:', err);
       setToast('Failed to open manuscript editor: ' + err.message);
       setOpeningDoc(false);
+    }
+  };
+
+  const handleResetWorkspace = async () => {
+    if (!workspace) return;
+    const confirm = window.confirm("WARNING: This will permanently delete your current workspace so you can restart the title submission process. Proceed?");
+    if (!confirm) return;
+
+    try {
+      // 1. Delete Workspace
+      await researchWorkspaceService.deleteWorkspace(workspace.id);
+      
+      // 2. Fetch Group and clear adviser fields
+      const group = await groupService.getGroupByStudentId(currentUser.uid);
+      if (group) {
+        await groupService.updateGroup(group.id, {
+          adviserId: "",
+          adviserName: ""
+        });
+      }
+
+      // 3. Delete any associated adviser requests
+      const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
+      for (const req of requests) {
+        await adviserRequestService.deleteRequest(req.id);
+      }
+
+      setToast('Workspace deleted. You can now submit a new title.');
+      navigate('/submit-title');
+    } catch (err) {
+      setToast('Failed to reset workspace: ' + err.message);
     }
   };
 
@@ -218,7 +254,7 @@ export const StudentResearchWorkspace = () => {
   };
 
   // Dynamic progress calculations
-  const overallProgress = progressService.calculateOverallProgress(workspace, tasks);
+  const overallProgress = progressService.calculateWorkspaceProgress(workspace, tasks);
   const taskProgress = progressService.calculateTaskProgress(tasks);
   const milestones = progressService.getResearchMilestones(workspace, tasks);
 
@@ -227,6 +263,17 @@ export const StudentResearchWorkspace = () => {
     if (taskFilter === 'completed') return t.status === 'completed';
     return true;
   });
+
+  const isSectionLocked = (secId) => {
+    const phase = workspace?.researchPhase || 'CHAPTERS_1_3';
+    if (phase === 'CHAPTERS_1_3' || phase === 'PROPOSAL_DEFENSE') {
+      return ['chapter_4', 'chapter_5', 'final_manuscript'].includes(secId);
+    }
+    if (phase === 'CHAPTERS_4_5') {
+      return ['final_manuscript'].includes(secId);
+    }
+    return false;
+  };
 
   return (
     <div className="space-y-6">
@@ -255,13 +302,31 @@ export const StudentResearchWorkspace = () => {
           <p className="text-xs text-gray-500 max-w-md mx-auto">
             A research workspace becomes active once your Title Proposal is approved and an adviser is assigned.
           </p>
-          <div className="pt-2">
+          <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
             <Button
               variant="primary"
               size="sm"
               onClick={() => navigate('/proposals')}
             >
               View Title Proposals
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+                    { id: `ws-${currentUser?.uid}`, title: 'Research Manuscript Draft', groupId: userProfile?.groupId || '' },
+                    userProfile
+                  );
+                  navigate(doc.editorUrl, { state: { from: location.pathname + location.search } });
+                } catch (e) {
+                  navigate(`/documents/doc-${Date.now()}`, { state: { from: location.pathname + location.search } });
+                }
+              }}
+            >
+              <FileEdit className="w-4 h-4 mr-1.5" />
+              Open Manuscript Editor
             </Button>
           </div>
         </Card>
@@ -310,6 +375,8 @@ export const StudentResearchWorkspace = () => {
               <div className="shrink-0 p-3 bg-white dark:bg-slate-800/80 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
                 <ResearchProgressCircle
                   progress={overallProgress}
+                  status={workspace.status}
+                  phase={workspace.researchPhase}
                   completedTasks={taskProgress.completed}
                   totalTasks={taskProgress.total}
                   subtitle="Research Completion"
@@ -329,9 +396,19 @@ export const StudentResearchWorkspace = () => {
                   {openingDoc ? 'Opening...' : 'Open Manuscript'}
                 </Button>
 
-                <p className="text-[10px] text-center text-gray-400 dark:text-gray-500">
+                <p className="text-[10px] text-center text-gray-400 dark:text-gray-500 mb-2">
                   Launches real-time collaborative TipTap / Yjs document editor
                 </p>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                  onClick={handleResetWorkspace}
+                >
+                  <AlertCircle className="w-4 h-4 mr-1.5" />
+                  Abandon Workspace & Restart (Dev)
+                </Button>
               </div>
             </div>
           </Card>
@@ -355,43 +432,51 @@ export const StudentResearchWorkspace = () => {
             </div>
 
             <div className="divide-y divide-gray-100 dark:divide-slate-800">
-              {(workspace.sections || []).map((sec) => (
-                <div
-                  key={sec.id}
-                  className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-900 dark:text-white">
-                        {sec.name}
-                      </span>
-                      <Badge
-                        variant={
-                          sec.status === 'completed'
-                            ? 'emerald'
-                            : sec.status === 'under_review' || sec.status === 'submitted'
-                            ? 'blue'
-                            : sec.status === 'revision_required'
-                            ? 'rose'
-                            : 'gray'
-                        }
-                      >
-                        {sec.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
-                    </div>
+              {(workspace.sections || []).map((sec) => {
+                const locked = isSectionLocked(sec.id);
+                return (
+                  <div
+                    key={sec.id}
+                    className={`py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${locked ? 'opacity-50' : ''}`}
+                  >
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                          {sec.name}
+                        </span>
+                        {locked ? (
+                          <Badge variant="gray">
+                            <Lock className="w-3 h-3 mr-1 inline" /> LOCKED
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant={
+                              sec.status === 'completed'
+                                ? 'emerald'
+                                : sec.status === 'under_review' || sec.status === 'submitted'
+                                ? 'blue'
+                                : sec.status === 'revision_required'
+                                ? 'rose'
+                                : 'gray'
+                            }
+                          >
+                            {sec.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                        )}
+                      </div>
 
-                    <div className="w-full max-w-xs bg-gray-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-primary h-full transition-all duration-500"
-                        style={{
-                          width: `${sec.status === 'completed' ? 100 : sec.progress || 0}%`,
-                        }}
-                      />
+                      <div className="w-full max-w-xs bg-gray-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-primary h-full transition-all duration-500"
+                          style={{
+                            width: `${locked ? 0 : (sec.status === 'completed' ? 100 : sec.progress || 0)}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
 
                   {/* Section Controls for Adviser / Coordinator */}
-                  {(isAdviser || isCoordinator) && (
+                  {(isAdviser || isCoordinator) && !locked && (
                     <div className="flex items-center gap-2">
                       <select
                         className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"
@@ -408,7 +493,7 @@ export const StudentResearchWorkspace = () => {
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
           </Card>
 

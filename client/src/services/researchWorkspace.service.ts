@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -17,7 +18,7 @@ import {
   SectionStatus,
   DEFAULT_MANUSCRIPT_SECTIONS,
 } from '../types/researchWorkspace.types';
-import { TitleProposal } from '../types/proposal.types';
+import { AdviserRequest } from './adviserRequest.service';
 import { UserProfile } from '../types/user.types';
 import progressService from './progress.service';
 
@@ -31,14 +32,13 @@ function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
 
 export const researchWorkspaceService = {
   /**
-   * Get or create a manuscript workspace for an approved proposal / group
+   * Get or create a manuscript workspace for an accepted Adviser Request
    */
-  async getOrCreateWorkspaceForProposal(
-    proposal: TitleProposal,
-    userProfile: UserProfile,
-    adviserInfo?: { id: string; name: string }
+  async getOrCreateWorkspaceForAdviserRequest(
+    request: AdviserRequest,
+    userProfile: UserProfile
   ): Promise<ManuscriptWorkspace> {
-    const workspaceId = `ws-${proposal.id}`;
+    const workspaceId = `ws-${request.id}`;
     const docRef = doc(db, COLLECTION_NAME, workspaceId);
     const docSnap = await getDoc(docRef);
 
@@ -49,16 +49,17 @@ export const researchWorkspaceService = {
     const now = new Date().toISOString();
     const newWorkspace: ManuscriptWorkspace = {
       id: workspaceId,
-      proposalId: proposal.id,
-      title: proposal.title || 'Research Manuscript',
-      studentId: proposal.submittedByUid || userProfile.uid,
-      studentName: proposal.submittedByName || userProfile.fullName || 'Student Researcher',
-      groupId: proposal.groupId || '',
-      groupName: proposal.groupName || 'Research Group',
-      adviserId: adviserInfo?.id || proposal.coordinatorId || '',
-      adviserName: adviserInfo?.name || proposal.coordinatorName || 'Assigned Adviser',
+      proposalId: request.id, // Keeping proposalId field but pointing to request ID for backward compatibility
+      title: request.researchTitle || 'Research Manuscript',
+      studentId: request.studentId || userProfile.uid,
+      studentName: request.studentName || userProfile.fullName || 'Student Researcher',
+      groupId: request.groupId || '',
+      groupName: request.groupName || 'Research Group',
+      adviserId: request.adviserId || '',
+      adviserName: request.adviserName || 'Assigned Adviser',
       department: userProfile.department || 'Computer Studies',
       status: 'in_progress',
+      researchPhase: 'CHAPTERS_1_3',
       sections: DEFAULT_MANUSCRIPT_SECTIONS,
       overallProgress: 20, // Base progress for approved proposal + setup
       createdAt: now,
@@ -225,6 +226,14 @@ export const researchWorkspaceService = {
       adviserName,
       updatedAt: new Date().toISOString(),
     });
+  },
+
+  /**
+   * Delete a workspace (useful for development/testing resets)
+   */
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    const docRef = doc(db, COLLECTION_NAME, workspaceId);
+    await deleteDoc(docRef);
   },
 };
 

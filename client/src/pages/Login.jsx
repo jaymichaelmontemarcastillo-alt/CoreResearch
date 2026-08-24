@@ -278,7 +278,11 @@ export const Login = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
           {[
             { role: "student", name: "Alex Rivera", hoverBg: "hover:bg-blue-50 dark:hover:bg-blue-500/10", hoverBorder: "hover:border-blue-300 dark:hover:border-blue-500/30" },
-            { role: "adviser", name: "Dr. Vance", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
+            { role: "adviser1", name: "Dr. Santos (Web)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
+            { role: "adviser2", name: "Dr. Cruz (AI)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
+            { role: "adviser3", name: "Dr. Reyes (DB)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
+            { role: "adviser4", name: "Dr. Garcia (Data)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
+            { role: "adviser5", name: "Dr. Mendoza (Net)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
             { role: "panelist", name: "Prof. Chen", hoverBg: "hover:bg-purple-50 dark:hover:bg-purple-500/10", hoverBorder: "hover:border-purple-300 dark:hover:border-purple-500/30" },
             { role: "admin", name: "Dean Office", hoverBg: "hover:bg-amber-50 dark:hover:bg-amber-500/10", hoverBorder: "hover:border-amber-300 dark:hover:border-amber-500/30" },
           ].map((item) => (

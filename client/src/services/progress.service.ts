@@ -65,6 +65,31 @@ export const progressService = {
   },
 
   /**
+   * Calculate overall dynamic workspace progress combining sections and tasks
+   */
+  calculateWorkspaceProgress(
+    workspace: ManuscriptWorkspace | null,
+    tasks: ResearchTask[] = []
+  ): number {
+    if (!workspace) return 0;
+    
+    const sectionStats = this.calculateSectionProgress(workspace.sections);
+    
+    // If no tasks, progress is purely based on sections
+    if (!tasks || tasks.length === 0) {
+      return sectionStats.percentage;
+    }
+    
+    const taskStats = this.calculateTaskProgress(tasks);
+    
+    // Weighted progress: 80% sections, 20% tasks
+    const weightedSection = (sectionStats.percentage * 0.8);
+    const weightedTask = (taskStats.percentage * 0.2);
+    
+    return Math.round(weightedSection + weightedTask);
+  },
+
+  /**
    * Determine milestone step progression
    */
   getResearchMilestones(

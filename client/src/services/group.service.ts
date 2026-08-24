@@ -99,6 +99,17 @@ export const groupService = {
       updatedAt: new Date().toISOString(),
     });
   },
+
+  /**
+   * Generic update group
+   */
+  async updateGroup(groupId: string, updates: Partial<ResearchGroup>): Promise<void> {
+    const ref = doc(db, COLLECTION_NAME, groupId);
+    await updateDoc(ref, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  }
 };
 
 export default groupService;

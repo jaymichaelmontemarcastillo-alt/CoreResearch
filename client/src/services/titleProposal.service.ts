@@ -99,7 +99,21 @@ export const titleProposalService = {
    * Students should always query by groupId.
    */
   async getProposalsByGroup(groupId: string): Promise<TitleProposal[]> {
+    if (!groupId) return [];
     const q = query(collection(db, COLLECTION), where('groupId', '==', groupId));
+    const snap = await getDocs(q);
+    const list = snap.docs.map((d) => d.data() as TitleProposal);
+    return list.sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+  },
+
+  /**
+   * Fetch all proposals submitted by a specific student UID.
+   */
+  async getProposalsByStudentId(studentUid: string): Promise<TitleProposal[]> {
+    if (!studentUid) return [];
+    const q = query(collection(db, COLLECTION), where('submittedByUid', '==', studentUid));
     const snap = await getDocs(q);
     const list = snap.docs.map((d) => d.data() as TitleProposal);
     return list.sort(

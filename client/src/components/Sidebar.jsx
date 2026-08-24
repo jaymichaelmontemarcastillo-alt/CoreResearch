@@ -3,6 +3,9 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logoImg from "../assets/logo.png";
+import { adviserRequestService } from "../services/adviserRequest.service";
+import researchWorkspaceService from "../services/researchWorkspace.service";
+import groupService from "../services/group.service";
 import {
   HiSquares2X2,
   HiDocumentText,
@@ -28,7 +31,38 @@ export const Sidebar = ({
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { role, logout } = useAuth();
+  const { role, logout, currentFacultyMode } = useAuth();
+  
+  const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
+  
+  const [hasWorkspace, setHasWorkspace] = React.useState(false);
+  const { currentUser } = useAuth();
+
+  React.useEffect(() => {
+    const checkWorkspace = async () => {
+      if (effectiveRole === 'student' && currentUser?.uid) {
+        try {
+          const group = await groupService.getGroupByStudentId(currentUser.uid);
+          const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(currentUser.uid, group?.id);
+          
+          if (ws) {
+            setHasWorkspace(true);
+          } else {
+            // Also check if they have an accepted request that is still processing
+            const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid);
+            if (requests.some(r => r.status === 'accepted')) {
+              setHasWorkspace(true);
+            } else {
+              setHasWorkspace(false);
+            }
+          }
+        } catch (err) {
+          console.error("Sidebar workspace fetch error", err);
+        }
+      }
+    };
+    checkWorkspace();
+  }, [effectiveRole, currentUser]);
 
   const handleLogout = async () => {
     await logout();
@@ -46,19 +80,19 @@ export const Sidebar = ({
           icon: HiSquares2X2,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
-        {
-          label: "Proposals",
-          path: "/proposals",
+        ...(!hasWorkspace && effectiveRole === "student" ? [{
+          label: "Submit Title",
+          path: "/submit-title",
           icon: HiDocumentText,
-          roles: ["student", "adviser"],
-        },
+          roles: ["student"],
+        }] : []),
         {
           label: "Proposal Review",
           path: "/coordinator/proposals",
           icon: HiClipboardDocumentCheck,
           roles: ["research_coordinator", "admin"],
         },
-        ...(role === "student"
+        ...(hasWorkspace && effectiveRole === "student"
           ? [
             {
               label: "Research Workspace",
@@ -74,7 +108,7 @@ export const Sidebar = ({
             },
           ]
           : []),
-        ...(role === "adviser" || role === "research_coordinator" || role === "admin"
+        ...(effectiveRole === "adviser" || effectiveRole === "research_coordinator" || effectiveRole === "admin"
           ? [
             {
               label: "My Advisees",
@@ -84,17 +118,21 @@ export const Sidebar = ({
             },
           ]
           : []),
-        {
-          label: "Documents",
-          path: "/documents",
-          icon: HiDocumentDuplicate,
-          roles: ["student", "adviser", "admin", "research_coordinator"],
-        },
+        ...(effectiveRole === "panelist"
+          ? [
+            {
+              label: "Panel Assignments",
+              path: "/panelist/defendees",
+              icon: HiUsers,
+              roles: ["panelist"],
+            },
+          ]
+          : []),
         {
           label: "Repository",
           path: "/repository",
           icon: HiBuildingLibrary,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
         },
       ],
     },

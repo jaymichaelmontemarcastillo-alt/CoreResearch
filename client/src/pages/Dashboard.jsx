@@ -23,15 +23,24 @@ import {
   HiBolt,
   HiArrowRight,
 } from "react-icons/hi2";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { groupService } from "../services/group.service";
+import titleProposalService from "../services/titleProposal.service";
+import researchWorkspaceService from "../services/researchWorkspace.service";
+import manuscriptDocumentAdapter from "../services/manuscriptDocumentAdapter";
+import { documentStore } from "../services/documentStore";
 import { Toast } from "../components/ui/Toast";
+import { facultyService } from '../services/faculty.service';
+import { adviserRequestService } from '../services/adviserRequest.service';
 
 export const Dashboard = () => {
-  const { userProfile, currentUser, role } = useAuth();
+  const { userProfile, currentUser, role, currentFacultyMode, setFacultyMode } = useAuth();
+  
+  const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
+  const navigate = useNavigate();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -59,6 +68,12 @@ export const Dashboard = () => {
   }, [location]);
 
   const [academicInfo, setAcademicInfo] = useState(null);
+  const [studentResearch, setStudentResearch] = useState({
+    workspace: null,
+    proposal: null,
+    documents: [],
+    loading: true,
+  });
 
   useEffect(() => {
     const studentUid = userProfile?.uid || currentUser?.uid;
@@ -83,11 +98,39 @@ export const Dashboard = () => {
             if (sec) sectionName = sec.name;
           }
 
+          // Fetch student proposals, workspace, and documents
+          let proposals = [];
+          if (group?.id) {
+            proposals = await titleProposalService.getProposalsByGroup(group.id);
+          }
+          if (proposals.length === 0 && studentUid) {
+            proposals = await titleProposalService.getProposalsByStudentId(studentUid);
+          }
+
+          const workspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
+            studentUid,
+            group?.id
+          );
+
+          let userDocs = [];
+          try {
+            const docs = await documentStore.fetchDocuments(userProfile);
+            userDocs = (docs || []).filter(
+              (d) => d.ownerId === studentUid || (group?.id && d.groupId === group.id)
+            );
+          } catch (e) {}
+
           if (isMounted) {
             setAcademicInfo({ course, sectionName, group });
+            setStudentResearch({
+              workspace,
+              proposal: proposals[0] || null,
+              documents: userDocs,
+              loading: false,
+            });
           }
         } catch (error) {
-          console.error("Failed to load academic info", error);
+          console.error("Failed to load academic and research info", error);
         }
       };
       fetchAcademicInfo();
@@ -109,6 +152,30 @@ export const Dashboard = () => {
               {getGreeting()}, {displayName} 👋
             </h1>
           </div>
+          {role === 'faculty' && (
+            <div className="flex items-center gap-2 mt-2 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg w-max">
+              <button
+                onClick={() => setFacultyMode('adviser')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  currentFacultyMode === 'adviser'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                Adviser Mode
+              </button>
+              <button
+                onClick={() => setFacultyMode('panelist')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  currentFacultyMode === 'panelist'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                Panelist Mode
+              </button>
+            </div>
+          )}
           <p className="text-gray-500 dark:text-gray-400 text-sm max-w-2xl">
             Your dashboard is active under{" "}
             <span className="font-semibold text-gray-700 dark:text-gray-300">
@@ -119,21 +186,21 @@ export const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-3 shrink-0 flex-wrap">
-          {role === "student" && (
+          {effectiveRole === "student" && (
             <>
               <Link to="/research/workspace">
                 <Button variant="secondary" size="md">
                   <HiBookOpen className="w-4 h-4 mr-2" /> Research Workspace
                 </Button>
               </Link>
-              <Link to="/proposals/new">
+              <Link to="/submit-title">
                 <Button variant="primary" size="md">
-                  <HiPlusCircle className="w-4 h-4 mr-2" /> Submit Proposal
+                  <HiPlusCircle className="w-4 h-4 mr-2" /> Start Research Workflow
                 </Button>
               </Link>
             </>
           )}
-          {role === "adviser" && (
+          {effectiveRole === "adviser" && (
             <>
               <Link to="/advisees">
                 <Button variant="primary" size="md">
@@ -147,14 +214,14 @@ export const Dashboard = () => {
               </Link>
             </>
           )}
-          {role === "panelist" && (
+          {effectiveRole === "panelist" && (
             <Link to="/reviews">
               <Button variant="primary" size="md">
                 <HiChatBubbleLeftRight className="w-4 h-4 mr-2" /> View Feedback Threads
               </Button>
             </Link>
           )}
-          {role === "admin" && (
+          {effectiveRole === "admin" && (
             <Link to="/admin/users">
               <Button variant="primary" size="md">
                 <HiUsers className="w-4 h-4 mr-2" /> Manage Users
@@ -165,10 +232,10 @@ export const Dashboard = () => {
       </div>
 
       {/* Metric Cards Row */}
-      {role === "student" && <StudentDashboardMetrics />}
-      {role === "adviser" && <AdviserDashboardMetrics />}
-      {role === "panelist" && <PanelistDashboardMetrics />}
-      {role === "admin" && <AdminDashboardMetrics />}
+      {effectiveRole === "student" && <StudentDashboardMetrics research={studentResearch} userProfile={userProfile} />}
+      {effectiveRole === "adviser" && <AdviserDashboardMetrics />}
+      {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
+      {effectiveRole === "admin" && <AdminDashboardMetrics />}
 
       {/* Main Content Grid: Pipeline + Active Papers + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -176,7 +243,7 @@ export const Dashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           
           {/* ====== STUDENT CONTENT ====== */}
-          {(!role || role === "student") && (
+          {(!effectiveRole || effectiveRole === "student") && (
             <>
               {/* Academic Profile Widget */}
               {userProfile && (
@@ -237,28 +304,30 @@ export const Dashboard = () => {
 
               {/* Module Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card hover className="flex flex-col justify-between space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
-                      <HiDocumentText className="w-5 h-5" />
+                {!studentResearch.workspace && (
+                  <Card hover className="flex flex-col justify-between space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
+                        <HiDocumentText className="w-5 h-5" />
+                      </div>
+                      <Badge variant="blue">Proposal Stage</Badge>
                     </div>
-                    <Badge variant="blue">Proposal Stage</Badge>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      Title Proposals
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                      Submit new research titles, review evaluation status, and adviser recommendations.
-                    </p>
-                  </div>
-                  <Link
-                    to="/proposals"
-                    className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                  >
-                    View Proposals <HiArrowUpRight className="w-3.5 h-3.5" />
-                  </Link>
-                </Card>
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                        Submit Title
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                        Submit a new research title to find and match with a faculty adviser.
+                      </p>
+                    </div>
+                    <Link
+                      to="/submit-title"
+                      className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
+                    >
+                      Start Submission <HiArrowUpRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </Card>
+                )}
 
                 <Card hover className="flex flex-col justify-between space-y-4">
                   <div className="flex items-start justify-between">
@@ -290,17 +359,91 @@ export const Dashboard = () => {
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     CURRENT MANUSCRIPT DRAFT
                   </h3>
-                  <Badge variant="purple">v1.2 In Progress</Badge>
+                  <Badge variant={studentResearch.workspace ? "purple" : studentResearch.proposal?.status === 'approved' ? "emerald" : "blue"}>
+                    {studentResearch.workspace
+                      ? "Active Workspace"
+                      : studentResearch.proposal?.status
+                      ? studentResearch.proposal.status.replace('_', ' ').toUpperCase()
+                      : studentResearch.documents.length > 0
+                      ? "Draft Document"
+                      : "Ready to Start"}
+                  </Badge>
                 </div>
-                <div className="space-y-2">
-                  <h4 className="text-base font-bold text-gray-900 dark:text-white">
-                    Enhancing RAG Retrieval with Hybrid Graph-Vector Embeddings
-                  </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Last edited 2 days ago — <strong className="text-gray-700 dark:text-gray-300">80% complete</strong>
-                  </p>
-                  <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden mt-2">
-                    <div className="bg-primary h-2 rounded-full w-[80%]" />
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                      {studentResearch.workspace?.title ||
+                        studentResearch.proposal?.title ||
+                        studentResearch.documents[0]?.title ||
+                        "Research Manuscript Draft"}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {studentResearch.workspace
+                        ? `Department of ${studentResearch.workspace.department || 'Computer Studies'} — Overall Progress: ${studentResearch.workspace.overallProgress || 20}%`
+                        : studentResearch.proposal
+                        ? `Proposal Status: ${studentResearch.proposal.status.replace('_', ' ')}`
+                        : "No active manuscript yet. Start drafting or submit your Title Proposal."}
+                    </p>
+                  </div>
+
+                  <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${
+                          studentResearch.workspace?.overallProgress ||
+                          (studentResearch.proposal?.status === 'approved' ? 20 : studentResearch.proposal ? 10 : 0)
+                        }%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center gap-3">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          if (studentResearch.workspace) {
+                            const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+                              studentResearch.workspace,
+                              userProfile
+                            );
+                            navigate(doc.editorUrl);
+                          } else if (studentResearch.proposal) {
+                            const ws = await researchWorkspaceService.getOrCreateWorkspaceForProposal(
+                              studentResearch.proposal,
+                              userProfile
+                            );
+                            const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+                              ws,
+                              userProfile
+                            );
+                            navigate(doc.editorUrl);
+                          } else {
+                            const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+                              {
+                                id: `ws-${currentUser?.uid}`,
+                                title: 'Research Manuscript Draft',
+                                groupId: userProfile?.groupId || '',
+                              },
+                              userProfile
+                            );
+                            navigate(doc.editorUrl);
+                          }
+                        } catch (e) {
+                          navigate('/research/workspace');
+                        }
+                      }}
+                    >
+                      <HiBookOpen className="w-4 h-4 mr-1.5" />
+                      Open Manuscript
+                    </Button>
+                    <Link to="/research/workspace">
+                      <Button variant="outline" size="sm">
+                        View Workspace
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               </Card>
@@ -308,7 +451,7 @@ export const Dashboard = () => {
           )}
 
           {/* ====== ADMIN CONTENT ====== */}
-          {role === "admin" && (
+          {effectiveRole === "admin" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card hover className="flex flex-col justify-between space-y-4">
                 <div className="flex items-start justify-between">
@@ -359,30 +502,13 @@ export const Dashboard = () => {
           )}
 
           {/* ====== ADVISER & PANELIST CONTENT ====== */}
-          {(role === "adviser" || role === "panelist") && (
+          {(effectiveRole === "adviser" || effectiveRole === "panelist") && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card hover className="flex flex-col justify-between space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
-                    <HiDocumentText className="w-5 h-5" />
-                  </div>
-                  <Badge variant="blue">Pending Action</Badge>
+              {effectiveRole === "adviser" && (
+                <div className="sm:col-span-2">
+                  <AdviserRequestsWidget />
                 </div>
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                    Review Proposals
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                    Evaluate and approve new title proposals submitted by students.
-                  </p>
-                </div>
-                <Link
-                  to="/proposals"
-                  className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                >
-                  View Proposals <HiArrowUpRight className="w-3.5 h-3.5" />
-                </Link>
-              </Card>
+              )}
 
               <Card hover className="flex flex-col justify-between space-y-4">
                 <div className="flex items-start justify-between">
@@ -479,34 +605,108 @@ export const Dashboard = () => {
 };
 
 /* Student Metrics */
-const StudentDashboardMetrics = () => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={HiDocumentText} label="Proposal Status" value="Approved" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-    <StatCard icon={HiFolder} label="Current Manuscript" value="Version v1.2" color="blue" />
-    <StatCard icon={HiChatBubbleLeftRight} label="Adviser Comments" value="3 Pending" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-    <StatCard icon={HiCalendarDays} label="Defense Schedule" value="Aug 14, 2026" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
-  </div>
-);
+const StudentDashboardMetrics = ({ research, userProfile }) => {
+  const proposalStatus = research?.proposal
+    ? research.proposal.status.replace('_', ' ').toUpperCase()
+    : 'No Proposal';
+
+  const manuscriptStatus = research?.workspace
+    ? `${research.workspace.overallProgress || 20}% Complete`
+    : (research?.documents?.length || 0) > 0
+    ? `${research.documents.length} Draft${research.documents.length > 1 ? 's' : ''}`
+    : 'Ready';
+
+  const adviserStatus = research?.workspace?.adviserName || 'In Matching';
+  const departmentStatus = userProfile?.department || 'Computer Studies';
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard
+        icon={HiDocumentText}
+        label="Proposal Status"
+        value={proposalStatus}
+        color={research?.proposal?.status === 'approved' ? 'emerald' : 'blue'}
+        valueColor={research?.proposal?.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary dark:text-blue-400'}
+      />
+      <StatCard
+        icon={HiFolder}
+        label="Manuscript Progress"
+        value={manuscriptStatus}
+        color="purple"
+      />
+      <StatCard
+        icon={HiUsers}
+        label="Faculty Adviser"
+        value={adviserStatus}
+        color="emerald"
+      />
+      <StatCard
+        icon={HiAcademicCap}
+        label="Department"
+        value={departmentStatus}
+        color="amber"
+      />
+    </div>
+  );
+};
 
 /* Adviser Metrics */
-const AdviserDashboardMetrics = () => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={HiCheckBadge} label="Assigned Teams" value="6 Research Groups" color="emerald" />
-    <StatCard icon={HiClock} label="Pending Reviews" value="4 Manuscripts" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-    <StatCard icon={HiDocumentText} label="Title Proposals" value="2 Pending" color="blue" valueColor="text-primary dark:text-blue-400" />
-    <StatCard icon={HiTrophy} label="Upcoming Defenses" value="3 This Month" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
-  </div>
-);
+const AdviserDashboardMetrics = () => {
+  const { currentUser } = useAuth();
+  const [metrics, setMetrics] = useState({ groups: 0, reviews: 0, proposals: 0, defenses: 0 });
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const fetchMetrics = async () => {
+      try {
+        const groups = await facultyService.getAdviserGroups(currentUser.uid);
+        // Assuming we could fetch reviews/proposals from other services if needed
+        setMetrics(prev => ({ ...prev, groups: groups.length }));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchMetrics();
+  }, [currentUser?.uid]);
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard icon={HiCheckBadge} label="My Groups" value={`${metrics.groups} Active`} color="emerald" />
+      <StatCard icon={HiClock} label="Pending Reviews" value="View Action Hub" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
+      <StatCard icon={HiDocumentText} label="Advisees" value="Active Tracking" color="blue" valueColor="text-primary dark:text-blue-400" />
+      <StatCard icon={HiTrophy} label="Upcoming Defenses" value="Check Schedule" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
+    </div>
+  );
+};
 
 /* Panelist Metrics */
-const PanelistDashboardMetrics = () => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={HiCalendarDays} label="Assigned Defenses" value="5 Panels" color="purple" />
-    <StatCard icon={HiTrophy} label="Pending Rubrics" value="2 Forms" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-    <StatCard icon={HiCheckCircle} label="Evaluations Done" value="8 Completed" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-    <StatCard icon={HiFolder} label="Pre-Defense Papers" value="3 Available" color="blue" valueColor="text-primary dark:text-blue-400" />
-  </div>
-);
+const PanelistDashboardMetrics = () => {
+  const { currentUser } = useAuth();
+  const [metrics, setMetrics] = useState({ defenses: 0, groups: 0 });
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const fetchMetrics = async () => {
+      try {
+        const groups = await facultyService.getPanelistGroups(currentUser.uid);
+        const defenses = await facultyService.getUpcomingDefenses(currentUser.uid);
+        setMetrics({ defenses: defenses.length, groups: groups.length });
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchMetrics();
+  }, [currentUser?.uid]);
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard icon={HiCalendarDays} label="Assigned Defenses" value={`${metrics.defenses} Upcoming`} color="purple" />
+      <StatCard icon={HiUsers} label="Panel Assignments" value={`${metrics.groups} Defendees`} color="amber" valueColor="text-amber-600 dark:text-amber-400" />
+      <StatCard icon={HiCheckCircle} label="Evaluations Done" value="Pending Action" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
+      <StatCard icon={HiFolder} label="Pre-Defense Papers" value="View Repository" color="blue" valueColor="text-primary dark:text-blue-400" />
+    </div>
+  );
+};
 
 /* Admin Metrics */
 const AdminDashboardMetrics = () => (
@@ -517,3 +717,105 @@ const AdminDashboardMetrics = () => (
     <StatCard icon={HiShieldCheck} label="System Health" value="100% Operational" color="blue" valueColor="text-emerald-600 dark:text-emerald-400" />
   </div>
 );
+
+/* Adviser Requests Widget */
+const AdviserRequestsWidget = () => {
+  const { currentUser, userProfile } = useAuth();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const fetchRequests = async () => {
+      try {
+        const reqs = await adviserRequestService.getPendingRequestsForAdviser(currentUser.uid);
+        setRequests(reqs);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRequests();
+  }, [currentUser]);
+
+  const handleAccept = async (reqId) => {
+    try {
+      const request = requests.find(r => r.id === reqId);
+      if (!request) return;
+
+      // 1. Accept the request
+      await adviserRequestService.acceptRequest(reqId);
+      
+      // 2. Assign the adviser to the group
+      if (request.groupId) {
+        await groupService.updateGroup(request.groupId, {
+          adviserId: request.adviserId,
+          adviserName: request.adviserName
+        });
+      }
+
+      // 3. Provision the Research Workspace
+      // We pass a dummy userProfile, or we can fetch it, but getOrCreateWorkspaceForAdviserRequest handles it fine
+      await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(request, userProfile);
+
+      // Remove from pending list
+      setRequests(prev => prev.filter(r => r.id !== reqId));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to accept request: ' + err.message);
+    }
+  };
+
+  const handleDecline = async (reqId) => {
+    try {
+      await adviserRequestService.declineRequest(reqId);
+      setRequests(prev => prev.filter(r => r.id !== reqId));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to decline request: ' + err.message);
+    }
+  };
+
+  if (loading) return null;
+  if (requests.length === 0) {
+    return (
+      <Card className="p-6 flex flex-col items-center justify-center text-gray-500 min-h-[160px]">
+        <HiCheckCircle className="w-8 h-8 text-gray-300 mb-2" />
+        <p>No pending adviser requests.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {requests.map(req => (
+        <Card key={req.id} className="p-5 border-l-4 border-l-amber-500">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="amber">New Request</Badge>
+                <span className="text-xs text-gray-400">Received {new Date(req.createdAt).toLocaleDateString()}</span>
+              </div>
+              <h4 className="text-lg font-bold text-gray-900 dark:text-white">{req.researchTitle}</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{req.researchDescription}</p>
+              
+              <div className="flex gap-4 mt-3 text-xs text-gray-500">
+                <div><span className="font-semibold">Student:</span> {req.studentName}</div>
+                {(req.courseName || req.sectionName) && (
+                  <div><span className="font-semibold">Program/Section:</span> {req.courseName} {req.sectionName}</div>
+                )}
+                <div><span className="font-semibold text-blue-600 dark:text-blue-400">Match: {req.compatibilityScore}%</span></div>
+              </div>
+            </div>
+            
+            <div className="flex md:flex-col gap-2 shrink-0 self-start md:self-center w-full md:w-auto">
+              <Button variant="primary" onClick={() => handleAccept(req.id)} className="flex-1 md:w-32">Accept</Button>
+              <Button variant="danger" onClick={() => handleDecline(req.id)} className="flex-1 md:w-32 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400">Decline</Button>
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+};

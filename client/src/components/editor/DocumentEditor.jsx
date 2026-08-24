@@ -447,7 +447,9 @@ export const DocumentEditor = ({
   pageSettings = DEFAULT_PAGE_SETTINGS,
   initialContent = null,
   sourceType = 'native',
+  title = '',
   comments = [],
+  isReadOnly = false,
   onEditorReady,
   onContentChange,
   onCommentSelect,
@@ -516,6 +518,7 @@ export const DocumentEditor = ({
 
   const editor = useEditor({
     extensions,
+    editable: !isReadOnly,
     onUpdate: ({ editor: currentEditor }) => {
       if (onContentChange) {
         onContentChange(currentEditor);
@@ -584,14 +587,12 @@ export const DocumentEditor = ({
           editor.commands.setContent(initialContent, false);
           initializedContentRef.current = true;
         } else if (isFragmentEmpty && editor.isEmpty && sourceType === 'native' && !initialContent && !initializedContentRef.current) {
-          editor.commands.setContent(`
-            <h1>Research Manuscript Title</h1>
-            <p>Welcome to the CoreResearch collaborative manuscript editor. Start drafting your research proposal or manuscript chapters here...</p>
-            <h2>1. Introduction & Background</h2>
-            <p>State your research rationale, problem formulation, and objectives.</p>
-            <h2>2. Methodology</h2>
-            <p>Describe your system architecture, data collection procedures, and evaluation metrics.</p>
-          `, false);
+          const heading = title && title !== 'Untitled Document' ? title : '';
+          if (heading) {
+            editor.commands.setContent(`<h1>${heading}</h1><p></p>`, false);
+          } else {
+            editor.commands.setContent(`<p></p>`, false);
+          }
           initializedContentRef.current = true;
         }
       }

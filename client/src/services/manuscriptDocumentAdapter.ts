@@ -42,7 +42,7 @@ export const manuscriptDocumentAdapter = {
     const store = documentStore as any;
     const newDoc = await store.createDocument(documentTitle, userProfile, {
       groupId: workspace.groupId || '',
-      projectId: workspace.projectId || workspace.id,
+      projectId: workspace.projectId || workspace.proposalId || workspace.id,
       sourceType: 'native',
     });
 

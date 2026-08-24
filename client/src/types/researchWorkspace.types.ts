@@ -9,6 +9,13 @@ export type ManuscriptWorkspaceStatus =
   | 'approved'
   | 'completed';
 
+export type ResearchPhase =
+  | 'CHAPTERS_1_3'
+  | 'PROPOSAL_DEFENSE'
+  | 'CHAPTERS_4_5'
+  | 'FINAL_MANUSCRIPT'
+  | 'COMPLETED';
+
 export type SectionStatus =
   | 'pending'
   | 'in_progress'
@@ -53,6 +60,7 @@ export interface ManuscriptWorkspace {
   adviserName: string;
   department?: string;
   status: ManuscriptWorkspaceStatus;
+  researchPhase: ResearchPhase;
   sections: ManuscriptSection[];
   overallProgress: number; // 0 - 100
   createdAt: string;

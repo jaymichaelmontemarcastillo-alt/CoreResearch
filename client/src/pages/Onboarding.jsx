@@ -304,7 +304,7 @@ export const Onboarding = () => {
             </span>
           ) : (
             <span className="flex items-center">
-              Complete Registration <ArrowRight className="w-4 h-4 ml-2" />
+              Complete Registration <HiArrowRight className="w-4 h-4 ml-2" />
             </span>
           )}
         </button>

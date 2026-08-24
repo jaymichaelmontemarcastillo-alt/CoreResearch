@@ -27,6 +27,8 @@ import {
 } from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import titleProposalService from "../services/titleProposal.service";
+import researchWorkspaceService from "../services/researchWorkspace.service";
+import manuscriptDocumentAdapter from "../services/manuscriptDocumentAdapter";
 import { PROPOSAL_STATUS_CONFIG } from "../types/proposal.types";
 
 // Icons for each status
@@ -288,35 +290,59 @@ export const ProposalDetail = () => {
       {/* ── APPROVED BANNER ─────────────────────────────────────────────────── */}
       {isApproved && (
         <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-800/50">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
-              <HiSparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-300 mb-1">
-                Proposal Approved
-              </h2>
-              <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
-                Your research title proposal has been approved by the Research
-                Coordinator.
-              </p>
-              <div className="mt-3 flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                <HiBookOpen className="w-4 h-4" />
-                <span className="text-sm font-semibold">
-                  Next Stage: Chapter 1–3 Manuscript Development
-                </span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+                <HiSparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg inline-block border border-emerald-200/60 dark:border-emerald-800/40">
-                Adviser Matching: Available in Phase 2 after proposal approval.
-              </div>
-              {proposal.coordinatorName && (
-                <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-2">
-                  Approved by {proposal.coordinatorName}
-                  {proposal.approvedAt && (
-                    <> · {new Date(proposal.approvedAt).toLocaleDateString()}</>
-                  )}
+              <div>
+                <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-300 mb-1">
+                  Proposal Approved
+                </h2>
+                <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                  Your research title proposal has been approved by the Research
+                  Coordinator.
                 </p>
-              )}
+                <div className="mt-3 flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                  <HiBookOpen className="w-4 h-4" />
+                  <span className="text-sm font-semibold">
+                    Next Stage: Chapter 1–3 Manuscript Development
+                  </span>
+                </div>
+                <div className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg inline-block border border-emerald-200/60 dark:border-emerald-800/40">
+                  Adviser Matching: Available in Phase 2 after proposal approval.
+                </div>
+                {proposal.coordinatorName && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-2">
+                    Approved by {proposal.coordinatorName}
+                    {proposal.approvedAt && (
+                      <> · {new Date(proposal.approvedAt).toLocaleDateString()}</>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={async () => {
+                  try {
+                    const ws = await researchWorkspaceService.getOrCreateWorkspaceForProposal(proposal, userProfile);
+                    const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(ws, userProfile);
+                    if (ws.documentId !== doc.documentId) {
+                      await researchWorkspaceService.linkDocumentId(ws.id, doc.documentId);
+                    }
+                    navigate(doc.editorUrl);
+                  } catch (e) {
+                    navigate('/research/workspace');
+                  }
+                }}
+              >
+                <HiBookOpen className="w-4 h-4 mr-2" />
+                Open Manuscript
+              </Button>
             </div>
           </div>
         </div>

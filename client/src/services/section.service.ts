@@ -35,6 +35,16 @@ export const sectionService = {
   },
 
   /**
+   * Fetch all sections globally.
+   */
+  async getAllSections(): Promise<Section[]> {
+    const q = query(collection(db, COLLECTION_NAME));
+    const querySnap = await getDocs(q);
+    const sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
+    return sections.sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  /**
    * Fetch sections by course ID.
    */
   async getSectionsByCourseId(courseId: string): Promise<Section[]> {

@@ -8,56 +8,68 @@ import { Button } from '../components/ui/Button';
 import { StatCard } from '../components/ui/StatCard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
-import {
-  Users,
-  BookOpen,
-  CheckCircle2,
-  Clock,
-  FileEdit,
-  ArrowRight,
-  PlusCircle,
-  FolderGit2,
-  Award,
-} from 'lucide-react';
-import researchWorkspaceService from '../services/researchWorkspace.service';
-import researchTaskService from '../services/researchTask.service';
-import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
+import { Users, BookOpen, CheckCircle2, Search, ArrowRight } from 'lucide-react';
+import { facultyService } from '../services/faculty.service';
 import progressService from '../services/progress.service';
-import { TaskManagementModal } from '../components/research/TaskManagementModal';
+import { courseService } from '../services/course.service';
+import { sectionService } from '../services/section.service';
+import { researchWorkspaceService } from '../services/researchWorkspace.service';
 
 export const AdviserAdvisees = () => {
-  const { currentUser, userProfile, role } = useAuth();
+  const { currentUser, role, currentFacultyMode } = useAuth();
   const navigate = useNavigate();
 
-  const [workspaces, setWorkspaces] = useState([]);
-  const [tasksMap, setTasksMap] = useState({});
+  const [groups, setGroups] = useState([]);
+  const [enrichedGroups, setEnrichedGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorkspaceForTask, setSelectedWorkspaceForTask] = useState(null);
   const [toast, setToast] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
 
   const fetchAdviseeData = async () => {
     setLoading(true);
     try {
       let list = [];
-      if (role === 'adviser') {
-        list = await researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid);
+      if (effectiveRole === 'adviser') {
+        list = await facultyService.getAdviserGroups(currentUser.uid);
       } else {
-        // Coordinators and Admins see all workspaces
-        list = await researchWorkspaceService.getAllWorkspaces();
+        // Fallback for admins etc if they hit this page
+        list = await facultyService.getAdviserGroups(currentUser.uid); 
       }
-      setWorkspaces(list);
+      setGroups(list);
 
-      // Fetch tasks for each workspace to calculate real-time stats
-      const tasksObj = {};
-      await Promise.all(
-        list.map(async (ws) => {
-          const wsTasks = await researchTaskService.getTasksByWorkspace(ws.id);
-          tasksObj[ws.id] = wsTasks;
-        })
-      );
-      setTasksMap(tasksObj);
+      // Fetch all courses and sections to map the IDs to names
+      const [allCourses, allSections] = await Promise.all([
+        courseService.getAllCourses(),
+        sectionService.getAllSections()
+      ]);
+
+      // Enrich groups with course, section, and progress data
+      const enriched = await Promise.all(list.map(async (group) => {
+        const course = allCourses.find(c => c.id === group.courseId);
+        const section = allSections.find(s => s.id === group.sectionId);
+        
+        // Use progressService which dynamically pulls from tasks/sections now, or use the workspace direct
+        const workspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', group.id);
+        const progress = workspace ? await progressService.calculateWorkspaceProgress(workspace, []) : 0;
+        
+        return {
+          ...group,
+          workspaceId: workspace?.id || '',
+          programCode: course?.code || 'N/A',
+          sectionName: section?.name || 'N/A',
+          specialization: group.specialization || course?.specializations?.[0]?.code || '',
+          progressPercentage: progress || 0,
+          currentStage: workspace?.researchPhase || 'Not Started',
+          memberCount: group.memberIds?.length || 0,
+        };
+      }));
+
+      setEnrichedGroups(enriched);
     } catch (err) {
       console.error('[AdviserAdvisees] fetch error:', err);
+      setToast('Failed to load advisee data.');
     } finally {
       setLoading(false);
     }
@@ -67,196 +79,130 @@ export const AdviserAdvisees = () => {
     if (currentUser?.uid) {
       fetchAdviseeData();
     }
-  }, [currentUser?.uid, role]);
+  }, [currentUser?.uid, effectiveRole]);
 
-  const handleOpenManuscript = async (ws) => {
-    try {
-      const { editorUrl } =
-        await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
-          ws,
-          userProfile
-        );
-      navigate(editorUrl);
-    } catch (err) {
-      setToast('Failed to launch manuscript: ' + err.message);
-    }
-  };
-
-  const handleTaskCreated = async (taskInput) => {
-    try {
-      await researchTaskService.createTask(taskInput);
-      setToast('Task successfully assigned to student.');
-      await fetchAdviseeData();
-    } catch (err) {
-      setToast('Failed to assign task: ' + err.message);
-    }
-  };
-
-  const totalAdvisees = workspaces.length;
-  const totalTasks = Object.values(tasksMap).flat().length;
-  const completedTasks = Object.values(tasksMap).flat().filter((t) => t.status === 'completed').length;
+  const filteredGroups = enrichedGroups.filter(g => 
+    g.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (g.programCode && g.programCode.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <Toast message={toast} variant="success" onClose={() => setToast('')} />
-      )}
+      {toast && <Toast message={toast} variant="error" onClose={() => setToast('')} />}
 
       <PageHeader
         icon={Users}
-        title="My Assigned Advisees & Research Progress"
-        description="Monitor student manuscripts, track chapter completion, assign actionable research tasks, and provide advisory reviews."
+        title="My Assigned Advisees"
+        description="Monitor student research groups, track progress, and manage your advisory workflow."
       />
 
-      {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           icon={Users}
           title="Assigned Research Groups"
-          value={totalAdvisees}
+          value={groups.length}
           description="Active student groups under advisory"
           trend="neutral"
         />
         <StatCard
           icon={CheckCircle2}
-          title="Assigned Tasks Completed"
-          value={`${completedTasks} / ${totalTasks}`}
-          description="Actionable tasks completed by advisees"
+          title="Average Progress"
+          value={`${enrichedGroups.length ? Math.round(enrichedGroups.reduce((acc, g) => acc + g.progressPercentage, 0) / enrichedGroups.length) : 0}%`}
+          description="Across all handled groups"
           trend="up"
         />
         <StatCard
           icon={BookOpen}
-          title="Active Manuscripts"
-          value={workspaces.filter((w) => w.documentId).length}
-          description="Linked collaborative manuscript workspaces"
-          trend="up"
+          title="Groups in Defense Stage"
+          value={enrichedGroups.filter(g => g.currentStage.toLowerCase().includes('defense')).length}
+          description="Groups ready for panel evaluation"
+          trend="neutral"
         />
       </div>
 
-      {loading ? (
-        <div className="py-16 text-center text-gray-400 dark:text-gray-500">
-          Loading advisees and research workspaces...
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Groups Overview</h3>
+          <div className="relative max-w-xs w-full">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search groups or program..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors"
+            />
+          </div>
         </div>
-      ) : workspaces.length === 0 ? (
-        <Card className="p-8 text-center space-y-3">
-          <Users className="w-10 h-10 text-gray-400 mx-auto" />
-          <h3 className="text-base font-bold text-gray-900 dark:text-white">
-            No Assigned Advisees Yet
-          </h3>
-          <p className="text-xs text-gray-500 max-w-md mx-auto">
-            Once research groups are matched with you or assigned by the coordinator, they will appear here with full workspace tracking.
-          </p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {workspaces.map((ws) => {
-            const wsTasks = tasksMap[ws.id] || [];
-            const calculatedProgress = progressService.calculateOverallProgress(ws, wsTasks);
-            const { completed, total } = progressService.calculateTaskProgress(wsTasks);
 
-            return (
-              <Card key={ws.id} className="p-5 flex flex-col justify-between space-y-4 hover:border-gray-300 dark:hover:border-slate-700 transition-all">
-                <div className="space-y-3">
-                  {/* Top Bar */}
-                  <div className="flex items-center justify-between gap-2">
-                    <Badge variant="emerald">
-                      {ws.status?.replace('_', ' ').toUpperCase()}
-                    </Badge>
-                    <span className="text-xs font-bold text-primary">
-                      {calculatedProgress}% Progress
-                    </span>
-                  </div>
-
-                  {/* Research Title */}
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">
-                    {ws.title}
-                  </h3>
-
-                  {/* Student & Group Meta */}
-                  <div className="p-3 rounded-xl bg-gray-50 dark:bg-slate-800/80 border border-gray-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-gray-400 block">
-                        Student Researcher
-                      </span>
-                      <span className="font-semibold text-gray-800 dark:text-gray-200 truncate block">
-                        {ws.studentName}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-gray-400 block">
-                        Group
-                      </span>
-                      <span className="font-semibold text-gray-800 dark:text-gray-200 truncate block">
-                        {ws.groupName}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Overall Milestone Progress</span>
-                      <span className="font-semibold">{calculatedProgress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-primary h-full transition-all duration-700"
-                        style={{ width: `${calculatedProgress}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-gray-400 pt-0.5">
-                      <span>{completed} of {total} tasks completed</span>
-                      <span>{(ws.sections || []).filter((s) => s.status === 'completed').length} / 7 chapters passed</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Actions */}
-                <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setSelectedWorkspaceForTask(ws)}
-                  >
-                    <PlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleOpenManuscript(ws)}
-                    >
-                      <FileEdit className="w-3.5 h-3.5 mr-1" /> Open Manuscript
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => navigate(`/research/workspace?id=${ws.id}`)}
-                    >
-                      Workspace <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Task Creation Modal */}
-      {selectedWorkspaceForTask && (
-        <TaskManagementModal
-          isOpen={Boolean(selectedWorkspaceForTask)}
-          onClose={() => setSelectedWorkspaceForTask(null)}
-          workspace={selectedWorkspaceForTask}
-          onTaskCreated={handleTaskCreated}
-        />
-      )}
+        {loading ? (
+          <div className="py-16 text-center text-gray-400">Loading advisee groups...</div>
+        ) : filteredGroups.length === 0 ? (
+          <div className="py-16 text-center text-gray-500">
+            No research groups match your criteria.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-700 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <th className="pb-3 px-4 font-semibold">Group & Title</th>
+                  <th className="pb-3 px-4 font-semibold">Program</th>
+                  <th className="pb-3 px-4 font-semibold">Section</th>
+                  <th className="pb-3 px-4 font-semibold">Specialization</th>
+                  <th className="pb-3 px-4 font-semibold">Members</th>
+                  <th className="pb-3 px-4 font-semibold">Progress</th>
+                  <th className="pb-3 px-4 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
+                {filteredGroups.map((group) => (
+                  <tr key={group.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group">
+                    <td className="py-4 px-4 min-w-[250px]">
+                      <div className="font-bold text-sm text-gray-900 dark:text-white">{group.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs" title={group.title || 'No Title Yet'}>
+                        {group.title || 'No Title Yet'}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">
+                      {group.programCode}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">
+                      {group.sectionName}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">
+                      {group.specialization || <span className="text-gray-400 italic">None</span>}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-700 dark:text-gray-300">
+                      {group.memberCount} Students
+                    </td>
+                    <td className="py-4 px-4 min-w-[150px]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-gray-900 dark:text-white">{group.progressPercentage}%</span>
+                        <span className="text-[10px] text-gray-500 capitalize px-2 bg-gray-100 dark:bg-slate-800 rounded-full">{group.currentStage.replace('_', ' ')}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-primary h-full transition-all duration-700" style={{ width: `${group.progressPercentage}%` }} />
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!group.workspaceId}
+                        onClick={() => navigate(`/faculty/workspace/${group.workspaceId}`)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        Workspace <ArrowRight className="w-3 h-3 ml-1" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 };
-
-export default AdviserAdvisees;
