@@ -270,7 +270,7 @@ export const DocumentEditorPage = () => {
     
     const isProduction = import.meta.env.PROD;
     const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || (isProduction 
-      ? 'wss://coreresearch-alt-lspusys-4030.onrender.com/collaboration' 
+      ? 'wss://coreresearch-api-lspu-40301844.onrender.com/collaboration' 
       : 'ws://localhost:5000/collaboration');
     setProviderState({ provider: null, status: 'connecting', error: null });
 
