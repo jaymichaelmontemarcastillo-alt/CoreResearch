@@ -1,13 +1,63 @@
 import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 
 // Seed initial mock users into mock storage if empty
-const seedMockUsersIfEmpty = () => {
+export const seedMockUsersIfEmpty = () => {
   if (mockUsersDb.size === 0) {
     const initialUsers = [
       { uid: 'dev-student-01', email: 'alex.rivera@university.edu', fullName: 'Alex Rivera', role: 'student', department: 'Computer Science', studentIdOrEmployeeId: '2022-10482', createdAt: new Date().toISOString() },
       { uid: 'dev-student-02', email: 'maria.santos@university.edu', fullName: 'Maria Santos', role: 'student', department: 'Information Technology', studentIdOrEmployeeId: '2022-11093', createdAt: new Date().toISOString() },
-      { uid: 'dev-adviser-01', email: 'dr.vance@university.edu', fullName: 'Dr. Eleanor Vance', role: 'adviser', department: 'Computer Science', studentIdOrEmployeeId: 'EMP-8821', createdAt: new Date().toISOString() },
-      { uid: 'dev-adviser-02', email: 'dr.reyes@university.edu', fullName: 'Dr. Roberto Reyes', role: 'adviser', department: 'Information Technology', studentIdOrEmployeeId: 'EMP-4401', createdAt: new Date().toISOString() },
+      
+      // NLP Test Adviser 1: Web / Info Systems
+      { 
+        uid: 'dev-adviser-01', email: 'maria.santos.adv@university.edu', fullName: 'Dr. Maria Santos', role: 'adviser', department: 'Computer Science', studentIdOrEmployeeId: 'EMP-8821', 
+        status: 'active', is_approved: true, isAvailable: true, maxCapacity: 5, activeGroupsCount: 2,
+        specialization: ['Web Development', 'Information Systems'],
+        expertise: ['Full-Stack Development', 'React', 'Node.js', 'System Architecture'],
+        researchInterests: ['Web Application Architecture', 'Educational Technology', 'Research Management Systems'],
+        keywords: ['web', 'software', 'architecture', 'management', 'systems', 'application'],
+        createdAt: new Date().toISOString() 
+      },
+      // NLP Test Adviser 2: AI / ML
+      { 
+        uid: 'dev-adviser-02', email: 'juan.cruz@university.edu', fullName: 'Dr. Juan Cruz', role: 'adviser', department: 'Information Technology', studentIdOrEmployeeId: 'EMP-4401', 
+        status: 'active', is_approved: true, isAvailable: true, maxCapacity: 4, activeGroupsCount: 1,
+        specialization: ['Artificial Intelligence', 'Data Science'],
+        expertise: ['Machine Learning', 'Deep Learning', 'Neural Networks', 'Predictive Modeling'],
+        researchInterests: ['Natural Language Processing', 'Computer Vision', 'Predictive Analytics in Education'],
+        keywords: ['machine', 'learning', 'neural', 'networks', 'predictive', 'ai', 'vision'],
+        createdAt: new Date().toISOString() 
+      },
+      // NLP Test Adviser 3: Database Systems
+      { 
+        uid: 'dev-adviser-03', email: 'ana.reyes@university.edu', fullName: 'Dr. Ana Reyes', role: 'adviser', department: 'Computer Science', studentIdOrEmployeeId: 'EMP-5502', 
+        status: 'active', is_approved: true, isAvailable: true, maxCapacity: 5, activeGroupsCount: 0,
+        specialization: ['Database Systems', 'Data Engineering'],
+        expertise: ['SQL', 'NoSQL', 'Database Optimization', 'Data Warehousing'],
+        researchInterests: ['Distributed Databases', 'Big Data Architecture', 'Query Optimization'],
+        keywords: ['sql', 'nosql', 'data', 'warehousing', 'optimization', 'database'],
+        createdAt: new Date().toISOString() 
+      },
+      // NLP Test Adviser 4: Data Analytics
+      { 
+        uid: 'dev-adviser-04', email: 'mark.garcia@university.edu', fullName: 'Dr. Mark Garcia', role: 'adviser', department: 'Information Technology', studentIdOrEmployeeId: 'EMP-6603', 
+        status: 'active', is_approved: true, isAvailable: true, maxCapacity: 3, activeGroupsCount: 3,
+        specialization: ['Data Analytics', 'Statistics'],
+        expertise: ['Data Visualization', 'Statistical Analysis', 'Business Intelligence'],
+        researchInterests: ['Educational Data Mining', 'Learning Analytics', 'Dashboard Design'],
+        keywords: ['analytics', 'big', 'data', 'visualization', 'mining', 'statistics'],
+        createdAt: new Date().toISOString() 
+      },
+      // NLP Test Adviser 5: Networking / Cybersecurity
+      { 
+        uid: 'dev-adviser-05', email: 'carlo.mendoza@university.edu', fullName: 'Dr. Carlo Mendoza', role: 'adviser', department: 'Computer Science', studentIdOrEmployeeId: 'EMP-7704', 
+        status: 'active', is_approved: true, isAvailable: true, maxCapacity: 5, activeGroupsCount: 1,
+        specialization: ['Networking', 'Cybersecurity'],
+        expertise: ['Network Security', 'Penetration Testing', 'Cryptography'],
+        researchInterests: ['IoT Security', 'Blockchain Security', 'Network Protocols'],
+        keywords: ['security', 'encryption', 'protocols', 'iot', 'network', 'cybersecurity'],
+        createdAt: new Date().toISOString() 
+      },
+
       { uid: 'dev-panelist-01', email: 'prof.chen@university.edu', fullName: 'Prof. Marcus Chen', role: 'panelist', department: 'Information Technology', studentIdOrEmployeeId: 'EMP-5510', createdAt: new Date().toISOString() },
       { uid: 'dev-panelist-02', email: 'prof.gomez@university.edu', fullName: 'Prof. Sofia Gomez', role: 'panelist', department: 'Computer Science', studentIdOrEmployeeId: 'EMP-7712', createdAt: new Date().toISOString() },
       { uid: 'dev-admin-01', email: 'admin.chair@university.edu', fullName: 'Dean Elizabeth Warren', role: 'admin', department: 'Dean of Research Office', studentIdOrEmployeeId: 'ADM-0001', createdAt: new Date().toISOString() }
@@ -146,7 +196,11 @@ export const updateMyProfile = async (req, res) => {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
-    const { first_name, last_name, fullName, college, department, studentIdOrEmployeeId, profile_image } = req.body;
+    const { 
+      first_name, last_name, fullName, college, department, 
+      studentIdOrEmployeeId, profile_image,
+      specialization, expertise, researchInterests, keywords, selectedExpertise
+    } = req.body;
 
     const updates = {
       updatedAt: new Date().toISOString(),
@@ -167,6 +221,13 @@ export const updateMyProfile = async (req, res) => {
     }
     if (studentIdOrEmployeeId !== undefined) updates.studentIdOrEmployeeId = studentIdOrEmployeeId;
     if (profile_image !== undefined) updates.profile_image = profile_image;
+    
+    // Academic fields (arrays of strings)
+    if (Array.isArray(specialization)) updates.specialization = specialization;
+    if (Array.isArray(expertise)) updates.expertise = expertise;
+    if (Array.isArray(researchInterests)) updates.researchInterests = researchInterests;
+    if (Array.isArray(keywords)) updates.keywords = keywords;
+    if (Array.isArray(selectedExpertise)) updates.selectedExpertise = selectedExpertise;
 
     if (isDevMockMode || !db) {
       const existing = mockUsersDb.get(uid) || {};

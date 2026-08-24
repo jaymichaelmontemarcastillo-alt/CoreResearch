@@ -14,3 +14,11 @@ services:
         value: https://coreresearch-33a17.web.app
       - key: FIREBASE_PROJECT_ID
         value: coreresearch-33a17
+      - key: MATCHING_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false

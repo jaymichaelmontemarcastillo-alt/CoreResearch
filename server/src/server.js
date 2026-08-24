@@ -20,6 +20,7 @@ import repositoryRoutes from './routes/repositoryRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import workspaceRoutes from './routes/workspaceRoutes.js';
+import adviserMatchingRoutes from './routes/adviserMatchingRoutes.js';
 
 dotenv.config();
 
@@ -75,6 +76,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/adviser-matching', adviserMatchingRoutes);
 app.use('/api/manuscripts', manuscriptRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/schedules', scheduleRoutes);
@@ -111,6 +113,13 @@ const hocuspocus = new Hocuspocus({
   quiet: true,
   debounce: 2000,
   maxDebounce: 10000,
+
+  onConnect(data) {
+    const { documentName, request } = data;
+    console.log(`[WebSocket] Collaboration connection received`);
+    console.log(`[WebSocket] Document: ${documentName}`);
+    console.log(`[WebSocket] Origin: ${request?.headers?.origin || 'unknown'}`);
+  },
 
   async onAuthenticate(data) {
     const { token, documentName } = data;
@@ -306,10 +315,11 @@ wss.on('connection', (ws, request) => {
   });
 });
 
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, () => {
   console.log(`=================================================`);
   console.log(`🚀 CoreResearch API Server running on port ${PORT}`);
   console.log(`📡 Hocuspocus OSS WebSocket Server: ws://0.0.0.0:${PORT}/collaboration`);
+  console.log(`[WebSocket] Hocuspocus server initialized`);
   console.log(`🌐 Health check: http://0.0.0.0:${PORT}/api/health`);
   console.log(`=================================================`);
 });

@@ -10,6 +10,7 @@
     "seed:db": "node --env-file=.env src/scripts/seedFirestoreAdmin.js"
   },
   "dependencies": {
+    "@google/genai": "^2.18.0",
     "@hocuspocus/server": "^4.6.0",
     "@supabase/supabase-js": "^2.112.3",
     "adm-zip": "^0.6.0",

@@ -1,5 +1,11 @@
 {
   "dependencies": {
     "docs": "^0.4.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\""
   }
 }

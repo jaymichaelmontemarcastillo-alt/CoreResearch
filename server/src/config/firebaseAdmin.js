@@ -17,12 +17,24 @@ import path from 'path';
 try {
   if (!admin.apps.length) {
     const rootDir = process.cwd();
-    const serviceAccountPaths = [
-      path.resolve(rootDir, 'coreresearch-db63b-firebase-adminsdk-fbsvc-0143d15ef2.json'),
-      path.resolve(rootDir, '..', 'coreresearch-db63b-firebase-adminsdk-fbsvc-0143d15ef2.json'),
-    ];
+    const parentDir = path.resolve(rootDir, '..');
+    
+    // Discover any service account key file in the server or root directories
+    const findServiceAccount = () => {
+      const dirsToSearch = [rootDir, parentDir];
+      for (const dir of dirsToSearch) {
+        if (!fs.existsSync(dir)) continue;
+        const files = fs.readdirSync(dir);
+        for (const file of files) {
+          if (file === 'serviceAccountKey.json' || (file.includes('firebase-adminsdk') && file.endsWith('.json'))) {
+            return path.resolve(dir, file);
+          }
+        }
+      }
+      return null;
+    };
 
-    const foundServiceAccount = serviceAccountPaths.find(p => fs.existsSync(p));
+    const foundServiceAccount = findServiceAccount();
 
     if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -35,7 +47,7 @@ try {
       });
       db = admin.firestore();
       auth = admin.auth();
-      console.log('[FirebaseAdmin] Initialized with Service Account Environment Variables');
+      console.log('[FirebaseAdmin] Initialized successfully with Service Account Environment Variables');
     } else if (foundServiceAccount) {
       const serviceAccount = JSON.parse(fs.readFileSync(foundServiceAccount, 'utf8'));
       admin.initializeApp({
@@ -43,9 +55,21 @@ try {
       });
       db = admin.firestore();
       auth = admin.auth();
-      console.log(`[FirebaseAdmin] Initialized with Service Account JSON file: ${foundServiceAccount}`);
+      console.log(`[FirebaseAdmin] Initialized successfully with Service Account JSON file: ${foundServiceAccount}`);
     } else {
-      console.log('[FirebaseAdmin] Running in local mock mode (in-memory db)');
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Missing required production Firebase credentials (FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL). Refusing to start mock mode in production.');
+      }
+      console.log('[FirebaseAdmin] Running in local mock mode (in-memory db) - Initializing auth for token verification');
+      admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID || 'coreresearch-33a17'
+      });
+      auth = admin.auth();
+      try {
+        db = admin.firestore();
+      } catch (dbErr) {
+        console.warn('[FirebaseAdmin] Could not initialize firestore locally:', dbErr.message);
+      }
       isDevMockMode = true;
     }
   } else {
@@ -53,6 +77,10 @@ try {
     auth = admin.auth();
   }
 } catch (error) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[FirebaseAdmin] CRITICAL ERROR: Failed to initialize Firebase Admin in production.', error);
+    process.exit(1);
+  }
   console.warn('[FirebaseAdmin] Warning during Admin SDK initialization, falling back to mock mode:', error.message);
   isDevMockMode = true;
 }
