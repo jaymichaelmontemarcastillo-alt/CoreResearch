@@ -1,5 +1,7 @@
+import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { seedMockRepositoryIfEmpty } from './repositoryController.js';
+import { Comment as MongoComment } from '../models/Comment.js';
 
 // Pre-seed mock manuscript version history & drafts if empty
 const defaultDraftContentHtml = `<h1 style="text-align: center; color: #1e293b;">Smart IoT Moisture & Nutrient Sensing System for Urban Farming</h1>
@@ -564,19 +566,50 @@ export const getManuscriptComments = async (req, res) => {
     seedMockManuscriptsIfEmpty();
 
     let comments = [];
+    let fetchedFromMongo = false;
 
-    if (isDevMockMode) {
-      const commentsMap = mockFirestoreDb.get('manuscript_comments');
-      comments = commentsMap.get(projectId) || [];
-    } else {
-      const snapshot = await db.collection('manuscript_drafts')
-        .doc(projectId)
-        .collection('comments')
-        .get();
-      comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const mongoDocs = await MongoComment.find({ documentId: projectId }).lean();
+        if (mongoDocs) {
+          comments = mongoDocs.map(doc => ({
+            id: doc.id,
+            projectId: doc.documentId,
+            text: doc.content,
+            selectedText: doc.selectedText || '',
+            section: doc.section || 'General',
+            page: doc.page || 1,
+            authorId: doc.authorUid,
+            authorName: doc.authorName,
+            authorRole: doc.authorRole,
+            createdAt: doc.createdAt,
+            resolved: doc.resolved,
+            replies: doc.replies || [],
+            yjsRelativePosition: doc.yjsRelativePosition,
+            anchorNodeId: doc.anchorNodeId
+          }));
+          fetchedFromMongo = true;
+        }
+      }
+    } catch (mongoErr) {
+      console.warn('[ManuscriptController] MongoDB get comments warning:', mongoErr.message);
     }
 
-    // Sort newest first
+    if (!fetchedFromMongo) {
+      if (isDevMockMode) {
+        const commentsMap = mockFirestoreDb.get('manuscript_comments');
+        if (commentsMap) {
+          comments = commentsMap.get(projectId) || [];
+        }
+      } else {
+        const snapshot = await db.collection('manuscript_drafts')
+          .doc(projectId)
+          .collection('comments')
+          .get();
+        comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
+    }
+
     comments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return res.status(200).json({
@@ -603,39 +636,58 @@ export const addManuscriptComment = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Comment text is required.' });
     }
 
-    const newComment = {
-      id: `comm-${Date.now()}`,
-      projectId,
-      text,
-      selectedText: selectedText || '',
-      section: section || 'General',
-      page: page || 1,
-      authorId: user.uid,
-      authorName: user.fullName || user.email.split('@')[0],
-      authorRole: user.role || 'adviser',
-      createdAt: new Date().toISOString(),
-      resolved: false,
-      replies: []
-    };
-
-    if (isDevMockMode) {
-      seedMockManuscriptsIfEmpty();
-      const commentsMap = mockFirestoreDb.get('manuscript_comments');
-      const list = commentsMap.get(projectId) || [];
-      list.push(newComment);
-      commentsMap.set(projectId, list);
-    } else {
-      await db.collection('manuscript_drafts')
-        .doc(projectId)
-        .collection('comments')
-        .doc(newComment.id)
-        .set(newComment);
+    const newCommentId = `comm-${Date.now()}`;
+    let mongoSuccess = false;
+    let createdComment = null;
+    
+    try {
+      if (mongoose.connection.readyState === 1) {
+        createdComment = await MongoComment.create({
+          id: newCommentId,
+          documentId: projectId,
+          content: text,
+          selectedText: selectedText || '',
+          section: section || 'General',
+          page: page || 1,
+          authorUid: user.uid,
+          authorName: user.fullName || user.email.split('@')[0],
+          authorRole: user.role || 'adviser',
+          resolved: false,
+          replies: []
+        });
+        mongoSuccess = true;
+      }
+    } catch (mongoErr) {
+      console.error('[ManuscriptController] MongoDB add comment error:', mongoErr.message);
     }
+    
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not write comment to authoritative database. Operation aborted.'
+      });
+    }
+
+    const responseData = {
+      id: createdComment.id,
+      projectId: createdComment.documentId,
+      text: createdComment.content,
+      selectedText: createdComment.selectedText,
+      section: createdComment.section,
+      page: createdComment.page,
+      authorId: createdComment.authorUid,
+      authorName: createdComment.authorName,
+      authorRole: createdComment.authorRole,
+      createdAt: createdComment.createdAt,
+      resolved: createdComment.resolved,
+      replies: createdComment.replies
+    };
 
     return res.status(201).json({
       success: true,
       message: 'Comment added successfully.',
-      data: newComment
+      data: responseData
     });
   } catch (error) {
     console.error('[ManuscriptController] addManuscriptComment error:', error);
@@ -652,70 +704,72 @@ export const updateManuscriptComment = async (req, res) => {
     const { resolved, replyText } = req.body;
     const user = req.user;
 
+    let mongoSuccess = false;
     let updatedComment = null;
 
-    if (isDevMockMode) {
-      seedMockManuscriptsIfEmpty();
-      const commentsMap = mockFirestoreDb.get('manuscript_comments');
-      const list = commentsMap.get(projectId) || [];
-      const item = list.find(c => c.id === commentId);
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const updateDoc = {};
+        if (typeof resolved === 'boolean') {
+          updateDoc.resolved = resolved;
+        }
+        
+        const updateQuery = { $set: updateDoc };
+        
+        if (replyText) {
+          updateQuery.$push = {
+            replies: {
+              id: `reply-${Date.now()}`,
+              content: replyText,
+              authorUid: user.uid,
+              authorName: user.fullName || user.email.split('@')[0],
+              authorRole: user.role,
+              createdAt: new Date()
+            }
+          };
+        }
 
-      if (!item) {
-        return res.status(404).json({ success: false, error: 'Comment not found.' });
+        updatedComment = await MongoComment.findOneAndUpdate(
+          { id: commentId, documentId: projectId },
+          updateQuery,
+          { new: true }
+        );
+
+        if (updatedComment) {
+          mongoSuccess = true;
+        }
       }
-
-      if (typeof resolved === 'boolean') {
-        item.resolved = resolved;
-      }
-
-      if (replyText) {
-        item.replies = item.replies || [];
-        item.replies.push({
-          id: `reply-${Date.now()}`,
-          text: replyText,
-          authorName: user.fullName || user.email.split('@')[0],
-          authorRole: user.role,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      updatedComment = item;
-      commentsMap.set(projectId, list);
-    } else {
-      const docRef = db.collection('manuscript_drafts')
-        .doc(projectId)
-        .collection('comments')
-        .doc(commentId);
-
-      const docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        return res.status(404).json({ success: false, error: 'Comment not found.' });
-      }
-
-      const updates = {};
-      if (typeof resolved === 'boolean') updates.resolved = resolved;
-
-      if (replyText) {
-        const existingReplies = docSnap.data().replies || [];
-        existingReplies.push({
-          id: `reply-${Date.now()}`,
-          text: replyText,
-          authorName: user.fullName || user.email.split('@')[0],
-          authorRole: user.role,
-          createdAt: new Date().toISOString()
-        });
-        updates.replies = existingReplies;
-      }
-
-      await docRef.update(updates);
-      const freshSnap = await docRef.get();
-      updatedComment = { id: freshSnap.id, ...freshSnap.data() };
+    } catch (mongoErr) {
+      console.error('[ManuscriptController] MongoDB update comment error:', mongoErr.message);
     }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not update comment in authoritative database. Operation aborted.'
+      });
+    }
+
+    const responseData = {
+      id: updatedComment.id,
+      projectId: updatedComment.documentId,
+      text: updatedComment.content,
+      selectedText: updatedComment.selectedText,
+      section: updatedComment.section,
+      page: updatedComment.page,
+      authorId: updatedComment.authorUid,
+      authorName: updatedComment.authorName,
+      authorRole: updatedComment.authorRole,
+      createdAt: updatedComment.createdAt,
+      resolved: updatedComment.resolved,
+      replies: updatedComment.replies
+    };
 
     return res.status(200).json({
       success: true,
       message: 'Comment updated successfully.',
-      data: updatedComment
+      data: responseData
     });
   } catch (error) {
     console.error('[ManuscriptController] updateManuscriptComment error:', error);

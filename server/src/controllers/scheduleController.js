@@ -1,4 +1,6 @@
+import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
+import { Schedule as MongoSchedule } from '../models/Schedule.js';
 
 // Pre-seed mock defense schedules if store is empty
 const seedMockSchedulesIfEmpty = () => {
@@ -55,34 +57,68 @@ export const createSchedule = async (req, res) => {
       }
     }
 
-    const newSchedule = {
-      id: `sch-${Date.now()}`,
-      projectId: projectId || 'proj-501',
-      projectTitle,
-      studentName: studentName || 'Student Researcher',
-      defenseType: defenseType || 'proposal_defense',
-      date,
-      startTime,
-      endTime: endTime || '11:00',
-      venue: venue || 'Conference Room A',
-      panelistIds: panelistIds || [],
-      panelistNames,
-      status: 'scheduled',
-      createdAt: new Date().toISOString()
-    };
+    const newScheduleId = `sch-${Date.now()}`;
+    
+    // [FINAL PRODUCTION ARCHITECTURE]
+    // Strictly write to MongoDB. Hard fail if unavailable.
+    let mongoSuccess = false;
+    let createdSchedule = null;
 
-    if (isDevMockMode) {
-      seedMockSchedulesIfEmpty();
-      const map = mockFirestoreDb.get('schedules');
-      map.set(newSchedule.id, newSchedule);
-    } else {
-      await db.collection('schedules').doc(newSchedule.id).set(newSchedule);
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const panelistsList = panelistIds ? panelistIds.map((pid, idx) => ({
+          id: pid,
+          name: panelistNames[idx] || 'Panelist',
+          email: '',
+          role: 'panelist'
+        })) : [];
+
+        createdSchedule = await MongoSchedule.create({
+          id: newScheduleId,
+          projectId: projectId || 'proj-501',
+          projectTitle,
+          date,
+          time: startTime,
+          location: venue || 'Conference Room A',
+          type: defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
+          status: 'scheduled',
+          panelists: panelistsList
+        });
+        mongoSuccess = true;
+      }
+    } catch (mongoErr) {
+      console.error('[ScheduleController] MongoDB create schedule error:', mongoErr.message);
     }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not write schedule to authoritative database. Operation aborted.'
+      });
+    }
+
+    // Map back for response compatibility
+    const responseData = {
+      id: createdSchedule.id,
+      projectId: createdSchedule.projectId,
+      projectTitle: createdSchedule.projectTitle,
+      studentName: studentName || 'Student Researcher',
+      defenseType: createdSchedule.type === 'proposal' ? 'proposal_defense' : 'final_defense',
+      date: createdSchedule.date,
+      startTime: createdSchedule.time,
+      endTime: endTime || '11:00',
+      venue: createdSchedule.location,
+      panelistIds: createdSchedule.panelists.map(p => p.id),
+      panelistNames: createdSchedule.panelists.map(p => p.name),
+      status: createdSchedule.status,
+      createdAt: createdSchedule.createdAt
+    };
 
     return res.status(201).json({
       success: true,
       message: 'Defense presentation scheduled successfully.',
-      data: newSchedule
+      data: responseData
     });
   } catch (error) {
     console.error('[ScheduleController] createSchedule error:', error);
@@ -96,14 +132,44 @@ export const createSchedule = async (req, res) => {
 export const getSchedules = async (req, res) => {
   try {
     let list = [];
+    let fetchedFromMongo = false;
 
-    if (isDevMockMode) {
-      seedMockSchedulesIfEmpty();
-      const map = mockFirestoreDb.get('schedules');
-      list = Array.from(map.values());
-    } else {
-      const snapshot = await db.collection('schedules').get();
-      list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const mongoDocs = await MongoSchedule.find().lean();
+        if (mongoDocs) {
+          list = mongoDocs.map(doc => ({
+            id: doc.id,
+            projectId: doc.projectId,
+            projectTitle: doc.projectTitle,
+            studentName: 'Student Researcher', // Unused in new schema
+            defenseType: doc.type === 'proposal' ? 'proposal_defense' : 'final_defense',
+            date: doc.date,
+            startTime: doc.time,
+            endTime: doc.time,
+            venue: doc.location,
+            panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : [],
+            panelistNames: doc.panelists ? doc.panelists.map(p => p.name) : [],
+            status: doc.status,
+            createdAt: doc.createdAt
+          }));
+          fetchedFromMongo = true;
+        }
+      }
+    } catch (mongoErr) {
+      console.warn('[ScheduleController] MongoDB get schedules warning:', mongoErr.message);
+    }
+
+    if (!fetchedFromMongo) {
+      // [TEMPORARY MIGRATION COMPATIBILITY]
+      if (isDevMockMode) {
+        seedMockSchedulesIfEmpty();
+        const map = mockFirestoreDb.get('schedules');
+        list = Array.from(map.values());
+      } else {
+        const snapshot = await db.collection('schedules').get();
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
     }
 
     list.sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
@@ -127,24 +193,51 @@ export const updateScheduleStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    let updated = null;
+    // [FINAL PRODUCTION ARCHITECTURE]
+    // Strictly write to MongoDB. Hard fail if unavailable.
+    let mongoSuccess = false;
+    let updatedSchedule = null;
 
-    if (isDevMockMode) {
-      seedMockSchedulesIfEmpty();
-      const map = mockFirestoreDb.get('schedules');
-      const sch = map.get(id);
-      if (!sch) {
-        return res.status(404).json({ success: false, error: 'Schedule not found' });
+    try {
+      if (mongoose.connection.readyState === 1) {
+        updatedSchedule = await MongoSchedule.findOneAndUpdate(
+          { id: id },
+          { $set: { status } },
+          { new: true }
+        );
+
+        if (updatedSchedule) {
+          mongoSuccess = true;
+        }
       }
-      sch.status = status;
-      map.set(id, sch);
-      updated = sch;
-    } else {
-      const ref = db.collection('schedules').doc(id);
-      await ref.update({ status });
-      const doc = await ref.get();
-      updated = { id: doc.id, ...doc.data() };
+    } catch (mongoErr) {
+      console.error('[ScheduleController] MongoDB update schedule error:', mongoErr.message);
     }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not update schedule in authoritative database. Operation aborted.'
+      });
+    }
+
+    // Map back for response compatibility
+    const updated = {
+      id: updatedSchedule.id,
+      projectId: updatedSchedule.projectId,
+      projectTitle: updatedSchedule.projectTitle,
+      studentName: 'Student Researcher', // Unused in new schema
+      defenseType: updatedSchedule.type === 'proposal' ? 'proposal_defense' : 'final_defense',
+      date: updatedSchedule.date,
+      startTime: updatedSchedule.time,
+      endTime: updatedSchedule.time,
+      venue: updatedSchedule.location,
+      panelistIds: updatedSchedule.panelists ? updatedSchedule.panelists.map(p => p.id) : [],
+      panelistNames: updatedSchedule.panelists ? updatedSchedule.panelists.map(p => p.name) : [],
+      status: updatedSchedule.status,
+      createdAt: updatedSchedule.createdAt
+    };
 
     return res.status(200).json({
       success: true,

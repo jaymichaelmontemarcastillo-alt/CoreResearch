@@ -7,6 +7,10 @@ import { WebSocketServer } from 'ws';
 import { Hocuspocus } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { db, auth, isDevMockMode, mockUsersDb, mockFirestoreDb } from './config/firebaseAdmin.js';
+import mongoose from 'mongoose';
+import { connectDB } from './config/db.js';
+import { Document as MongoDocument } from './models/Document.js';
+
 
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -183,17 +187,31 @@ const hocuspocus = new Hocuspocus({
     const cleanDocId = documentName.replace(/^(manuscript-|document-)/, '');
 
     try {
-      if (isDevMockMode) {
-        if (!mockFirestoreDb.has('documents')) {
-          mockFirestoreDb.set('documents', new Map());
+      let fetchedFromMongo = false;
+      try {
+        if (mongoose.connection.readyState === 1) {
+          const mongoDoc = await MongoDocument.findOne({ id: cleanDocId }).lean();
+          if (mongoDoc && mongoDoc.yjsBinaryState) {
+            Y.applyUpdate(document, mongoDoc.yjsBinaryState);
+            fetchedFromMongo = true;
+          }
         }
-        const docsMap = mockFirestoreDb.get('documents');
-        const existing = docsMap.get(cleanDocId) || docsMap.get(documentName);
-        if (existing?.yjsBinaryState) {
-          const binary = Buffer.from(existing.yjsBinaryState, 'base64');
-          Y.applyUpdate(document, binary);
-        }
-      } else if (db) {
+      } catch (mongoErr) {
+        console.warn(`[Hocuspocus] MongoDB onLoadDocument warning for ${documentName}:`, mongoErr.message);
+      }
+
+      if (!fetchedFromMongo) {
+        if (isDevMockMode) {
+          if (!mockFirestoreDb.has('documents')) {
+            mockFirestoreDb.set('documents', new Map());
+          }
+          const docsMap = mockFirestoreDb.get('documents');
+          const existing = docsMap.get(cleanDocId) || docsMap.get(documentName);
+          if (existing?.yjsBinaryState) {
+            const binary = Buffer.from(existing.yjsBinaryState, 'base64');
+            Y.applyUpdate(document, binary);
+          }
+        } else if (db) {
         try {
           // Attempt loading from Firestore documents collection
           const docRef = db.collection('documents').doc(cleanDocId);
@@ -218,6 +236,7 @@ const hocuspocus = new Hocuspocus({
           }
         }
       }
+      }
     } catch (err) {
       console.warn(`[Hocuspocus] onLoadDocument warning for ${documentName}:`, err.message);
     }
@@ -232,39 +251,36 @@ const hocuspocus = new Hocuspocus({
     try {
       const state = Y.encodeStateAsUpdate(document);
       const base64State = Buffer.from(state).toString('base64');
+      const bufferState = Buffer.from(state);
 
-      if (isDevMockMode) {
-        if (!mockFirestoreDb.has('documents')) {
-          mockFirestoreDb.set('documents', new Map());
+      // Extract plain text for search and NLP (without making it the source of truth)
+      let plainText = '';
+      try {
+        const fragment = document.getXmlFragment('default');
+        const xmlString = fragment.toString();
+        plainText = xmlString.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+      } catch (textErr) {
+        console.warn(`[Hocuspocus] Failed to extract plain text for ${documentName}:`, textErr.message);
+      }
+
+      let savedToMongo = false;
+      try {
+        if (mongoose.connection.readyState === 1) {
+          await MongoDocument.findOneAndUpdate(
+            { id: cleanDocId },
+            { id: cleanDocId, yjsBinaryState: bufferState, plainText },
+            { upsert: true }
+          );
+          savedToMongo = true;
         }
-        const docsMap = mockFirestoreDb.get('documents');
-        const existing = docsMap.get(cleanDocId) || {};
-        docsMap.set(cleanDocId, {
-          ...existing,
-          id: cleanDocId,
-          yjsBinaryState: base64State,
-          updatedAt: new Date().toISOString()
-        });
-      } else if (db) {
-        try {
-          await db.collection('documents').doc(cleanDocId).set({
-            yjsBinaryState: base64State,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {
-          // Fallback to dev storage
-          if (!mockFirestoreDb.has('documents')) {
-            mockFirestoreDb.set('documents', new Map());
-          }
-          const docsMap = mockFirestoreDb.get('documents');
-          const existing = docsMap.get(cleanDocId) || {};
-          docsMap.set(cleanDocId, {
-            ...existing,
-            id: cleanDocId,
-            yjsBinaryState: base64State,
-            updatedAt: new Date().toISOString()
-          });
-        }
+      } catch (mongoErr) {
+        console.warn(`[Hocuspocus] MongoDB onStoreDocument warning for ${documentName}:`, mongoErr.message);
+      }
+
+      if (!savedToMongo) {
+        console.error(`[Hocuspocus] CRITICAL: MongoDB is unavailable. Document ${documentName} could not be saved.`);
+        // We do not fallback to Firestore to prevent 1MB limit crashes and split-brain scenarios.
+        throw new Error('Database unavailable for document persistence.');
       }
     } catch (err) {
       console.error(`[Hocuspocus] onStoreDocument error for ${documentName}:`, err.message);
@@ -315,14 +331,20 @@ wss.on('connection', (ws, request) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`=================================================`);
-  console.log(`🚀 CoreResearch API Server running on port ${PORT}`);
-  console.log(`📡 Hocuspocus OSS WebSocket Server: ws://0.0.0.0:${PORT}/collaboration`);
-  console.log(`[WebSocket] Hocuspocus server initialized`);
-  console.log(`🌐 Health check: http://0.0.0.0:${PORT}/api/health`);
-  console.log(`=================================================`);
-});
+const startServer = async () => {
+  await connectDB();
+
+  httpServer.listen(PORT, () => {
+    console.log(`=================================================`);
+    console.log(`🚀 CoreResearch API Server running on port ${PORT}`);
+    console.log(`📡 Hocuspocus OSS WebSocket Server: ws://0.0.0.0:${PORT}/collaboration`);
+    console.log(`[WebSocket] Hocuspocus server initialized`);
+    console.log(`🌐 Health check: http://0.0.0.0:${PORT}/api/health`);
+    console.log(`=================================================`);
+  });
+};
+
+startServer();
 
 export default app;
 

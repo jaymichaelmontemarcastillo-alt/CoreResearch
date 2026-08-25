@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { User } from '../models/User.js';
 import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 
 /**
@@ -67,8 +69,20 @@ export const registerUserSync = async (req, res) => {
     // Update in-memory mock cache
     mockUsersDb.set(uid, userProfile);
 
-    // Persist to Firestore if initialized
-    if (db) {
+    // Persist to MongoDB if initialized
+    let savedToMongo = false;
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await User.findOneAndUpdate({ uid }, userProfile, { upsert: true, new: true, setDefaultsOnInsert: true });
+        console.log(`[AuthController] Synchronized user document in MongoDB for UID: ${uid}`);
+        savedToMongo = true;
+      }
+    } catch (mongoErr) {
+      console.warn(`[AuthController] MongoDB write warning: ${mongoErr.message}`);
+    }
+
+    // Persist to Firestore ONLY if MongoDB save failed or is unavailable
+    if (!savedToMongo && db) {
       try {
         await db.collection('users').doc(uid).set(userProfile, { merge: true });
         console.log(`[AuthController] Synchronized user document in Firestore for UID: ${uid}`);
@@ -101,8 +115,27 @@ export const loginSync = async (req, res) => {
 
     let profileData = { ...user };
 
-    // Fetch existing document from Firestore if available
-    if (db) {
+    // 1. Fetch existing document from MongoDB if available
+    let fetchedFromMongo = false;
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const userDoc = await User.findOne({ uid: user.uid }).lean();
+        if (userDoc) {
+          profileData = { ...profileData, ...userDoc };
+          fetchedFromMongo = true;
+        } else {
+          const initialDoc = buildUserProfileDoc(user);
+          await User.findOneAndUpdate({ uid: user.uid }, initialDoc, { upsert: true, new: true, setDefaultsOnInsert: true });
+          profileData = { ...profileData, ...initialDoc };
+          fetchedFromMongo = true;
+        }
+      }
+    } catch (mongoErr) {
+      console.warn('[AuthController] MongoDB read warning:', mongoErr.message);
+    }
+
+    // 2. Fetch existing document from Firestore if available and Mongo failed
+    if (!fetchedFromMongo && db) {
       try {
         const userRef = db.collection('users').doc(user.uid);
         const doc = await userRef.get();
