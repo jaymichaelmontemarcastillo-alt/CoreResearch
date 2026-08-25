@@ -45,11 +45,18 @@ export class LocalStorageProvider extends IStorageProvider {
   }
 
   async delete(key) {
-    const cleanKey = key.replace(/^\/+/, '');
-    const targetFilePath = path.join(UPLOADS_ROOT, cleanKey);
-    if (fs.existsSync(targetFilePath)) {
-      await fs.promises.unlink(targetFilePath);
+    const filePath = this.getFilePath(key);
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath);
     }
+  }
+
+  async downloadStream(key) {
+    const filePath = this.getFilePath(key);
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return fs.createReadStream(filePath);
   }
 
   getFilePath(key) {

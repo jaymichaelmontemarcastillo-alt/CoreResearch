@@ -4,6 +4,7 @@ import { PdfParser } from './pdf/PdfParser.js';
 import { DocumentIRToTiptap } from './tiptap/documentIRToTiptap.js';
 import { getStorageProvider } from '../storage/storageManager.js';
 import { db, isDevMockMode, mockFirestoreDb } from '../../config/firebaseAdmin.js';
+import mongoose from 'mongoose';
 
 export class DocumentImportService {
   constructor() {
@@ -127,22 +128,32 @@ export class DocumentImportService {
       importVersion: '1.0.0',
     };
 
-    // 6. Save to Firestore
-    if (isDevMockMode) {
-      if (!mockFirestoreDb.has('documents')) {
-        mockFirestoreDb.set('documents', new Map());
+    // 6. Save to MongoDB
+    try {
+      if (mongoose.connection.readyState === 1) {
+        // Need to import MongoDocument at the top of the file
+        // For now, let's dynamically import or use the model
+        const MongoDocument = mongoose.model('Document');
+        
+        await MongoDocument.create({
+          id: documentId,
+          title: newDocumentRecord.title,
+          abstract: '', // Default abstract
+          status: 'draft',
+          authors: [ownerId],
+          adviser: null,
+          plainText: newDocumentRecord.plainText,
+          // We won't save yjsBinaryState here yet, as the initial import doesn't produce binary state
+          // The client will load the Tiptap JSON and push the binary state via Hocuspocus
+        });
+        
+        // Also save original file metadata into the document (requires schema update if needed)
+      } else {
+        throw new Error('MongoDB not connected');
       }
-      mockFirestoreDb.get('documents').set(documentId, newDocumentRecord);
-    } else if (db) {
-      try {
-        await db.collection('documents').doc(documentId).set(newDocumentRecord);
-      } catch (dbErr) {
-        console.warn('[DocumentImportService] Firestore write fallback:', dbErr.message);
-        if (!mockFirestoreDb.has('documents')) {
-          mockFirestoreDb.set('documents', new Map());
-        }
-        mockFirestoreDb.get('documents').set(documentId, newDocumentRecord);
-      }
+    } catch (mongoErr) {
+      console.warn('[DocumentImportService] MongoDB write error:', mongoErr.message);
+      throw mongoErr;
     }
 
     return newDocumentRecord;

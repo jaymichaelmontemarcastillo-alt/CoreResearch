@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { documentImportService } from '../services/import/DocumentImportService.js';
-import { localStorageProvider } from '../services/storage/storageManager.js';
+import { getStorageProvider, localStorageProvider } from '../services/storage/storageManager.js';
 
 export const importDocument = async (req, res) => {
   try {
@@ -55,22 +55,14 @@ export const importDocument = async (req, res) => {
   }
 };
 
-export const serveStorageAsset = (req, res) => {
+export const serveStorageAsset = async (req, res) => {
   try {
     const rawPath = req.params[0] || '';
     const cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
-    const filePath = localStorageProvider.getFilePath(cleanKey);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: `Asset '${cleanKey}' does not exist.`,
-      });
-    }
+    const storageProvider = getStorageProvider();
 
     // Determine Content-Type
-    const ext = path.extname(filePath).toLowerCase();
+    const ext = path.extname(cleanKey).toLowerCase();
     const mimeMap = {
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
@@ -80,11 +72,20 @@ export const serveStorageAsset = (req, res) => {
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
 
+    const stream = await storageProvider.downloadStream(cleanKey);
+    
+    if (!stream) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: `Asset '${cleanKey}' does not exist.`,
+      });
+    }
+
     const contentType = mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
 
-    const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   } catch (err) {
     console.error('[documentController] Serve asset error:', err);

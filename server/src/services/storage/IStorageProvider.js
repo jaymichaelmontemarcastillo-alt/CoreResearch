@@ -34,6 +34,16 @@ export class IStorageProvider {
   async delete(key) {
     throw new Error('Method delete() must be implemented.');
   }
+
+  /**
+   * Get a readable stream for the object by key
+   * @param {string} key
+   * @returns {Promise<ReadableStream|null>}
+   */
+  async downloadStream(key) {
+    throw new Error('Method downloadStream() must be implemented.');
+  }
 }
 
 export default IStorageProvider;
+
