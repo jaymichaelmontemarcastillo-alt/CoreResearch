@@ -6,6 +6,7 @@ import { DocumentEditor } from '../components/editor/DocumentEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { EditorMenuBar } from '../components/editor/EditorMenuBar';
 import { CommentsPanel } from '../components/editor/CommentsPanel';
+import { VersionControlPanel } from '../components/editor/VersionControlPanel';
 import { FloatingCommentPopover } from '../components/editor/FloatingCommentPopover';
 import { ShareDialog } from '../components/editor/ShareDialog';
 import { PageSettingsModal } from '../components/editor/PageSettingsModal';
@@ -27,7 +28,8 @@ import {
   HiCalendar, 
   HiAcademicCap,
   HiChatBubbleLeftRight,
-  HiShare
+  HiShare,
+  HiClock
 } from 'react-icons/hi2';
 
 import { documentStore, DEFAULT_PAGE_SETTINGS } from '../services/documentStore';
@@ -88,7 +90,7 @@ export const DocumentEditorPage = () => {
   
   const [editor, setEditor] = useState(null);
   const [collaborators, setCollaborators] = useState([]);
-  const [showComments, setShowComments] = useState(true);
+  const [activeRightPanel, setActiveRightPanel] = useState(null); // 'comments' | 'versionControl' | null
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPageSettingsModal, setShowPageSettingsModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
@@ -99,6 +101,9 @@ export const DocumentEditorPage = () => {
   const [sourceType, setSourceType] = useState('native');
   const [comments, setComments] = useState([]);
   const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+  const [previewingVersion, setPreviewingVersion] = useState(null);
+  const [pendingRestoreContent, setPendingRestoreContent] = useState(null);
+  const [pendingRestoreVersionLabel, setPendingRestoreVersionLabel] = useState(null);
   
   // Fullscreen Maximize & Drawer Sidebar state
   const [isMaximized, setIsMaximized] = useState(false);
@@ -515,6 +520,68 @@ export const DocumentEditorPage = () => {
     }
   }, [commentsWidth]);
 
+  // Restore a previewed version
+  const handleRestoreVersion = async () => {
+    if (!previewingVersion || !editor) return;
+    try {
+      // Auto-backup current live state before restoring
+      const currentDoc = await documentStore.fetchDocument(documentId);
+      if (currentDoc && currentDoc.content) {
+         await documentStore.saveVersion(documentId, currentDoc.content, effectiveUserProfile, `Auto-backup before restore`);
+      }
+
+      setPendingRestoreContent(previewingVersion.content);
+      setPendingRestoreVersionLabel(previewingVersion.label || formatVersionDateTime(previewingVersion.createdAt));
+      
+      // Clear preview mode to re-enable live collaboration extensions
+      setPreviewingVersion(null);
+    } catch (err) {
+      console.error('Failed to restore version:', err);
+    }
+  };
+
+  // Apply restore content once the editor has re-initialized out of preview mode
+  useEffect(() => {
+    if (editor && !previewingVersion && pendingRestoreContent) {
+      const applyRestore = async () => {
+        try {
+          editor.commands.setContent(pendingRestoreContent, false);
+          const contentJson = editor.getJSON();
+          const contentHtml = editor.getHTML();
+          const plainText = editor.getText();
+          
+          await documentStore.saveVersion(documentId, contentJson, effectiveUserProfile, `Restored from ${pendingRestoreVersionLabel}`);
+          await documentStore.saveDocumentContent(documentId, contentJson, contentHtml, plainText, effectiveUserProfile);
+          
+        } catch (e) {
+          console.error('Error applying restore:', e);
+        } finally {
+          setPendingRestoreContent(null);
+          setPendingRestoreVersionLabel(null);
+        }
+      };
+      
+      // Delay slightly to let Yjs sync initial state before we override it
+      const timer = setTimeout(applyRestore, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [editor, previewingVersion, pendingRestoreContent, documentId, effectiveUserProfile, pendingRestoreVersionLabel]);
+
+  const formatVersionDateTime = (isoString) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const year = d.getFullYear();
+      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${month}/${day}/${year} • ${timeStr}`;
+    } catch {
+      return '';
+    }
+  };
+
   return (
     <div className={`flex flex-col bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
       isMaximized 
@@ -712,17 +779,6 @@ export const DocumentEditorPage = () => {
             ))}
           </div>
 
-          {/* Comments Toggle Button */}
-          <Button 
-            variant={showComments ? 'primary' : 'outline'} 
-            size="sm" 
-            onClick={() => setShowComments(!showComments)}
-            className={`rounded-lg ${showComments ? '' : 'text-gray-600 dark:text-gray-300'}`}
-            title="Toggle comments"
-          >
-            <HiChatBubbleLeftRight className="w-4 h-4 sm:mr-1.5" />
-            <span className="hidden sm:inline text-xs">Comments</span>
-          </Button>
 
           {/* Share Dialog Button */}
           {!isFaculty && (
@@ -772,8 +828,31 @@ export const DocumentEditorPage = () => {
 
       {/* Main Document Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] dark:bg-slate-950 flex justify-center pb-20 custom-scrollbar">
-          <div className="my-6">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] dark:bg-slate-950 flex flex-col items-center pb-20 custom-scrollbar">
+          {previewingVersion && (
+            <div className="w-full bg-blue-50 dark:bg-blue-900/40 border-b border-blue-200 dark:border-blue-800 p-3 flex flex-col sm:flex-row items-center justify-center gap-3 shadow-sm z-10 shrink-0">
+              <div className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+                Previewing version from <strong>{formatVersionDateTime(previewingVersion.createdAt)}</strong> by {previewingVersion.createdByName}
+              </div>
+              <div className="flex items-center gap-2">
+                {!isFaculty && (
+                  <button
+                    onClick={handleRestoreVersion}
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
+                  >
+                    Restore This Version
+                  </button>
+                )}
+                <button
+                  onClick={() => setPreviewingVersion(null)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          <div className={`my-6 ${previewingVersion ? 'opacity-80' : ''}`}>
             <EditorErrorBoundary key={documentId}>
               {documentLoaded ? (
                 <DocumentEditor 
@@ -786,11 +865,12 @@ export const DocumentEditorPage = () => {
                   sourceType={sourceType}
                   title={title}
                   comments={comments}
-                  isReadOnly={isFaculty}
+                  isReadOnly={isFaculty || previewingVersion !== null}
+                  previewingVersion={previewingVersion}
                   onCommentSelect={(commentId) => {
                     setHighlightedCommentId(commentId);
-                    if (!showComments) {
-                      setShowComments(true);
+                    if (activeRightPanel !== 'comments') {
+                      setActiveRightPanel('comments');
                     }
                   }}
                   onEditorReady={handleEditorReady}
@@ -813,16 +893,16 @@ export const DocumentEditorPage = () => {
               documentId={documentId}
               userProfile={effectiveUserProfile}
               onCommentAdded={() => {
-                if (!showComments) {
-                  setShowComments(true);
+                if (activeRightPanel !== 'comments') {
+                  setActiveRightPanel('comments');
                 }
               }}
             />
           )}
         </div>
 
-        {/* Right Sidebar - Comments Panel (Local Resizable) */}
-        {showComments && (
+        {/* Right Sidebar - Expanded Panels */}
+        {activeRightPanel === 'comments' && (
           <div 
             className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
             style={{ width: `${commentsWidth}px` }}
@@ -830,7 +910,7 @@ export const DocumentEditorPage = () => {
             {/* Draggable Resize Divider Handle */}
             <div
               onPointerDown={handleResizeStart}
-              title="Drag horizontally to resize Comments panel"
+              title="Drag horizontally to resize panel"
               className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
                 isResizingComments ? 'bg-blue-500/20' : ''
               }`}
@@ -842,16 +922,63 @@ export const DocumentEditorPage = () => {
               }`} />
             </div>
 
-            {/* Comments Component */}
             <CommentsPanel 
               documentId={documentId} 
               editor={editor} 
               highlightedCommentId={highlightedCommentId}
               onClearHighlight={() => setHighlightedCommentId(null)}
-              onClose={() => setShowComments(false)}
+              onClose={() => setActiveRightPanel(null)}
             />
           </div>
         )}
+
+        {activeRightPanel === 'versionControl' && (
+          <div 
+            className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
+            style={{ width: `360px` }}
+          >
+            <VersionControlPanel 
+              documentId={documentId}
+              editor={editor}
+              onClose={() => setActiveRightPanel(null)}
+              onPreviewVersion={(version) => {
+                if (previewingVersion?.id === version.id) {
+                  setPreviewingVersion(null);
+                } else {
+                  setPreviewingVersion(version);
+                }
+              }}
+              previewingVersionId={previewingVersion?.id}
+            />
+          </div>
+        )}
+
+        {/* Compact Right Action Rail */}
+        <div className="shrink-0 w-14 border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4 gap-3 z-30 shadow-[-2px_0_10px_rgba(0,0,0,0.02)]">
+          <button 
+            onClick={() => setActiveRightPanel(activeRightPanel === 'comments' ? null : 'comments')}
+            className={`p-2.5 rounded-xl transition-all ${
+              activeRightPanel === 'comments' 
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
+            }`}
+            title="Comments"
+          >
+            <HiChatBubbleLeftRight className="w-5 h-5" />
+          </button>
+          
+          <button 
+            onClick={() => setActiveRightPanel(activeRightPanel === 'versionControl' ? null : 'versionControl')}
+            className={`p-2.5 rounded-xl transition-all ${
+              activeRightPanel === 'versionControl' 
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
+            }`}
+            title="Version Control"
+          >
+            <HiClock className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Share Dialog */}

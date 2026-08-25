@@ -453,6 +453,7 @@ export const DocumentEditor = ({
   onEditorReady,
   onContentChange,
   onCommentSelect,
+  previewingVersion,
 }) => {
   const commentsRef = useRef(comments);
   commentsRef.current = comments;
@@ -470,7 +471,7 @@ export const DocumentEditor = ({
   const extensions = useMemo(() => {
     const list = [
       StarterKit.configure({
-        history: false, // Managed by Yjs collaboration
+        history: previewingVersion ? true : false, // Managed by Yjs collaboration normally, but enable locally for preview mode
       }),
       Underline,
       Superscript,
@@ -492,7 +493,7 @@ export const DocumentEditor = ({
       CustomTableCell,
     ];
 
-    if (ydoc) {
+    if (ydoc && !previewingVersion) {
       list.push(
         Collaboration.configure({
           document: ydoc,
@@ -500,7 +501,7 @@ export const DocumentEditor = ({
       );
     }
 
-    if (provider && provider.awareness && provider.doc) {
+    if (provider && provider.awareness && provider.doc && !previewingVersion) {
       try {
         list.push(
           CollaborationCursor.configure({
@@ -514,7 +515,7 @@ export const DocumentEditor = ({
     }
 
     return list;
-  }, [ydoc, provider, effectiveUser, activeCommentsExt]);
+  }, [ydoc, provider, effectiveUser, activeCommentsExt, previewingVersion]);
 
   const editor = useEditor({
     extensions,
@@ -619,6 +620,14 @@ export const DocumentEditor = ({
       console.warn('[DocumentEditor] initialContent load warning:', e);
     }
   }, [editor, ydoc, initialContent, sourceType]);
+
+  // Handle previewing a specific version
+  useEffect(() => {
+    if (editor && previewingVersion) {
+      // Temporarily set content to the version snapshot
+      editor.commands.setContent(previewingVersion.content, false);
+    }
+  }, [editor, previewingVersion]);
 
   // Compute paper dimension styles based on pageSettings
   const pageStyle = useMemo(() => {

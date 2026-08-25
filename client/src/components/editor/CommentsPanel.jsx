@@ -757,63 +757,7 @@ export const CommentsPanel = ({
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 select-text overflow-hidden">
-      {/* 1. Header (Fixed at top) */}
-      <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-10 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
-              <HiChatBubbleLeftRight className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-              Manuscript Feedback & Comments
-            </h3>
-          </div>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              title="Close panel"
-            >
-              <HiXMark className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Tabs Filter */}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setFilter('active');
-              onClearHighlight?.();
-              lastHighlightedRef.current = null;
-            }}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
-              filter === 'active'
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm border border-blue-200/60 dark:border-blue-800'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            Active ({activeCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFilter('resolved');
-              onClearHighlight?.();
-              lastHighlightedRef.current = null;
-            }}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
-              filter === 'resolved'
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shadow-sm border border-emerald-200/60 dark:border-emerald-800'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            Resolved ({resolvedCount})
-          </button>
-        </div>
-      </div>
+      {/* Header removed for clean UI */}
 
       {/* 2. Middle Scrollable Comments Feed (Oldest to Newest) */}
       <div 

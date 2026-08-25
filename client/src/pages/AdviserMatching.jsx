@@ -93,7 +93,7 @@ export const AdviserMatching = () => {
           location.state.title,
           location.state.description || ''
         );
-        setMatches(recommendations);
+        setMatches(recommendations.slice(0, 5));
         setServiceError(null);
         setLoading(false);
 
@@ -190,7 +190,7 @@ export const AdviserMatching = () => {
           title || location.state?.title || '',
           description || location.state?.description || ''
         );
-        setMatches(recommendations);
+        setMatches(recommendations.slice(0, 5));
         setServiceError(null);
       } catch (err) {
         if (err.message?.includes('unavailable') || err.message?.includes('temporarily') || err.message?.includes('Network')) {

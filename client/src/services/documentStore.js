@@ -16,6 +16,7 @@ import { db } from '../firebase/firebase';
 
 const COLLECTION_NAME = 'documents';
 const COMMENTS_SUBCOLLECTION = 'comments';
+const VERSIONS_SUBCOLLECTION = 'versions';
 
 // Memory/temporary session cache for instant UI response
 const memoryDocCache = new Map();
@@ -588,6 +589,76 @@ export const documentStore = {
       await deleteDoc(commentRef);
     } catch (error) {
       console.warn(`[documentStore] deleteComment error:`, error.message);
+    }
+  },
+
+  // ==================== VERSIONS SUBCOLLECTION ====================
+
+  /**
+   * Save a snapshot version of the document content
+   */
+  saveVersion: async (documentId, contentJson, userProfile = null, label = '') => {
+    if (!documentId) return null;
+    const versionId = `v_${Date.now()}`;
+    const now = new Date().toISOString();
+    const authorId = userProfile?.uid || 'unknown-user';
+    const authorName = userProfile?.fullName || userProfile?.first_name || 'Researcher';
+
+    let cleanJson = null;
+    if (contentJson) {
+      if (typeof contentJson.getJSON === 'function') {
+        cleanJson = contentJson.getJSON();
+      } else if (typeof contentJson === 'object') {
+        try {
+          cleanJson = JSON.parse(JSON.stringify(contentJson));
+        } catch (e) {
+          cleanJson = null;
+        }
+      }
+    }
+
+    const newVersion = {
+      id: versionId,
+      documentId,
+      content: cleanJson,
+      label: label.trim(),
+      createdBy: authorId,
+      createdByName: authorName,
+      createdAt: now
+    };
+
+    try {
+      const versionRef = doc(db, COLLECTION_NAME, documentId, VERSIONS_SUBCOLLECTION, versionId);
+      await setDoc(versionRef, newVersion);
+      return newVersion;
+    } catch (error) {
+      console.warn(`[documentStore] saveVersion error for ${documentId}:`, error.message);
+      return null;
+    }
+  },
+
+  /**
+   * Subscribe to real-time version history updates for a document
+   */
+  subscribeVersions: (documentId, onUpdate, onError) => {
+    if (!documentId) return () => {};
+    try {
+      const versionsCol = collection(db, COLLECTION_NAME, documentId, VERSIONS_SUBCOLLECTION);
+      const q = query(versionsCol, orderBy('createdAt', 'desc'));
+
+      return onSnapshot(q, (snapshot) => {
+        const versions = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+        onUpdate(versions);
+      }, (err) => {
+        console.warn(`[documentStore] subscribeVersions error for ${documentId}:`, err.message);
+        if (onError) onError(err);
+      });
+    } catch (error) {
+      console.warn(`[documentStore] subscribeVersions exception:`, error.message);
+      return () => {};
     }
   }
 };
