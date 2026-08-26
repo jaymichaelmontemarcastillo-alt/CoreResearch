@@ -323,6 +323,8 @@ export const Scheduling = () => {
               filteredGroups.map((group) => {
                 const proposal = getProposalForGroup(group.id);
                 const schedule = getScheduleForGroup(group.id);
+                const activePanelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (group.panelists || []);
+                const activeAdviserName = schedule?.adviserName || group.adviserName;
                 
                 return (
                   <TableRow key={group.id}>
@@ -367,15 +369,15 @@ export const Scheduling = () => {
                     {/* Adviser */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.adviserName || <span className="text-gray-400 italic">Not Assigned</span>}
+                        {activeAdviserName || <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
 
                     {/* Subject Specialist */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.panelists?.find(p => (p.role || '').toLowerCase().includes('subject'))?.name || 
-                         group.panelists?.find(p => (p.role || '').toLowerCase().includes('subject'))?.fullName || 
+                        {activePanelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.name || 
+                         activePanelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.fullName || 
                          <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
@@ -383,8 +385,8 @@ export const Scheduling = () => {
                     {/* Stat */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.panelists?.find(p => (p.role || '').toLowerCase().includes('stat'))?.name || 
-                         group.panelists?.find(p => (p.role || '').toLowerCase().includes('stat'))?.fullName || 
+                        {activePanelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.name || 
+                         activePanelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.fullName || 
                          <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
@@ -392,8 +394,8 @@ export const Scheduling = () => {
                     {/* Technical */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.panelists?.find(p => (p.role || '').toLowerCase().includes('tech'))?.name || 
-                         group.panelists?.find(p => (p.role || '').toLowerCase().includes('tech'))?.fullName || 
+                        {activePanelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.name || 
+                         activePanelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.fullName || 
                          <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>

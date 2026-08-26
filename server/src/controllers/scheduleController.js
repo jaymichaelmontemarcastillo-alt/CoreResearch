@@ -151,6 +151,9 @@ export const getSchedules = async (req, res) => {
             venue: doc.location,
             panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : [],
             panelistNames: doc.panelists ? doc.panelists.map(p => p.name) : [],
+            panelists: doc.panelists || [],
+            adviserId: doc.adviserId,
+            adviserName: doc.adviserName,
             status: doc.status,
             createdAt: doc.createdAt
           }));
