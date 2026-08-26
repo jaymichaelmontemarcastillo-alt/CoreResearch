@@ -46,9 +46,9 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
 
   useEffect(() => {
     if (schedule && isOpen) {
-      const subj = schedule.panelists?.find(p => p.role?.toLowerCase().includes('subject'));
-      const stat = schedule.panelists?.find(p => p.role?.toLowerCase().includes('stat'));
-      const tech = schedule.panelists?.find(p => p.role?.toLowerCase().includes('tech'));
+      const subj = schedule.panelists?.find(p => (p.role || '').toLowerCase().includes('subject'));
+      const stat = schedule.panelists?.find(p => (p.role || '').toLowerCase().includes('stat'));
+      const tech = schedule.panelists?.find(p => (p.role || '').toLowerCase().includes('tech'));
 
       setFormData({
         date: schedule.date || '',

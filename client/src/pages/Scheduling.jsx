@@ -372,8 +372,8 @@ export const Scheduling = () => {
                     {/* Subject Specialist */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.panelists?.find(p => p.role?.toLowerCase().includes('subject'))?.name || 
-                         group.panelists?.find(p => p.role?.toLowerCase().includes('subject'))?.fullName || 
+                        {group.panelists?.find(p => (p.role || '').toLowerCase().includes('subject'))?.name || 
+                         group.panelists?.find(p => (p.role || '').toLowerCase().includes('subject'))?.fullName || 
                          <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
@@ -381,8 +381,8 @@ export const Scheduling = () => {
                     {/* Stat */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.panelists?.find(p => p.role?.toLowerCase().includes('stat'))?.name || 
-                         group.panelists?.find(p => p.role?.toLowerCase().includes('stat'))?.fullName || 
+                        {group.panelists?.find(p => (p.role || '').toLowerCase().includes('stat'))?.name || 
+                         group.panelists?.find(p => (p.role || '').toLowerCase().includes('stat'))?.fullName || 
                          <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
@@ -390,8 +390,8 @@ export const Scheduling = () => {
                     {/* Technical */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.panelists?.find(p => p.role?.toLowerCase().includes('tech'))?.name || 
-                         group.panelists?.find(p => p.role?.toLowerCase().includes('tech'))?.fullName || 
+                        {group.panelists?.find(p => (p.role || '').toLowerCase().includes('tech'))?.name || 
+                         group.panelists?.find(p => (p.role || '').toLowerCase().includes('tech'))?.fullName || 
                          <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
