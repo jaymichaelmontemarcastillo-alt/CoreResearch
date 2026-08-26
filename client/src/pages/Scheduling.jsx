@@ -36,6 +36,8 @@ export const Scheduling = () => {
   const [toastMessage, setToastMessage] = useState("");
   const [toastVariant, setToastVariant] = useState("success");
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [editingSchedule, setEditingSchedule] = useState(null);
 
   useEffect(() => {
     fetchInitialData();
