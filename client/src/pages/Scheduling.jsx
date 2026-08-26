@@ -332,7 +332,7 @@ export const Scheduling = () => {
                             {schedule.startTime} - {schedule.endTime}
                           </span>
                           <span className="text-[10px] text-gray-500 font-medium">
-                            {new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
                           </span>
                         </div>
                       ) : null}
