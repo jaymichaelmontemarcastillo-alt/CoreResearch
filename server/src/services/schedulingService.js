@@ -2,8 +2,9 @@ export const checkConflicts = (proposedSchedule, existingSchedules) => {
   const conflicts = [];
 
   const parseTime = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
+    return (hours || 0) * 60 + (minutes || 0);
   };
 
   const isOverlapping = (s1, e1, s2, e2) => {
@@ -58,8 +59,9 @@ export const generateTimeSlots = (config, groups, existingSchedules) => {
   const { date, venue, durationMinutes, startTime, breakStart, breakEnd, endTime, defenseType } = config;
 
   const parseTime = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
+    return (hours || 0) * 60 + (minutes || 0);
   };
 
   const formatTime = (totalMinutes) => {
