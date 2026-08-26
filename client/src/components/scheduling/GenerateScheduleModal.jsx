@@ -229,7 +229,9 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
             </div>
 
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-              {previewData.proposedSchedules.map((schedule, i) => (
+              {previewData.proposedSchedules.map((schedule, i) => {
+                const originalGroup = groups.find(g => g.id === schedule.projectId);
+                return (
                 <div key={i} className="p-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col md:flex-row gap-4">
                   <div className="flex-shrink-0 w-32 border-r border-gray-100 dark:border-slate-800 flex flex-col justify-center">
                     <span className="text-lg font-bold text-gray-900 dark:text-white">{schedule.startTime}</span>
@@ -237,6 +239,11 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900 dark:text-white">{schedule.projectTitle}</h4>
+                    {originalGroup?.members?.length > 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        {originalGroup.members.map(m => m.fullName).join(', ')}
+                      </p>
+                    )}
                     
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div>
@@ -261,8 +268,10 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
+
           </div>
         )}
 

@@ -411,7 +411,10 @@ export const Scheduling = () => {
         <GenerateScheduleModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
-          groups={filteredGroups}
+          groups={filteredGroups.map(g => ({
+            ...g,
+            title: getProposalForGroup(g.id)?.title || 'No approved title yet',
+          }))}
           onSchedulesCreated={() => {
             setIsScheduleModalOpen(false);
             showToast("Schedules created successfully!");
