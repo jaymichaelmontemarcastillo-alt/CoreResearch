@@ -391,7 +391,7 @@ export const ProfileSettings = () => {
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
       {/* Page Title Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+        <h1 className="text-2xl font-medium text-gray-900 dark:text-white tracking-tight">
           Account settings
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -541,7 +541,7 @@ export const ProfileSettings = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-3xl flex items-center justify-center tracking-wider">
+                      <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-medium text-3xl flex items-center justify-center tracking-wider">
                         {getInitials()}
                       </div>
                     )}

@@ -6,9 +6,12 @@ const ScheduleSchema = new mongoose.Schema({
   projectTitle: { type: String },
   date: { type: String },
   time: { type: String },
+  endTime: { type: String },
   location: { type: String },
   type: { type: String, enum: ['proposal', 'final_defense'] },
   status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' },
+  adviserId: { type: String },
+  adviserName: { type: String },
   panelists: [{
     id: String,
     name: String,

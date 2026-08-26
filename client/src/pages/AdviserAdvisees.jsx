@@ -122,7 +122,7 @@ export const AdviserAdvisees = () => {
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Groups Overview</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Groups Overview</h3>
           <div className="relative max-w-xs w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input

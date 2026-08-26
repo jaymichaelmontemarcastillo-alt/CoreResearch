@@ -5,8 +5,11 @@ import { MatchCache } from '../models/MatchCache.js';
 import { User } from '../models/User.js';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 
+import { connectDB } from '../config/db.js';
+
 const migratePhase6 = async () => {
   console.log('[Phase 6] Starting Adviser NLP Matching Migration...');
+  await connectDB();
 
   if (mongoose.connection.readyState !== 1) {
     console.error('[Phase 6] ERROR: MongoDB not connected. Cannot migrate.');

@@ -296,7 +296,7 @@ export const ProposalDetail = () => {
                 <HiSparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-300 mb-1">
+                <h2 className="text-lg font-medium text-emerald-800 dark:text-emerald-300 mb-1">
                   Proposal Approved
                 </h2>
                 <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
@@ -411,7 +411,7 @@ export const ProposalDetail = () => {
               )}
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-snug">
+            <h1 className="text-xl sm:text-2xl font-medium text-gray-900 dark:text-white leading-snug">
               {proposal.title}
             </h1>
 

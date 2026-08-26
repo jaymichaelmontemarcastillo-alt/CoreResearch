@@ -89,7 +89,7 @@ export const PageSettingsModal = ({ isOpen, onClose, pageSettings, onSaveSetting
             <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
               <HiDocumentText className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-gray-900 dark:text-white text-base">Page Setup & Margins</h3>
+            <h3 className="font-medium text-gray-900 dark:text-white text-base">Page Setup & Margins</h3>
           </div>
           <button
             type="button"

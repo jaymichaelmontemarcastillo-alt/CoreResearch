@@ -72,7 +72,7 @@ export const TaskManagementModal = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
           <div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
               Create Research Task
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">

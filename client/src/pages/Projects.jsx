@@ -93,7 +93,7 @@ export const Projects = () => {
                   <span className="text-xs text-gray-400 dark:text-gray-500">{p.department}</span>
                 </div>
 
-                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">
+                <h3 className="text-base font-medium text-gray-900 dark:text-white leading-snug">
                   {p.title}
                 </h3>
 

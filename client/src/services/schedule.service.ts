@@ -11,6 +11,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
+import api from './api';
 import {
   DefenseSchedule,
   CreateScheduleInput,
@@ -82,6 +83,22 @@ export const scheduleService = {
     const docRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(docRef);
   },
+
+  /**
+   * Generate schedule preview using Node API
+   */
+  async generateSchedulePreview(payload: { groups: any[], config: any }) {
+    const response = await api.post('/schedules/preview', payload);
+    return response.data.data;
+  },
+
+  /**
+   * Bulk create schedules using Node API
+   */
+  async bulkCreateSchedules(schedules: any[]) {
+    const response = await api.post('/schedules/bulk', { schedules });
+    return response.data;
+  }
 };
 
 export default scheduleService;

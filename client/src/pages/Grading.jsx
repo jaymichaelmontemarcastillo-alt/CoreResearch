@@ -112,7 +112,7 @@ export const Grading = () => {
           <div className="text-xs uppercase font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
             <HiCalculator className="w-4 h-4" /> Composite Panel Evaluation Grade
           </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Smart IoT Moisture & Nutrient Sensing System</h2>
+          <h2 className="text-xl font-medium text-gray-900 dark:text-white">Smart IoT Moisture & Nutrient Sensing System</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Candidate: <strong className="text-gray-700 dark:text-gray-300">Alex Rivera</strong> (Computer Science)
           </p>
@@ -121,7 +121,7 @@ export const Grading = () => {
         <div className="flex items-center gap-6 border-t md:border-t-0 md:border-l border-gray-200 dark:border-slate-800 pt-4 md:pt-0 md:pl-6">
           <div className="text-center">
             <div className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500">Average Panel Score</div>
-            <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">
+            <div className="text-3xl font-medium text-amber-600 dark:text-amber-400">
               {gradeSummary.averageScore}<span className="text-sm text-gray-400 dark:text-gray-500">/100</span>
             </div>
           </div>
@@ -161,7 +161,7 @@ export const Grading = () => {
                 </div>
 
                 <div className="text-right">
-                  <div className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  <div className="text-xl font-medium text-gray-900 dark:text-white">
                     {ev.totalScore}<span className="text-xs text-gray-400 dark:text-gray-500">/100</span>
                   </div>
                   <Badge variant="emerald" className="text-[10px]">PASSED</Badge>
@@ -208,7 +208,7 @@ export const Grading = () => {
         <form onSubmit={handleRubricSubmit} className="space-y-4">
           <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-xs flex justify-between items-center">
             <span className="text-gray-600 dark:text-gray-300">Calculated Composite Score:</span>
-            <span className="text-lg font-extrabold text-amber-600 dark:text-amber-400">{currentComputedTotal} / 100</span>
+            <span className="text-lg font-medium text-amber-600 dark:text-amber-400">{currentComputedTotal} / 100</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -57,57 +57,75 @@ export const AdviserMatching = () => {
   }, [loading, pendingRequest]);
 
   useEffect(() => {
+    let unsubscribe = () => {};
+
     const initMatching = async () => {
       try {
         const group = await groupService.getGroupByStudentId(currentUser.uid);
         
-        // 1. Check for existing request
-        const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
-        const activeRequest = requests.find(r => r.status === 'pending');
-        
-        if (activeRequest) {
-          setPendingRequest(activeRequest);
-          setLoading(false);
-          return;
-        }
+        // 1. Check for existing request via Real-time subscription
+        unsubscribe = adviserRequestService.subscribeToStudentRequests(
+          currentUser.uid,
+          async (requests) => {
+            const activeRequest = requests.find(r => r.status === 'pending');
+            const acceptedRequest = requests.find(r => r.status === 'accepted');
+            const declinedRequest = requests.find(r => r.status === 'declined');
 
-        const acceptedRequest = requests.find(r => r.status === 'accepted');
-        if (acceptedRequest) {
-          // Adviser accepted! Head to workspace
-          navigate('/research/workspace');
-          return;
-        }
+            if (acceptedRequest) {
+              // Adviser accepted! Head to workspace
+              navigate('/research/workspace');
+              return;
+            }
 
-        // 2. We don't have a pending request. Start matching based on state.
-        if (!location.state?.title) {
-          // If they got here without a title, send them back
-          navigate('/submit-title');
-          return;
-        }
+            if (activeRequest) {
+              setPendingRequest(activeRequest);
+              setLoading(false);
+              return;
+            }
+            
+            if (declinedRequest) {
+              // If declined, clear the pending state and let them see matches again
+              setPendingRequest(null);
+            }
 
-        setTitle(location.state.title);
-        setDescription(location.state.description || '');
+            // 2. We don't have a pending/accepted request. Start matching based on state.
+            if (!location.state?.title && !activeRequest) {
+              // If they got here without a title, send them back
+              navigate('/submit-title');
+              return;
+            }
 
-        // 3. Call the backend matching API (which calls NLP service)
-        const recommendations = await adviserMatchingService.getRecommendations(
-          location.state.title,
-          location.state.description || ''
+            if (location.state?.title && !activeRequest && matches.length === 0 && !serviceError) {
+              // Only fetch recommendations if we haven't already
+              setTitle(location.state.title);
+              setDescription(location.state.description || '');
+
+              try {
+                const recommendations = await adviserMatchingService.getRecommendations(
+                  location.state.title,
+                  location.state.description || ''
+                );
+                setMatches(recommendations.slice(0, 5));
+                setServiceError(null);
+              } catch (err) {
+                console.error(err);
+                if (err.message?.includes('unavailable') || err.message?.includes('temporarily')) {
+                  setServiceError(err.message);
+                } else if (err.message?.includes('Network Error') || err.message?.includes('connection')) {
+                  setServiceError('Adviser matching service is temporarily unavailable. Please try again later.');
+                } else {
+                  setToast('Failed to initialize matching: ' + err.message);
+                }
+              }
+              setLoading(false);
+            }
+          },
+          group?.id
         );
-        setMatches(recommendations.slice(0, 5));
-        setServiceError(null);
-        setLoading(false);
 
       } catch (err) {
         console.error(err);
-        
-        // Differentiate between NLP service errors and other errors
-        if (err.message?.includes('unavailable') || err.message?.includes('temporarily')) {
-          setServiceError(err.message);
-        } else if (err.message?.includes('Network Error') || err.message?.includes('connection')) {
-          setServiceError('Adviser matching service is temporarily unavailable. Please try again later.');
-        } else {
-          setToast('Failed to initialize matching: ' + err.message);
-        }
+        setToast('Failed to initialize matching: ' + err.message);
         setLoading(false);
       }
     };
@@ -115,6 +133,8 @@ export const AdviserMatching = () => {
     if (currentUser) {
       initMatching();
     }
+    
+    return () => unsubscribe();
   }, [currentUser, location.state, navigate]);
 
   const handleSelectAdviser = async (adviser) => {
@@ -231,7 +251,7 @@ export const AdviserMatching = () => {
       <div className="max-w-2xl mx-auto space-y-6 mt-8">
         <Card className="p-8 text-center border-t-4 border-t-red-500">
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-2">
             Matching Service Unavailable
           </h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
@@ -256,7 +276,7 @@ export const AdviserMatching = () => {
       <div className="max-w-2xl mx-auto space-y-6 mt-8">
         <Card className="p-8 text-center border-t-4 border-t-amber-500">
           <Clock className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Waiting for Adviser Acceptance</h2>
+          <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-2">Waiting for Adviser Acceptance</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
             Your request has been sent to <strong>{pendingRequest.adviserName}</strong>. 
             Once they accept your request, your Research Workspace will be activated immediately.
@@ -314,7 +334,7 @@ export const AdviserMatching = () => {
       {matches.length === 0 && (
         <Card className="p-8 text-center">
           <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Suitable Matches Found</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Suitable Matches Found</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-4">
             No adviser matches were found for your research title. This may happen if no advisers have matching specializations.
           </p>
@@ -336,7 +356,7 @@ export const AdviserMatching = () => {
               
               <div className="space-y-2">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
                     {adviser.adviserName}
                     {adviser.compatibilityScore >= 90 && (
                       <Badge variant="emerald" size="sm">High Match</Badge>
@@ -381,7 +401,7 @@ export const AdviserMatching = () => {
 
             <div className="flex flex-col items-end gap-3 shrink-0 w-full md:w-auto border-t md:border-t-0 md:border-l border-gray-100 dark:border-slate-800 pt-4 md:pt-0 md:pl-6 text-right">
               <div className="text-center md:text-right w-full">
-                <div className="text-3xl font-black text-blue-600 dark:text-blue-400 leading-none">
+                <div className="text-3xl font-medium text-blue-600 dark:text-blue-400 leading-none">
                   {adviser.compatibilityScore}%
                 </div>
                 <div className="text-[10px] uppercase font-bold text-gray-400 mt-1">Compatibility</div>

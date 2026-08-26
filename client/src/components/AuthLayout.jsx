@@ -74,7 +74,7 @@ export const AuthLayout = ({
                 alt="CoreResearch Logo"
                 className="w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.6)] transition-transform duration-300 group-hover:scale-105"
               />
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center">
+              <span className="text-2xl sm:text-3xl font-medium tracking-tight text-white flex items-center">
                 <span>Core</span>
                 <span className="text-blue-500">Research</span>
               </span>
@@ -83,7 +83,7 @@ export const AuthLayout = ({
 
           {/* Lower-Left Quotes & Tagline */}
           <div className="hidden lg:block space-y-5 max-w-xl pb-4 xl:pb-8">
-            <h1 className="text-3xl sm:text-4xl xl:text-5xl font-extrabold text-white tracking-tight leading-[1.15]">
+            <h1 className="text-3xl sm:text-4xl xl:text-5xl font-medium text-white tracking-tight leading-[1.15]">
               {quoteTitle}
             </h1>
             <p className="text-sm xl:text-base text-slate-300/80 font-normal leading-relaxed max-w-lg">
@@ -110,7 +110,7 @@ export const AuthLayout = ({
               {(title || subtitle) && (
                 <div className="mb-6 xl:mb-7">
                   {title && (
-                    <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                    <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
                       {title}
                     </h2>
                   )}

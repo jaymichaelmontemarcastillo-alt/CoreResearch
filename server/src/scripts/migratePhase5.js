@@ -78,8 +78,11 @@ const seedMockSchedulesIfEmpty = () => {
   }
 };
 
+import { connectDB } from '../config/db.js';
+
 const migratePhase5 = async () => {
   console.log('[Phase 5] Starting Comments, Reviews, and Schedules Migration...');
+  await connectDB();
 
   if (mongoose.connection.readyState !== 1) {
     console.error('[Phase 5] ERROR: MongoDB not connected. Cannot migrate.');

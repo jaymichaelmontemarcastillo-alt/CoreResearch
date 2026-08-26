@@ -58,7 +58,7 @@ class EditorErrorBoundary extends React.Component {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Editor Error</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Editor Error</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
             The document editor encountered an error. Click below to reload the editor instance.
           </p>
@@ -583,7 +583,7 @@ export const DocumentEditorPage = () => {
   };
 
   return (
-    <div className={`flex flex-col bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
+    <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
       isMaximized 
         ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
         : 'h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8'
@@ -828,7 +828,7 @@ export const DocumentEditorPage = () => {
 
       {/* Main Document Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] dark:bg-slate-950 flex flex-col items-center pb-20 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] dark:bg-slate-950 flex flex-col items-center pb-20 custom-scrollbar mr-1">
           {previewingVersion && (
             <div className="w-full bg-blue-50 dark:bg-blue-900/40 border-b border-blue-200 dark:border-blue-800 p-3 flex flex-col sm:flex-row items-center justify-center gap-3 shadow-sm z-10 shrink-0">
               <div className="text-sm text-blue-800 dark:text-blue-200 font-medium">
@@ -935,8 +935,23 @@ export const DocumentEditorPage = () => {
         {activeRightPanel === 'versionControl' && (
           <div 
             className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
-            style={{ width: `360px` }}
+            style={{ width: `${commentsWidth}px` }}
           >
+            {/* Draggable Resize Divider Handle */}
+            <div
+              onPointerDown={handleResizeStart}
+              title="Drag horizontally to resize panel"
+              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
+                isResizingComments ? 'bg-blue-500/20' : ''
+              }`}
+            >
+              <div className={`w-1 h-10 rounded-full transition-colors ${
+                isResizingComments 
+                  ? 'bg-blue-600' 
+                  : 'bg-transparent group-hover:bg-blue-500/60'
+              }`} />
+            </div>
+
             <VersionControlPanel 
               documentId={documentId}
               editor={editor}

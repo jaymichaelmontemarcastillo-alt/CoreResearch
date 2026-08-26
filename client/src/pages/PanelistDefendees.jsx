@@ -108,7 +108,7 @@ export const PanelistDefendees = () => {
         <div className="lg:col-span-1 space-y-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
                 <CalendarDays className="w-5 h-5 text-purple-600" /> 
                 Upcoming Defenses
               </h3>
@@ -147,7 +147,7 @@ export const PanelistDefendees = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
                 <Folder className="w-5 h-5 text-amber-600" />
                 Assigned Defendee Groups
               </h3>

@@ -8,6 +8,7 @@ export const ResearchProgressCircle = ({
   completedTasks = 0,
   totalTasks = 0,
   subtitle = 'Overall Progress',
+  showDetails = true,
 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -50,23 +51,27 @@ export const ResearchProgressCircle = ({
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+          <span className="text-2xl font-medium text-gray-900 dark:text-white tracking-tight" style={{ fontSize: size < 80 ? '1.25rem' : '1.5rem' }}>
             {validProgress}%
           </span>
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider" style={{ fontSize: size < 80 ? '0.5rem' : '0.625rem', marginTop: size < 80 ? '-2px' : '0' }}>
             Done
           </span>
         </div>
       </div>
 
-      <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mt-2">
-        {subtitle}
-      </p>
+      {showDetails && (
+        <>
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mt-2">
+            {subtitle}
+          </p>
 
-      {totalTasks > 0 && (
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-          {completedTasks} of {totalTasks} tasks completed
-        </p>
+          {totalTasks > 0 && (
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+              {completedTasks} of {totalTasks} tasks completed
+            </p>
+          )}
+        </>
       )}
     </div>
   );

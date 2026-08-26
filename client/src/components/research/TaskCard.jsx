@@ -179,7 +179,7 @@ export const TaskCard = ({
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white">
+            <h3 className="text-base font-medium text-gray-900 dark:text-white">
               Submit Task: {task.title}
             </h3>
             <p className="text-xs text-gray-500">

@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useNotifications } from "../hooks/useNotifications";
 import { Avatar } from "./ui/Avatar";
 import {
   HiBars3,
@@ -20,20 +21,54 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const { userProfile, currentUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const notificationDropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Close dropdown on outside click
+  const { notifications, unreadCount, markAsRead, markAllAsRead, loading } = useNotifications(currentUser?.uid);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setProfileDropdownOpen(false);
       }
+      if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+        setNotificationDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const prevUnreadCountRef = useRef(0);
+
+  // Auto-open dropdown when new notification arrives
+  useEffect(() => {
+    if (unreadCount > prevUnreadCountRef.current) {
+      setNotificationDropdownOpen(true);
+      setProfileDropdownOpen(false);
+    }
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount]);
+
+  const handleNotificationClick = async (notif) => {
+    if (!notif.read) {
+      await markAsRead(notif.id);
+    }
+    setNotificationDropdownOpen(false);
+    
+    // Simple navigation rules based on notification title/type
+    if (notif.title.toLowerCase().includes('adviser request')) {
+      if (userProfile?.role === 'adviser') {
+        navigate('/dashboard'); // Or wherever adviser requests are
+      } else {
+        navigate('/research-workspace');
+      }
+    }
+  };
 
   const handleLogout = async () => {
     setProfileDropdownOpen(false);
@@ -126,11 +161,79 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
           )}
         </button>
 
-        {/* 2. Notification Icon */}
-        <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 relative transition">
-          <HiBell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-        </button>
+        {/* 2. Notification Icon & Dropdown */}
+        <div className="relative" ref={notificationDropdownRef}>
+          <button 
+            onClick={() => {
+              setNotificationDropdownOpen(!notificationDropdownOpen);
+              setProfileDropdownOpen(false);
+            }}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 relative transition"
+          >
+            <HiBell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            )}
+          </button>
+
+          {notificationDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+              <div className="p-3 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-800/30">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Notifications</h3>
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={async () => {
+                      await markAllAsRead();
+                    }}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                  >
+                    Mark all as read
+                  </button>
+                )}
+              </div>
+              
+              <div className="overflow-y-auto flex-1 p-1">
+                {loading && notifications.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-gray-500">Loading...</div>
+                ) : notifications.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-gray-500 flex flex-col items-center gap-2">
+                    <HiBell className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                    <span>No notifications yet.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {notifications.map((notif) => (
+                      <div 
+                        key={notif.id}
+                        onClick={() => handleNotificationClick(notif)}
+                        className={`p-3 rounded-xl cursor-pointer transition-colors flex gap-3 items-start ${
+                          notif.read 
+                            ? 'hover:bg-gray-50 dark:hover:bg-slate-800/50' 
+                            : 'bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                        }`}
+                      >
+                        <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${notif.read ? 'bg-transparent' : 'bg-blue-500'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${notif.read ? 'text-gray-900 dark:text-gray-200' : 'font-semibold text-gray-900 dark:text-white'}`}>
+                            {notif.title}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                            {notif.message}
+                          </p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">
+                            {new Date(notif.createdAt).toLocaleString(undefined, { 
+                              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* 3. Vertical Divider */}
         <div className="h-5 w-px bg-gray-200 dark:bg-slate-800 mx-0.5" />

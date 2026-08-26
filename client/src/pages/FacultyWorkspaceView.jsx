@@ -161,7 +161,7 @@ export const FacultyWorkspaceView = () => {
     return (
       <div className="py-20 text-center text-gray-500">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-lg font-bold text-gray-900">Workspace Not Found</h2>
+        <h2 className="text-lg font-medium text-gray-900">Workspace Not Found</h2>
         <Button onClick={() => navigate(-1)} className="mt-4" variant="outline">Go Back</Button>
       </div>
     );
@@ -196,7 +196,7 @@ export const FacultyWorkspaceView = () => {
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight">
+          <h1 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white leading-tight">
             {workspace.title}
           </h1>
 

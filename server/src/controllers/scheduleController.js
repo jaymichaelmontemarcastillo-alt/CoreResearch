@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
 import { Schedule as MongoSchedule } from '../models/Schedule.js';
+import { generateTimeSlots } from '../services/schedulingService.js';
 
 // Pre-seed mock defense schedules if store is empty
 const seedMockSchedulesIfEmpty = () => {
@@ -246,6 +247,105 @@ export const updateScheduleStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('[ScheduleController] updateScheduleStatus error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Generate schedule preview
+ */
+export const generateSchedulePreview = async (req, res) => {
+  try {
+    const { groups, config } = req.body;
+    
+    // Fetch existing schedules from DB to check conflicts
+    let existingSchedules = [];
+    if (mongoose.connection.readyState === 1) {
+      const mongoDocs = await MongoSchedule.find({ date: config.date, status: { $ne: 'cancelled' } }).lean();
+      if (mongoDocs) {
+        existingSchedules = mongoDocs.map(doc => ({
+          id: doc.id,
+          projectId: doc.projectId,
+          projectTitle: doc.projectTitle,
+          date: doc.date,
+          startTime: doc.time,
+          endTime: doc.endTime || doc.time, // Fallback if old data
+          venue: doc.location,
+          adviserId: doc.adviserId,
+          adviserName: doc.adviserName,
+          panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : []
+        }));
+      }
+    }
+
+    const { proposedSchedules, errors } = generateTimeSlots(config, groups, existingSchedules);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        proposedSchedules,
+        errors
+      }
+    });
+  } catch (error) {
+    console.error('[ScheduleController] generateSchedulePreview error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Bulk create schedules
+ */
+export const bulkCreateSchedules = async (req, res) => {
+  try {
+    const { schedules } = req.body;
+
+    if (!Array.isArray(schedules) || schedules.length === 0) {
+      return res.status(400).json({ success: false, error: 'No schedules provided.' });
+    }
+
+    let mongoSuccess = false;
+    let createdCount = 0;
+
+    if (mongoose.connection.readyState === 1) {
+      const docsToInsert = schedules.map(s => ({
+        id: `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        projectId: s.projectId,
+        projectTitle: s.projectTitle,
+        date: s.date,
+        time: s.startTime, // Keeping 'time' for backward compatibility
+        endTime: s.endTime,
+        location: s.venue,
+        type: s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
+        status: 'scheduled',
+        adviserId: s.adviserId,
+        adviserName: s.adviserName,
+        panelists: s.panelists
+      }));
+
+      await MongoSchedule.insertMany(docsToInsert);
+      mongoSuccess = true;
+      createdCount = docsToInsert.length;
+    }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not save schedules to authoritative database.'
+      });
+    }
+
+    // Existing notification hooks can be triggered here if there is a notification service
+    // e.g. await notificationService.notifySchedulesCreated(docsToInsert);
+
+    return res.status(201).json({
+      success: true,
+      message: `${createdCount} schedules successfully generated.`,
+    });
+
+  } catch (error) {
+    console.error('[ScheduleController] bulkCreateSchedules error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
