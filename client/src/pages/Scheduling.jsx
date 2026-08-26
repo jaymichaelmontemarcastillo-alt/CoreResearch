@@ -166,12 +166,14 @@ export const Scheduling = () => {
   const getScheduleForGroup = (groupId) => schedules.find(s => s.projectId === groupId);
 
   const tableColumns = [
+    { label: "Time", className: "min-w-[120px]" },
     { label: "Name of Students", className: "min-w-[150px]" },
     { label: "Title", className: "min-w-[200px]" },
-    { label: "Panelists", className: "min-w-[200px]" },
     { label: "Adviser", className: "min-w-[150px]" },
-    { label: "Schedule", className: "min-w-[150px]" },
-    { label: "Actions", className: "min-w-[120px] text-center" },
+    { label: "Subject Specialist", className: "min-w-[150px]" },
+    { label: "Stat", className: "min-w-[120px]" },
+    { label: "Technical", className: "min-w-[150px]" },
+    { label: "Actions", className: "min-w-[100px] text-center" },
   ];
 
   return (
@@ -321,14 +323,25 @@ export const Scheduling = () => {
                 
                 return (
                   <TableRow key={group.id}>
+                    {/* Time */}
+                    <TableCell>
+                      {schedule ? (
+                        <div className="flex flex-col space-y-0.5">
+                          <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                            {schedule.startTime} - {schedule.endTime}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            {new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                      ) : null}
+                    </TableCell>
+
                     {/* Students */}
                     <TableCell>
                       <div className="flex flex-col gap-1.5">
                         {(group.members || []).map(member => (
                           <div key={member.uid || member.id} className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                              {(member.fullName || "U").charAt(0)}
-                            </div>
                             <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
                               {member.fullName || "Student"}
                             </span>
@@ -348,47 +361,38 @@ export const Scheduling = () => {
                       )}
                     </TableCell>
 
-                    {/* Panelists */}
-                    <TableCell>
-                      <div className="flex flex-col space-y-2">
-                        {(!group.panelists || group.panelists.length === 0) ? (
-                          <span className="text-sm text-gray-400 italic">No panelists assigned</span>
-                        ) : (
-                          group.panelists.map((panelist, idx) => (
-                            <div key={idx} className="flex flex-col">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                                {panelist.role || 'Panelist'}
-                              </span>
-                              <span className="font-medium text-sm text-gray-800 dark:text-gray-200">
-                                {panelist.fullName || panelist.name || 'Unknown'}
-                              </span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </TableCell>
-
                     {/* Adviser */}
                     <TableCell>
                       <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {group.adviserName || "Pending Adviser"}
+                        {group.adviserName || <span className="text-gray-400 italic">Not Assigned</span>}
                       </span>
                     </TableCell>
 
-                    {/* Schedule */}
+                    {/* Subject Specialist */}
                     <TableCell>
-                      {schedule ? (
-                        <div className="flex flex-col space-y-1">
-                          <span className="font-semibold text-sm text-gray-900 dark:text-white">
-                            {new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                          <span className="text-xs text-gray-500 font-medium">
-                            {schedule.startTime} – {schedule.endTime}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400 italic">Not scheduled</span>
-                      )}
+                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                        {group.panelists?.find(p => p.role?.toLowerCase().includes('subject'))?.name || 
+                         group.panelists?.find(p => p.role?.toLowerCase().includes('subject'))?.fullName || 
+                         <span className="text-gray-400 italic">Not Assigned</span>}
+                      </span>
+                    </TableCell>
+
+                    {/* Stat */}
+                    <TableCell>
+                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                        {group.panelists?.find(p => p.role?.toLowerCase().includes('stat'))?.name || 
+                         group.panelists?.find(p => p.role?.toLowerCase().includes('stat'))?.fullName || 
+                         <span className="text-gray-400 italic">Not Assigned</span>}
+                      </span>
+                    </TableCell>
+
+                    {/* Technical */}
+                    <TableCell>
+                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                        {group.panelists?.find(p => p.role?.toLowerCase().includes('tech'))?.name || 
+                         group.panelists?.find(p => p.role?.toLowerCase().includes('tech'))?.fullName || 
+                         <span className="text-gray-400 italic">Not Assigned</span>}
+                      </span>
                     </TableCell>
 
                     {/* Actions */}
