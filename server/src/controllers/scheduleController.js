@@ -147,7 +147,7 @@ export const getSchedules = async (req, res) => {
             defenseType: doc.type === 'proposal' ? 'proposal_defense' : 'final_defense',
             date: doc.date,
             startTime: doc.time,
-            endTime: doc.time,
+            endTime: doc.endTime || doc.time,
             venue: doc.location,
             panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : [],
             panelistNames: doc.panelists ? doc.panelists.map(p => p.name) : [],
@@ -247,6 +247,52 @@ export const updateScheduleStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('[ScheduleController] updateScheduleStatus error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Update full schedule details
+ */
+export const updateSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, startTime, endTime, venue, adviserId, adviserName, panelists } = req.body;
+
+    let mongoSuccess = false;
+    let updatedSchedule = null;
+
+    if (mongoose.connection.readyState === 1) {
+      updatedSchedule = await MongoSchedule.findOneAndUpdate(
+        { id },
+        { 
+          $set: { 
+            date, 
+            time: startTime, 
+            endTime, 
+            location: venue, 
+            adviserId, 
+            adviserName, 
+            panelists 
+          } 
+        },
+        { new: true }
+      );
+
+      if (updatedSchedule) mongoSuccess = true;
+    }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'Could not update schedule' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Schedule updated successfully.`,
+      data: updatedSchedule
+    });
+  } catch (error) {
+    console.error('[ScheduleController] updateSchedule error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

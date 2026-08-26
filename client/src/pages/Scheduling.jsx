@@ -13,6 +13,7 @@ import { groupService } from "../services/group.service";
 import { titleProposalService } from "../services/titleProposal.service";
 import { scheduleService } from "../services/schedule.service";
 import { GenerateScheduleModal } from "../components/scheduling/GenerateScheduleModal";
+import EditScheduleModal from "../components/scheduling/EditScheduleModal";
 
 export const Scheduling = () => {
   // --- Data State ---
@@ -398,7 +399,15 @@ export const Scheduling = () => {
                     {/* Actions */}
                     <TableCell>
                       <div className="flex items-center justify-center gap-2">
-                        <Button variant="outline" size="sm" className="h-8 px-3">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 px-3"
+                          onClick={() => {
+                            setEditingGroup(group);
+                            setEditingSchedule(schedule || null);
+                          }}
+                        >
                           <HiPencil className="w-3.5 h-3.5 mr-1" /> Edit
                         </Button>
                       </div>
@@ -423,6 +432,27 @@ export const Scheduling = () => {
             setIsScheduleModalOpen(false);
             showToast("Schedules created successfully!");
             fetchGroupsAndSchedules(); // Refresh
+          }}
+        />
+      )}
+
+      {editingGroup && (
+        <EditScheduleModal
+          isOpen={!!editingGroup}
+          onClose={() => {
+            setEditingGroup(null);
+            setEditingSchedule(null);
+          }}
+          schedule={editingSchedule}
+          group={{
+            ...editingGroup,
+            title: getProposalForGroup(editingGroup.id)?.title || 'No approved title yet'
+          }}
+          onSaved={() => {
+            setEditingGroup(null);
+            setEditingSchedule(null);
+            showToast("Schedule updated successfully!");
+            fetchGroupsAndSchedules();
           }}
         />
       )}

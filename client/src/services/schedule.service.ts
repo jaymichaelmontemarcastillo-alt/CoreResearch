@@ -69,7 +69,15 @@ export const scheduleService = {
   },
 
   /**
-   * Update defense schedule status.
+   * Update full schedule (Admin only)
+   */
+  async updateSchedule(scheduleId: string, updates: Partial<DefenseSchedule>): Promise<DefenseSchedule> {
+    const { data } = await api.put(`/schedules/${scheduleId}`, updates);
+    return data.data;
+  },
+
+  /**
+   * Update schedule status (Admin & Adviser)
    */
   async updateScheduleStatus(id: string, status: ScheduleStatus): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, id);

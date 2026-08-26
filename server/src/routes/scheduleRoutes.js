@@ -3,6 +3,7 @@ import {
   createSchedule, 
   getSchedules, 
   updateScheduleStatus,
+  updateSchedule,
   generateSchedulePreview,
   bulkCreateSchedules
 } from '../controllers/scheduleController.js';
@@ -21,6 +22,9 @@ router.post('/preview', verifyToken, requireRole(['admin']), generateSchedulePre
 
 // Bulk create schedules (Admin only)
 router.post('/bulk', verifyToken, requireRole(['admin']), bulkCreateSchedules);
+
+// Update full schedule details (Admin only)
+router.put('/:id', verifyToken, requireRole(['admin']), updateSchedule);
 
 // Update status (Admin & Adviser)
 router.patch('/:id/status', verifyToken, requireRole(['admin', 'adviser']), updateScheduleStatus);
