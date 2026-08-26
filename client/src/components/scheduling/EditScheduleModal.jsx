@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { HiX, HiCalendar } from 'react-icons/hi2';
-import Button from '../ui/Button';
-import Input from '../ui/Input';
+import { HiXMark, HiCalendar } from 'react-icons/hi2';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { userService } from '../../services/user.service';
 import { scheduleService } from '../../services/schedule.service';
 
@@ -153,7 +153,7 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
             {schedule ? 'Edit Schedule & Panel' : 'Set Schedule & Panel'}
           </h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
-            <HiX className="w-5 h-5" />
+            <HiXMark className="w-5 h-5" />
           </button>
         </div>
 
