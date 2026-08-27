@@ -105,8 +105,8 @@ export const Scheduling = () => {
     }
   };
 
-  const fetchGroupsAndSchedules = async () => {
-    setLoading(true);
+  const fetchGroupsAndSchedules = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const sectionGroups = await groupService.getGroupsBySection(selectedSection);
       
@@ -126,7 +126,7 @@ export const Scheduling = () => {
       console.error("Failed to load data", error);
       showToast("Failed to load data.", "error");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -353,12 +353,16 @@ export const Scheduling = () => {
                           <button
                             onClick={async () => {
                               if (window.confirm("Are you sure you want to clear the scheduled time?")) {
+                                // Optimistically clear locally first
+                                setSchedules(prev => prev.map(s => s.id === schedule.id ? { ...s, date: '', startTime: '', endTime: '' } : s));
                                 try {
                                   await scheduleService.updateSchedule(schedule.id, { date: '', startTime: '', endTime: '' });
                                   showToast("Time cleared.", "success");
-                                  fetchGroupsAndSchedules();
+                                  fetchGroupsAndSchedules(false);
                                 } catch (e) {
                                   showToast("Failed to clear time.", "error");
+                                  // Revert optimistic update by refetching
+                                  fetchGroupsAndSchedules(false);
                                 }
                               }
                             }}
@@ -493,7 +497,7 @@ export const Scheduling = () => {
             setEditingGroup(null);
             setEditingSchedule(null);
             showToast("Schedule updated successfully!");
-            fetchGroupsAndSchedules();
+            fetchGroupsAndSchedules(false);
           }}
         />
       )}
