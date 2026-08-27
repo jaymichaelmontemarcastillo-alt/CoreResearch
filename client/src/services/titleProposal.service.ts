@@ -174,15 +174,24 @@ export const titleProposalService = {
    */
   async getProposalsByGroupIds(groupIds: string[]): Promise<TitleProposal[]> {
     if (groupIds.length === 0) return [];
-    // Firestore 'in' supports up to 30 values
-    const q = query(
-      collection(db, COLLECTION),
-      where('groupId', 'in', groupIds.slice(0, 30)),
-      where('status', 'in', ['submitted', 'needs_revision', 'approved'])
-    );
-    const snap = await getDocs(q);
-    const list = snap.docs.map((d) => d.data() as TitleProposal);
-    return list.sort(
+    
+    // Firestore supports a maximum of 30 disjunctions per query.
+    // We have 3 items in the 'status' IN clause, so we can only query up to 10 'groupId' items at a time (10 * 3 = 30).
+    const chunkSize = 10;
+    const allProposals: TitleProposal[] = [];
+    
+    for (let i = 0; i < groupIds.length; i += chunkSize) {
+      const chunk = groupIds.slice(i, i + chunkSize);
+      const q = query(
+        collection(db, COLLECTION),
+        where('groupId', 'in', chunk),
+        where('status', 'in', ['submitted', 'needs_revision', 'approved'])
+      );
+      const snap = await getDocs(q);
+      allProposals.push(...snap.docs.map((d) => d.data() as TitleProposal));
+    }
+    
+    return allProposals.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   },
