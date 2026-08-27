@@ -105,11 +105,24 @@ export const generateTimeSlots = (config, groups, existingSchedules) => {
         adviserId: group.adviserId,
         adviserName: group.adviserName,
         panelistIds: group.panelistIds || [],
-        panelists: (group.panelists || []).map(p => ({
-           id: p.uid || p.id,
-           name: p.fullName || p.name,
-           role: p.role || 'panelist'
-        }))
+        panelists: (() => {
+          const pList = (group.panelists || []).map(p => ({
+             id: p.uid || p.id,
+             name: p.fullName || p.name,
+             role: p.role || 'panelist'
+          }));
+          
+          let subj = pList.find(p => (p.role || '').toLowerCase().includes('subject'));
+          let stat = pList.find(p => (p.role || '').toLowerCase().includes('stat'));
+          let tech = pList.find(p => (p.role || '').toLowerCase().includes('tech'));
+
+          const unassigned = pList.filter(p => !['subject specialist', 'statistician', 'technical'].some(r => (p.role || '').toLowerCase().includes(r)));
+          if (!subj && unassigned.length > 0) { subj = unassigned.shift(); subj.role = 'Subject Specialist'; }
+          if (!stat && unassigned.length > 0) { stat = unassigned.shift(); stat.role = 'Statistician'; }
+          if (!tech && unassigned.length > 0) { tech = unassigned.shift(); tech.role = 'Technical'; }
+
+          return pList;
+        })()
       };
 
       const conflicts = checkConflicts(proposed, allSchedulesToCheck);

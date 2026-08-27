@@ -51,26 +51,37 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
 
   useEffect(() => {
     if (schedule && isOpen) {
-      const subj = schedule.panelists?.find(p => (p.role || '').toLowerCase().includes('subject'));
-      const stat = schedule.panelists?.find(p => (p.role || '').toLowerCase().includes('stat'));
-      const tech = schedule.panelists?.find(p => (p.role || '').toLowerCase().includes('tech'));
+      const pList = schedule.panelists || [];
+      const subj = pList.find(p => (p.role || '').toLowerCase().includes('subject'));
+      const stat = pList.find(p => (p.role || '').toLowerCase().includes('stat'));
+      const tech = pList.find(p => (p.role || '').toLowerCase().includes('tech'));
 
       setFormData({
         date: schedule.date || '',
-        startTime: schedule.startTime || '',
+        startTime: schedule.startTime || schedule.time || '',
         endTime: schedule.endTime || '',
         venue: schedule.location || schedule.venue || '',
         adviserId: schedule.adviserId || group?.adviserId || '',
         adviserName: schedule.adviserName || group?.adviserName || '',
-        subjectSpecialistId: subj?.id || '',
+        subjectSpecialistId: subj?.id || subj?.uid || '',
         subjectSpecialistName: subj?.name || subj?.fullName || '',
-        statId: stat?.id || '',
+        statId: stat?.id || stat?.uid || '',
         statName: stat?.name || stat?.fullName || '',
-        techId: tech?.id || '',
+        techId: tech?.id || tech?.uid || '',
         techName: tech?.name || tech?.fullName || '',
       });
     } else if (group && !schedule && isOpen) {
       // If creating a schedule manually from scratch using the modal
+      const pList = group.panelists || [];
+      let subj = pList.find(p => (p.role || '').toLowerCase().includes('subject'));
+      let stat = pList.find(p => (p.role || '').toLowerCase().includes('stat'));
+      let tech = pList.find(p => (p.role || '').toLowerCase().includes('tech'));
+
+      const unassigned = pList.filter(p => !['subject specialist', 'statistician', 'technical'].some(r => (p.role || '').toLowerCase().includes(r)));
+      if (!subj && unassigned.length > 0) subj = unassigned.shift();
+      if (!stat && unassigned.length > 0) stat = unassigned.shift();
+      if (!tech && unassigned.length > 0) tech = unassigned.shift();
+
       setFormData({
         date: '',
         startTime: '',
@@ -78,12 +89,12 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
         venue: '',
         adviserId: group?.adviserId || '',
         adviserName: group?.adviserName || '',
-        subjectSpecialistId: '',
-        subjectSpecialistName: '',
-        statId: '',
-        statName: '',
-        techId: '',
-        techName: '',
+        subjectSpecialistId: subj?.id || subj?.uid || '',
+        subjectSpecialistName: subj?.name || subj?.fullName || '',
+        statId: stat?.id || stat?.uid || '',
+        statName: stat?.name || stat?.fullName || '',
+        techId: tech?.id || tech?.uid || '',
+        techName: tech?.name || tech?.fullName || '',
       });
     }
   }, [schedule, group, isOpen]);
@@ -126,6 +137,7 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
       const payload = {
         projectId: group.id,
         projectTitle: group.title,
+        defenseType: schedule?.defenseType || 'proposal_defense',
         date: formData.date,
         startTime: formData.startTime,
         endTime: formData.endTime,

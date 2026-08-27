@@ -142,6 +142,20 @@ class AdviserRequestService {
     });
 
     if (requestData) {
+      // Update the actual research group to assign the adviser
+      if (requestData.groupId && requestData.adviserId) {
+        try {
+          const groupService = (await import('./group.service')).default;
+          await groupService.updateGroupAdviser(
+            requestData.groupId,
+            requestData.adviserId,
+            requestData.adviserName
+          );
+        } catch (error) {
+          console.error('Error updating group adviser:', error);
+        }
+      }
+
       await notificationService.createNotification({
         userId: requestData.studentId, // or group notification if applicable
         title: 'Adviser Request Accepted',

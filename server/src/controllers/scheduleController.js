@@ -235,7 +235,7 @@ export const updateScheduleStatus = async (req, res) => {
       defenseType: updatedSchedule.type === 'proposal' ? 'proposal_defense' : 'final_defense',
       date: updatedSchedule.date,
       startTime: updatedSchedule.time,
-      endTime: updatedSchedule.time,
+      endTime: updatedSchedule.endTime || updatedSchedule.time,
       venue: updatedSchedule.location,
       panelistIds: updatedSchedule.panelists ? updatedSchedule.panelists.map(p => p.id) : [],
       panelistNames: updatedSchedule.panelists ? updatedSchedule.panelists.map(p => p.name) : [],
@@ -312,18 +312,21 @@ export const generateSchedulePreview = async (req, res) => {
     if (mongoose.connection.readyState === 1) {
       const mongoDocs = await MongoSchedule.find({ date: config.date, status: { $ne: 'cancelled' } }).lean();
       if (mongoDocs) {
-        existingSchedules = mongoDocs.map(doc => ({
-          id: doc.id,
-          projectId: doc.projectId,
-          projectTitle: doc.projectTitle,
-          date: doc.date,
-          startTime: doc.time,
-          endTime: doc.endTime || doc.time, // Fallback if old data
-          venue: doc.location,
-          adviserId: doc.adviserId,
-          adviserName: doc.adviserName,
-          panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : []
-        }));
+        const groupIds = groups.map(g => g.id);
+        existingSchedules = mongoDocs
+          .filter(doc => !groupIds.includes(doc.projectId))
+          .map(doc => ({
+            id: doc.id,
+            projectId: doc.projectId,
+            projectTitle: doc.projectTitle,
+            date: doc.date,
+            startTime: doc.time,
+            endTime: doc.endTime || doc.time, // Fallback if old data
+            venue: doc.location,
+            adviserId: doc.adviserId,
+            adviserName: doc.adviserName,
+            panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : []
+          }));
       }
     }
 
@@ -357,6 +360,15 @@ export const bulkCreateSchedules = async (req, res) => {
     let createdCount = 0;
 
     if (mongoose.connection.readyState === 1) {
+      const projectIds = schedules.map(s => s.projectId);
+      const defenseTypes = [...new Set(schedules.map(s => s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense'))];
+      
+      // Clear existing schedules for these groups and defense types to prevent duplicates
+      await MongoSchedule.deleteMany({ 
+        projectId: { $in: projectIds },
+        type: { $in: defenseTypes }
+      });
+
       const docsToInsert = schedules.map(s => ({
         id: `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         projectId: s.projectId,
