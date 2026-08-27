@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { userService } from '../../services/user.service';
 import { scheduleService } from '../../services/schedule.service';
+import { groupService } from '../../services/group.service';
 
 const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
   const [formData, setFormData] = useState({
@@ -134,8 +135,9 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
         updatedPanelists.push({ id: formData.techId, name: formData.techName, role: 'Technical' });
       }
 
+      const projectId = group?.id || schedule?.projectId;
       const payload = {
-        projectId: group?.id || schedule?.projectId,
+        projectId: projectId,
         projectTitle: group?.title || schedule?.projectTitle,
         defenseType: schedule?.defenseType || 'proposal_defense',
         date: formData.date,
@@ -147,9 +149,21 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
         panelists: updatedPanelists
       };
 
+      // Always update group details if we have a group ID
+      if (projectId) {
+        await groupService.updateGroup(projectId, {
+          adviserId: formData.adviserId,
+          adviserName: formData.adviserName,
+          panelists: updatedPanelists
+        });
+      }
+
+      // Only create/update schedule if schedule already exists OR if date/time are provided
+      const hasScheduleData = formData.date && formData.startTime;
+      
       if (schedule && schedule.id) {
         await scheduleService.updateSchedule(schedule.id, payload);
-      } else {
+      } else if (hasScheduleData) {
         await scheduleService.bulkCreateSchedules([payload]);
       }
       onSaved();
