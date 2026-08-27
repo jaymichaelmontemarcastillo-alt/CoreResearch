@@ -135,8 +135,8 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
       }
 
       const payload = {
-        projectId: group.id,
-        projectTitle: group.title,
+        projectId: group?.id || schedule?.projectId,
+        projectTitle: group?.title || schedule?.projectTitle,
         defenseType: schedule?.defenseType || 'proposal_defense',
         date: formData.date,
         startTime: formData.startTime,
