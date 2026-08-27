@@ -1,12 +1,15 @@
-// src/components/Layout.jsx
 import React, { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  // Check if we are on the document editor page (which needs full width)
+  const isDocumentEditor = /^\/documents\/[a-zA-Z0-9_-]+$/.test(location.pathname);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col">
@@ -27,7 +30,7 @@ export const Layout = () => {
           sidebarCollapsed ? "lg:pl-24" : "lg:pl-72"
         }`}
       >
-        <div className="max-w-7xl mx-auto">
+        <div className={isDocumentEditor ? "w-full h-full" : "max-w-7xl mx-auto"}>
           <Outlet />
         </div>
       </main>
