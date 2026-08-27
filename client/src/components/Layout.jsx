@@ -9,7 +9,7 @@ export const Layout = () => {
   const location = useLocation();
 
   // Check if we are on the document editor page (which needs full width)
-  const isDocumentEditor = /^\/documents\/[a-zA-Z0-9_-]+$/.test(location.pathname);
+  const isDocumentEditor = location.pathname.startsWith('/documents/') && location.pathname.length > 11;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col">
@@ -26,9 +26,9 @@ export const Layout = () => {
       />
 
       <main
-        className={`flex-1 p-4 sm:p-6 lg:p-8 transition-all duration-200 ${
+        className={`flex-1 transition-all duration-200 ${
           sidebarCollapsed ? "lg:pl-24" : "lg:pl-72"
-        }`}
+        } ${isDocumentEditor ? "p-0" : "p-4 sm:p-6 lg:p-8"}`}
       >
         <div className={isDocumentEditor ? "w-full h-full" : "max-w-7xl mx-auto"}>
           <Outlet />

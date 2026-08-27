@@ -586,7 +586,7 @@ export const DocumentEditorPage = () => {
     <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
       isMaximized 
         ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
-        : 'h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8'
+        : 'h-[calc(100vh-4rem)]'
     }`}>
       {/* Hovering Circle Arrow Button to Open Sidebar in Maximized Mode */}
       {isMaximized && (
