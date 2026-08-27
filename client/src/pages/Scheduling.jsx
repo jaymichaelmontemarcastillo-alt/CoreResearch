@@ -15,6 +15,16 @@ import { scheduleService } from "../services/schedule.service";
 import { GenerateScheduleModal } from "../components/scheduling/GenerateScheduleModal";
 import EditScheduleModal from "../components/scheduling/EditScheduleModal";
 
+const formatTime12Hour = (time) => {
+  if (!time) return '';
+  const parts = time.split(':');
+  if (parts.length < 2) return time;
+  const h = parseInt(parts[0], 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const formattedHour = h % 12 || 12;
+  return `${formattedHour}:${parts[1]} ${ampm}`;
+};
+
 export const Scheduling = () => {
   // --- Data State ---
   const [courses, setCourses] = useState([]);
@@ -333,7 +343,7 @@ export const Scheduling = () => {
                       {schedule ? (
                         <div className="flex flex-col space-y-0.5">
                           <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                            {schedule.startTime} - {schedule.endTime}
+                            {formatTime12Hour(schedule.startTime)} - {formatTime12Hour(schedule.endTime)}
                           </span>
                           <span className="text-[10px] text-gray-500 font-medium">
                             {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
@@ -414,6 +424,26 @@ export const Scheduling = () => {
                         >
                           <HiPencil className="w-3.5 h-3.5 mr-1" /> Edit
                         </Button>
+                        {schedule && (
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            className="h-8 px-3 bg-red-50 text-red-600 hover:bg-red-100 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30"
+                            onClick={async () => {
+                              if (window.confirm("Are you sure you want to delete this schedule?")) {
+                                try {
+                                  await scheduleService.deleteSchedule(schedule.id);
+                                  showToast("Schedule deleted.", "success");
+                                  fetchGroupsAndSchedules();
+                                } catch (e) {
+                                  showToast("Failed to delete schedule.", "error");
+                                }
+                              }
+                            }}
+                          >
+                            <HiTrash className="w-3.5 h-3.5 mr-1" /> Delete
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

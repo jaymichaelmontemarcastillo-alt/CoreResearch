@@ -60,8 +60,7 @@ export const scheduleService = {
    * Delete a defense schedule.
    */
   async deleteSchedule(id: string): Promise<void> {
-    // Delete is not currently supported by backend API
-    console.warn('deleteSchedule not supported by backend API');
+    await api.delete(`/schedules/${id}`);
   },
 
   /**

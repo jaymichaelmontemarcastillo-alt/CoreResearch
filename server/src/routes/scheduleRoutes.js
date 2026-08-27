@@ -5,7 +5,8 @@ import {
   updateScheduleStatus,
   updateSchedule,
   generateSchedulePreview,
-  bulkCreateSchedules
+  bulkCreateSchedules,
+  deleteSchedule
 } from '../controllers/scheduleController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
@@ -28,5 +29,8 @@ router.put('/:id', verifyToken, requireRole(['admin']), updateSchedule);
 
 // Update status (Admin & Adviser)
 router.patch('/:id/status', verifyToken, requireRole(['admin', 'adviser']), updateScheduleStatus);
+
+// Delete schedule (Admin only)
+router.delete('/:id', verifyToken, requireRole(['admin']), deleteSchedule);
 
 export default router;

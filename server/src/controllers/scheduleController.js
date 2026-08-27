@@ -410,3 +410,25 @@ export const bulkCreateSchedules = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Delete a schedule by ID (Admin only)
+ */
+export const deleteSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (mongoose.connection.readyState === 1) {
+      const result = await MongoSchedule.findOneAndDelete({ id: id });
+      if (!result) {
+        return res.status(404).json({ success: false, message: 'Schedule not found in MongoDB' });
+      }
+      return res.status(200).json({ success: true, message: 'Schedule deleted successfully' });
+    }
+    
+    return res.status(503).json({ success: false, message: 'MongoDB not connected' });
+  } catch (error) {
+    console.error('[ScheduleController] deleteSchedule error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
