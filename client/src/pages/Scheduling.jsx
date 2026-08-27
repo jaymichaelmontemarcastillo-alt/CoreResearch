@@ -340,16 +340,37 @@ export const Scheduling = () => {
                   <TableRow key={group.id}>
                     {/* Time */}
                     <TableCell>
-                      {schedule ? (
-                        <div className="flex flex-col space-y-0.5">
-                          <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                            {formatTime12Hour(schedule.startTime)} - {formatTime12Hour(schedule.endTime)}
-                          </span>
-                          <span className="text-[10px] text-gray-500 font-medium">
-                            {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                          </span>
+                      {schedule && (schedule.startTime || schedule.date) ? (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                              {formatTime12Hour(schedule.startTime)} {schedule.endTime ? `- ${formatTime12Hour(schedule.endTime)}` : ''}
+                            </span>
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                            </span>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (window.confirm("Are you sure you want to clear the scheduled time?")) {
+                                try {
+                                  await scheduleService.updateSchedule(schedule.id, { date: '', startTime: '', endTime: '' });
+                                  showToast("Time cleared.", "success");
+                                  fetchGroupsAndSchedules();
+                                } catch (e) {
+                                  showToast("Failed to clear time.", "error");
+                                }
+                              }
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors tooltip-trigger"
+                            title="Clear Time"
+                          >
+                            <HiTrash className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      ) : null}
+                      ) : (
+                        <span className="text-gray-400 italic text-sm">Not set</span>
+                      )}
                     </TableCell>
 
                     {/* Students */}
@@ -424,26 +445,6 @@ export const Scheduling = () => {
                         >
                           <HiPencil className="w-3.5 h-3.5 mr-1" /> Edit
                         </Button>
-                        {schedule && (
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            className="h-8 px-3 bg-red-50 text-red-600 hover:bg-red-100 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30"
-                            onClick={async () => {
-                              if (window.confirm("Are you sure you want to delete this schedule?")) {
-                                try {
-                                  await scheduleService.deleteSchedule(schedule.id);
-                                  showToast("Schedule deleted.", "success");
-                                  fetchGroupsAndSchedules();
-                                } catch (e) {
-                                  showToast("Failed to delete schedule.", "error");
-                                }
-                              }
-                            }}
-                          >
-                            <HiTrash className="w-3.5 h-3.5 mr-1" /> Delete
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
