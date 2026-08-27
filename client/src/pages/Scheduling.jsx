@@ -176,7 +176,16 @@ export const Scheduling = () => {
   };
 
   const getProposalForGroup = (groupId) => proposals.find(p => p.groupId === groupId);
-  const getScheduleForGroup = (groupId) => schedules.find(s => s.projectId === groupId);
+  const getScheduleForGroup = (groupId) => {
+    const groupSchedules = schedules.filter(s => s.projectId === groupId);
+    if (groupSchedules.length === 0) return null;
+    
+    // If a group has multiple schedules (e.g. proposal and final defense),
+    // prefer the one that actually has a time set to avoid showing 'Not set'
+    // when a valid schedule exists.
+    const validSchedule = groupSchedules.find(s => s.startTime && s.startTime.trim() !== '');
+    return validSchedule || groupSchedules[groupSchedules.length - 1]; // fallback to the most recent one
+  };
 
   const tableColumns = [
     { label: "Time", className: "min-w-[120px]" },
@@ -465,12 +474,14 @@ export const Scheduling = () => {
           onClose={() => setIsScheduleModalOpen(false)}
           groups={filteredGroups.map(g => {
             const schedule = getScheduleForGroup(g.id);
+            const panelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (g.panelists || []);
             return {
               ...g,
               title: getProposalForGroup(g.id)?.title || 'No approved title yet',
               adviserId: schedule?.adviserId || g.adviserId,
               adviserName: schedule?.adviserName || g.adviserName,
-              panelists: (schedule?.panelists?.length > 0) ? schedule.panelists : (g.panelists || [])
+              panelists: panelists,
+              panelistIds: panelists.map(p => p.id || p.uid).filter(Boolean)
             };
           })}
           onSchedulesCreated={() => {
