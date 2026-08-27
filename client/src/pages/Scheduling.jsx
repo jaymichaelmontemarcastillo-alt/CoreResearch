@@ -428,10 +428,16 @@ export const Scheduling = () => {
         <GenerateScheduleModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
-          groups={filteredGroups.map(g => ({
-            ...g,
-            title: getProposalForGroup(g.id)?.title || 'No approved title yet',
-          }))}
+          groups={filteredGroups.map(g => {
+            const schedule = getScheduleForGroup(g.id);
+            return {
+              ...g,
+              title: getProposalForGroup(g.id)?.title || 'No approved title yet',
+              adviserId: schedule?.adviserId || g.adviserId,
+              adviserName: schedule?.adviserName || g.adviserName,
+              panelists: (schedule?.panelists?.length > 0) ? schedule.panelists : (g.panelists || [])
+            };
+          })}
           onSchedulesCreated={() => {
             setIsScheduleModalOpen(false);
             showToast("Schedules created successfully!");
