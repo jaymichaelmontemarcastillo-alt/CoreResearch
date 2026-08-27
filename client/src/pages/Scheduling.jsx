@@ -187,6 +187,35 @@ export const Scheduling = () => {
     return validSchedule || groupSchedules[groupSchedules.length - 1]; // fallback to the most recent one
   };
 
+  const handleClearAllTimes = async () => {
+    // Find all schedules currently shown that have a time set
+    const schedulesToClear = filteredGroups.map(g => getScheduleForGroup(g.id))
+      .filter(s => s && (s.startTime || s.date));
+
+    if (schedulesToClear.length === 0) {
+      showToast("No schedules to clear in the current view.", "info");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to clear the scheduled time for ${schedulesToClear.length} group(s)?\n(This will keep the assigned panelists but remove the date and time)`)) {
+      return;
+    }
+
+    // Optimistically update
+    const scheduleIdsToClear = schedulesToClear.map(s => s.id);
+    setSchedules(prev => prev.map(s => scheduleIdsToClear.includes(s.id) ? { ...s, date: '', startTime: '', endTime: '' } : s));
+
+    try {
+      await Promise.all(scheduleIdsToClear.map(id => scheduleService.updateSchedule(id, { date: '', startTime: '', endTime: '' })));
+      showToast(`Cleared times for ${scheduleIdsToClear.length} group(s).`, "success");
+      fetchGroupsAndSchedules(false);
+    } catch (error) {
+      console.error("Bulk clear error:", error);
+      showToast("Failed to clear some times.", "error");
+      fetchGroupsAndSchedules(false); // revert on error
+    }
+  };
+
   const tableColumns = [
     { label: "Time", className: "min-w-[120px]" },
     { label: "Name of Students", className: "min-w-[150px]" },
@@ -288,7 +317,21 @@ export const Scheduling = () => {
           )}
         </div>
 
-        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0">
+        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex gap-2">
+          {filteredGroups.some(g => {
+            const s = getScheduleForGroup(g.id);
+            return s && (s.startTime || s.date);
+          }) && (
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full md:w-auto h-10 shadow-sm text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200 dark:border-red-900/30 dark:hover:bg-red-900/20 dark:text-red-400"
+              onClick={handleClearAllTimes}
+            >
+              <HiTrash className="w-4 h-4 mr-2" />
+              Clear All Times
+            </Button>
+          )}
           <Button
             variant="primary"
             size="md"
