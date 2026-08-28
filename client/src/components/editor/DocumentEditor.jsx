@@ -19,6 +19,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import * as Y from 'yjs';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
+import { AutoPagination, paginationPluginKey } from './extensions/AutoPagination';
 
 // Custom CommentMark Extension for Google Docs style anchored manuscript comments
 export const CommentMark = Mark.create({
@@ -351,6 +352,45 @@ export const ParagraphIndent = Extension.create({
       },
     ];
   },
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        return this.editor.commands.command(({ tr, state, dispatch }) => {
+          const { $from, empty } = state.selection;
+          if (!empty) return false;
+
+          if ($from.parentOffset === 0 && ($from.parent.type.name === 'paragraph' || $from.parent.type.name === 'heading')) {
+            if (dispatch) {
+              tr.setNodeMarkup($from.before(), null, { ...$from.parent.attrs, textIndent: '0.5in' });
+            }
+            return true;
+          }
+
+          if (dispatch) {
+            tr.insertText('\u00a0\u00a0\u00a0\u00a0');
+          }
+          return true;
+        });
+      },
+      'Shift-Tab': () => {
+        return this.editor.commands.command(({ tr, state, dispatch }) => {
+          const { $from, empty } = state.selection;
+          if (!empty) return false;
+
+          if ($from.parent.type.name === 'paragraph' || $from.parent.type.name === 'heading') {
+            const currentIndent = $from.parent.attrs.textIndent;
+            if (currentIndent) {
+              if (dispatch) {
+                tr.setNodeMarkup($from.before(), null, { ...$from.parent.attrs, textIndent: null });
+              }
+              return true;
+            }
+          }
+          return false;
+        });
+      },
+    };
+  },
 });
 
 // Custom TableCell with background shading & border color support
@@ -457,6 +497,7 @@ export const DocumentEditor = ({
 }) => {
   const commentsRef = useRef(comments);
   commentsRef.current = comments;
+  const [pageCount, setPageCount] = React.useState(1);
 
   const effectiveUser = useMemo(() => ({
     name: userProfile?.fullName || userProfile?.first_name || 'Researcher',
@@ -469,9 +510,30 @@ export const DocumentEditor = ({
   }, []);
 
   const extensions = useMemo(() => {
+    let rawHeight = 1056;
+    if (pageSettings?.size === 'a4') rawHeight = 1123;
+    else if (pageSettings?.size === 'legal') rawHeight = 1344;
+    
+    if (pageSettings?.orientation === 'landscape') {
+      rawHeight = pageSettings?.size === 'a4' ? 794 : 816;
+    }
+
+    const parseMargin = (val) => {
+      if (!val) return 96;
+      if (val.includes('in')) return parseFloat(val) * 96;
+      if (val.includes('px')) return parseFloat(val);
+      if (val.includes('cm')) return parseFloat(val) * 37.8;
+      return 96;
+    };
+
+    const contentHeight = rawHeight - parseMargin(pageSettings?.marginTop) - parseMargin(pageSettings?.marginBottom);
+
     const list = [
       StarterKit.configure({
         history: previewingVersion ? true : false, // Managed by Yjs collaboration normally, but enable locally for preview mode
+      }),
+      AutoPagination.configure({
+        contentHeight: contentHeight > 200 ? contentHeight : 864,
       }),
       Underline,
       Superscript,
@@ -523,6 +585,12 @@ export const DocumentEditor = ({
     onUpdate: ({ editor: currentEditor }) => {
       if (onContentChange) {
         onContentChange(currentEditor);
+      }
+    },
+    onTransaction: ({ editor: currentEditor }) => {
+      const state = paginationPluginKey.getState(currentEditor.state);
+      if (state && state.pageCount !== undefined) {
+        setPageCount((prev) => (prev !== state.pageCount ? state.pageCount : prev));
       }
     },
     editorProps: {
@@ -651,12 +719,15 @@ export const DocumentEditor = ({
 
     const padding = `${pageSettings?.marginTop || '1in'} ${pageSettings?.marginRight || '1in'} ${pageSettings?.marginBottom || '1in'} ${pageSettings?.marginLeft || '1in'}`;
 
+    const gapHeight = 48; // Must match CSS hr/page-break height
+    const totalMinHeight = minHeight * pageCount + gapHeight * (pageCount - 1);
+
     return {
       width: `${width}px`,
-      minHeight: `${minHeight}px`,
+      minHeight: `${totalMinHeight}px`,
       padding,
     };
-  }, [pageSettings]);
+  }, [pageSettings, pageCount]);
 
   if (!editor) {
     return (
@@ -679,6 +750,7 @@ export const DocumentEditor = ({
           margin: 0 auto;
           background: #ffffff;
           font-family: inherit;
+          text-align: left;
         }
 
         .ProseMirror:focus {
@@ -819,24 +891,6 @@ export const DocumentEditor = ({
           z-index: 10;
         }
 
-        .ProseMirror hr::after,
-        .ProseMirror .page-break::after {
-          content: "PAGE BREAK • NEXT PAGE";
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background: #ffffff;
-          color: #475569;
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          padding: 4px 14px;
-          border-radius: 9999px;
-          border: 1px solid #cbd5e1;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-          pointer-events: none;
-        }
 
         :is(.dark) .ProseMirror hr,
         :is(.dark) .ProseMirror .page-break {
@@ -849,12 +903,6 @@ export const DocumentEditor = ({
             inset 0 -6px 10px -3px rgba(0, 0, 0, 0.5) !important;
         }
 
-        :is(.dark) .ProseMirror hr::after,
-        :is(.dark) .ProseMirror .page-break::after {
-          background: #0f172a;
-          color: #94a3b8;
-          border: 1px solid #334155;
-        }
 
         /* Image alignment helpers */
         .ProseMirror img {

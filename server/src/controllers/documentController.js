@@ -9,6 +9,7 @@ export const importDocument = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
+        errorCode: 'INVALID_DOCX',
         error: 'Bad Request',
         message: 'No file uploaded. Please select a .docx or .pdf file.',
       });
@@ -47,8 +48,18 @@ export const importDocument = async (req, res) => {
     });
   } catch (error) {
     console.error('[documentController] Import error:', error);
+    
+    // Attempt to map error messages to Phase 2 error codes
+    let errorCode = 'DOCX_CONVERSION_FAILED';
+    if (error.message.includes('Unsupported document format')) errorCode = 'UNSUPPORTED_FILE_TYPE';
+    if (error.message.includes('No file data')) errorCode = 'INVALID_DOCX';
+    if (error.message.includes('File too large')) errorCode = 'FILE_TOO_LARGE'; // Assuming multer handles this before reaching here usually
+    if (error.message.includes('Sanitization failed')) errorCode = 'SANITIZATION_FAILED';
+    if (error.message.includes('Tiptap conversion failed')) errorCode = 'TIPTAP_CONVERSION_FAILED';
+
     return res.status(500).json({
       success: false,
+      errorCode,
       error: 'Import Failed',
       message: error.message || 'An error occurred while importing the document.',
     });

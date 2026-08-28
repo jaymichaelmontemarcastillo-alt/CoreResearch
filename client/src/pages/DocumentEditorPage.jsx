@@ -10,6 +10,8 @@ import { VersionControlPanel } from '../components/editor/VersionControlPanel';
 import { FloatingCommentPopover } from '../components/editor/FloatingCommentPopover';
 import { ShareDialog } from '../components/editor/ShareDialog';
 import { PageSettingsModal } from '../components/editor/PageSettingsModal';
+import { ImportDocumentModal } from './Documents/components/ImportDocumentModal';
+import { useDocumentUpload } from './Documents/hooks/useDocumentUpload';
 import { Button } from '../components/ui/Button';
 import { 
   HiChevronLeft, 
@@ -108,6 +110,42 @@ export const DocumentEditorPage = () => {
   // Fullscreen Maximize & Drawer Sidebar state
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMaximizedSidebarOpen, setIsMaximizedSidebarOpen] = useState(false);
+
+  // Document Import Hook
+  const {
+    isOpen: isImportModalOpen,
+    openModal: openImportModal,
+    closeModal: closeImportModal,
+    stage: uploadStage,
+    progress: uploadProgress,
+    selectedFile,
+    errorMessage: uploadErrorMessage,
+    createdDocument: importedDoc,
+    handleUploadFile,
+    resetUpload,
+  } = useDocumentUpload({
+    userProfile,
+    group: null, // Depending on context, group might not be needed here as we overwrite existing doc
+    onSuccess: (importedData) => {
+      // In DocumentEditorPage, we don't navigate to the new document,
+      // we extract its Tiptap JSON and apply it to the CURRENT document.
+      if (editorRef.current && importedData.content && importedData.content.tiptap) {
+        editorRef.current.commands.setContent(importedData.content.tiptap, true); // true = emit update to Yjs
+      }
+      setTimeout(() => {
+        closeImportModal();
+        resetUpload();
+      }, 1500); // give user time to see success message
+    },
+  });
+
+  const handleImportRequest = () => {
+    if (editorRef.current && !editorRef.current.isEmpty) {
+      const confirmOverwrite = window.confirm("This document already contains content. Importing a DOCX will replace the current document content. Continue?");
+      if (!confirmOverwrite) return;
+    }
+    openImportModal();
+  };
 
   // Stable Yjs Document per documentId
   const ydoc = useMemo(() => new Y.Doc(), [documentId]);
@@ -693,7 +731,7 @@ export const DocumentEditorPage = () => {
       )}
 
       {/* Top Header Row (Google Docs style) */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10 shrink-0 shadow-sm">
+      <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-20 shrink-0 shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || '/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
             <HiChevronLeft className="w-5 h-5" />
@@ -719,6 +757,7 @@ export const DocumentEditorPage = () => {
                 title={title}
                 onOpenPageSettings={() => setShowPageSettingsModal(true)}
                 onNewDocument={handleNewDocument}
+                onImportDocument={handleImportRequest}
               />
             )}
           </div>
@@ -1010,6 +1049,23 @@ export const DocumentEditorPage = () => {
         onClose={() => setShowPageSettingsModal(false)}
         pageSettings={pageSettings}
         onSaveSettings={handleSavePageSettings}
+      />
+
+      {/* Document Import Modal */}
+      <ImportDocumentModal
+        isOpen={isImportModalOpen}
+        onClose={closeImportModal}
+        stage={uploadStage}
+        progress={uploadProgress}
+        selectedFile={selectedFile}
+        errorMessage={uploadErrorMessage}
+        createdDocument={importedDoc}
+        onUploadFile={handleUploadFile}
+        onOpenDocument={() => {
+          closeImportModal();
+          resetUpload();
+        }}
+        onReset={resetUpload}
       />
     </div>
   );

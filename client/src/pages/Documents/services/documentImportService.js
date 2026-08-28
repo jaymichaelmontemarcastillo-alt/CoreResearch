@@ -1,5 +1,5 @@
 // src/pages/Documents/services/documentImportService.js
-import { documentImportService as isolatedImportService } from '../import/DocumentImportService';
+import api from '../../../services/api';
 
 export const documentImportService = {
   /**
@@ -17,12 +17,37 @@ export const documentImportService = {
     groupInfo = null,
     onProgress = () => {},
   }) => {
-    return isolatedImportService.importDocument({
-      file,
-      userProfile,
-      groupInfo,
-      onProgress,
-    });
+    onProgress(10);
+    const formData = new FormData();
+    formData.append('file', file);
+    if (groupInfo) {
+      formData.append('groupInfo', JSON.stringify(groupInfo));
+    }
+
+    try {
+      const response = await api.post('/documents/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'x-user-id': userProfile?.uid || '',
+          'x-user-name': userProfile?.fullName || userProfile?.first_name || '',
+          'x-user-role': userProfile?.role || 'student',
+          'x-group-id': groupInfo?.id || '',
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            // Report actual upload progress. 
+            // 100% means upload is finished, but backend is still converting/saving.
+            onProgress(percentCompleted);
+          }
+        },
+      });
+
+      return response.data.document;
+    } catch (error) {
+      console.error('[documentImportService] Failed to import document via API:', error);
+      throw new Error(error.response?.data?.message || 'Failed to import document');
+    }
   },
 };
 

@@ -54,13 +54,13 @@ export const UploadProgress = ({
         </div>
       )}
 
-      {/* Processing State */}
-      {stage === UPLOAD_STAGES.PROCESSING && (
+      {/* Converting State */}
+      {stage === UPLOAD_STAGES.CONVERTING && (
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
               <HiArrowPath className="w-3.5 h-3.5 animate-spin text-purple-600" />
-              {isDocx ? 'Converting Word content for Document Editor...' : 'Extracting PDF document data...'}
+              {isDocx ? 'Converting DOCX content...' : 'Extracting PDF document data...'}
             </span>
             <span className="font-bold text-purple-600">Processing</span>
           </div>
@@ -70,18 +70,18 @@ export const UploadProgress = ({
         </div>
       )}
 
-      {/* Creating Record State */}
-      {stage === UPLOAD_STAGES.CREATING_RECORD && (
+      {/* Loading State */}
+      {stage === UPLOAD_STAGES.LOADING && (
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
               <HiArrowPath className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-              Creating CoreResearch document record...
+              Loading document into editor...
             </span>
             <span className="font-bold text-indigo-600">Finalizing</span>
           </div>
           <div className="w-full h-2 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-600 w-full rounded-full" />
+            <div className="h-full bg-indigo-600 animate-pulse w-full rounded-full" />
           </div>
         </div>
       )}

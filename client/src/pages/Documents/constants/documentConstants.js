@@ -29,10 +29,12 @@ export const SOURCE_TYPES = {
 
 export const UPLOAD_STAGES = {
   IDLE: 'idle',
-  SELECTING: 'selecting',
+  VALIDATING: 'validating',
   UPLOADING: 'uploading',
-  PROCESSING: 'processing',
-  CREATING_RECORD: 'creating_record',
+  CONVERTING: 'converting',
+  PREPARING: 'preparing',
+  SAVING: 'saving',
+  LOADING: 'loading',
   COMPLETED: 'completed',
   ERROR: 'error',
 };
