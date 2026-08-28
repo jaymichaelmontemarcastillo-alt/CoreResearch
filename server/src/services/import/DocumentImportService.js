@@ -1,5 +1,6 @@
 // server/src/services/import/DocumentImportService.js
 import { DocxParser } from './docx/DocxParser.js';
+import { LibreOfficeParser } from './docx/LibreOfficeParser.js';
 import { PdfParser } from './pdf/PdfParser.js';
 import { DocumentIRToTiptap, getTiptapExtensions } from './tiptap/documentIRToTiptap.js';
 import { getStorageProvider } from '../storage/storageManager.js';
@@ -10,6 +11,7 @@ import * as Y from 'yjs';
 export class DocumentImportService {
   constructor() {
     this.docxParser = new DocxParser();
+    this.libreOfficeParser = new LibreOfficeParser();
     this.pdfParser = new PdfParser();
     this.tiptapConverter = new DocumentIRToTiptap();
   }
@@ -47,8 +49,13 @@ export class DocumentImportService {
 
     // 1. Parse document to HTML and extract assets
     if (ext === 'docx') {
-      parserName = 'mammoth';
-      parseResult = await this.docxParser.parse(fileBuffer, fileName);
+      if (process.env.USE_LIBREOFFICE_IMPORT === 'true') {
+        parserName = 'libreoffice';
+        parseResult = await this.libreOfficeParser.parse(fileBuffer, fileName);
+      } else {
+        parserName = 'mammoth';
+        parseResult = await this.docxParser.parse(fileBuffer, fileName);
+      }
     } else if (ext === 'pdf') {
       parserName = 'pdf-parser';
       parseResult = await this.pdfParser.parse(fileBuffer, fileName);

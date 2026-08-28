@@ -13,6 +13,17 @@ export class DocxParser {
     const title = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
     const options = {
+      transformDocument: mammoth.transforms.paragraph((element) => {
+        if (element.alignment && element.alignment !== "left") {
+          const baseName = element.styleName || "p";
+          return {
+            ...element,
+            styleName: `${baseName}-align-${element.alignment}`,
+            styleId: `${baseName}-align-${element.alignment}`
+          };
+        }
+        return element;
+      }),
       convertImage: mammoth.images.inline((element) => {
         return element.read("base64").then((imageBuffer) => {
           const mimeType = element.contentType;
@@ -36,15 +47,33 @@ export class DocxParser {
       }),
       styleMap: [
         "p[style-name='Heading 1'] => h1:fresh",
+        "p[style-name='Heading 1-align-center'] => h1.align-center:fresh",
+        "p[style-name='Heading 1-align-right'] => h1.align-right:fresh",
+        "p[style-name='Heading 1-align-justify'] => h1.align-justify:fresh",
+        
         "p[style-name='Heading 2'] => h2:fresh",
+        "p[style-name='Heading 2-align-center'] => h2.align-center:fresh",
+        "p[style-name='Heading 2-align-right'] => h2.align-right:fresh",
+        "p[style-name='Heading 2-align-justify'] => h2.align-justify:fresh",
+        
         "p[style-name='Heading 3'] => h3:fresh",
+        "p[style-name='Heading 3-align-center'] => h3.align-center:fresh",
+        "p[style-name='Heading 3-align-right'] => h3.align-right:fresh",
+        "p[style-name='Heading 3-align-justify'] => h3.align-justify:fresh",
+        
         "p[style-name='Heading 4'] => h4:fresh",
         "p[style-name='Heading 5'] => h5:fresh",
         "p[style-name='Heading 6'] => h6:fresh",
+        
         "p[style-name='Title'] => h1.title",
         "p[style-name='Subtitle'] => h2.subtitle",
         "p[style-name='Caption'] => p.caption",
         "p[style-name='caption'] => p.caption",
+        
+        "p[style-name='p-align-center'] => p.align-center:fresh",
+        "p[style-name='p-align-right'] => p.align-right:fresh",
+        "p[style-name='p-align-justify'] => p.align-justify:fresh",
+        
         "br[type='page'] => hr.page-break",
         "b => strong",
         "i => em",

@@ -68,8 +68,10 @@ export const importDocument = async (req, res) => {
 
 export const serveStorageAsset = async (req, res) => {
   try {
-    const rawPath = req.params[0] || '';
-    const cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
+    const rawPath = decodeURIComponent(req.params[0] || '');
+    // Normalize path but ensure we use forward slashes for MongoDB GridFS match
+    let cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
+    cleanKey = cleanKey.replace(/\\/g, '/'); // Crucial fix for Windows
     const storageProvider = getStorageProvider();
 
     // Determine Content-Type

@@ -13,6 +13,7 @@ import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Image } from '@tiptap/extension-image';
+import { Link } from '@tiptap/extension-link';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
@@ -538,6 +539,10 @@ export const DocumentEditor = ({
       Underline,
       Superscript,
       Subscript,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+      }),
       TextStyle,
       FontFamily,
       FontSize,
@@ -891,6 +896,24 @@ export const DocumentEditor = ({
           z-index: 10;
         }
 
+        .ProseMirror hr::after,
+        .ProseMirror .page-break::after {
+          content: "PAGE BREAK • NEXT PAGE";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: #ffffff;
+          color: #475569;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          padding: 4px 14px;
+          border-radius: 9999px;
+          border: 1px solid #cbd5e1;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+          pointer-events: none;
+        }
 
         :is(.dark) .ProseMirror hr,
         :is(.dark) .ProseMirror .page-break {
@@ -901,6 +924,13 @@ export const DocumentEditor = ({
             0 10px 15px -3px rgba(0, 0, 0, 0.5),
             inset 0 6px 10px -3px rgba(0, 0, 0, 0.5), 
             inset 0 -6px 10px -3px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        :is(.dark) .ProseMirror hr::after,
+        :is(.dark) .ProseMirror .page-break::after {
+          background: #0f172a;
+          color: #94a3b8;
+          border: 1px solid #334155;
         }
 
 
