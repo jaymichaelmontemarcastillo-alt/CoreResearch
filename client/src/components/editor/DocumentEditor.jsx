@@ -18,6 +18,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import HorizontalRuleBase from '@tiptap/extension-horizontal-rule';
 import * as Y from 'yjs';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
 import { AutoPagination, paginationPluginKey } from './extensions/AutoPagination';
@@ -469,6 +470,22 @@ export const CustomImage = Image.extend({
   },
 });
 
+// Custom Horizontal Rule to preserve LibreOffice page breaks
+export const CustomHorizontalRule = HorizontalRuleBase.extend({
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('class'),
+        renderHTML: (attributes) => {
+          if (!attributes.class) return {};
+          return { class: attributes.class };
+        },
+      },
+    };
+  },
+});
+
 // A simple hash function for assigning distinct collaborator colors
 const getUserColor = (userId) => {
   const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6'];
@@ -552,6 +569,7 @@ export const DocumentEditor = ({
       Color,
       Highlight.configure({ multicolor: true }),
       activeCommentsExt,
+      CustomHorizontalRule,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       CustomImage.configure({ inline: true, allowBase64: true }),
       Table.configure({ resizable: true }),
@@ -705,34 +723,50 @@ export const DocumentEditor = ({
   // Compute paper dimension styles based on pageSettings
   const pageStyle = useMemo(() => {
     const isLandscape = pageSettings?.orientation === 'landscape';
-    let width = 816; // Letter 8.5in in px (96 DPI)
-    let minHeight = 1056; // Letter 11in in px
+    let paperWidth = 816; // Letter 8.5in in px (96 DPI)
+    let paperHeight = 1056; // Letter 11in in px
 
     if (pageSettings?.size === 'a4') {
-      width = 794; // 8.27in
-      minHeight = 1123; // 11.69in
+      paperWidth = 794; // 8.27in
+      paperHeight = 1123; // 11.69in
     } else if (pageSettings?.size === 'legal') {
-      width = 816;
-      minHeight = 1344; // 14in
+      paperWidth = 816;
+      paperHeight = 1344; // 14in
     }
 
     if (isLandscape) {
-      const temp = width;
-      width = minHeight;
-      minHeight = temp;
+      const temp = paperWidth;
+      paperWidth = paperHeight;
+      paperHeight = temp;
     }
 
-    const padding = `${pageSettings?.marginTop || '1in'} ${pageSettings?.marginRight || '1in'} ${pageSettings?.marginBottom || '1in'} ${pageSettings?.marginLeft || '1in'}`;
+    const parseMargin = (val) => {
+      if (!val) return 96;
+      if (val.includes('in')) return parseFloat(val) * 96;
+      if (val.includes('px')) return parseFloat(val);
+      if (val.includes('cm')) return parseFloat(val) * 37.8;
+      return 96;
+    };
 
-    const gapHeight = 48; // Must match CSS hr/page-break height
-    const totalMinHeight = minHeight * pageCount + gapHeight * (pageCount - 1);
+    const marginTop = parseMargin(pageSettings?.marginTop);
+    const marginRight = parseMargin(pageSettings?.marginRight);
+    const marginBottom = parseMargin(pageSettings?.marginBottom);
+    const marginLeft = parseMargin(pageSettings?.marginLeft);
+
+    const padding = `${marginTop}px ${marginRight}px ${marginBottom}px ${marginLeft}px`;
 
     return {
-      width: `${width}px`,
-      minHeight: `${totalMinHeight}px`,
+      '--page-width': `${paperWidth}px`,
+      '--page-height': `${paperHeight}px`,
+      '--page-margin-top': `${marginTop}px`,
+      '--page-margin-right': `${marginRight}px`,
+      '--page-margin-bottom': `${marginBottom}px`,
+      '--page-margin-left': `${marginLeft}px`,
+      width: `${paperWidth}px`,
+      minHeight: `${paperHeight}px`,
       padding,
     };
-  }, [pageSettings, pageCount]);
+  }, [pageSettings]);
 
   if (!editor) {
     return (
@@ -744,18 +778,52 @@ export const DocumentEditor = ({
   }
 
   return (
-    <div className="document-editor-container flex justify-center py-6">
+    <div className="document-editor-container flex justify-center py-8 bg-gray-100 min-h-screen">
       {/* Editor CSS styles for ProseMirror, Carets, Selection, Tables, Page Breaks, and Image alignment */}
       <style>{`
         .ProseMirror {
-          width: ${pageStyle.width};
-          min-height: ${pageStyle.minHeight};
+          --page-width: ${pageStyle['--page-width']};
+          --page-height: ${pageStyle['--page-height']};
+          --page-margin-top: ${pageStyle['--page-margin-top']};
+          --page-margin-right: ${pageStyle['--page-margin-right']};
+          --page-margin-bottom: ${pageStyle['--page-margin-bottom']};
+          --page-margin-left: ${pageStyle['--page-margin-left']};
+          
+          width: var(--page-width);
+          min-height: var(--page-height);
           padding: ${pageStyle.padding};
           box-sizing: border-box;
           margin: 0 auto;
           background: #ffffff;
           font-family: inherit;
           text-align: left;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Physical Page Visual Split */
+        .ProseMirror .page-break-decoration {
+          display: block;
+          height: 24px;
+          background-color: #f3f4f6;
+          
+          margin-left: calc(-1 * var(--page-margin-left));
+          margin-right: calc(-1 * var(--page-margin-right));
+          width: var(--page-width);
+          
+          margin-top: var(--page-margin-bottom);
+          margin-bottom: var(--page-margin-top);
+          
+          border-top: 1px solid #d1d5db;
+          border-bottom: 1px solid #d1d5db;
+          
+          /* Visual shadow trick to make it look like separate papers */
+          box-shadow: 
+            inset 0 4px 6px -4px rgba(0,0,0,0.1),
+            inset 0 -4px 6px -4px rgba(0,0,0,0.1);
+            
+          /* Make it un-editable */
+          user-select: none;
+          pointer-events: none;
         }
 
         .ProseMirror:focus {
@@ -992,6 +1060,17 @@ export const DocumentEditor = ({
           list-style-type: decimal;
           padding-left: 1.5rem;
           margin: 0.5rem 0;
+        }
+        
+        /* Explicit Page Breaks from LibreOffice */
+        .ProseMirror hr.page-break {
+          display: none; /* AutoPagination will render the visual gap, hide this semantic marker */
+        }
+
+        .ProseMirror hr {
+          border: none;
+          border-top: 1px solid #e2e8f0;
+          margin: 1rem 0;
         }
       `}</style>
       

@@ -14,7 +14,7 @@ import { Link } from '@tiptap/extension-link';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { Color } from '@tiptap/extension-color';
-import { FontSize, LineSpacing, Indentation } from './customExtensions.js';
+import { FontSize, LineSpacing, Indentation, HorizontalRule } from './customExtensions.js';
 import sanitizeHtml from 'sanitize-html';
 import * as cheerio from 'cheerio';
 
@@ -38,6 +38,7 @@ export const getTiptapExtensions = () => [
   FontSize,
   LineSpacing,
   Indentation,
+  HorizontalRule,
   TextAlign.configure({ types: ['heading', 'paragraph'] }),
 ];
 

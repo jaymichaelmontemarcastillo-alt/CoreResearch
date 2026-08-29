@@ -1,5 +1,5 @@
-// server/src/services/import/tiptap/customExtensions.js
 import { Extension, markInputRule } from '@tiptap/core';
+import HorizontalRuleBase from '@tiptap/extension-horizontal-rule';
 
 export const FontSize = Extension.create({
   name: 'fontSize',
@@ -118,5 +118,20 @@ export const Indentation = Extension.create({
         },
       },
     ];
+  },
+});
+
+export const HorizontalRule = HorizontalRuleBase.extend({
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: element => element.getAttribute('class'),
+        renderHTML: attributes => {
+          if (!attributes.class) return {};
+          return { class: attributes.class };
+        },
+      },
+    };
   },
 });

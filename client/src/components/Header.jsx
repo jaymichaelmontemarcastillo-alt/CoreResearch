@@ -128,10 +128,6 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
         >
           <HiBars3 className="w-6 h-6" />
         </button>
-
-        <h1 className="text-base font-semibold text-gray-900 dark:text-white tracking-tight">
-          {getPageTitle()}
-        </h1>
       </div>
 
       {/* CENTER SECTION — Centered Search Bar */}
