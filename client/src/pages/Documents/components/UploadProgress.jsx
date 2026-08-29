@@ -1,5 +1,5 @@
 // src/pages/Documents/components/UploadProgress.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { UPLOAD_STAGES } from '../constants/documentConstants';
 import { HiCheckCircle, HiExclamationCircle, HiArrowPath, HiDocumentText, HiDocument } from 'react-icons/hi2';
 import { Button } from '../../../components/ui/Button';
@@ -15,6 +15,34 @@ export const UploadProgress = ({
   onClose,
 }) => {
   const isDocx = file?.name?.toLowerCase().endsWith('.docx');
+  const [conversionProgress, setConversionProgress] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (stage === UPLOAD_STAGES.CONVERTING) {
+      setConversionProgress(0);
+      interval = setInterval(() => {
+        setConversionProgress((prev) => {
+          // Fast up to 85%, then slower, then crawl up to 98%
+          if (prev < 85) {
+            return prev + Math.floor(Math.random() * 8) + 2;
+          } else if (prev < 95) {
+            return prev + Math.floor(Math.random() * 3) + 1;
+          } else if (prev < 99) {
+            return prev + 1;
+          }
+          return prev;
+        });
+      }, 400);
+    } else if (stage === UPLOAD_STAGES.LOADING || stage === UPLOAD_STAGES.COMPLETED) {
+      setConversionProgress(100);
+    }
+    return () => clearInterval(interval);
+  }, [stage]);
+
+  const showUpload = stage === UPLOAD_STAGES.UPLOADING || stage === UPLOAD_STAGES.CONVERTING || stage === UPLOAD_STAGES.LOADING || stage === UPLOAD_STAGES.COMPLETED;
+  const showConvert = stage === UPLOAD_STAGES.CONVERTING || stage === UPLOAD_STAGES.LOADING || stage === UPLOAD_STAGES.COMPLETED;
+  const showLoading = stage === UPLOAD_STAGES.LOADING || stage === UPLOAD_STAGES.COMPLETED;
 
   return (
     <div className="py-4 space-y-4">
@@ -35,44 +63,61 @@ export const UploadProgress = ({
         </div>
       </div>
 
-      {/* Progress Bar & Status Text */}
-      {stage === UPLOAD_STAGES.UPLOADING && (
+      {/* 1. Uploading State */}
+      {showUpload && (
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
-              <HiArrowPath className="w-3.5 h-3.5 animate-spin text-blue-600" />
-              Uploading document...
+              {stage === UPLOAD_STAGES.UPLOADING ? (
+                <HiArrowPath className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              ) : (
+                <HiCheckCircle className="w-4 h-4 text-emerald-500" />
+              )}
+              {stage === UPLOAD_STAGES.UPLOADING ? 'Uploading document...' : 'Upload complete'}
             </span>
-            <span className="font-bold text-blue-600 dark:text-blue-400">{progress}%</span>
+            <span className={`font-bold ${stage === UPLOAD_STAGES.UPLOADING ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {stage === UPLOAD_STAGES.UPLOADING ? `${progress}%` : '100%'}
+            </span>
           </div>
           <div className="w-full h-2 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-600 transition-all duration-200 ease-out rounded-full"
-              style={{ width: `${progress}%` }}
+              className={`h-full transition-all duration-200 ease-out rounded-full ${stage === UPLOAD_STAGES.UPLOADING ? 'bg-blue-600' : 'bg-emerald-500'}`}
+              style={{ width: `${stage === UPLOAD_STAGES.UPLOADING ? progress : 100}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* Converting State */}
-      {stage === UPLOAD_STAGES.CONVERTING && (
-        <div className="space-y-2">
+      {/* 2. Converting State */}
+      {showConvert && (
+        <div className="space-y-2 animate-fade-in">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
-              <HiArrowPath className="w-3.5 h-3.5 animate-spin text-purple-600" />
-              {isDocx ? 'Converting DOCX content...' : 'Extracting PDF document data...'}
+              {stage === UPLOAD_STAGES.CONVERTING ? (
+                <HiArrowPath className="w-3.5 h-3.5 animate-spin text-purple-600" />
+              ) : (
+                <HiCheckCircle className="w-4 h-4 text-emerald-500" />
+              )}
+              {stage === UPLOAD_STAGES.CONVERTING 
+                ? (isDocx ? 'Converting DOCX content...' : 'Extracting PDF document data...') 
+                : 'Conversion complete'}
             </span>
-            <span className="font-bold text-purple-600">Processing</span>
+            <span className={`font-bold ${stage === UPLOAD_STAGES.CONVERTING ? 'text-purple-600' : 'text-emerald-600'}`}>
+              {stage === UPLOAD_STAGES.CONVERTING ? `${conversionProgress}%` : '100%'}
+            </span>
           </div>
           <div className="w-full h-2 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-purple-600 animate-pulse w-full rounded-full" />
+            <div
+              className={`h-full transition-all duration-200 ease-out rounded-full ${stage === UPLOAD_STAGES.CONVERTING ? 'bg-purple-600' : 'bg-emerald-500'}`}
+              style={{ width: `${stage === UPLOAD_STAGES.CONVERTING ? conversionProgress : 100}%` }}
+            />
           </div>
         </div>
       )}
 
-      {/* Loading State */}
-      {stage === UPLOAD_STAGES.LOADING && (
-        <div className="space-y-2">
+      {/* 3. Loading State */}
+      {showLoading && stage !== UPLOAD_STAGES.COMPLETED && (
+        <div className="space-y-2 animate-fade-in">
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1.5 font-medium">
               <HiArrowPath className="w-3.5 h-3.5 animate-spin text-indigo-600" />
@@ -88,7 +133,7 @@ export const UploadProgress = ({
 
       {/* Completed Success State */}
       {stage === UPLOAD_STAGES.COMPLETED && (
-        <div className="text-center py-3 space-y-3">
+        <div className="text-center py-3 space-y-3 animate-fade-in">
           <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
             <HiCheckCircle className="w-6 h-6" />
           </div>
@@ -145,3 +190,4 @@ export const UploadProgress = ({
     </div>
   );
 };
+

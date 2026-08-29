@@ -549,6 +549,11 @@ export const DocumentEditor = ({
     const list = [
       StarterKit.configure({
         history: previewingVersion ? true : false, // Managed by Yjs collaboration normally, but enable locally for preview mode
+        // Disable extensions bundled in StarterKit v3 that we register
+        // explicitly below with custom configuration/attributes
+        horizontalRule: false,
+        link: false,
+        underline: false,
       }),
       AutoPagination.configure({
         contentHeight: contentHeight > 200 ? contentHeight : 864,
@@ -668,24 +673,36 @@ export const DocumentEditor = ({
     }
 
     try {
-      if (initialContent && !initializedContentRef.current) {
-        editor.commands.setContent(initialContent, false);
-        initializedContentRef.current = true;
-      } else if (ydoc) {
-        const fragment = ydoc.getXmlFragment('default');
-        const isFragmentEmpty = fragment.length === 0;
-
-        if (initialContent && (isFragmentEmpty || editor.isEmpty)) {
+      if (!ydoc) {
+        // Non-collaborative mode: safely apply initialContent directly
+        if (initialContent && !initializedContentRef.current) {
           editor.commands.setContent(initialContent, false);
           initializedContentRef.current = true;
-        } else if (isFragmentEmpty && editor.isEmpty && sourceType === 'native' && !initialContent && !initializedContentRef.current) {
-          const heading = title && title !== 'Untitled Document' ? title : '';
-          if (heading) {
-            editor.commands.setContent(`<h1>${heading}</h1><p></p>`, false);
-          } else {
-            editor.commands.setContent(`<p></p>`, false);
+        }
+      } else {
+        // Collaborative mode (Yjs via Hocuspocus)
+        // The provider automatically manages state sync. Do NOT setContent from props
+        // to avoid duplicating the Yjs binary state coming from the server.
+        
+        const initTemplate = () => {
+          if (!initializedContentRef.current) {
+            const fragment = ydoc.getXmlFragment('default');
+            // If the document is natively created (not imported) and genuinely empty after sync, set a default
+            if (fragment.length === 0 && editor.isEmpty && sourceType === 'native') {
+              editor.commands.setContent(`<p></p>`, false);
+            }
+            initializedContentRef.current = true;
           }
-          initializedContentRef.current = true;
+        };
+
+        if (provider && provider.isSynced) {
+          initTemplate();
+        } else if (provider) {
+          provider.on('synced', initTemplate);
+          return () => provider.off('synced', initTemplate);
+        } else {
+          // Fallback if no provider object is explicitly passed but ydoc is
+          initTemplate(); 
         }
       }
 
@@ -798,32 +815,37 @@ export const DocumentEditor = ({
           font-family: inherit;
           text-align: left;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          position: relative;
         }
 
-        /* Physical Page Visual Split */
-        .ProseMirror .page-break-decoration {
+        /* Physical Page Visual Split (AutoPagination Gap + Spacer) */
+        .ProseMirror .page-break-widget {
+          user-select: none;
+          pointer-events: none;
           display: block;
-          height: 24px;
-          background-color: #f3f4f6;
+        }
+
+        .ProseMirror .page-break-gap {
+          display: block;
+          height: 40px;
+          background-color: #f3f4f6; /* Same as workspace background */
           
+          /* Push out into the page margins to cut the white paper completely */
           margin-left: calc(-1 * var(--page-margin-left));
           margin-right: calc(-1 * var(--page-margin-right));
           width: var(--page-width);
-          
-          margin-top: var(--page-margin-bottom);
-          margin-bottom: var(--page-margin-top);
-          
-          border-top: 1px solid #d1d5db;
-          border-bottom: 1px solid #d1d5db;
           
           /* Visual shadow trick to make it look like separate papers */
           box-shadow: 
             inset 0 4px 6px -4px rgba(0,0,0,0.1),
             inset 0 -4px 6px -4px rgba(0,0,0,0.1);
-            
-          /* Make it un-editable */
-          user-select: none;
-          pointer-events: none;
+        }
+
+        :is(.dark) .ProseMirror .page-break-gap {
+          background-color: #0f172a; /* matches dark bg-slate-900 */
+          box-shadow: 
+            inset 0 4px 6px -4px rgba(0,0,0,0.3),
+            inset 0 -4px 6px -4px rgba(0,0,0,0.3);
         }
 
         .ProseMirror:focus {

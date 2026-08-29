@@ -9,7 +9,7 @@ import { CommentsPanel } from '../components/editor/CommentsPanel';
 import { VersionControlPanel } from '../components/editor/VersionControlPanel';
 import { FloatingCommentPopover } from '../components/editor/FloatingCommentPopover';
 import { ShareDialog } from '../components/editor/ShareDialog';
-import { PageSettingsModal } from '../components/editor/PageSettingsModal';
+import { PageSettingsPanel } from '../components/editor/PageSettingsPanel';
 import { ImportDocumentModal } from './Documents/components/ImportDocumentModal';
 import { useDocumentUpload } from './Documents/hooks/useDocumentUpload';
 import { Button } from '../components/ui/Button';
@@ -31,7 +31,8 @@ import {
   HiAcademicCap,
   HiChatBubbleLeftRight,
   HiShare,
-  HiClock
+  HiClock,
+  HiOutlineDocumentText
 } from 'react-icons/hi2';
 
 import { documentStore, DEFAULT_PAGE_SETTINGS } from '../services/documentStore';
@@ -92,9 +93,8 @@ export const DocumentEditorPage = () => {
   
   const [editor, setEditor] = useState(null);
   const [collaborators, setCollaborators] = useState([]);
-  const [activeRightPanel, setActiveRightPanel] = useState(null); // 'comments' | 'versionControl' | null
+  const [activeRightPanel, setActiveRightPanel] = useState(null); // 'comments' | 'versionControl' | 'pageSettings' | null
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showPageSettingsModal, setShowPageSettingsModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
   const [title, setTitle] = useState('Untitled Document');
   const [pageSettings, setPageSettings] = useState(DEFAULT_PAGE_SETTINGS);
@@ -190,14 +190,14 @@ export const DocumentEditorPage = () => {
       if (e.key === 'Escape' && isMaximized) {
         if (isMaximizedSidebarOpen) {
           setIsMaximizedSidebarOpen(false);
-        } else if (!showShareModal && !showPageSettingsModal) {
+        } else if (!showShareModal) {
           setIsMaximized(false);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMaximized, isMaximizedSidebarOpen, showShareModal, showPageSettingsModal]);
+  }, [isMaximized, isMaximizedSidebarOpen, showShareModal]);
 
   // 1. Load authoritative document metadata, settings & content from Firestore with real-time sync
   useEffect(() => {
@@ -483,9 +483,10 @@ export const DocumentEditorPage = () => {
   // 5. Handle Page Settings Save
   const handleSavePageSettings = async (newSettings) => {
     setPageSettings(newSettings);
-    setShowPageSettingsModal(false);
+    // Let the panel stay open if they want to adjust more, or close it if needed. 
+    // They can close it manually with the X button.
     try {
-      await documentStore.savePageSettings(documentId, newSettings);
+      await documentStore.updatePageSettings(documentId, newSettings);
     } catch (err) {
       console.error('Failed to save page settings:', err);
     }
@@ -755,7 +756,7 @@ export const DocumentEditorPage = () => {
               <EditorMenuBar 
                 editor={editor} 
                 title={title}
-                onOpenPageSettings={() => setShowPageSettingsModal(true)}
+                onOpenPageSettings={() => setActiveRightPanel('pageSettings')}
                 onNewDocument={handleNewDocument}
                 onImportDocument={handleImportRequest}
               />
@@ -860,7 +861,7 @@ export const DocumentEditorPage = () => {
           <EditorToolbar 
             editor={editor} 
             documentId={documentId}
-            onOpenPageSettings={() => setShowPageSettingsModal(true)}
+            onOpenPageSettings={() => setActiveRightPanel('pageSettings')}
           />
         </div>
       )}
@@ -1007,6 +1008,34 @@ export const DocumentEditorPage = () => {
           </div>
         )}
 
+        {activeRightPanel === 'pageSettings' && (
+          <div 
+            className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
+            style={{ width: `${commentsWidth}px` }}
+          >
+            {/* Draggable Resize Divider Handle */}
+            <div
+              onPointerDown={handleResizeStart}
+              title="Drag horizontally to resize panel"
+              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
+                isResizingComments ? 'bg-blue-500/20' : ''
+              }`}
+            >
+              <div className={`w-1 h-10 rounded-full transition-colors ${
+                isResizingComments 
+                  ? 'bg-blue-600' 
+                  : 'bg-transparent group-hover:bg-blue-500/60'
+              }`} />
+            </div>
+
+            <PageSettingsPanel
+              pageSettings={pageSettings}
+              onSaveSettings={handleSavePageSettings}
+              onClose={() => setActiveRightPanel(null)}
+            />
+          </div>
+        )}
+
         {/* Compact Right Action Rail */}
         <div className="shrink-0 w-14 border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4 gap-3 z-30 shadow-[-2px_0_10px_rgba(0,0,0,0.02)]">
           <button 
@@ -1032,6 +1061,17 @@ export const DocumentEditorPage = () => {
           >
             <HiClock className="w-5 h-5" />
           </button>
+          <button 
+            onClick={() => setActiveRightPanel(activeRightPanel === 'pageSettings' ? null : 'pageSettings')}
+            className={`p-2.5 rounded-xl transition-all ${
+              activeRightPanel === 'pageSettings' 
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
+            }`}
+            title="Page Setup"
+          >
+            <HiOutlineDocumentText className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -1042,14 +1082,6 @@ export const DocumentEditorPage = () => {
           onClose={() => setShowShareModal(false)} 
         />
       )}
-
-      {/* Page Setup & Margins Modal */}
-      <PageSettingsModal
-        isOpen={showPageSettingsModal}
-        onClose={() => setShowPageSettingsModal(false)}
-        pageSettings={pageSettings}
-        onSaveSettings={handleSavePageSettings}
-      />
 
       {/* Document Import Modal */}
       <ImportDocumentModal

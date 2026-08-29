@@ -10,6 +10,7 @@ export const AutoPagination = Extension.create({
   addOptions() {
     return {
       contentHeight: 864, // Default content height in px (e.g. 1056 - 96 top - 96 bottom)
+      gapHeight: 40, // Visual workspace gap between pages
     };
   },
 
@@ -50,7 +51,7 @@ export const AutoPagination = Extension.create({
 
           return {
             update: (view, prevState) => {
-              const { contentHeight } = this.options;
+              const { contentHeight, gapHeight } = this.options;
               
               // Recalculate if document changed OR if a forceRecalc was triggered
               const meta = view.state.tr.getMeta(paginationPluginKey);
@@ -69,20 +70,37 @@ export const AutoPagination = Extension.create({
                 view.state.doc.forEach((node, offset) => {
                   const domNode = view.nodeDOM(offset);
                   if (domNode instanceof HTMLElement) {
-                    // Check for explicit page break from LibreOffice
                     const isExplicitBreak = node.type.name === 'horizontalRule' && 
                                             domNode.classList.contains('page-break');
 
                     const style = window.getComputedStyle(domNode);
                     const marginTop = parseFloat(style.marginTop) || 0;
                     const marginBottom = parseFloat(style.marginBottom) || 0;
-                    const nodeTotalHeight = domNode.offsetHeight + marginTop + marginBottom;
+                    
+                    // DOM Measurement Compensation (Subtract known widget heights)
+                    const injectedGaps = domNode.querySelectorAll('.page-break-gap');
+                    const rawHeight = domNode.offsetHeight + marginTop + marginBottom;
+                    const trueHeight = rawHeight - (injectedGaps.length * 40); // 40px is the gap height
 
-                    // If it's an explicit break, OR adding this node exceeds the page height
-                    if (isExplicitBreak || (accumulatedHeight + nodeTotalHeight > contentHeight && accumulatedHeight > 0)) {
+                    // If explicit break
+                    if (isExplicitBreak) {
+                      const remainingSpace = Math.max(0, contentHeight - accumulatedHeight);
                       const widget = document.createElement('div');
-                      widget.className = 'page-break page-break-decoration';
+                      widget.className = 'page-break-widget block-break';
                       widget.contentEditable = 'false';
+                      widget.style.width = '100%';
+                      widget.style.display = 'block';
+
+                      const spacer = document.createElement('div');
+                      spacer.style.height = `${remainingSpace}px`;
+                      spacer.style.backgroundColor = 'transparent';
+                      widget.appendChild(spacer);
+
+                      const gap = document.createElement('div');
+                      gap.className = 'page-break-gap';
+                      widget.appendChild(gap);
+                      
+                      domNode.style.display = 'none'; // hide the original hr
                       
                       decorations.push(
                         Decoration.widget(offset, widget, {
@@ -91,11 +109,98 @@ export const AutoPagination = Extension.create({
                         })
                       );
                       
-                      // This node starts the next page
-                      accumulatedHeight = isExplicitBreak ? 0 : nodeTotalHeight;
+                      accumulatedHeight = 0;
                       pageCount++;
+                    } 
+                    // Natural Page Break: True content overflows the page boundary
+                    else if (accumulatedHeight + trueHeight > contentHeight && accumulatedHeight > 0) {
+                      
+                      const remainingSpace = Math.max(0, contentHeight - accumulatedHeight);
+                      let injected = false;
+
+                      if (node.isTextblock) {
+                        // Adjust visual coordinate lookup to account for currently rendered gaps
+                        let visualRemainingSpace = remainingSpace;
+                        Array.from(injectedGaps).forEach(gap => {
+                          if (gap.offsetTop < visualRemainingSpace) {
+                            visualRemainingSpace += 40;
+                          }
+                        });
+
+                        const nodeTop = domNode.getBoundingClientRect().top;
+                        const breakViewportY = nodeTop + visualRemainingSpace;
+                        const leftEdge = domNode.getBoundingClientRect().left + 10;
+                        
+                        const resolvedPos = view.posAtCoords({ left: leftEdge, top: breakViewportY });
+                        
+                        if (resolvedPos && resolvedPos.pos > offset && resolvedPos.pos < offset + node.nodeSize) {
+                          let finalPos = resolvedPos.pos;
+                          
+                          // Smart word-tearing protection
+                          const textNode = view.state.doc.textBetween(offset, offset + node.nodeSize, '\n');
+                          const relativePos = finalPos - offset - 1;
+                          
+                          if (relativePos > 0 && relativePos < textNode.length) {
+                             if (textNode[relativePos] !== ' ' && textNode[relativePos - 1] !== ' ') {
+                                // Find nearest space backwards to snap the break cleanly
+                                let spaceIdx = textNode.lastIndexOf(' ', relativePos);
+                                if (spaceIdx > -1) {
+                                   finalPos = offset + 1 + spaceIdx + 1; // Put break after the space
+                                }
+                             }
+                          }
+
+                          const widget = document.createElement('span');
+                          widget.className = 'page-break-widget inline-break';
+                          widget.contentEditable = 'false';
+                          
+                          const gap = document.createElement('span');
+                          gap.className = 'page-break-gap';
+                          widget.appendChild(gap);
+
+                          decorations.push(
+                            Decoration.widget(finalPos, widget, {
+                              key: `page-break-inline-${pageCount}-${finalPos}`,
+                              side: -1
+                            })
+                          );
+                          injected = true;
+                          
+                          // The remaining content belongs to the next page
+                          accumulatedHeight = trueHeight - remainingSpace;
+                          pageCount++;
+                        }
+                      } 
+                      
+                      // Fallback: Block Pushing (Tables, Images, or posAtCoords failed)
+                      if (!injected) {
+                        const widget = document.createElement('div');
+                        widget.className = 'page-break-widget block-break fallback-break';
+                        widget.contentEditable = 'false';
+                        widget.style.width = '100%';
+                        widget.style.display = 'block';
+
+                        const spacer = document.createElement('div');
+                        spacer.style.height = `${remainingSpace}px`;
+                        spacer.style.backgroundColor = 'transparent';
+                        widget.appendChild(spacer);
+
+                        const gap = document.createElement('div');
+                        gap.className = 'page-break-gap';
+                        widget.appendChild(gap);
+
+                        decorations.push(
+                          Decoration.widget(offset, widget, {
+                            key: `page-break-${pageCount}-${offset}`,
+                            side: -1
+                          })
+                        );
+                        
+                        accumulatedHeight = trueHeight;
+                        pageCount++;
+                      }
                     } else {
-                      accumulatedHeight += nodeTotalHeight;
+                      accumulatedHeight += trueHeight;
                     }
                   }
                 });

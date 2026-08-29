@@ -222,6 +222,48 @@ export const documentStore = {
   },
 
   /**
+   * Update page settings in MongoDB (Source of Truth for Phase 4)
+   */
+  updatePageSettings: async (id, newPageSettings) => {
+    if (!id || !newPageSettings) return false;
+    const now = new Date().toISOString();
+    
+    // Update local cache
+    const existing = memoryDocCache.get(id) || {};
+    const updated = {
+      ...existing,
+      editorSettings: {
+        ...(existing.editorSettings || DEFAULT_EDITOR_SETTINGS),
+        page: { ...DEFAULT_PAGE_SETTINGS, ...newPageSettings }
+      },
+      updatedAt: now
+    };
+    memoryDocCache.set(id, updated);
+
+    try {
+      // 1. Save to MongoDB (Authoritative Source of Truth)
+      const res = await fetch(`/api/documents/${id}/page-settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageSettings: newPageSettings }),
+      });
+      if (!res.ok) throw new Error('Failed to update page settings in MongoDB');
+      
+      // 2. Also save to Firestore to notify active clients via subscription
+      const docRef = doc(db, COLLECTION_NAME, id);
+      await setDoc(docRef, {
+        pageSettings: newPageSettings,
+        updatedAt: now
+      }, { merge: true });
+      
+      return true;
+    } catch (error) {
+      console.warn(`[documentStore] updatePageSettings error for ${id}:`, error.message);
+      return false;
+    }
+  },
+
+  /**
    * Real-time subscription to document changes in Firestore
    */
   subscribeDocument: (id, onUpdate, onError) => {
