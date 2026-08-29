@@ -110,7 +110,7 @@ export const convertToHtml = async (inputFilePath, outputDirPath) => {
       if (code !== 0 && code !== null) {
         reject(new Error(`LibreOffice conversion failed with code ${code}. Stderr: ${stderr}`));
       } else if (code === null) {
-        // Process was killed by timeout
+        reject(new Error('LibreOffice conversion was killed due to timeout.'));
       } else {
         // Output file will have the same basename as input, but .html extension
         const baseName = path.basename(inputFilePath, path.extname(inputFilePath));
