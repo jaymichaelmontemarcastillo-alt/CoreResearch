@@ -142,7 +142,8 @@ export class DocumentImportService {
           equations: unsupportedElements.includes('Equations (OMML)') ? "unsupported" : "not present",
           pageBreaks: "supported"
         }
-      }
+      },
+      ...(parseResult.metadata?.pageSettings ? { pageSettings: parseResult.metadata.pageSettings } : {})
     };
 
     // Generate deterministic Yjs state so Hocuspocus initializes correctly
@@ -158,24 +159,20 @@ export class DocumentImportService {
 
     // 6. Save directly to MongoDB as the application source of truth
     try {
-      if (mongoose.connection.readyState === 1) {
-        const MongoDocument = mongoose.model('Document');
-        
-        await MongoDocument.create({
-          id: documentId,
-          title: parseResult.metadata?.title || cleanFileName.replace(/\.[^/.]+$/, ''),
-          abstract: '', 
-          status: 'draft',
-          authors: [ownerId],
-          adviser: null,
-          plainText: plainText,
-          yjsBinaryState, // Prevent race condition when Hocuspocus connects!
-          // Extra structured metadata per Persistence Requirement
-          ...documentMetadata
-        });
-      } else {
-        throw new Error('MongoDB not connected');
-      }
+      const MongoDocument = mongoose.model('Document');
+      
+      await MongoDocument.create({
+        id: documentId,
+        title: parseResult.metadata?.title || cleanFileName.replace(/\.[^/.]+$/, ''),
+        abstract: '', 
+        status: 'draft',
+        authors: [ownerId],
+        adviser: null,
+        plainText: plainText,
+        yjsBinaryState, // Prevent race condition when Hocuspocus connects!
+        // Extra structured metadata per Persistence Requirement
+        ...documentMetadata
+      });
     } catch (mongoErr) {
       console.warn('[DocumentImportService] MongoDB write error:', mongoErr.message);
       throw mongoErr;

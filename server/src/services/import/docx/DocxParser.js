@@ -1,5 +1,6 @@
-// server/src/services/import/docx/DocxParser.js
 import mammoth from 'mammoth';
+import AdmZip from 'adm-zip';
+import { XMLParser } from 'fast-xml-parser';
 
 export class DocxParser {
   /**
@@ -11,6 +12,47 @@ export class DocxParser {
   async parse(docxBuffer, fileName = 'Document.docx') {
     const assets = [];
     const title = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+
+    let pageSettings = null;
+    try {
+      // Extract exact geometry from docx XML
+      const zip = new AdmZip(docxBuffer);
+      const documentXml = zip.readAsText('word/document.xml');
+      if (documentXml) {
+        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+        const parsed = parser.parse(documentXml);
+        const body = parsed['w:document']?.['w:body'];
+        if (body && body['w:sectPr']) {
+          const sectPr = body['w:sectPr'];
+          const pgSz = sectPr['w:pgSz'];
+          const pgMar = sectPr['w:pgMar'];
+          
+          if (pgSz && pgMar) {
+            // Convert twips to inches (1440 twips = 1 inch)
+            const twipsToInches = (twips) => twips ? `${(parseInt(twips, 10) / 1440).toFixed(2)}in` : '1in';
+            
+            // Determine size string
+            const wInches = parseInt(pgSz['@_w'] || 12240) / 1440;
+            const hInches = parseInt(pgSz['@_h'] || 15840) / 1440;
+            
+            let size = 'letter';
+            if (Math.abs(wInches - 8.27) < 0.2 && Math.abs(hInches - 11.69) < 0.2) size = 'a4';
+            else if (Math.abs(wInches - 8.5) < 0.2 && Math.abs(hInches - 14) < 0.2) size = 'legal';
+            
+            pageSettings = {
+              size,
+              orientation: pgSz['@_orient'] === 'landscape' ? 'landscape' : 'portrait',
+              marginTop: twipsToInches(pgMar['@_top']),
+              marginBottom: twipsToInches(pgMar['@_bottom']),
+              marginLeft: twipsToInches(pgMar['@_left']),
+              marginRight: twipsToInches(pgMar['@_right'])
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[DocxParser] Failed to extract page geometry:', err.message);
+    }
 
     const options = {
       transformDocument: mammoth.transforms.paragraph((element) => {
@@ -90,7 +132,8 @@ export class DocxParser {
       metadata: {
         title,
         sourceFormat: 'docx',
-        warnings: result.messages
+        warnings: result.messages,
+        pageSettings
       }
     };
   }

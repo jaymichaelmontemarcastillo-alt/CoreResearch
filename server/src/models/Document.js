@@ -1,5 +1,14 @@
 import mongoose from 'mongoose';
 
+const PageSettingsSchema = new mongoose.Schema({
+  size: { type: String, default: 'a4' }, // 'letter', 'a4', 'legal'
+  orientation: { type: String, default: 'portrait' }, // 'portrait', 'landscape'
+  marginTop: { type: String, default: '1in' },
+  marginBottom: { type: String, default: '1in' },
+  marginLeft: { type: String, default: '1in' },
+  marginRight: { type: String, default: '1in' },
+}, { _id: false });
+
 const DocumentSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, index: true },
   
@@ -14,6 +23,9 @@ const DocumentSchema = new mongoose.Schema({
   // Content (Phase 3)
   yjsBinaryState: { type: Buffer },
   plainText: { type: String, default: '' },
+  
+  // Phase 4E - True Document Page Engine
+  pageSettings: { type: PageSettingsSchema, default: () => ({}) },
 }, { 
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   strict: false // Allow dynamic fields if we merge metadata here later

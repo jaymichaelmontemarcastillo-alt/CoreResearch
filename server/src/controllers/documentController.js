@@ -1,6 +1,6 @@
-// server/src/controllers/documentController.js
 import fs from 'fs';
 import path from 'path';
+import mongoose from 'mongoose';
 import { documentImportService } from '../services/import/DocumentImportService.js';
 import { getStorageProvider, localStorageProvider } from '../services/storage/storageManager.js';
 
@@ -106,7 +106,41 @@ export const serveStorageAsset = async (req, res) => {
   }
 };
 
+export const updatePageSettings = async (req, res) => {
+  try {
+    const documentId = req.params.id;
+    const { pageSettings } = req.body;
+
+    if (!documentId || !pageSettings) {
+      return res.status(400).json({ success: false, message: 'Missing documentId or pageSettings' });
+    }
+
+    const DocumentModel = mongoose.model('Document');
+    
+    // Find the document and update pageSettings
+    const updatedDoc = await DocumentModel.findOneAndUpdate(
+      { id: documentId },
+      { $set: { pageSettings: pageSettings } },
+      { new: true } // Return updated doc
+    );
+
+    if (!updatedDoc) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Page settings updated successfully.',
+      pageSettings: updatedDoc.pageSettings,
+    });
+  } catch (error) {
+    console.error('[documentController] updatePageSettings error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update page settings' });
+  }
+};
+
 export default {
   importDocument,
   serveStorageAsset,
+  updatePageSettings,
 };

@@ -19,7 +19,13 @@ import sanitizeHtml from 'sanitize-html';
 import * as cheerio from 'cheerio';
 
 export const getTiptapExtensions = () => [
-  StarterKit,
+  StarterKit.configure({
+    // Disable extensions bundled in StarterKit v3 that we register
+    // explicitly below with custom configuration/attributes
+    horizontalRule: false,
+    link: false,
+    underline: false,
+  }),
   Image,
   Table,
   TableRow,
