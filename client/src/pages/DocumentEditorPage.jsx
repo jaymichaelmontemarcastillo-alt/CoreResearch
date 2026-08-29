@@ -1061,6 +1061,7 @@ export const DocumentEditorPage = () => {
           >
             <HiClock className="w-5 h-5" />
           </button>
+
           <button 
             onClick={() => setActiveRightPanel(activeRightPanel === 'pageSettings' ? null : 'pageSettings')}
             className={`p-2.5 rounded-xl transition-all ${
