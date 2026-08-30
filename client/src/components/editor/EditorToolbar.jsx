@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   FaBold, FaItalic, FaUnderline, FaStrikethrough, FaSubscript, FaSuperscript,
   FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify,
@@ -57,6 +57,18 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
   const [showTableMenu, setShowTableMenu] = useState(false);
   const [showSpacingMenu, setShowSpacingMenu] = useState(false);
 
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.editor-dropdown-wrapper')) {
+        setShowTableMenu(false);
+        setShowSpacingMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (!editor) return null;
 
   // Image Upload handler with Firebase Storage
@@ -93,7 +105,9 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
 
   const currentFontFamily = editor.getAttributes('textStyle').fontFamily || '';
   const currentFontSize = editor.getAttributes('textStyle').fontSize || '';
-
+  
+  const currentLineHeight = editor.getAttributes('paragraph').lineHeight || editor.getAttributes('heading').lineHeight || '1.5';
+  
   return (
     <div className="flex flex-wrap items-center gap-1 max-w-full px-2 py-1 text-xs sm:text-sm relative z-50">
       
@@ -292,8 +306,8 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
       />
 
-      {/* Line & Paragraph Spacing Dropdown */}
-      <div className="relative">
+      {/* Spacing & Layout Dropdown */}
+      <div className="relative editor-dropdown-wrapper">
         <button
           type="button"
           onClick={() => { setShowSpacingMenu(!showSpacingMenu); setShowTableMenu(false); }}
@@ -316,7 +330,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
             >
               <span>Single</span>
-              {editor.isActive({ lineHeight: '1' }) && <span className="text-blue-600">✓</span>}
+              {currentLineHeight === '1' && <span className="text-blue-600">✓</span>}
             </button>
             <button
               type="button"
@@ -324,7 +338,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
             >
               <span>1.15</span>
-              {editor.isActive({ lineHeight: '1.15' }) && <span className="text-blue-600">✓</span>}
+              {currentLineHeight === '1.15' && <span className="text-blue-600">✓</span>}
             </button>
             <button
               type="button"
@@ -332,7 +346,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
             >
               <span>1.5</span>
-              {editor.isActive({ lineHeight: '1.5' }) && <span className="text-blue-600">✓</span>}
+              {currentLineHeight === '1.5' && <span className="text-blue-600">✓</span>}
             </button>
             <button
               type="button"
@@ -340,7 +354,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
             >
               <span>Double</span>
-              {editor.isActive({ lineHeight: '2' }) && <span className="text-blue-600">✓</span>}
+              {currentLineHeight === '2' && <span className="text-blue-600">✓</span>}
             </button>
             
             <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
@@ -440,7 +454,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
       </ToolbarButton>
 
       {/* Table & Table Operations Dropdown */}
-      <div className="relative">
+      <div className="relative editor-dropdown-wrapper">
         <button
           type="button"
           onClick={() => { setShowTableMenu(!showTableMenu); setShowSpacingMenu(false); }}
