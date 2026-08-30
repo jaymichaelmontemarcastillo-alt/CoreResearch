@@ -34,18 +34,18 @@ export const Modal = ({
 
       {/* Modal Content */}
       <div
-        className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-modal animate-slide-up max-h-[90vh] overflow-y-auto ${className}`}
+        className={`relative w-full ${maxWidth} bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-modal animate-slide-up max-h-[90vh] overflow-y-auto ${className}`}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#222433]">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               {Icon && <Icon className="w-5 h-5 text-primary" />}
               {title}
             </h3>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition"
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1c1d28] text-gray-400 dark:text-[#9396a8] hover:text-gray-600 dark:hover:text-white transition"
             >
               <HiXMark className="w-5 h-5" />
             </button>

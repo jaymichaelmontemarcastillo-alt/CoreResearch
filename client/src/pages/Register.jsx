@@ -141,13 +141,13 @@ export const Register = () => {
           {/* First Name & Last Name */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">First Name</label>
               <div className="relative">
-                <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                 <input
                   type="text"
                   placeholder="e.g. Alex"
-                  className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
+                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
@@ -155,13 +155,13 @@ export const Register = () => {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Last Name</label>
               <div className="relative">
-                <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                 <input
                   type="text"
                   placeholder="e.g. Rivera"
-                  className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
+                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
@@ -172,13 +172,13 @@ export const Register = () => {
 
           {/* Email */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Institutional email</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Institutional email</label>
             <div className="relative">
-              <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type="email"
                 placeholder="Enter your university email"
-                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
+                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -189,11 +189,11 @@ export const Register = () => {
           {/* Role & Program */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Role</label>
               <div className="relative">
-                <HiBriefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                <HiBriefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
                 <select
-                  className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
+                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   required
@@ -206,11 +206,11 @@ export const Register = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Program</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Program</label>
               <div className="relative">
-                <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
                 <select
-                  className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
+                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
                   value={program}
                   onChange={(e) => setProgram(e.target.value)}
                   required
@@ -225,15 +225,15 @@ export const Register = () => {
 
           {/* Student / Employee ID Number */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">
               {role === "student" ? "Student ID Number" : "Employee ID Number"}
             </label>
             <div className="relative">
-              <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type="text"
                 placeholder={role === "student" ? "e.g. 2024-1002" : "e.g. EMP-2024"}
-                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
+                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
                 value={studentIdOrEmployeeId}
                 onChange={(e) => setStudentIdOrEmployeeId(e.target.value)}
                 required
@@ -243,13 +243,13 @@ export const Register = () => {
 
           {/* Password */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Password</label>
             <div className="relative">
-              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="Create a password (min 6 characters)"
-                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition"
+                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-10 transition"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -257,7 +257,7 @@ export const Register = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#6b6f84] hover:text-gray-600 dark:hover:text-[#f3f4f8] transition"
               >
                 {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
               </button>
@@ -266,13 +266,13 @@ export const Register = () => {
 
           {/* Confirm Password */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Confirm password</label>
             <div className="relative">
-              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="Re-enter your password"
-                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition"
+                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-10 transition"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -280,7 +280,7 @@ export const Register = () => {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#6b6f84] hover:text-gray-600 dark:hover:text-[#f3f4f8] transition"
               >
                 {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
               </button>
@@ -308,9 +308,9 @@ export const Register = () => {
 
           {/* Divider */}
           <div className="relative flex items-center py-1">
-            <div className="flex-grow border-t border-gray-200 dark:border-slate-700" />
-            <span className="flex-shrink mx-4 text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">or</span>
-            <div className="flex-grow border-t border-gray-200 dark:border-slate-700" />
+            <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
+            <span className="flex-shrink mx-4 text-xs text-gray-400 dark:text-[#6b6f84] font-medium uppercase tracking-wider">or</span>
+            <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
           </div>
 
           {/* Google Sign Up */}
@@ -330,7 +330,7 @@ export const Register = () => {
                 }
               }
             }}
-            className="w-full h-11 px-4 rounded-lg bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center justify-center gap-3 transition"
+            className="w-full h-11 px-4 rounded-lg bg-white dark:bg-[#0e0f15] hover:bg-gray-50 dark:hover:bg-[#1c1d28] border border-gray-300 dark:border-[#222433] text-gray-700 dark:text-[#f3f4f8] text-sm font-medium flex items-center justify-center gap-3 transition"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -343,7 +343,7 @@ export const Register = () => {
         </form>
       )}
 
-      <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+      <div className="mt-6 text-center text-sm text-gray-500 dark:text-[#9396a8]">
         Already have an account?{" "}
         <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
       </div>

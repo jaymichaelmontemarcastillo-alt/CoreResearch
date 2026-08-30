@@ -1,35 +1,59 @@
 // src/components/ui/StatCard.jsx
 import React from "react";
 
-const colorMap = {
-  blue: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400",
-  emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
-  amber: "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400",
-  purple: "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400",
-  rose: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400",
-};
-
 export const StatCard = ({
   icon: Icon,
   label,
   value,
+  subtitle,
+  trend,
+  trendType = "positive",
   color = "blue",
   valueColor,
   className = "",
+  showIcon = false,
 }) => {
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-card p-4 flex items-center gap-3 ${className}`}>
-      {Icon && (
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colorMap[color] || colorMap.blue}`}>
-          <Icon className="w-5 h-5" />
+    <div
+      className={`bg-white dark:bg-[#15161e] rounded-xl border border-gray-200/90 dark:border-[#222433] p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-200 hover:border-gray-300 dark:hover:border-[#333649] ${className}`}
+    >
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-[11px] sm:text-xs font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider truncate">
+          {label}
+        </span>
+        {showIcon && Icon && (
+          <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+            <Icon className="w-3.5 h-3.5" />
+          </div>
+        )}
+      </div>
+
+      <div className={`text-lg sm:text-xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
+        {value}
+      </div>
+
+      {(subtitle || trend) && (
+        <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+          {trend && (
+            <span
+              className={`font-semibold flex items-center gap-0.5 ${
+                trendType === "positive"
+                  ? "text-emerald-500 dark:text-emerald-400"
+                  : trendType === "negative"
+                  ? "text-rose-500 dark:text-rose-400"
+                  : "text-blue-500 dark:text-blue-400"
+              }`}
+            >
+              {trend}
+            </span>
+          )}
+          {subtitle && (
+            <span className="text-gray-400 dark:text-[#6b6f84] truncate">
+              {subtitle}
+            </span>
+          )}
         </div>
       )}
-      <div className="min-w-0">
-        <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{label}</div>
-        <div className={`text-base font-semibold truncate ${valueColor || "text-gray-900 dark:text-white"}`}>
-          {value}
-        </div>
-      </div>
     </div>
   );
 };

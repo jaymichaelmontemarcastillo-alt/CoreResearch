@@ -144,44 +144,40 @@ export const Dashboard = () => {
         <Toast message={toastMessage} variant="success" onClose={() => setToastMessage("")} />
       )}
 
-      {/* Welcome Banner matching Dashboard Reference */}
-      <div className="p-6 sm:p-8 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Page Header / Welcome Hero Section */}
+      <div className="px-6 py-8 sm:px-8 sm:py-9 lg:px-10 lg:py-10 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all shadow-sm">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
-              {getGreeting()}, {displayName} 👋
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              {getGreeting()}, {displayName}
             </h1>
           </div>
           {role === 'faculty' && (
-            <div className="flex items-center gap-2 mt-2 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg w-max">
+            <div className="flex items-center gap-2 mt-2.5 bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-xl w-max border border-transparent dark:border-[#222433]">
               <button
                 onClick={() => setFacultyMode('adviser')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   currentFacultyMode === 'adviser'
-                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200 dark:border-[#222433]'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
                 }`}
               >
                 Adviser Mode
               </button>
               <button
                 onClick={() => setFacultyMode('panelist')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   currentFacultyMode === 'panelist'
-                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200 dark:border-[#222433]'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
                 }`}
               >
                 Panelist Mode
               </button>
             </div>
           )}
-          <p className="text-gray-500 dark:text-gray-400 text-sm max-w-2xl">
-            Your dashboard is active under{" "}
-            <span className="font-semibold text-gray-700 dark:text-gray-300">
-              {userProfile?.department || "Computer Studies"}
-            </span>
-            . Centralized workspace for proposals, manuscript revisions, defense rubrics, and archiving.
+          <p className="text-gray-500 dark:text-[#9396a8] text-sm sm:text-base max-w-2xl leading-relaxed mt-1">
+            Active under <span className="font-semibold text-gray-800 dark:text-white">{userProfile?.department || "Computer Studies"}</span>. Proposals, manuscripts, defense rubrics, and archiving.
           </p>
         </div>
 
@@ -190,12 +186,12 @@ export const Dashboard = () => {
             <>
               <Link to="/research/workspace">
                 <Button variant="secondary" size="md">
-                  <HiBookOpen className="w-4 h-4 mr-2" /> Research Workspace
+                  Research Workspace
                 </Button>
               </Link>
               <Link to="/submit-title">
                 <Button variant="primary" size="md">
-                  <HiPlusCircle className="w-4 h-4 mr-2" /> Start Research Workflow
+                  Submit Title
                 </Button>
               </Link>
             </>
@@ -204,12 +200,12 @@ export const Dashboard = () => {
             <>
               <Link to="/advisees">
                 <Button variant="primary" size="md">
-                  <HiUsers className="w-4 h-4 mr-2" /> My Advisees
+                  My Advisees
                 </Button>
               </Link>
               <Link to="/reviews">
                 <Button variant="secondary" size="md">
-                  <HiChatBubbleLeftRight className="w-4 h-4 mr-2" /> Feedback Threads
+                  Feedback Threads
                 </Button>
               </Link>
             </>
@@ -217,14 +213,14 @@ export const Dashboard = () => {
           {effectiveRole === "panelist" && (
             <Link to="/reviews">
               <Button variant="primary" size="md">
-                <HiChatBubbleLeftRight className="w-4 h-4 mr-2" /> View Feedback Threads
+                View Feedback Threads
               </Button>
             </Link>
           )}
           {effectiveRole === "admin" && (
             <Link to="/admin/users">
               <Button variant="primary" size="md">
-                <HiUsers className="w-4 h-4 mr-2" /> Manage Users
+                Manage Users
               </Button>
             </Link>
           )}
@@ -238,7 +234,7 @@ export const Dashboard = () => {
       {effectiveRole === "admin" && <AdminDashboardMetrics />}
 
       {/* Main Content Grid: Pipeline + Active Papers + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
         {/* Left 2 Cols: Role-Specific Content */}
         <div className="lg:col-span-2 space-y-6">
           
@@ -247,117 +243,130 @@ export const Dashboard = () => {
             <>
               {/* Academic Profile Widget */}
               {userProfile && (
-                <Card className="p-5 border-blue-100 dark:border-blue-800 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
-                      <HiAcademicCap className="w-6 h-6" />
+                <Card className="p-5 sm:p-6 border-blue-100/60 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/40 to-transparent dark:from-blue-950/10">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Academic Profile</h3>
+                      <Badge variant="blue">{userProfile.enrollmentStatus || "Active Enrollee"}</Badge>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">Academic Profile</h3>
-                      {userProfile.courseId ? (
-                        <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                          <p>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Course:</span>{" "}
-                            {academicInfo?.course?.name || userProfile.courseId}
-                          </p>
-                          <p>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Section:</span>{" "}
-                            {academicInfo?.sectionName || "Unassigned"}
-                          </p>
-                          <p>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Year Level:</span>{" "}
-                            {userProfile.yearLevel ? `Year ${userProfile.yearLevel}` : "N/A"} 
-                            {" • "}
-                            <span className="capitalize">{userProfile.enrollmentStatus || "N/A"}</span>
-                          </p>
 
-                          {academicInfo?.group ? (
-                            <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800/50">
-                              <p className="font-semibold text-gray-900 dark:text-white mb-1 text-base">
-                                {academicInfo.group.name}
-                              </p>
-                              <div className="flex flex-col gap-1 mt-1 text-gray-600 dark:text-gray-400">
-                                <span className="font-semibold text-gray-700 dark:text-gray-300 text-xs uppercase tracking-wider">Members:</span>
-                                {academicInfo.group.members.map(m => (
-                                  <span key={m.uid} className="flex items-center gap-1">
-                                    <span className="w-1 h-1 rounded-full bg-blue-500"></span>
-                                    {m.fullName} {m.uid === userProfile.uid ? "(You)" : ""}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800/50 text-orange-600 dark:text-orange-400 font-medium">
-                              No Research Group Assigned Yet
-                            </div>
-                          )}
+                    {userProfile.courseId ? (
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-[#9396a8] space-y-1.5 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <p>
+                            <span className="font-medium text-gray-400 dark:text-[#6b6f84]">Program:</span>{" "}
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{academicInfo?.course?.name || userProfile.courseId}</span>
+                          </p>
+                          <p>
+                            <span className="font-medium text-gray-400 dark:text-[#6b6f84]">Section:</span>{" "}
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{academicInfo?.sectionName || "Unassigned"}</span>
+                          </p>
                         </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          You have not been assigned to a Course and Section yet. Please contact your coordinator.
-                        </p>
-                      )}
-                    </div>
+
+                        {academicInfo?.group ? (
+                          <div className="mt-3 pt-3 border-t border-blue-200/50 dark:border-[#222433]">
+                            <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                              {academicInfo.group.name}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {academicInfo.group.members.map((m) => (
+                                <span
+                                  key={m.uid}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8]"
+                                >
+                                  {m.fullName} {m.uid === userProfile.uid ? "(You)" : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-2 pt-2 border-t border-blue-200/50 dark:border-[#222433] text-amber-600 dark:text-amber-400 text-xs font-medium">
+                            No Research Group Assigned Yet
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-[#9396a8]">
+                        You have not been assigned to a Course and Section yet. Please contact your coordinator.
+                      </p>
+                    )}
                   </div>
                 </Card>
               )}
 
-              {/* Module Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {!studentResearch.workspace && (
-                  <Card hover className="flex flex-col justify-between space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center">
-                        <HiDocumentText className="w-5 h-5" />
-                      </div>
+              {/* Module Cards Grid (Always 2 balanced cards, no dead space) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                {!studentResearch.workspace ? (
+                  <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Workflow</span>
                       <Badge variant="blue">Proposal Stage</Badge>
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                        Submit Title
+                        Submit Title Proposal
                       </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
                         Submit a new research title to find and match with a faculty adviser.
                       </p>
                     </div>
                     <Link
                       to="/submit-title"
-                      className="text-xs font-semibold text-primary dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
+                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                     >
-                      Start Submission <HiArrowUpRight className="w-3.5 h-3.5" />
+                      Start Submission →
+                    </Link>
+                  </Card>
+                ) : (
+                  <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Workspace</span>
+                      <Badge variant="purple">Active Team</Badge>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                        Research Workspace
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
+                        Collaborate on manuscript chapters, view adviser comments, and track defense milestones.
+                      </p>
+                    </div>
+                    <Link
+                      to="/research/workspace"
+                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
+                    >
+                      Open Workspace →
                     </Link>
                   </Card>
                 )}
 
-                <Card hover className="flex flex-col justify-between space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                      <HiFolder className="w-5 h-5" />
-                    </div>
-                    <Badge variant="emerald">Versioning</Badge>
+                <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Repository</span>
+                    <Badge variant="emerald">Published Papers</Badge>
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      Manuscript Repository
+                      Research Manuscripts
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
                       Upload PDF/DOCX drafts, track submission timelines, and download revisions.
                     </p>
                   </div>
                   <Link
-                    to="/manuscripts"
-                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
+                    to="/repository"
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                   >
-                    Open Manuscripts <HiArrowUpRight className="w-3.5 h-3.5" />
+                    Open Repository →
                   </Link>
                 </Card>
               </div>
 
               {/* Current Research Highlight */}
-              <Card className="space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    CURRENT MANUSCRIPT DRAFT
+              <Card className="p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
+                    Current Manuscript Draft
                   </h3>
                   <Badge variant={studentResearch.workspace ? "purple" : studentResearch.proposal?.status === 'approved' ? "emerald" : "blue"}>
                     {studentResearch.workspace
@@ -371,13 +380,13 @@ export const Dashboard = () => {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <h4 className="text-base font-medium text-gray-900 dark:text-white">
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">
                       {studentResearch.workspace?.title ||
                         studentResearch.proposal?.title ||
                         studentResearch.documents[0]?.title ||
                         "Research Manuscript Draft"}
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
                       {studentResearch.workspace
                         ? `Department of ${studentResearch.workspace.department || 'Computer Studies'} — Overall Progress: ${studentResearch.workspace.overallProgress || 20}%`
                         : studentResearch.proposal
@@ -386,9 +395,9 @@ export const Dashboard = () => {
                     </p>
                   </div>
 
-                  <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-gray-100 dark:bg-[#1c1d28] rounded-full h-2 overflow-hidden border border-transparent dark:border-[#222433]">
                     <div
-                      className="bg-primary h-2 rounded-full transition-all duration-500"
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-500"
                       style={{
                         width: `${
                           studentResearch.workspace?.overallProgress ||
@@ -436,7 +445,6 @@ export const Dashboard = () => {
                         }
                       }}
                     >
-                      <HiBookOpen className="w-4 h-4 mr-1.5" />
                       Open Manuscript
                     </Button>
                     <Link to="/research/workspace">
@@ -452,50 +460,46 @@ export const Dashboard = () => {
 
           {/* ====== ADMIN CONTENT ====== */}
           {effectiveRole === "admin" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card hover className="flex flex-col justify-between space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                    <HiUsers className="w-5 h-5" />
-                  </div>
-                  <Badge variant="amber">Access Control</Badge>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Access</span>
+                  <Badge variant="amber">User Directory</Badge>
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                     User Directory
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
                     Manage institutional accounts, assign roles, and handle department assignments.
                   </p>
                 </div>
                 <Link
                   to="/admin/users"
-                  className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 hover:underline pt-2"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  Manage Users <HiArrowUpRight className="w-3.5 h-3.5" />
+                  Manage Users →
                 </Link>
               </Card>
 
-              <Card hover className="flex flex-col justify-between space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                    <HiBookOpen className="w-5 h-5" />
-                  </div>
+              <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Repository</span>
                   <Badge variant="emerald">Knowledge Base</Badge>
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                     Repository Overview
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
                     Monitor published papers and institutional research output.
                   </p>
                 </div>
                 <Link
                   to="/repository"
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline pt-2"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  View Repository <HiArrowUpRight className="w-3.5 h-3.5" />
+                  View Repository →
                 </Link>
               </Card>
             </div>
@@ -503,33 +507,31 @@ export const Dashboard = () => {
 
           {/* ====== ADVISER & PANELIST CONTENT ====== */}
           {(effectiveRole === "adviser" || effectiveRole === "panelist") && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               {effectiveRole === "adviser" && (
                 <div className="sm:col-span-2">
                   <AdviserRequestsWidget />
                 </div>
               )}
 
-              <Card hover className="flex flex-col justify-between space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                    <HiChatBubbleLeftRight className="w-5 h-5" />
-                  </div>
-                  <Badge variant="purple">Collaboration</Badge>
+              <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Collaboration</span>
+                  <Badge variant="purple">Feedback Hub</Badge>
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                     Feedback Threads
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
                     Provide feedback on ongoing manuscript drafts and revisions.
                   </p>
                 </div>
                 <Link
                   to="/reviews"
-                  className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 hover:underline pt-2"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
                 >
-                  View Reviews <HiArrowUpRight className="w-3.5 h-3.5" />
+                  View Reviews →
                 </Link>
               </Card>
             </div>
@@ -537,28 +539,28 @@ export const Dashboard = () => {
         </div>
 
         {/* Right Col: Recent Activity */}
-        <Card className="space-y-4 flex flex-col justify-between">
+        <Card className="p-5 sm:p-6 space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                <HiBolt className="w-4 h-4 text-primary" /> RECENT ACTIVITY
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
+                Recent Activity
               </h3>
-              <Link to="/reviews" className="text-xs text-primary font-semibold hover:underline">
+              <Link to="/reviews" className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                 View all
               </Link>
             </div>
 
-            <div className="space-y-4 text-xs">
+            <div className="space-y-3.5 text-xs">
               <div className="flex items-start gap-3">
                 <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <div className="font-semibold text-gray-900 dark:text-white">
                     Manuscript under panel review
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-gray-500 dark:text-[#9396a8]">
                     Chapter 3 - System Design & Q&A
                   </div>
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500">2 hours ago</div>
+                  <div className="text-[10px] text-gray-400 dark:text-[#6b6f84]">2 hours ago</div>
                 </div>
                 <Badge variant="blue">PLANNED</Badge>
               </div>
@@ -569,10 +571,10 @@ export const Dashboard = () => {
                   <div className="font-semibold text-gray-900 dark:text-white">
                     Proposal approved
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-gray-500 dark:text-[#9396a8]">
                     Smart Agriculture Sensing Platform
                   </div>
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500">Yesterday</div>
+                  <div className="text-[10px] text-gray-400 dark:text-[#6b6f84]">Yesterday</div>
                 </div>
                 <Badge variant="emerald">APPROVED</Badge>
               </div>
@@ -583,20 +585,14 @@ export const Dashboard = () => {
                   <div className="font-semibold text-gray-900 dark:text-white">
                     Defense Date Scheduled
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-gray-500 dark:text-[#9396a8]">
                     Room 402 — Engineering Building
                   </div>
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500">3 days ago</div>
+                  <div className="text-[10px] text-gray-400 dark:text-[#6b6f84]">3 days ago</div>
                 </div>
                 <Badge variant="purple">SCHEDULED</Badge>
               </div>
             </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-200 dark:border-slate-800 text-center">
-            <Link to="/repository" className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-blue-400 flex items-center justify-center gap-1">
-              Browse University Research Repository <HiArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </Card>
       </div>
@@ -610,41 +606,41 @@ const StudentDashboardMetrics = ({ research, userProfile }) => {
     ? research.proposal.status.replace('_', ' ').toUpperCase()
     : 'No Proposal';
 
-  const manuscriptStatus = research?.workspace
-    ? `${research.workspace.overallProgress || 20}% Complete`
+  const manuscriptProgress = research?.workspace?.overallProgress
+    ? `${research.workspace.overallProgress}%`
     : (research?.documents?.length || 0) > 0
-    ? `${research.documents.length} Draft${research.documents.length > 1 ? 's' : ''}`
-    : 'Ready';
+    ? `${research.documents.length} Drafts`
+    : '0%';
 
   const adviserStatus = research?.workspace?.adviserName || 'In Matching';
   const departmentStatus = userProfile?.department || 'Computer Studies';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
       <StatCard
-        icon={HiDocumentText}
         label="Proposal Status"
         value={proposalStatus}
-        color={research?.proposal?.status === 'approved' ? 'emerald' : 'blue'}
-        valueColor={research?.proposal?.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary dark:text-blue-400'}
+        trend={research?.proposal?.status === 'approved' ? '✓ Approved' : 'In Review'}
+        trendType={research?.proposal?.status === 'approved' ? 'positive' : 'neutral'}
+        valueColor={research?.proposal?.status === 'approved' ? 'text-emerald-500 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}
       />
       <StatCard
-        icon={HiFolder}
         label="Manuscript Progress"
-        value={manuscriptStatus}
-        color="purple"
+        value={manuscriptProgress}
+        trend="Overall Completion"
+        trendType="neutral"
       />
       <StatCard
-        icon={HiUsers}
         label="Faculty Adviser"
         value={adviserStatus}
-        color="emerald"
+        trend="Assigned Mentor"
+        trendType={research?.workspace?.adviserName ? 'positive' : 'neutral'}
       />
       <StatCard
-        icon={HiAcademicCap}
-        label="Department"
+        label="Academic Unit"
         value={departmentStatus}
-        color="amber"
+        trend="Active Term"
+        trendType="positive"
       />
     </div>
   );
@@ -660,7 +656,6 @@ const AdviserDashboardMetrics = () => {
     const fetchMetrics = async () => {
       try {
         const groups = await facultyService.getAdviserGroups(currentUser.uid);
-        // Assuming we could fetch reviews/proposals from other services if needed
         setMetrics(prev => ({ ...prev, groups: groups.length }));
       } catch (e) {
         console.error(e);
@@ -670,11 +665,32 @@ const AdviserDashboardMetrics = () => {
   }, [currentUser?.uid]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard icon={HiCheckBadge} label="My Groups" value={`${metrics.groups} Active`} color="emerald" />
-      <StatCard icon={HiClock} label="Pending Reviews" value="View Action Hub" color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-      <StatCard icon={HiDocumentText} label="Advisees" value="Active Tracking" color="blue" valueColor="text-primary dark:text-blue-400" />
-      <StatCard icon={HiTrophy} label="Upcoming Defenses" value="Check Schedule" color="purple" valueColor="text-purple-600 dark:text-purple-400" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <StatCard
+        label="Active Advisees"
+        value={`${metrics.groups} Groups`}
+        trend="Current Cohort"
+        trendType="positive"
+      />
+      <StatCard
+        label="Pending Reviews"
+        value="Action Hub"
+        trend="Manuscripts & Feedback"
+        trendType="neutral"
+        valueColor="text-blue-600 dark:text-blue-400"
+      />
+      <StatCard
+        label="Title Proposals"
+        value="Matching"
+        trend="Adviser Requests"
+        trendType="neutral"
+      />
+      <StatCard
+        label="Upcoming Defenses"
+        value="Schedules"
+        trend="Oral Examinations"
+        trendType="positive"
+      />
     </div>
   );
 };
@@ -699,22 +715,63 @@ const PanelistDashboardMetrics = () => {
   }, [currentUser?.uid]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard icon={HiCalendarDays} label="Assigned Defenses" value={`${metrics.defenses} Upcoming`} color="purple" />
-      <StatCard icon={HiUsers} label="Panel Assignments" value={`${metrics.groups} Defendees`} color="amber" valueColor="text-amber-600 dark:text-amber-400" />
-      <StatCard icon={HiCheckCircle} label="Evaluations Done" value="Pending Action" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-      <StatCard icon={HiFolder} label="Pre-Defense Papers" value="View Repository" color="blue" valueColor="text-primary dark:text-blue-400" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <StatCard
+        label="Assigned Defenses"
+        value={`${metrics.defenses}`}
+        trend="Upcoming Hearings"
+        trendType="positive"
+      />
+      <StatCard
+        label="Panel Defendees"
+        value={`${metrics.groups}`}
+        trend="Assigned Research Groups"
+        trendType="neutral"
+      />
+      <StatCard
+        label="Rubric Evaluations"
+        value="Pending"
+        trend="Grading Matrix"
+        trendType="neutral"
+      />
+      <StatCard
+        label="Repository Drafts"
+        value="Available"
+        trend="Pre-Defense Manuscripts"
+        trendType="positive"
+      />
     </div>
   );
 };
 
 /* Admin Metrics */
 const AdminDashboardMetrics = () => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard icon={HiUsers} label="Total Users" value="128 Registered" color="amber" />
-    <StatCard icon={HiDocumentText} label="Active Proposals" value="42 Active" color="blue" valueColor="text-primary dark:text-blue-400" />
-    <StatCard icon={HiBookOpen} label="Published Papers" value="19 Repository" color="emerald" valueColor="text-emerald-600 dark:text-emerald-400" />
-    <StatCard icon={HiShieldCheck} label="System Health" value="100% Operational" color="blue" valueColor="text-emerald-600 dark:text-emerald-400" />
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <StatCard
+      label="Total Users"
+      value="128"
+      trend="↗ +12% this semester"
+      trendType="positive"
+    />
+    <StatCard
+      label="Active Proposals"
+      value="42"
+      trend="Under Institutional Review"
+      trendType="neutral"
+      valueColor="text-blue-600 dark:text-blue-400"
+    />
+    <StatCard
+      label="Published Theses"
+      value="19"
+      trend="Archived in Repository"
+      trendType="positive"
+    />
+    <StatCard
+      label="System Status"
+      value="100%"
+      trend="All Services Operational"
+      trendType="positive"
+    />
   </div>
 );
 

@@ -15,7 +15,7 @@ export const Login = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleRegisterLoading, setGoogleRegisterLoading] = useState(false);
 
-  const { login, selectDevRole, loginWithGoogle, registerWithGoogle } = useAuth();
+  const { login, loginWithGoogle, registerWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   // Extract returnTo from URL if present
@@ -91,18 +91,13 @@ export const Login = () => {
     }
   };
 
-  const handleDevRoleSelect = (role) => {
-    selectDevRole(role);
-    navigate(returnTo);
-  };
-
   return (
     <AuthLayout
       title="Welcome Back!"
       subtitle="Log in to start managing your research projects with ease."
     >
       {error && (
-        <div className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium">
+        <div className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium">
           {error}
         </div>
       )}
@@ -110,15 +105,15 @@ export const Login = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Email */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
             Email
           </label>
           <div className="relative">
-            <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
             <input
               type="email"
               placeholder="Input your email"
-              className="w-full h-11 sm:h-12 bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
+              className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -128,15 +123,15 @@ export const Login = () => {
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
             Password
           </label>
           <div className="relative">
-            <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Input your password"
-              className="w-full h-11 sm:h-12 bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-10 transition"
+              className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 rounded-xl text-sm pl-10 pr-10 transition"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -144,7 +139,7 @@ export const Login = () => {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#6b6f84] hover:text-gray-600 dark:hover:text-[#f3f4f8] transition"
             >
               {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
             </button>
@@ -153,18 +148,18 @@ export const Login = () => {
 
         {/* Remember Me & Forgot Password Row */}
         <div className="flex items-center justify-between pt-1">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-600 dark:text-gray-400">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-600 dark:text-[#9396a8]">
             <input
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500/20 dark:bg-slate-800"
+              className="w-4 h-4 rounded border-gray-300 dark:border-[#333649] text-blue-600 focus:ring-blue-500/20 dark:bg-[#0e0f15]"
             />
             <span>Remember Me</span>
           </label>
           <Link
             to="/forgot-password"
-            className="text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition font-medium"
+            className="text-xs text-gray-600 dark:text-[#9396a8] hover:text-blue-600 dark:hover:text-blue-400 transition font-medium"
           >
             Forgot Password?
           </Link>
@@ -191,11 +186,11 @@ export const Login = () => {
 
         {/* Divider */}
         <div className="relative flex items-center py-2">
-          <div className="flex-grow border-t border-gray-200 dark:border-slate-800" />
-          <span className="flex-shrink mx-3 text-xs text-gray-400 dark:text-gray-500 font-normal">
+          <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
+          <span className="flex-shrink mx-3 text-xs text-gray-400 dark:text-[#6b6f84] font-normal">
             Or continue with:
           </span>
-          <div className="flex-grow border-t border-gray-200 dark:border-slate-800" />
+          <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
         </div>
 
         {/* Google Sign In — Direct Log In */}
@@ -203,7 +198,7 @@ export const Login = () => {
           type="button"
           disabled={googleLoading || googleRegisterLoading || loading}
           onClick={handleGoogleSignIn}
-          className="w-full h-11 sm:h-12 px-4 rounded-full bg-white dark:bg-slate-800/80 hover:bg-gray-50 dark:hover:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-200 text-sm font-medium flex items-center justify-center gap-3 transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+          className="w-full h-11 sm:h-12 px-4 rounded-full bg-white dark:bg-[#0e0f15] hover:bg-gray-50 dark:hover:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#f3f4f8] text-sm font-medium flex items-center justify-center gap-3 transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
         >
           {googleLoading ? (
             <span className="flex items-center gap-2">
@@ -228,7 +223,7 @@ export const Login = () => {
       </form>
 
       {/* Register link */}
-      <div className="mt-5 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+      <div className="mt-5 text-center text-xs sm:text-sm text-gray-500 dark:text-[#9396a8]">
         Don't have an account?{" "}
         <Link to="/register" className="text-gray-900 dark:text-white font-bold hover:underline">
           Sign up here
@@ -241,7 +236,7 @@ export const Login = () => {
           type="button"
           disabled={googleLoading || googleRegisterLoading || loading}
           onClick={handleGoogleRegister}
-          className="w-full h-9 px-4 rounded-full bg-gray-50 dark:bg-slate-800/50 hover:bg-gray-100 dark:hover:bg-slate-800 border border-dashed border-gray-300 dark:border-slate-700 text-gray-600 dark:text-gray-300 text-xs font-medium flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-9 px-4 rounded-full bg-gray-50 dark:bg-[#0e0f15] hover:bg-gray-100 dark:hover:bg-[#1c1d28] border border-dashed border-gray-300 dark:border-[#222433] text-gray-600 dark:text-[#9396a8] text-xs font-medium flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {googleRegisterLoading ? (
             <span className="flex items-center gap-1.5">
@@ -263,43 +258,6 @@ export const Login = () => {
             </>
           )}
         </button>
-      </div>
-
-      {/* Quick Demo Access */}
-      <div className="mt-4 p-2.5 rounded-2xl bg-blue-50/70 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/20">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">
-            Quick Demo Access
-          </span>
-          <span className="text-[9px] font-semibold text-blue-700 dark:text-blue-400 bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-500/20 shadow-2xs">
-            1-Click Login
-          </span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-          {[
-            { role: "student", name: "Alex Rivera", hoverBg: "hover:bg-blue-50 dark:hover:bg-blue-500/10", hoverBorder: "hover:border-blue-300 dark:hover:border-blue-500/30" },
-            { role: "adviser1", name: "Dr. Santos (Web)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
-            { role: "adviser2", name: "Dr. Cruz (AI)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
-            { role: "adviser3", name: "Dr. Reyes (DB)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
-            { role: "adviser4", name: "Dr. Garcia (Data)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
-            { role: "adviser5", name: "Dr. Mendoza (Net)", hoverBg: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10", hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-500/30" },
-            { role: "panelist", name: "Prof. Chen", hoverBg: "hover:bg-purple-50 dark:hover:bg-purple-500/10", hoverBorder: "hover:border-purple-300 dark:hover:border-purple-500/30" },
-            { role: "admin", name: "Dean Office", hoverBg: "hover:bg-amber-50 dark:hover:bg-amber-500/10", hoverBorder: "hover:border-amber-300 dark:hover:border-amber-500/30" },
-          ].map((item) => (
-            <button
-              key={item.role}
-              onClick={() => handleDevRoleSelect(item.role)}
-              className={`p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-700 text-left transition-all text-xs ${item.hoverBg} ${item.hoverBorder}`}
-            >
-              <div className="font-bold text-gray-800 dark:text-gray-200 text-[10px] truncate">
-                {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
-              </div>
-              <div className="text-[9px] text-gray-400 dark:text-gray-500 truncate">
-                {item.name}
-              </div>
-            </button>
-          ))}
-        </div>
       </div>
     </AuthLayout>
   );

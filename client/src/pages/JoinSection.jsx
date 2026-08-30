@@ -6,6 +6,7 @@ import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { LogoPreloader } from "../components/ui/LogoPreloader";
 import { HiAcademicCap, HiExclamationCircle, HiCheckCircle } from "react-icons/hi2";
 import logoImg from "../assets/logo.png";
 
@@ -90,11 +91,7 @@ export const JoinSection = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin h-8 w-8 text-blue-600 rounded-full border-4 border-t-transparent"></div>
-      </div>
-    );
+    return <LogoPreloader message="Validating class invitation..." />;
   }
 
   if (error || !invite) {

@@ -422,7 +422,7 @@ export const ResearchGroups = () => {
       <div className="flex flex-col md:flex-row items-end justify-between gap-4 pb-2">
         <div className="flex flex-col md:flex-row items-end gap-3 flex-1 w-full">
           <div className="w-full md:max-w-xs">
-            <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
               Search Groups
             </label>
             <Input
@@ -430,16 +430,16 @@ export const ResearchGroups = () => {
               icon={HiMagnifyingGlass}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white dark:bg-slate-900 shadow-sm"
+              className="shadow-sm"
             />
           </div>
 
           <div className="hidden md:flex h-10 items-center px-1">
-            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-[#6b6f84]" />
           </div>
 
           <div className="w-full md:w-48">
-            <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
               Program
             </label>
             <CourseFilterDropdown
@@ -455,11 +455,11 @@ export const ResearchGroups = () => {
 
           {hasSpecializations && (
             <div className="w-full md:w-56 animate-in fade-in slide-in-from-left-2 duration-200">
-              <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
                 Specialization
               </label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 value={selectedSpecialization}
                 onChange={(e) => {
                   setSelectedSpecialization(e.target.value);
@@ -478,11 +478,11 @@ export const ResearchGroups = () => {
 
           {showSectionFilter && (
             <div className="w-full md:w-40 animate-in fade-in slide-in-from-left-2 duration-200">
-              <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
                 Section
               </label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow disabled:opacity-50"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer disabled:opacity-50"
                 value={selectedSection}
                 onChange={(e) => setSelectedSection(e.target.value)}
               >
@@ -513,14 +513,14 @@ export const ResearchGroups = () => {
 
       {selectedCourse && selectedSection && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-white dark:bg-[#15161e] p-6 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white leading-tight">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
                 {courseFullName}
               </h2>
               {specFullName && (
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
-                  Specialized in <span className="text-gray-700 dark:text-gray-300">{specFullName}</span>
+                <p className="text-sm font-medium text-gray-500 dark:text-[#9396a8] mt-1">
+                  Specialized in <span className="text-gray-700 dark:text-[#f3f4f8] font-semibold">{specFullName}</span>
                 </p>
               )}
             </div>
@@ -536,8 +536,8 @@ export const ResearchGroups = () => {
           </div>
           
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Section <span className="text-gray-900 dark:text-white">{sectionName}</span>
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">
+              Section <span className="text-gray-900 dark:text-white font-bold">{sectionName}</span>
             </h3>
           </div>
 
@@ -569,7 +569,7 @@ export const ResearchGroups = () => {
                         <div className="flex flex-col gap-2">
                           {(group.members || []).map((member, index) => (
                             <div key={member.uid} className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-[#1c1d28] border border-transparent dark:border-[#222433] text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                 {(member.fullName || "U").charAt(0)}
                               </div>
                               <Input
@@ -585,10 +585,10 @@ export const ResearchGroups = () => {
                         <div className="flex flex-col gap-1.5">
                           {(group.members || []).map(member => (
                             <div key={member.uid || member.id} className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-[#1c1d28] border border-transparent dark:border-[#222433] text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0">
                                 {(member.fullName || "U").charAt(0)}
                               </div>
-                              <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                              <span className="font-medium text-sm text-gray-700 dark:text-[#f3f4f8]">
                                 {member.fullName || "Student"}
                               </span>
                             </div>
@@ -611,7 +611,7 @@ export const ResearchGroups = () => {
                             {proposal.title}
                           </div>
                         ) : (
-                          <span className="text-sm text-gray-400 italic">No approved title yet</span>
+                          <span className="text-sm text-gray-400 dark:text-[#6b6f84] italic">No approved title yet</span>
                         )
                       )}
                     </TableCell>
@@ -626,11 +626,11 @@ export const ResearchGroups = () => {
                         />
                       ) : (
                         <div className="flex flex-col space-y-1">
-                          <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                          <span className="font-medium text-sm text-gray-700 dark:text-[#f3f4f8]">
                             {group.adviserName || "Pending Adviser"}
                           </span>
                           {group.adviserName && (
-                            <span className="text-xs text-gray-400">Scheduled: May 18, 2026</span>
+                            <span className="text-xs text-gray-400 dark:text-[#6b6f84]">Scheduled: May 18, 2026</span>
                           )}
                         </div>
                       )}
@@ -705,15 +705,15 @@ export const ResearchGroups = () => {
         maxWidth="max-w-2xl"
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#222433] pb-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
               Unassigned Students ({unassignedStudents.length})
             </h3>
             <Badge variant="gray">{selectedStudentIds.length} / 3 Selected</Badge>
           </div>
 
           {unassignedStudents.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm italic">
+            <div className="text-center py-8 text-gray-400 dark:text-[#6b6f84] text-sm italic">
               All students in this section are assigned to a group.
             </div>
           ) : (
@@ -722,17 +722,17 @@ export const ResearchGroups = () => {
                 <div
                   key={student.uid}
                   onClick={() => toggleStudentSelection(student.uid)}
-                  className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
                     selectedStudentIds.includes(student.uid)
-                      ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
-                      : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600"
+                      ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40"
+                      : "bg-white dark:bg-[#15161e] border-gray-200 dark:border-[#222433] hover:border-gray-300 dark:hover:border-[#333649]"
                   }`}
                 >
                   <div className="flex flex-col">
                     <span className="font-semibold text-sm text-gray-900 dark:text-white">
                       {student.fullName}
                     </span>
-                    <span className="text-xs text-gray-500">{student.studentIdOrEmployeeId || student.email}</span>
+                    <span className="text-xs text-gray-500 dark:text-[#9396a8]">{student.studentIdOrEmployeeId || student.email}</span>
                   </div>
                   {selectedStudentIds.includes(student.uid) && (
                     <HiCheckCircle className="w-5 h-5 text-blue-500" />

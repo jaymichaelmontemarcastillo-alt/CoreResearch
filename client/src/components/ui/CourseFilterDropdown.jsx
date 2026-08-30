@@ -69,21 +69,21 @@ export const CourseFilterDropdown = ({
   };
 
   const panelCls =
-    "bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden py-1.5";
+    "bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl overflow-hidden py-1.5";
   const itemBaseCls =
     "w-full flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-left transition-colors duration-100 outline-none";
-  const itemIdleCls = "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800";
-  const itemActiveCls = "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400";
+  const itemIdleCls = "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white";
+  const itemActiveCls = "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400";
 
   return (
     <div ref={containerRef} className="relative w-full" style={{ minWidth: "160px" }}>
       <button
         type="button"
         onClick={() => { setOpen((o) => !o); setHoveredCourse(null); setHoveredSpec(null); }}
-        className="w-full h-10 flex items-center justify-between px-3.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 shadow-sm hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+        className="w-full h-10 flex items-center justify-between px-3.5 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] shadow-sm hover:border-blue-400 dark:hover:border-[#333649] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all"
       >
         <span className="truncate">{getLabel()}</span>
-        <HiChevronDown className={"w-4 h-4 shrink-0 text-gray-400 ml-2 transition-transform duration-200 " + (open ? "rotate-180" : "")} />
+        <HiChevronDown className={"w-4 h-4 shrink-0 text-gray-400 dark:text-[#6b6f84] ml-2 transition-transform duration-200 " + (open ? "rotate-180" : "")} />
       </button>
 
       {open && (
@@ -108,13 +108,13 @@ export const CourseFilterDropdown = ({
               return (
                 <button
                   key={course.id}
-                  className={itemBaseCls + " " + (isHovered ? itemActiveCls : isSelected ? "bg-blue-50/50 dark:bg-blue-500/5 text-blue-600 dark:text-blue-400" : itemIdleCls)}
+                  className={itemBaseCls + " " + (isHovered ? itemActiveCls : isSelected ? "bg-blue-50/50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400" : itemIdleCls)}
                   onClick={() => !hasFlyout && handleSelectCourse(course.id)}
                   onMouseEnter={() => { setHoveredCourse(course.id); setHoveredSpec(null); }}
                 >
                   <span className="flex-1 font-semibold">{course.code}</span>
                   {isSelected && !isHovered && <HiCheck className="w-4 h-4 text-blue-500 shrink-0" />}
-                  {hasFlyout && <HiChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+                  {hasFlyout && <HiChevronRight className="w-4 h-4 text-gray-400 dark:text-[#6b6f84] shrink-0" />}
                 </button>
               );
             })}
@@ -122,9 +122,9 @@ export const CourseFilterDropdown = ({
 
           {hoveredCourse && hoveredCourseSpecs.length > 0 && (
             <div className={panelCls} style={{ minWidth: "240px" }}>
-              <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Specialization</div>
-              <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-slate-700 mb-1"} onClick={() => handleSelectCourse(hoveredCourse)} onMouseEnter={() => setHoveredSpec(null)}>
-                <span className="text-[12px] text-gray-400 italic">All specializations</span>
+              <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-[#6b6f84] uppercase tracking-widest">Specialization</div>
+              <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-[#222433] mb-1"} onClick={() => handleSelectCourse(hoveredCourse)} onMouseEnter={() => setHoveredSpec(null)}>
+                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">All specializations</span>
               </button>
               {hoveredCourseSpecs.map((spec) => {
                 const specSecs = hoveredCourseSecs.filter((s) => s.specializationId === spec.id);
@@ -134,10 +134,10 @@ export const CourseFilterDropdown = ({
                     <div className="flex-1 min-w-0 text-left">
                       <div className="font-semibold text-[13px] leading-tight">{spec.code}</div>
                       {spec.name && spec.name !== spec.code && (
-                        <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate leading-tight mt-0.5">{spec.name}</div>
+                        <div className="text-[11px] text-gray-400 dark:text-[#6b6f84] truncate leading-tight mt-0.5">{spec.name}</div>
                       )}
                     </div>
-                    {specSecs.length > 0 && <HiChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+                    {specSecs.length > 0 && <HiChevronRight className="w-4 h-4 text-gray-400 dark:text-[#6b6f84] shrink-0" />}
                   </button>
                 );
               })}
@@ -146,9 +146,9 @@ export const CourseFilterDropdown = ({
 
           {hoveredCourse && hoveredCourseSpecs.length === 0 && hoveredCourseSecs.length > 0 && (
             <div className={panelCls} style={{ minWidth: "160px" }}>
-              <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Section</div>
-              <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-slate-700 mb-1"} onClick={() => handleSelectCourse(hoveredCourse)}>
-                <span className="text-[12px] text-gray-400 italic">No specific section</span>
+              <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-[#6b6f84] uppercase tracking-widest">Section</div>
+              <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-[#222433] mb-1"} onClick={() => handleSelectCourse(hoveredCourse)}>
+                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">No specific section</span>
               </button>
               {hoveredCourseSecs.map((sec) => (
                 <button key={sec.id} className={itemBaseCls + " " + itemIdleCls} onClick={() => handleSelectSection(hoveredCourse, null, sec.id)}>
@@ -160,9 +160,9 @@ export const CourseFilterDropdown = ({
 
           {hoveredSpec && hoveredSpecSecs.length > 0 && (
             <div className={panelCls} style={{ minWidth: "160px" }}>
-              <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Section</div>
-              <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-slate-700 mb-1"} onClick={() => handleSelectSpec(hoveredCourse, hoveredSpec)}>
-                <span className="text-[12px] text-gray-400 italic">No specific section</span>
+              <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-[#6b6f84] uppercase tracking-widest">Section</div>
+              <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-[#222433] mb-1"} onClick={() => handleSelectSpec(hoveredCourse, hoveredSpec)}>
+                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">No specific section</span>
               </button>
               {hoveredSpecSecs.map((sec) => (
                 <button key={sec.id} className={itemBaseCls + " " + itemIdleCls} onClick={() => handleSelectSection(hoveredCourse, hoveredSpec, sec.id)}>

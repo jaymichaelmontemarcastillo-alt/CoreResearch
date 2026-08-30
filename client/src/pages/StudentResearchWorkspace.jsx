@@ -363,18 +363,18 @@ export const StudentResearchWorkspace = () => {
       ) : (
         <div className="space-y-6">
           {/* Top Hero Card: Research Overview + Overall Progress Circle + Open Manuscript CTA */}
-          <Card className="p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm">
+          <Card className="p-6 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-sm">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
               {/* Left Details (75%) */}
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between space-y-4">
                 <div className="space-y-4">
                   {/* Category */}
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="text-xs font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider">
                     {workspace.department || 'Computer Studies'}
                   </div>
 
                   {/* Title */}
-                  <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white leading-tight line-clamp-3">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-3">
                     {workspace.title}
                   </h1>
                 </div>
@@ -382,21 +382,21 @@ export const StudentResearchWorkspace = () => {
                 {/* Metadata */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-6 pt-2">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    <span className="text-[10px] text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1">
                       Research Group
                     </span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5 text-sm">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      {workspace.groupName} <span className="text-gray-500 font-normal">({workspace.studentName})</span>
+                    <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-sm">
+                      <Users className="w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                      {workspace.groupName} <span className="text-gray-500 dark:text-[#9396a8] font-normal">({workspace.studentName})</span>
                     </span>
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    <span className="text-[10px] text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1">
                       Faculty Adviser
                     </span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5 text-sm">
-                      <UserCheck className="w-4 h-4 text-gray-400" />
+                    <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-sm">
+                      <UserCheck className="w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                       {workspace.adviserName || 'Adviser Assignment in Progress'}
                     </span>
                   </div>
@@ -420,7 +420,7 @@ export const StudentResearchWorkspace = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                    className="w-full sm:w-auto text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                     onClick={handleResetWorkspace}
                   >
                     Restart
@@ -442,24 +442,24 @@ export const StudentResearchWorkspace = () => {
           </Card>
 
           {/* Milestones Tracker */}
-          <Card className="p-5">
+          <Card className="p-5 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433]">
             <MilestonesTracker milestones={milestones} />
           </Card>
 
           {/* Manuscript Sections Progress Table */}
-          <Card className="p-5 space-y-4">
+          <Card className="p-5 space-y-4 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433]">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">
                   Manuscript Chapters &amp; Section Status
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400 dark:text-[#6b6f84] mt-0.5">
                   Track individual progress and advisory evaluation across all manuscript sections
                 </p>
               </div>
             </div>
 
-            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+            <div className="divide-y divide-gray-100 dark:divide-[#222433]">
               {(workspace.sections || []).map((sec) => {
                 const locked = isSectionLocked(sec.id);
                 return (
@@ -469,7 +469,7 @@ export const StudentResearchWorkspace = () => {
                   >
                     <div className="space-y-1 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
                           {sec.name}
                         </span>
                         {locked ? (
@@ -493,9 +493,9 @@ export const StudentResearchWorkspace = () => {
                         )}
                       </div>
 
-                      <div className="w-full max-w-xs bg-gray-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div className="w-full max-w-xs bg-gray-100 dark:bg-[#1c1d28] h-1.5 rounded-full overflow-hidden border border-transparent dark:border-[#222433]">
                         <div
-                          className="bg-primary h-full transition-all duration-500"
+                          className="bg-blue-600 h-full transition-all duration-500"
                           style={{
                             width: `${locked ? 0 : (sec.status === 'completed' ? 100 : sec.progress || 0)}%`,
                           }}
@@ -507,7 +507,7 @@ export const StudentResearchWorkspace = () => {
                   {(isAdviser || isCoordinator) && !locked && (
                     <div className="flex items-center gap-2">
                       <select
-                        className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"
+                        className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-700 dark:text-[#f3f4f8]"
                         value={sec.status}
                         onChange={(e) => handleSectionStatusChange(sec.id, e.target.value)}
                       >
@@ -531,39 +531,39 @@ export const StudentResearchWorkspace = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
                     Research Tasks ({tasks.length})
                   </h3>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center rounded-lg bg-gray-100 dark:bg-slate-800 p-0.5 text-xs">
+                  <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#1c1d28] p-0.5 text-xs border border-transparent dark:border-[#222433]">
                     <button
-                      className={`px-2 py-1 rounded-md font-semibold ${
+                      className={`px-2 py-1 rounded-md font-semibold transition-all ${
                         taskFilter === 'all'
-                          ? 'bg-white dark:bg-slate-700 text-primary shadow-xs'
-                          : 'text-gray-500'
+                          ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
+                          : 'text-gray-500 dark:text-[#9396a8]'
                       }`}
                       onClick={() => setTaskFilter('all')}
                     >
                       All
                     </button>
                     <button
-                      className={`px-2 py-1 rounded-md font-semibold ${
+                      className={`px-2 py-1 rounded-md font-semibold transition-all ${
                         taskFilter === 'active'
-                          ? 'bg-white dark:bg-slate-700 text-primary shadow-xs'
-                          : 'text-gray-500'
+                          ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
+                          : 'text-gray-500 dark:text-[#9396a8]'
                       }`}
                       onClick={() => setTaskFilter('active')}
                     >
                       Active
                     </button>
                     <button
-                      className={`px-2 py-1 rounded-md font-semibold ${
+                      className={`px-2 py-1 rounded-md font-semibold transition-all ${
                         taskFilter === 'completed'
-                          ? 'bg-white dark:bg-slate-700 text-primary shadow-xs'
-                          : 'text-gray-500'
+                          ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
+                          : 'text-gray-500 dark:text-[#9396a8]'
                       }`}
                       onClick={() => setTaskFilter('completed')}
                     >

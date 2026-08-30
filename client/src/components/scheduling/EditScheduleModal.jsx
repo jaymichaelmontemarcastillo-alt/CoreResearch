@@ -176,87 +176,87 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#222433] flex justify-between items-center bg-gray-50/50 dark:bg-[#15161e]">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <HiCalendar className="w-5 h-5 text-blue-500" />
             {schedule ? 'Edit Schedule & Panel' : 'Set Schedule & Panel'}
           </h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 text-gray-400 dark:text-[#9396a8] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1c1d28] rounded-full transition-colors">
             <HiXMark className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white border-b pb-2">Time & Venue</h3>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#222433] pb-2">Time & Venue</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Date</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Date</label>
                 <Input type="date" name="date" value={formData.date} onChange={handleChange} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Venue</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Venue</label>
                 <Input name="venue" value={formData.venue} onChange={handleChange} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Time</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Start Time</label>
                 <Input type="time" name="startTime" value={formData.startTime} onChange={handleChange} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Time</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">End Time</label>
                 <Input type="time" name="endTime" value={formData.endTime} onChange={handleChange} />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white border-b pb-2">Panel & Adviser</h3>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#222433] pb-2">Panel & Adviser</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Adviser</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Adviser</label>
                 <select 
                   name="adviserId" 
                   value={formData.adviserId} 
                   onChange={handleChange}
-                  className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Adviser...</option>
                   {advisers.map(a => <option key={a.uid} value={a.uid}>{a.fullName}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Subject Specialist</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Subject Specialist</label>
                 <select 
                   name="subjectSpecialistId" 
                   value={formData.subjectSpecialistId} 
                   onChange={handleChange}
-                  className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Panelist...</option>
                   {panelists.map(p => <option key={p.uid} value={p.uid}>{p.fullName}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Statistician</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Statistician</label>
                 <select 
                   name="statId" 
                   value={formData.statId} 
                   onChange={handleChange}
-                  className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Panelist...</option>
                   {panelists.map(p => <option key={p.uid} value={p.uid}>{p.fullName}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Technical</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Technical</label>
                 <select 
                   name="techId" 
                   value={formData.techId} 
                   onChange={handleChange}
-                  className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Panelist...</option>
                   {panelists.map(p => <option key={p.uid} value={p.uid}>{p.fullName}</option>)}
@@ -266,7 +266,7 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 flex justify-end gap-3">
+        <div className="p-4 border-t border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#15161e] flex justify-end gap-3">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} disabled={loading} className="min-w-[120px]">
             {loading ? "Saving..." : "Save Changes"}

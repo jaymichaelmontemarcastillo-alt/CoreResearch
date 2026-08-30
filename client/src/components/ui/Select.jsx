@@ -32,8 +32,8 @@ export const Select = ({
         )}
         <select
           id={selectId}
-          className={`w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100
-                     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary 
+          className={`w-full bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8]
+                     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500
                      transition-all duration-200 rounded-lg text-sm py-2.5 pr-10 appearance-none ${Icon ? "pl-10" : "pl-3.5"} ${
                        error
                          ? "border-red-300 dark:border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
@@ -43,7 +43,7 @@ export const Select = ({
         >
           {children}
         </select>
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 dark:text-[#6b6f84]">
           <HiChevronDown className="w-4 h-4" />
         </div>
       </div>

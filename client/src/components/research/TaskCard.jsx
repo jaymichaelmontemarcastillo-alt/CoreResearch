@@ -65,21 +65,21 @@ export const TaskCard = ({
   };
 
   return (
-    <Card className="p-4 space-y-3 transition-all hover:border-gray-300 dark:hover:border-slate-700">
+    <Card className="p-4 space-y-3 transition-all bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] hover:border-gray-300 dark:hover:border-[#333649]">
       {/* Header Badges */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
           <Badge variant={priorityCfg.variant}>{priorityCfg.label}</Badge>
           {isOverdue && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-transparent dark:border-rose-500/20">
               Overdue
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-          <Calendar className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-[#9396a8]">
+          <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
           <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No date'}</span>
         </div>
       </div>
@@ -90,7 +90,7 @@ export const TaskCard = ({
           {task.title}
         </h4>
         {task.description && (
-          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
+          <p className="text-xs text-gray-600 dark:text-[#9396a8] leading-relaxed whitespace-pre-line">
             {task.description}
           </p>
         )}
@@ -98,19 +98,19 @@ export const TaskCard = ({
 
       {/* Student Submission Note (if any) */}
       {task.submissionNote && (
-        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-slate-800/80 border border-gray-100 dark:border-slate-800 text-xs">
-          <span className="font-semibold text-gray-700 dark:text-gray-300 block mb-0.5">
+        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433] text-xs">
+          <span className="font-semibold text-gray-700 dark:text-[#9396a8] block mb-0.5">
             Student Submission Note:
           </span>
-          <p className="text-gray-600 dark:text-gray-400 italic">
+          <p className="text-gray-600 dark:text-[#f3f4f8] italic">
             "{task.submissionNote}"
           </p>
         </div>
       )}
 
       {/* Action Footer */}
-      <div className="pt-2 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-[11px] text-gray-400 dark:text-gray-500">
+      <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-[11px] text-gray-400 dark:text-[#6b6f84]">
           {task.adviserName && <span>Assigned by {task.adviserName}</span>}
         </div>
 
@@ -165,7 +165,7 @@ export const TaskCard = ({
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                 onClick={() => onDelete?.(task.id)}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -177,17 +177,17 @@ export const TaskCard = ({
 
       {/* Submission Modal for Student */}
       {showSubmitModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-base font-medium text-gray-900 dark:text-white">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-gray-900 dark:text-white">
               Submit Task: {task.title}
             </h3>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-[#9396a8]">
               Provide an optional note or summary of your completed work for your adviser to review.
             </p>
 
             <textarea
-              className="w-full text-xs p-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:outline-none min-h-[100px]"
+              className="w-full text-xs p-3 rounded-xl border border-gray-200 dark:border-[#222433] bg-gray-50 dark:bg-[#0e0f15] text-gray-900 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none min-h-[100px] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84]"
               placeholder="e.g. Updated Chapter 1 background with 5 new 2024–2026 citations as discussed."
               value={submissionNote}
               onChange={(e) => setSubmissionNote(e.target.value)}

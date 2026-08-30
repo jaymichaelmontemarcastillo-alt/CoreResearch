@@ -103,16 +103,16 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
         {step === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white border-b pb-2">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#222433] pb-2">
                 Basic Details
               </h3>
               
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Defense Type</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Defense Type</label>
                 <select
                   value={config.defenseType}
                   onChange={(e) => handleConfigChange('defenseType', e.target.value)}
-                  className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl px-3 text-sm text-gray-700 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="proposal_defense">Proposal Defense</option>
                   <option value="final_defense">Final Defense</option>
@@ -120,7 +120,7 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Date</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Date</label>
                 <Input
                   type="date"
                   value={config.date}
@@ -129,7 +129,7 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Venue</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Venue</label>
                 <Input
                   icon={HiMapPin}
                   placeholder="e.g. LSPU Research Defense Room"
@@ -139,12 +139,12 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Duration Per Group</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Duration Per Group</label>
                 <div className="flex gap-2 items-center">
                   <select
                     value={config.durationMinutes}
                     onChange={(e) => handleConfigChange('durationMinutes', e.target.value === 'custom' ? 'custom' : Number(e.target.value))}
-                    className="flex-1 h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl px-3 text-sm text-gray-700 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                   >
                     <option value={30}>30 minutes</option>
                     <option value={45}>45 minutes</option>
@@ -168,34 +168,34 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white border-b pb-2">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#222433] pb-2">
                 Operating Hours
               </h3>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-[#9396a8]">
                 The scheduling engine will allocate time slots starting from the start time, skipping the break period.
               </p>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Time</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Start Time</label>
                   <Input type="time" value={config.startTime} onChange={(e) => handleConfigChange('startTime', e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Time</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">End Time</label>
                   <Input type="time" value={config.endTime} onChange={(e) => handleConfigChange('endTime', e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Break Start</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Break Start</label>
                   <Input type="time" value={config.breakStart} onChange={(e) => handleConfigChange('breakStart', e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Break End</label>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase mb-1">Break End</label>
                   <Input type="time" value={config.breakEnd} onChange={(e) => handleConfigChange('breakEnd', e.target.value)} />
                 </div>
               </div>
               
-              <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-                 <p className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="pt-4 border-t border-gray-100 dark:border-[#222433]">
+                 <p className="text-sm text-gray-600 dark:text-[#9396a8]">
                    You are about to schedule <strong className="text-blue-600 dark:text-blue-400">{groups.length}</strong> research group(s).
                  </p>
               </div>
@@ -206,7 +206,7 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
         {step === 2 && (
           <div className="space-y-6">
             {previewData.errors && previewData.errors.length > 0 && (
-              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+              <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-xl border border-orange-200 dark:border-orange-800/40">
                 <h4 className="font-semibold text-orange-800 dark:text-orange-400 text-sm mb-2">Scheduling Conflicts Found</h4>
                 <ul className="list-disc pl-5 text-sm text-orange-700 dark:text-orange-300 space-y-1">
                   {previewData.errors.map((err, i) => (
@@ -218,11 +218,11 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">
-                  <HiMapPin className="inline w-4 h-4 mr-1" /> {config.venue}
+                <p className="text-sm font-medium text-gray-500 dark:text-[#9396a8]">
+                  <HiMapPin className="inline w-4 h-4 mr-1 text-blue-500" /> {config.venue}
                 </p>
-                <p className="text-sm font-medium text-gray-500 mt-1">
-                  <HiCalendar className="inline w-4 h-4 mr-1" /> {new Date(config.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                <p className="text-sm font-medium text-gray-500 dark:text-[#9396a8] mt-1">
+                  <HiCalendar className="inline w-4 h-4 mr-1 text-blue-500" /> {new Date(config.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
               </div>
               <Badge variant="blue">{previewData.proposedSchedules.length} Schedules Generated</Badge>
@@ -232,33 +232,33 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
               {previewData.proposedSchedules.map((schedule, i) => {
                 const originalGroup = groups.find(g => g.id === schedule.projectId);
                 return (
-                <div key={i} className="p-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col md:flex-row gap-4">
-                  <div className="flex-shrink-0 w-32 border-r border-gray-100 dark:border-slate-800 flex flex-col justify-center">
+                <div key={i} className="p-4 rounded-xl border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#1c1d28] shadow-sm flex flex-col md:flex-row gap-4">
+                  <div className="flex-shrink-0 w-32 border-r border-gray-100 dark:border-[#222433] flex flex-col justify-center">
                     <span className="text-lg font-bold text-gray-900 dark:text-white">{schedule.startTime}</span>
-                    <span className="text-xs text-gray-400">to {schedule.endTime}</span>
+                    <span className="text-xs text-gray-400 dark:text-[#6b6f84]">to {schedule.endTime}</span>
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900 dark:text-white">{schedule.projectTitle}</h4>
                     {originalGroup?.members?.length > 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      <p className="text-sm text-gray-500 dark:text-[#9396a8] mt-0.5">
                         {originalGroup.members.map(m => m.fullName).join(', ')}
                       </p>
                     )}
                     
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Adviser</p>
-                        <p className="text-gray-700 dark:text-gray-300">{schedule.adviserName || 'None'}</p>
+                        <p className="text-xs text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider font-semibold mb-1">Adviser</p>
+                        <p className="text-gray-700 dark:text-[#f3f4f8]">{schedule.adviserName || 'None'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Panelists</p>
+                        <p className="text-xs text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider font-semibold mb-1">Panelists</p>
                         <div className="space-y-0.5">
                           {schedule.panelists.length === 0 ? (
-                            <p className="text-gray-500 italic">No panelists assigned</p>
+                            <p className="text-gray-500 dark:text-[#6b6f84] italic">No panelists assigned</p>
                           ) : (
                             schedule.panelists.map((p, idx) => (
-                              <p key={idx} className="text-gray-700 dark:text-gray-300 flex items-center">
-                                <span className="text-xs bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2 uppercase text-gray-500">{p.role}</span>
+                              <p key={idx} className="text-gray-700 dark:text-[#f3f4f8] flex items-center">
+                                <span className="text-xs bg-gray-100 dark:bg-[#15161e] border border-transparent dark:border-[#222433] px-1.5 py-0.5 rounded mr-2 uppercase text-gray-500 dark:text-[#9396a8]">{p.role}</span>
                                 {p.name}
                               </p>
                             ))
@@ -276,7 +276,7 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
         )}
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-800">
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-[#222433]">
           {step === 1 ? (
             <>
               <Button variant="outline" onClick={() => { resetModal(); onClose(); }}>Cancel</Button>

@@ -116,28 +116,25 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
 
   return (
     <header
-      className={`sticky top-0 z-30 h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between shrink-0 transition-all duration-200 ${
-        sidebarCollapsed ? "lg:pl-24" : "lg:pl-72"
+      className={`sticky top-0 z-30 h-16 bg-white dark:bg-[#111218] border-b border-gray-200 dark:border-[#222433] px-8 sm:px-12 lg:px-16 flex items-center justify-between shrink-0 transition-all duration-200 ${
+        sidebarCollapsed ? "lg:ml-20" : "lg:ml-64"
       }`}
     >
-      {/* LEFT SECTION — Page Title */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* LEFT SECTION — Mobile Menu + Left-Aligned Search Bar */}
+      <div className="flex items-center gap-3 flex-1 max-w-md">
         <button
           onClick={onOpenMobileMenu}
-          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition"
+          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-600 dark:text-[#9396a8] transition shrink-0"
         >
           <HiBars3 className="w-6 h-6" />
         </button>
-      </div>
 
-      {/* CENTER SECTION — Centered Search Bar */}
-      <div className="hidden sm:flex flex-1 max-w-sm mx-6">
-        <div className="relative w-full">
-          <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+        <div className="relative w-full max-w-sm">
+          <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
           <input
             type="text"
-            placeholder="Search..."
-            className="w-full h-10 bg-gray-50/70 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700/80 rounded-xl text-sm pl-10 pr-3.5 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            placeholder="Type here to start searching..."
+            className="w-full h-10 bg-gray-50/70 dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm pl-10 pr-3.5 text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 transition-all"
           />
         </div>
       </div>
@@ -147,7 +144,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
         {/* 1. Theme Toggle */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 transition"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-500 dark:text-[#9396a8] transition"
           title={theme === "dark" ? "Light Mode" : "Dark Mode"}
         >
           {theme === "dark" ? (
@@ -164,7 +161,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
               setNotificationDropdownOpen(!notificationDropdownOpen);
               setProfileDropdownOpen(false);
             }}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 relative transition"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-500 dark:text-[#9396a8] relative transition"
           >
             <HiBell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -173,8 +170,8 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
           </button>
 
           {notificationDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
-              <div className="p-3 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-800/30">
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+              <div className="p-3 border-b border-gray-100 dark:border-[#222433] flex items-center justify-between bg-gray-50/50 dark:bg-[#111218]">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">Notifications</h3>
                 {unreadCount > 0 && (
                   <button 
@@ -193,7 +190,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                   <div className="p-8 text-center text-xs text-gray-500">Loading...</div>
                 ) : notifications.length === 0 ? (
                   <div className="p-8 text-center text-xs text-gray-500 flex flex-col items-center gap-2">
-                    <HiBell className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                    <HiBell className="w-8 h-8 text-gray-300 dark:text-[#4c5064]" />
                     <span>No notifications yet.</span>
                   </div>
                 ) : (
@@ -204,19 +201,19 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                         onClick={() => handleNotificationClick(notif)}
                         className={`p-3 rounded-xl cursor-pointer transition-colors flex gap-3 items-start ${
                           notif.read 
-                            ? 'hover:bg-gray-50 dark:hover:bg-slate-800/50' 
-                            : 'bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                            ? 'hover:bg-gray-50 dark:hover:bg-[#1c1d28]/60' 
+                            : 'bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30'
                         }`}
                       >
                         <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${notif.read ? 'bg-transparent' : 'bg-blue-500'}`} />
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm ${notif.read ? 'text-gray-900 dark:text-gray-200' : 'font-semibold text-gray-900 dark:text-white'}`}>
+                          <p className={`text-sm ${notif.read ? 'text-gray-900 dark:text-[#9396a8]' : 'font-semibold text-gray-900 dark:text-white'}`}>
                             {notif.title}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                          <p className="text-xs text-gray-500 dark:text-[#6b6f84] mt-0.5 line-clamp-2">
                             {notif.message}
                           </p>
-                          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">
+                          <p className="text-[10px] text-gray-400 dark:text-[#4c5064] mt-1.5">
                             {new Date(notif.createdAt).toLocaleString(undefined, { 
                               month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
                             })}
@@ -232,13 +229,13 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
         </div>
 
         {/* 3. Vertical Divider */}
-        <div className="h-5 w-px bg-gray-200 dark:bg-slate-800 mx-0.5" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-[#222433] mx-0.5" />
 
         {/* 4. User Profile Dropdown Pill */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-            className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 group"
+            className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1a1b26] transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 group"
             title="Account & Profile Settings"
           >
             <Avatar name={displayName} src={avatarSrc} size="sm" color="blue" />
@@ -250,21 +247,21 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
 
           {/* Profile Dropdown Menu */}
           {profileDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-2 animate-scale-in">
+            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl z-50 p-2 animate-scale-in">
               {/* User Header Summary */}
-              <div className="p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl mb-1">
+              <div className="p-3 bg-gray-50 dark:bg-[#1c1d28] border border-transparent dark:border-[#222433] rounded-xl mb-1">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                   {displayName}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] truncate mt-0.5">
                   {userProfile?.email || currentUser?.email || "user@university.edu"}
                 </p>
                 <div className="mt-2 flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-transparent dark:border-blue-500/30">
                     {roleLabel}
                   </span>
                   {userProfile?.department && (
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
+                    <span className="text-[11px] text-gray-400 dark:text-[#6b6f84] truncate max-w-[120px]">
                       • {userProfile.department}
                     </span>
                   )}
@@ -278,7 +275,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                     setProfileDropdownOpen(false);
                     navigate("/profile?tab=profile");
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-[#9396a8] hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
                 >
                   <HiUserCircle className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
                   <span>Profile Settings</span>
@@ -289,7 +286,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                     setProfileDropdownOpen(false);
                     navigate("/profile?tab=password");
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-[#9396a8] hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition text-left"
                 >
                   <HiLockClosed className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
                   <span>Password & Security</span>
@@ -297,11 +294,11 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
               </div>
 
               {/* Divider & Logout */}
-              <div className="my-1.5 border-t border-gray-100 dark:border-slate-800" />
+              <div className="my-1.5 border-t border-gray-100 dark:border-[#222433]" />
 
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition text-left"
               >
                 <HiArrowRightOnRectangle className="w-4 h-4" />
                 <span>Log out</span>

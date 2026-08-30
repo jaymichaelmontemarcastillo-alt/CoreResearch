@@ -12,7 +12,7 @@ export const Layout = () => {
   const isDocumentEditor = location.pathname.startsWith('/documents/') && location.pathname.length > 11;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c10] flex flex-col">
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -28,11 +28,11 @@ export const Layout = () => {
       <main
         className={`flex-1 transition-all duration-200 ${
           sidebarCollapsed 
-            ? (isDocumentEditor ? "lg:pl-20" : "lg:pl-24") 
-            : (isDocumentEditor ? "lg:pl-64" : "lg:pl-72")
-        } ${isDocumentEditor ? "p-0" : "p-4 sm:p-6 lg:p-8"}`}
+            ? (isDocumentEditor ? "lg:ml-20" : "lg:ml-20") 
+            : (isDocumentEditor ? "lg:ml-64" : "lg:ml-64")
+        } ${isDocumentEditor ? "p-0" : "px-8 py-6 sm:px-12 sm:py-8 lg:px-16 lg:py-8"}`}
       >
-        <div className={isDocumentEditor ? "w-full h-full" : "max-w-7xl mx-auto"}>
+        <div className={isDocumentEditor ? "w-full h-full" : "w-full"}>
           <Outlet />
         </div>
       </main>

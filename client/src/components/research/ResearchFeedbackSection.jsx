@@ -65,15 +65,15 @@ export const ResearchFeedbackSection = ({
 
       {/* Advisory Composer (Advisers / Coordinators / Panelists) */}
       {(isAdviser || userProfile?.role === 'research_coordinator' || userProfile?.role === 'admin') && (
-        <Card className="p-4 bg-gray-50/70 dark:bg-slate-800/50 border-dashed space-y-3">
+        <Card className="p-4 bg-gray-50/70 dark:bg-[#15161e] border-dashed border-gray-200 dark:border-[#222433] space-y-3">
           <form onSubmit={handleCreateFeedback} className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-primary" /> Provide Research Guidance / Feedback
+              <span className="text-xs font-bold text-gray-700 dark:text-[#9396a8] flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-blue-500" /> Provide Research Guidance / Feedback
               </span>
 
               <select
-                className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300"
+                className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-700 dark:text-[#f3f4f8]"
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
               >
@@ -87,7 +87,7 @@ export const ResearchFeedbackSection = ({
             </div>
 
             <textarea
-              className="w-full text-xs p-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:outline-none min-h-[80px]"
+              className="w-full text-xs p-3 rounded-xl border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-900 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none min-h-[80px] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84]"
               placeholder="Write concrete observations, requested revisions, or methodological suggestions for the research group..."
               value={comment}
               onChange={(e) => setComment(e.target.value)}
@@ -111,7 +111,7 @@ export const ResearchFeedbackSection = ({
 
       {/* Feedback Feed */}
       {feedbackList.length === 0 ? (
-        <div className="p-6 text-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl text-xs text-gray-400 dark:text-gray-500">
+        <div className="p-6 text-center border-2 border-dashed border-gray-200 dark:border-[#222433] rounded-xl text-xs text-gray-400 dark:text-[#6b6f84]">
           No advisory feedback recorded yet. Feedback from your adviser and panel will appear here.
         </div>
       ) : (
@@ -123,15 +123,15 @@ export const ResearchFeedbackSection = ({
             return (
               <Card
                 key={fb.id}
-                className={`p-4 space-y-3 transition-all ${
+                className={`p-4 space-y-3 transition-all border ${
                   isResolved
-                    ? 'opacity-60 bg-gray-50/50 dark:bg-slate-900/30'
-                    : 'border-l-4 border-l-primary'
+                    ? 'opacity-60 bg-gray-50/50 dark:bg-[#15161e]/50 border-gray-200 dark:border-[#222433]'
+                    : 'bg-white dark:bg-[#15161e] border-l-4 border-l-blue-600 border-gray-200/90 dark:border-[#222433]'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold shrink-0">
                       {fb.authorName?.charAt(0).toUpperCase() || 'A'}
                     </div>
                     <div>
@@ -143,7 +143,7 @@ export const ResearchFeedbackSection = ({
                           {fb.authorRole?.toUpperCase() || 'ADVISER'}
                         </Badge>
                       </div>
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-gray-400 dark:text-[#6b6f84]">
                         {new Date(fb.createdAt).toLocaleDateString()} at{' '}
                         {new Date(fb.createdAt).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -170,15 +170,15 @@ export const ResearchFeedbackSection = ({
                   </Badge>
                 </div>
 
-                <div className="p-3 rounded-xl bg-gray-50 dark:bg-slate-800/70 border border-gray-100 dark:border-slate-800 text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-line">
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433] text-xs text-gray-800 dark:text-[#f3f4f8] leading-relaxed whitespace-pre-line">
                   {fb.comment}
                 </div>
 
                 {/* Footer Controls */}
-                <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-slate-800 text-xs">
+                <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-[#222433] text-xs">
                   {fb.sectionId && (
-                    <span className="text-[11px] text-gray-400">
-                      Attached to: <strong className="capitalize">{fb.sectionId.replace('_', ' ')}</strong>
+                    <span className="text-[11px] text-gray-400 dark:text-[#6b6f84]">
+                      Attached to: <strong className="capitalize text-gray-700 dark:text-gray-300">{fb.sectionId.replace('_', ' ')}</strong>
                     </span>
                   )}
 

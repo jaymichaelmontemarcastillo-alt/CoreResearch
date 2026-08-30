@@ -403,13 +403,13 @@ export const ProfileSettings = () => {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar Tabs */}
         <div className="md:col-span-4 lg:col-span-3">
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-2 shadow-sm space-y-1">
+          <div className="bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl p-2 shadow-sm space-y-1">
             {/* Tab: Profile Settings */}
             <button
               onClick={() => handleTabChange("profile")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "profile"
-                  ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
+                  ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
                 }`}
             >
               <div className="flex items-center gap-3">
@@ -425,8 +425,8 @@ export const ProfileSettings = () => {
             <button
               onClick={() => handleTabChange("password")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "password"
-                  ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
+                  ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
                 }`}
             >
               <div className="flex items-center gap-3">
@@ -442,8 +442,8 @@ export const ProfileSettings = () => {
             <button
               onClick={() => handleTabChange("notifications")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "notifications"
-                  ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
+                  ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
                 }`}
             >
               <div className="flex items-center gap-3">
@@ -459,8 +459,8 @@ export const ProfileSettings = () => {
             <button
               onClick={() => handleTabChange("verification")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "verification"
-                  ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
+                  ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
                 }`}
             >
               <div className="flex items-center gap-3">
@@ -477,8 +477,8 @@ export const ProfileSettings = () => {
               <button
                 onClick={() => handleTabChange("expertise")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "expertise"
-                    ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white"
+                    ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                    : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
                   }`}
               >
                 <div className="flex items-center gap-3">
@@ -493,22 +493,22 @@ export const ProfileSettings = () => {
           </div>
 
           {/* Institutional Badge Card */}
-          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-slate-800/70 dark:to-slate-800/30 border border-blue-100/80 dark:border-slate-700/60">
+          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-[#1c1d28] dark:to-[#15161e] border border-blue-100/80 dark:border-[#222433]">
             <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-semibold text-xs uppercase tracking-wider">
               <HiSparkles className="w-3.5 h-3.5" />
               Institutional Account
             </div>
-            <p className="text-xs text-gray-600 dark:text-gray-300 mt-1.5 font-medium">
+            <p className="text-xs text-gray-700 dark:text-[#f3f4f8] mt-1.5 font-semibold">
               {roleLabel}
             </p>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+            <p className="text-[11px] text-gray-500 dark:text-[#9396a8] mt-0.5 truncate">
               {email}
             </p>
           </div>
         </div>
 
         {/* Right Column: Main Form Card */}
-        <div className="md:col-span-8 lg:col-span-9 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm">
+        <div className="md:col-span-8 lg:col-span-9 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl p-6 sm:p-8 shadow-sm">
           {/* TAB 1: PROFILE SETTINGS */}
           {activeTab === "profile" && (
             <form onSubmit={handleSaveProfile} className="space-y-8">
@@ -530,10 +530,10 @@ export const ProfileSettings = () => {
               )}
 
               {/* Avatar Upload Section (Matches Reference Image) */}
-              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-6 pb-6 border-b border-gray-100 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-6 pb-6 border-b border-gray-100 dark:border-[#222433]">
                 {/* Circular Avatar with Camera Badge */}
                 <div className="relative group shrink-0">
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full ring-4 ring-gray-100 dark:ring-slate-800 overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-inner">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full ring-4 ring-gray-100 dark:ring-[#222433] overflow-hidden bg-gray-100 dark:bg-[#1c1d28] flex items-center justify-center shadow-inner">
                     {avatarPreview ? (
                       <img
                         src={avatarPreview}
@@ -551,7 +551,7 @@ export const ProfileSettings = () => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white dark:border-slate-900 transition transform hover:scale-105"
+                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white dark:border-[#15161e] transition transform hover:scale-105"
                     title="Change picture"
                   >
                     <HiCamera className="w-4 h-4" />
@@ -583,13 +583,13 @@ export const ProfileSettings = () => {
                       type="button"
                       onClick={handleDeleteAvatar}
                       disabled={!avatarPreview}
-                      className="px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 font-medium text-sm rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 bg-gray-100 dark:bg-[#1c1d28] hover:bg-gray-200 dark:hover:bg-[#252839] border border-transparent dark:border-[#222433] text-gray-700 dark:text-[#9396a8] font-medium text-sm rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      <HiTrash className="w-4 h-4 text-gray-500" />
+                      <HiTrash className="w-4 h-4 text-gray-500 dark:text-[#6b6f84]" />
                       Delete avatar
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8]">
                     JPG, PNG, or WebP. Choose a picture to pan and zoom before applying.
                   </p>
                 </div>
@@ -600,7 +600,7 @@ export const ProfileSettings = () => {
                 {/* Row 1: First Name & Last Name */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                       First Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -609,12 +609,12 @@ export const ProfileSettings = () => {
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
-                      className="w-full h-11 px-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className="w-full h-11 px-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                       Last Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -623,7 +623,7 @@ export const ProfileSettings = () => {
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
-                      className="w-full h-11 px-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className="w-full h-11 px-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                   </div>
                 </div>
@@ -631,36 +631,36 @@ export const ProfileSettings = () => {
                 {/* Row 2: Email & Student/Employee ID */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                       Email
                     </label>
                     <div className="relative">
-                      <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                      <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                       <input
                         type="email"
                         value={email}
                         readOnly
                         disabled
-                        className="w-full h-11 pl-10 pr-4 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                        className="w-full h-11 pl-10 pr-4 bg-gray-50 dark:bg-[#1c1d28]/70 border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-500 dark:text-[#6b6f84] cursor-not-allowed"
                       />
                     </div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                    <p className="text-[11px] text-gray-400 dark:text-[#6b6f84]">
                       Institutional email is managed by your university directory.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                       {userProfile?.role === "student" ? "Student ID Number" : "Employee ID Number"}
                     </label>
                     <div className="relative">
-                      <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                      <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                       <input
                         type="text"
                         placeholder="e.g. 2022-10482 or ADM-0001"
                         value={studentIdOrEmployeeId}
                         onChange={(e) => setStudentIdOrEmployeeId(e.target.value)}
-                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                       />
                     </div>
                   </div>
@@ -669,15 +669,15 @@ export const ProfileSettings = () => {
                 {/* Row 3: College & Department */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                       College
                     </label>
                     <div className="relative">
-                      <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                      <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
                       <select
                         value={college}
                         onChange={handleCollegeChange}
-                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition appearance-none cursor-pointer"
+                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition appearance-none cursor-pointer"
                       >
                         {Object.keys(COLLEGES_DATA).map((col) => (
                           <option key={col} value={col}>
@@ -689,15 +689,15 @@ export const ProfileSettings = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                       Department
                     </label>
                     <div className="relative">
-                      <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                      <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
                       <select
                         value={department}
                         onChange={(e) => setDepartment(e.target.value)}
-                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition appearance-none cursor-pointer"
+                        className="w-full h-11 pl-10 pr-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition appearance-none cursor-pointer"
                       >
                         {(COLLEGES_DATA[college] || [
                           "Department of Computer Science",
@@ -714,10 +714,8 @@ export const ProfileSettings = () => {
                 </div>
               </div>
 
-
-
               {/* Bottom Action Footer */}
-              <div className="pt-6 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-3">
+              <div className="pt-6 border-t border-gray-100 dark:border-[#222433] flex items-center justify-end gap-3">
                 <button
                   type="submit"
                   disabled={profileSaving}
@@ -762,11 +760,11 @@ export const ProfileSettings = () => {
           {activeTab === "password" && (
             <form onSubmit={handleUpdatePassword} className="space-y-6">
               {/* Section Header */}
-              <div className="pb-4 border-b border-gray-100 dark:border-slate-800">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
                   Change Password
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
                   Ensure your account is using a strong, unique password with at least 6 characters.
                 </p>
               </div>
@@ -792,23 +790,23 @@ export const ProfileSettings = () => {
               <div className="max-w-xl space-y-5">
                 {/* Current Password */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                     Current Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <HiKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <HiKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                     <input
                       type={showCurrentPassword ? "text" : "password"}
                       placeholder="Enter your current password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       required
-                      className="w-full h-11 pl-10 pr-11 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className="w-full h-11 pl-10 pr-11 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-[#6b6f84] dark:hover:text-[#9396a8] transition"
                     >
                       {showCurrentPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
                     </button>
@@ -817,23 +815,23 @@ export const ProfileSettings = () => {
 
                 {/* New Password */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                     New Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                     <input
                       type={showNewPassword ? "text" : "password"}
                       placeholder="Enter new password (min 6 chars)"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
-                      className="w-full h-11 pl-10 pr-11 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className="w-full h-11 pl-10 pr-11 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-[#6b6f84] dark:hover:text-[#9396a8] transition"
                     >
                       {showNewPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
                     </button>
@@ -842,23 +840,23 @@ export const ProfileSettings = () => {
 
                 {/* Confirm New Password */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
                     Confirm New password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                    <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                     <input
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder="Re-enter new password"
                       value={confirmNewPassword}
                       onChange={(e) => setConfirmNewPassword(e.target.value)}
                       required
-                      className="w-full h-11 pl-10 pr-11 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className="w-full h-11 pl-10 pr-11 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-[#6b6f84] dark:hover:text-[#9396a8] transition"
                     >
                       {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
                     </button>
@@ -866,12 +864,12 @@ export const ProfileSettings = () => {
                 </div>
 
                 {/* Real-time Checklist */}
-                <div className="p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl space-y-2 text-xs">
+                <div className="p-3.5 bg-gray-50 dark:bg-[#1c1d28]/70 border border-gray-100 dark:border-[#222433] rounded-xl space-y-2 text-xs">
                   <div className="flex items-center gap-2">
                     <div
                       className={`w-4 h-4 rounded-full flex items-center justify-center ${newPassword.length >= 6
                           ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
-                          : "bg-gray-200 text-gray-400 dark:bg-slate-700 dark:text-gray-500"
+                          : "bg-gray-200 text-gray-400 dark:bg-[#0e0f15] dark:text-[#6b6f84]"
                         }`}
                     >
                       <HiCheck className="w-3 h-3" />
@@ -880,7 +878,7 @@ export const ProfileSettings = () => {
                       className={
                         newPassword.length >= 6
                           ? "text-emerald-700 dark:text-emerald-400 font-medium"
-                          : "text-gray-500 dark:text-gray-400"
+                          : "text-gray-500 dark:text-[#9396a8]"
                       }
                     >
                       At least 6 characters long
@@ -891,7 +889,7 @@ export const ProfileSettings = () => {
                     <div
                       className={`w-4 h-4 rounded-full flex items-center justify-center ${newPassword && confirmNewPassword && newPassword === confirmNewPassword
                           ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
-                          : "bg-gray-200 text-gray-400 dark:bg-slate-700 dark:text-gray-500"
+                          : "bg-gray-200 text-gray-400 dark:bg-[#0e0f15] dark:text-[#6b6f84]"
                         }`}
                     >
                       <HiCheck className="w-3 h-3" />
@@ -900,7 +898,7 @@ export const ProfileSettings = () => {
                       className={
                         newPassword && confirmNewPassword && newPassword === confirmNewPassword
                           ? "text-emerald-700 dark:text-emerald-400 font-medium"
-                          : "text-gray-500 dark:text-gray-400"
+                          : "text-gray-500 dark:text-[#9396a8]"
                       }
                     >
                       Passwords match
@@ -910,7 +908,7 @@ export const ProfileSettings = () => {
               </div>
 
               {/* Bottom Action Footer */}
-              <div className="pt-6 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-3">
+              <div className="pt-6 border-t border-gray-100 dark:border-[#222433] flex items-center justify-end gap-3">
                 <button
                   type="submit"
                   disabled={passwordSaving}
@@ -954,11 +952,11 @@ export const ProfileSettings = () => {
           {/* TAB 3: NOTIFICATIONS SETTINGS */}
           {activeTab === "notifications" && (
             <div className="space-y-6">
-              <div className="pb-4 border-b border-gray-100 dark:border-slate-800">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
                   Notification Preferences
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
                   Choose which alerts and email updates you want to receive.
                 </p>
               </div>
@@ -971,12 +969,12 @@ export const ProfileSettings = () => {
               )}
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/50 transition">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                       Manuscript & Proposal Updates
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
                       Receive notifications when titles or chapters are approved or revised.
                     </p>
                   </div>
@@ -992,12 +990,12 @@ export const ProfileSettings = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/50 transition">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                       Defense Schedule Reminders
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
                       Get automated reminders 24 hours and 1 hour before scheduled defenses.
                     </p>
                   </div>
@@ -1013,12 +1011,12 @@ export const ProfileSettings = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/50 transition">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                       Adviser & Panel Annotations
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
                       Alerts when comments and inline annotations are added to your document.
                     </p>
                   </div>
@@ -1034,12 +1032,12 @@ export const ProfileSettings = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/50 transition">
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                       Institutional Announcements
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
                       Research ethics guidelines, deadline announcements, and repository digests.
                     </p>
                   </div>
@@ -1061,16 +1059,16 @@ export const ProfileSettings = () => {
           {/* TAB 4: VERIFICATION SETTINGS */}
           {activeTab === "verification" && (
             <div className="space-y-6">
-              <div className="pb-4 border-b border-gray-100 dark:border-slate-800">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
                   Institutional Verification
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
                   View and confirm your institution membership and verification credentials.
                 </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/60 dark:from-slate-800/80 dark:via-slate-900 dark:to-slate-800/40 border border-blue-100 dark:border-slate-700 space-y-5">
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/60 dark:from-[#1c1d28] dark:via-[#15161e] dark:to-[#1c1d28] border border-blue-100 dark:border-[#222433] space-y-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
@@ -1083,30 +1081,30 @@ export const ProfileSettings = () => {
                           Active & Verified
                         </span>
                       </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
                         University Academic Directory
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200/60 dark:border-slate-700/60 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200/60 dark:border-[#222433] text-xs">
                   <div>
-                    <span className="text-gray-400 dark:text-gray-500 block">Assigned Role</span>
+                    <span className="text-gray-400 dark:text-[#6b6f84] block">Assigned Role</span>
                     <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block">
                       {roleLabel}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-gray-400 dark:text-gray-500 block">Department</span>
+                    <span className="text-gray-400 dark:text-[#6b6f84] block">Department</span>
                     <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block truncate">
                       {department}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-gray-400 dark:text-gray-500 block">ID Reference</span>
+                    <span className="text-gray-400 dark:text-[#6b6f84] block">ID Reference</span>
                     <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block">
                       {studentIdOrEmployeeId || "Verified by SSO"}
                     </span>
@@ -1136,12 +1134,12 @@ export const ProfileSettings = () => {
                 </div>
               )}
 
-              <div className="pb-4 border-b border-gray-100 dark:border-slate-800">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <HiSparkles className="w-5 h-5 text-indigo-500" />
+              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <HiSparkles className="w-5 h-5 text-blue-500" />
                   Expertise
                 </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
                   Manage the areas of research and technology you specialize in.
                   Your expertise helps CoreResearch recommend students whose research topics align with your specialization.
                 </p>
@@ -1156,14 +1154,14 @@ export const ProfileSettings = () => {
                   </span>
                 </div>
                 
-                <div className="flex flex-wrap gap-2 p-4 rounded-2xl bg-gray-50/50 dark:bg-slate-800/40 border border-gray-100 dark:border-slate-700/60 min-h-[80px]">
+                <div className="flex flex-wrap gap-2 p-4 rounded-2xl bg-gray-50/50 dark:bg-[#1c1d28]/60 border border-gray-100 dark:border-[#222433] min-h-[80px]">
                   {selectedExpertise.length === 0 ? (
-                    <div className="w-full flex items-center justify-center text-sm text-gray-400 dark:text-gray-500 italic">
+                    <div className="w-full flex items-center justify-center text-sm text-gray-400 dark:text-[#6b6f84] italic">
                       No expertise selected yet.
                     </div>
                   ) : (
                     selectedExpertise.map((tag) => (
-                      <div key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 shadow-sm transition-all group">
+                      <div key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 shadow-xs transition-all group">
                         {tag}
                         <button 
                           onClick={() => toggleExpertise(tag)}
@@ -1180,11 +1178,11 @@ export const ProfileSettings = () => {
               </div>
 
               {/* Category Browsing */}
-              <div className="space-y-6 pt-6 border-t border-gray-100 dark:border-slate-800">
+              <div className="space-y-6 pt-6 border-t border-gray-100 dark:border-[#222433]">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Explore Expertise</h3>
                   <div className="relative w-full sm:w-64">
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input 
@@ -1192,7 +1190,7 @@ export const ProfileSettings = () => {
                       placeholder="Search expertise..."
                       value={expertiseSearchTerm}
                       onChange={(e) => setExpertiseSearchTerm(e.target.value)}
-                      className="w-full h-9 pl-9 pr-3 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className="w-full h-9 pl-9 pr-3 rounded-xl bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-sm text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                   </div>
                 </div>
@@ -1204,7 +1202,7 @@ export const ProfileSettings = () => {
                     
                     return (
                       <div key={category} className="space-y-3">
-                        <h4 className="text-xs font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase">
+                        <h4 className="text-xs font-semibold tracking-wider text-gray-400 dark:text-[#6b6f84] uppercase">
                           {category}
                         </h4>
                         <div className="flex flex-wrap gap-2">
@@ -1215,10 +1213,10 @@ export const ProfileSettings = () => {
                                 key={tag}
                                 type="button"
                                 onClick={() => toggleExpertise(tag)}
-                                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
                                   isSelected
-                                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                                    : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                                    ? "bg-blue-600 text-white shadow-xs"
+                                    : "bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8] hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/10"
                                 }`}
                               >
                                 {tag}
@@ -1230,7 +1228,7 @@ export const ProfileSettings = () => {
                     );
                   })}
                   {Object.values(EXPERTISE_CATEGORIES).every(tags => tags.filter(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase())).length === 0) && (
-                    <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="text-center py-8 text-sm text-gray-500 dark:text-[#9396a8]">
                       No expertise found matching "{expertiseSearchTerm}".
                     </div>
                   )}
@@ -1238,7 +1236,7 @@ export const ProfileSettings = () => {
               </div>
 
               {/* Save Footer */}
-              <div className="pt-6 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end gap-4">
+              <div className="pt-6 border-t border-gray-100 dark:border-[#222433] flex items-center justify-end gap-4">
                 <button
                   type="button"
                   onClick={handleSaveProfile}

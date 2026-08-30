@@ -242,7 +242,7 @@ export const Scheduling = () => {
       <div className="flex flex-col md:flex-row items-end justify-between gap-4 pb-2">
         <div className="flex flex-col md:flex-row items-end gap-3 flex-1 w-full">
           <div className="w-full md:max-w-xs">
-            <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
               Search Groups
             </label>
             <Input
@@ -250,16 +250,16 @@ export const Scheduling = () => {
               icon={HiMagnifyingGlass}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white dark:bg-slate-900 shadow-sm"
+              className="shadow-sm"
             />
           </div>
 
           <div className="hidden md:flex h-10 items-center px-1">
-            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-[#6b6f84]" />
           </div>
 
           <div className="w-full md:w-48">
-            <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
               Program
             </label>
             <CourseFilterDropdown
@@ -275,11 +275,11 @@ export const Scheduling = () => {
 
           {hasSpecializations && (
             <div className="w-full md:w-56 animate-in fade-in slide-in-from-left-2 duration-200">
-              <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
                 Specialization
               </label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 value={selectedSpecialization}
                 onChange={(e) => {
                   setSelectedSpecialization(e.target.value);
@@ -298,11 +298,11 @@ export const Scheduling = () => {
 
           {showSectionFilter && (
             <div className="w-full md:w-40 animate-in fade-in slide-in-from-left-2 duration-200">
-              <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
                 Section
               </label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow disabled:opacity-50"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer disabled:opacity-50"
                 value={selectedSection}
                 onChange={(e) => setSelectedSection(e.target.value)}
               >
@@ -347,14 +347,14 @@ export const Scheduling = () => {
 
       {selectedCourse && selectedSection && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-white dark:bg-[#15161e] p-6 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white leading-tight">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
                 {courseObj?.name || "PROGRAM NOT SELECTED"}
               </h2>
               {specializations.find(s => s.id === selectedSpecialization)?.name && (
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
-                  Specialized in <span className="text-gray-700 dark:text-gray-300">{specializations.find(s => s.id === selectedSpecialization)?.name}</span>
+                <p className="text-sm font-medium text-gray-500 dark:text-[#9396a8] mt-1">
+                  Specialized in <span className="text-gray-700 dark:text-[#f3f4f8] font-semibold">{specializations.find(s => s.id === selectedSpecialization)?.name}</span>
                 </p>
               )}
             </div>

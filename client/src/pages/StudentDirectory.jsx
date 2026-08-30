@@ -375,13 +375,13 @@ export const StudentDirectory = () => {
 
       {/* Manual Assignment Form (Legacy/Preserved) */}
       {showAssignForm && selectedCourse && selectedSection && (
-        <Card className="p-4 bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800">
-          <h3 className="text-sm font-semibold mb-3 text-blue-800 dark:text-blue-300">Assign Student</h3>
+        <Card className="p-4 bg-blue-50/40 dark:bg-blue-950/20 border-blue-100 dark:border-blue-800/40">
+          <h3 className="text-sm font-bold mb-3 text-blue-800 dark:text-blue-300">Assign Student</h3>
           <form onSubmit={handleAssignSubmit} className="flex flex-col md:flex-row gap-3 items-end">
             <div className="flex-1 w-full">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Select Unassigned Student</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] mb-1">Select Unassigned Student</label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm px-3"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm px-3 text-gray-900 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 value={assignUid}
                 onChange={(e) => setAssignUid(e.target.value)}
                 required
@@ -395,9 +395,9 @@ export const StudentDirectory = () => {
               </select>
             </div>
             <div className="w-full md:w-32">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Year Level</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] mb-1">Year Level</label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm px-3"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm px-3 text-gray-900 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 value={yearLevel}
                 onChange={(e) => setYearLevel(e.target.value)}
               >
@@ -406,9 +406,9 @@ export const StudentDirectory = () => {
               </select>
             </div>
             <div className="w-full md:w-48">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Enrollment Status</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] mb-1">Enrollment Status</label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm px-3"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm px-3 text-gray-900 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 value={enrollmentStatus}
                 onChange={(e) => setEnrollmentStatus(e.target.value)}
               >
@@ -438,7 +438,7 @@ export const StudentDirectory = () => {
         <div className="flex flex-col md:flex-row items-end gap-3 flex-1 w-full">
           {/* Search Bar */}
           <div className="w-full md:max-w-xs">
-            <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
               Search
             </label>
             <Input
@@ -446,18 +446,18 @@ export const StudentDirectory = () => {
               icon={HiMagnifyingGlass}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white dark:bg-slate-900 shadow-sm"
+              className="shadow-sm"
             />
           </div>
 
           {/* Filter Icon Indicator (visual only) */}
           <div className="hidden md:flex h-10 items-center px-1">
-            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-gray-600" />
+            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-[#6b6f84]" />
           </div>
 
           {/* Program/Course Filter - Custom flyout dropdown */}
           <div className="w-full md:w-48">
-            <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
               Program
             </label>
             <CourseFilterDropdown
@@ -474,11 +474,11 @@ export const StudentDirectory = () => {
           {/* Specialization Filter (Conditional) */}
           {hasSpecializations && (
             <div className="w-full md:w-56 animate-in fade-in slide-in-from-left-2 duration-200">
-              <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
                 Specialization
               </label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 value={selectedSpecialization}
                 onChange={(e) => {
                   setSelectedSpecialization(e.target.value);
@@ -498,11 +498,11 @@ export const StudentDirectory = () => {
           {/* Section Filter (Conditional based on course/specialization logic) */}
           {showSectionFilter && (
             <div className="w-full md:w-40 animate-in fade-in slide-in-from-left-2 duration-200">
-              <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
                 Section
               </label>
               <select
-                className="w-full h-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl text-[13px] font-medium text-gray-600 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow disabled:opacity-50"
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer disabled:opacity-50"
                 value={selectedSection}
                 onChange={(e) => setSelectedSection(e.target.value)}
               >
@@ -537,35 +537,35 @@ export const StudentDirectory = () => {
       {isInviteEnabled() && (
         <div className="pt-2 pb-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
               Active Join Links for this selection
             </h3>
           </div>
           {loadingInvites ? (
-            <div className="text-xs text-gray-400">Loading links...</div>
+            <div className="text-xs text-gray-400 dark:text-[#6b6f84]">Loading links...</div>
           ) : invitations.length === 0 ? (
-            <div className="text-xs text-gray-400 italic">No active links for this selection.</div>
+            <div className="text-xs text-gray-400 dark:text-[#6b6f84] italic">No active links for this selection.</div>
           ) : (
             <div className="flex flex-col gap-2">
               {invitations.map(invite => (
-                <div key={invite.id} className={`flex items-center justify-between p-3 rounded-lg border ${invite.active ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-gray-50 dark:bg-slate-800/50 border-gray-100 dark:border-slate-700'}`}>
+                <div key={invite.id} className={`flex items-center justify-between p-3 rounded-xl border ${invite.active ? 'bg-emerald-50/70 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-gray-50 dark:bg-[#1c1d28] border-gray-100 dark:border-[#222433]'}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <Badge variant={invite.active ? "emerald" : "gray"}>
                       {invite.active ? "Active" : "Inactive"}
                     </Badge>
-                    <span className={`text-sm font-medium truncate max-w-[200px] md:max-w-none ${invite.active ? 'text-emerald-700 dark:text-emerald-400' : 'text-black dark:text-gray-300'}`}>
+                    <span className={`text-sm font-medium truncate max-w-[200px] md:max-w-none ${invite.active ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-900 dark:text-[#f3f4f8]'}`}>
                       {window.location.origin}/join/{invite.id}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0 ml-4">
                     <Button variant="ghost" size="sm" onClick={() => handleCopyLink(invite.id)} title="Copy Link">
-                      <HiDocumentDuplicate className="w-4 h-4 text-gray-500" />
+                      <HiDocumentDuplicate className="w-4 h-4 text-gray-500 dark:text-[#9396a8]" />
                     </Button>
                     {invite.active ? (
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-orange-500 hover:text-orange-600 hover:bg-orange-50" 
+                        className="text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10" 
                         onClick={() => handleDeactivate(invite.id)}
                         title="Deactivate Link"
                       >
@@ -575,7 +575,7 @@ export const StudentDirectory = () => {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50" 
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" 
                         onClick={() => confirmDelete(invite.id)}
                         title="Delete Link"
                       >

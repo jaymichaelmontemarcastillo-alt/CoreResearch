@@ -31,8 +31,8 @@ export const Input = ({
         )}
         <input
           id={inputId}
-          className={`w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 
-                     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary 
+          className={`w-full bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] 
+                     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500
                      transition-all duration-200 rounded-lg text-sm py-2.5 px-3.5 ${Icon ? "pl-10" : ""} ${
                        error
                          ? "border-red-300 dark:border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
@@ -45,7 +45,7 @@ export const Input = ({
         <p className="text-xs text-red-500 dark:text-red-400 font-medium mt-1">{error}</p>
       )}
       {helperText && !error && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{helperText}</p>
+        <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">{helperText}</p>
       )}
     </div>
   );

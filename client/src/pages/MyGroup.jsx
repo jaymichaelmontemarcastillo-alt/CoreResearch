@@ -63,12 +63,12 @@ export const MyGroup = () => {
           title="My Research Group"
           description="View your assigned research group and members."
         />
-        <Card className="p-8 text-center bg-gray-50/50 dark:bg-slate-900/50 border-dashed border-2 border-gray-200 dark:border-slate-700">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+        <Card className="p-8 text-center bg-gray-50/50 dark:bg-[#15161e] border-dashed border-2 border-gray-200 dark:border-[#222433]">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-[#1c1d28] rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400 dark:text-[#6b6f84]">
             <HiUsers className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Research Group Assigned</h3>
-          <p className="text-gray-500 max-w-sm mx-auto">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Research Group Assigned</h3>
+          <p className="text-gray-500 dark:text-[#9396a8] max-w-sm mx-auto text-sm">
             You have not been assigned to a research group yet. Please contact your Research Coordinator.
           </p>
         </Card>
@@ -77,40 +77,40 @@ export const MyGroup = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6">
       <PageHeader
         icon={HiUsers}
         title="My Research Group"
         description="View your assigned research group and members."
       />
 
-      <Card className="overflow-hidden border border-gray-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+      <Card className="overflow-hidden border border-gray-200/90 dark:border-[#222433] shadow-sm bg-white dark:bg-[#15161e]">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/20 p-6 md:p-8 border-b border-gray-100 dark:border-slate-800">
+        <div className="bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 p-6 md:p-8 border-b border-gray-100 dark:border-[#222433]">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div className="space-y-1">
-              <h2 className="text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                 {group.name}
               </h2>
-              <p className="text-gray-500 dark:text-gray-400 font-medium">
+              <p className="text-gray-500 dark:text-[#9396a8] font-medium text-sm">
                 {course?.name || "Unknown Course"} • {section?.name || "Unknown Section"}
               </p>
             </div>
             
-            <div className="flex flex-col items-start md:items-end gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Current Status</span>
+            <div className="flex flex-col items-start md:items-end gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Current Status</span>
               {group.status === 'ready' ? (
-                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800/50">
+                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-500/20">
                   <HiCheckCircle className="w-4 h-4" />
-                  <span className="font-semibold text-sm">Ready for Title Proposal</span>
+                  <span className="font-semibold text-xs">Ready for Title Proposal</span>
                 </div>
               ) : group.status === 'incomplete' ? (
-                <div className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-lg border border-orange-100 dark:border-orange-800/50">
+                <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-lg border border-amber-100 dark:border-amber-500/20">
                   <HiExclamationCircle className="w-4 h-4" />
-                  <span className="font-semibold text-sm">Incomplete Group</span>
+                  <span className="font-semibold text-xs">Incomplete Group</span>
                 </div>
               ) : (
-                <Badge variant="blue" className="capitalize text-sm px-3 py-1.5">{group.status}</Badge>
+                <Badge variant="blue" className="capitalize text-xs px-3 py-1.5">{group.status}</Badge>
               )}
             </div>
           </div>
@@ -118,8 +118,8 @@ export const MyGroup = () => {
 
         {/* Members Section */}
         <div className="p-6 md:p-8">
-          <h3 className="text-base font-medium text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-            <HiUsers className="w-5 h-5 text-blue-500" /> 
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84] mb-4 flex items-center gap-2">
+            <HiUsers className="w-4 h-4 text-blue-500" /> 
             Group Members ({group.members.length}/3)
           </h3>
           
@@ -127,30 +127,30 @@ export const MyGroup = () => {
             {group.members.map((member) => (
               <div 
                 key={member.uid} 
-                className={`flex items-center p-4 rounded-xl border ${
+                className={`flex items-center p-4 rounded-xl border transition-all ${
                   member.uid === userProfile.uid 
-                  ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800" 
-                  : "bg-gray-50/50 dark:bg-slate-800/30 border-gray-100 dark:border-slate-700"
+                  ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40" 
+                  : "bg-gray-50/70 dark:bg-[#1c1d28] border-gray-100 dark:border-[#222433]"
                 }`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-medium text-lg mr-4 shrink-0 ${
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-base mr-3.5 shrink-0 ${
                   member.uid === userProfile.uid
-                  ? "bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300"
-                  : "bg-white dark:bg-slate-700 text-gray-600 dark:text-gray-300 shadow-sm"
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                  : "bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8]"
                 }`}>
                   {member.fullName.charAt(0)}
                 </div>
                 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-gray-900 dark:text-white truncate">
+                    <h4 className="font-semibold text-gray-900 dark:text-white truncate text-sm">
                       {member.fullName}
                     </h4>
                     {member.uid === userProfile.uid && (
                       <Badge variant="blue" className="text-[10px] px-1.5 py-0">YOU</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] truncate mt-0.5">
                     {member.email}
                   </p>
                 </div>
@@ -161,14 +161,14 @@ export const MyGroup = () => {
             {group.members.length < 3 && Array.from({ length: 3 - group.members.length }).map((_, idx) => (
               <div 
                 key={`empty-${idx}`} 
-                className="flex items-center p-4 rounded-xl border border-dashed border-gray-200 dark:border-slate-700 bg-transparent opacity-50"
+                className="flex items-center p-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] bg-transparent opacity-50"
               >
-                <div className="w-12 h-12 rounded-full border-2 border-dashed border-gray-200 dark:border-slate-600 flex items-center justify-center mr-4 shrink-0">
+                <div className="w-11 h-11 rounded-full border-2 border-dashed border-gray-200 dark:border-[#333649] flex items-center justify-center mr-3.5 shrink-0">
                   <HiUsers className="w-5 h-5 text-gray-300 dark:text-gray-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-400 dark:text-gray-500">Empty Slot</h4>
-                  <p className="text-xs text-gray-400 dark:text-gray-600">Awaiting assignment</p>
+                  <h4 className="font-semibold text-gray-400 dark:text-gray-500 text-sm">Empty Slot</h4>
+                  <p className="text-xs text-gray-400 dark:text-[#6b6f84]">Awaiting assignment</p>
                 </div>
               </div>
             ))}
