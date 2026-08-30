@@ -19,121 +19,96 @@ export class DocxParser {
 
     let pageSettings = null;
     let paragraphFormats = []; // Per-paragraph formatting extracted from XML
-    let runFormats = []; // Per-run formatting extracted from XML
-    let tableFormats = []; // Table and cell formatting
+    let metadata = { title: fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ') };
     
     this.themeExtractor = new DocxThemeExtractor();
     this.styleExtractor = new DocxStyleExtractor();
     this.numberingExtractor = new DocxNumberingExtractor();
 
+    let formatting = { paragraphs: [], runs: [], tables: [] };
+
     try {
-      // Extract exact geometry and paragraph formatting from docx XML
+      console.log(`[DocxParser] Reading ZIP with AdmZip...`);
       const zip = new AdmZip(filePath);
+      console.log(`[DocxParser] Reading document.xml from ZIP...`);
       const documentXml = zip.readAsText('word/document.xml');
+      
       if (documentXml) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: "@_",
-          isArray: (name) => {
-            // Force arrays for elements that can repeat
-            return ['w:p', 'w:r', 'w:tbl', 'w:tr', 'w:tc', 'w:sectPr'].includes(name);
-          }
-        });
-        const parsed = parser.parse(documentXml);
-        const body = parsed['w:document']?.['w:body'];
-
-        if (body) {
-          // Extract Theme, Styles, Numbering
-          const themeXml = zip.readAsText('word/theme/theme1.xml');
-          if (themeXml) this.themeExtractor.parse(themeXml);
-          
-          const stylesXml = zip.readAsText('word/styles.xml');
-          if (stylesXml) this.styleExtractor.parse(stylesXml);
-          
-          const numXml = zip.readAsText('word/numbering.xml');
-          if (numXml) this.numberingExtractor.parse(numXml);
-
-          // sectPr can be at body level or inside paragraphs for section breaks
-          const sectPr = Array.isArray(body['w:sectPr'])
-            ? body['w:sectPr'][0]
-            : body['w:sectPr'];
-          
-          if (sectPr) {
-            const pgSz = sectPr['w:pgSz'];
-            const pgMar = sectPr['w:pgMar'];
-            
-            if (pgSz && pgMar) {
-              // Convert twips to inches (1440 twips = 1 inch)
-              const twipsToInches = (twips) => twips ? `${(parseInt(twips, 10) / 1440).toFixed(2)}in` : '1in';
-              // Convert twips to mm (1 inch = 25.4mm, 1440 twips = 1 inch)
-              const twipsToMm = (twips) => twips ? parseFloat((parseInt(twips, 10) / 1440 * 25.4).toFixed(2)) : 25.4;
-              
-              // Exact physical dimensions in twips
-              const wTwips = parseInt(pgSz['@_w'] || 12240, 10);
-              const hTwips = parseInt(pgSz['@_h'] || 15840, 10);
-              const wInches = wTwips / 1440;
-              const hInches = hTwips / 1440;
-              
-              let size = 'letter';
-              if (Math.abs(wInches - 8.27) < 0.2 && Math.abs(hInches - 11.69) < 0.2) size = 'a4';
-              else if (Math.abs(hInches - 11.69) < 0.2 && Math.abs(wInches - 8.27) < 0.2) size = 'a4';
-              else if (Math.abs(wInches - 11.69) < 0.2 && Math.abs(hInches - 8.27) < 0.2) size = 'a4'; // landscape A4
-              else if (Math.abs(wInches - 8.5) < 0.2 && Math.abs(hInches - 14) < 0.2) size = 'legal';
-              
-              pageSettings = {
-                size,
-                orientation: pgSz['@_orient'] === 'landscape' ? 'landscape' : 'portrait',
-                marginTop: twipsToInches(pgMar['@_top']),
-                marginBottom: twipsToInches(pgMar['@_bottom']),
-                marginLeft: twipsToInches(pgMar['@_left']),
-                marginRight: twipsToInches(pgMar['@_right']),
-                // Exact physical dimensions for CSS physical units
-                widthMm: twipsToMm(wTwips),
-                heightMm: twipsToMm(hTwips),
-              };
+        console.log(`[DocxParser] document.xml size: ${documentXml.length} bytes`);
+        
+        // OOM Protection: fast-xml-parser is extremely memory intensive.
+        if (documentXml.length > 2000000) {
+          console.warn(`[DocxParser] document.xml is too large (${documentXml.length} bytes). Skipping high-fidelity extraction to prevent OOM.`);
+        } else {
+          console.log(`[DocxParser] Parsing XML with fast-xml-parser...`);
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: "@_",
+            isArray: (name) => {
+              return ['w:p', 'w:r', 'w:tbl', 'w:tr', 'w:tc', 'w:sectPr'].includes(name);
             }
-          }
+          });
+          const parsed = parser.parse(documentXml);
+          console.log(`[DocxParser] XML parsing completed. Extracting formats...`);
+          
+          const body = parsed['w:document']?.['w:body'];
+          if (body) {
+            // Extract Theme, Styles, Numbering
+            const themeXml = zip.readAsText('word/theme/theme1.xml');
+            if (themeXml) this.themeExtractor.parse(themeXml);
+            
+            const stylesXml = zip.readAsText('word/styles.xml');
+            if (stylesXml) this.styleExtractor.parse(stylesXml);
+            
+            const numXml = zip.readAsText('word/numbering.xml');
+            if (numXml) this.numberingExtractor.parse(numXml);
 
-          // --- Paragraph & Run & Table Formatting ---
-          const extracted = this._extractFormats(body);
-          paragraphFormats = extracted.paragraphs;
-          runFormats = extracted.runs;
-          tableFormats = extracted.tables;
+            // sectPr can be at body level or inside paragraphs for section breaks
+            const sectPr = Array.isArray(body['w:sectPr'])
+              ? body['w:sectPr'][0]
+              : body['w:sectPr'];
+            
+            if (sectPr) {
+              const pgSz = sectPr['w:pgSz'];
+              const pgMar = sectPr['w:pgMar'];
+              
+              if (pgSz && pgMar) {
+                const twipsToInches = (twips) => twips ? `${(parseInt(twips, 10) / 1440).toFixed(2)}in` : '1in';
+                const twipsToMm = (twips) => twips ? parseFloat((parseInt(twips, 10) / 1440 * 25.4).toFixed(2)) : 25.4;
+                
+                const wTwips = parseInt(pgSz['@_w'] || 12240, 10);
+                const hTwips = parseInt(pgSz['@_h'] || 15840, 10);
+                const wInches = wTwips / 1440;
+                const hInches = hTwips / 1440;
+                
+                let size = 'letter';
+                if (Math.abs(wInches - 8.27) < 0.2 && Math.abs(hInches - 11.69) < 0.2) size = 'a4';
+                else if (Math.abs(hInches - 11.69) < 0.2 && Math.abs(wInches - 8.27) < 0.2) size = 'a4';
+                else if (Math.abs(wInches - 11.69) < 0.2 && Math.abs(hInches - 8.27) < 0.2) size = 'a4';
+                else if (Math.abs(wInches - 8.5) < 0.2 && Math.abs(hInches - 14) < 0.2) size = 'legal';
+                
+                pageSettings = {
+                  size,
+                  orientation: pgSz['@_orient'] === 'landscape' ? 'landscape' : 'portrait',
+                  marginTop: twipsToInches(pgMar['@_top']),
+                  marginBottom: twipsToInches(pgMar['@_bottom']),
+                  marginLeft: twipsToInches(pgMar['@_left']),
+                  marginRight: twipsToInches(pgMar['@_right']),
+                  widthMm: twipsToMm(wTwips),
+                  heightMm: twipsToMm(hTwips),
+                };
+              }
+            }
+
+            formatting = this._extractFormats(body);
+            console.log(`[DocxParser] Formats extracted successfully.`);
+          }
         }
       }
     } catch (err) {
       console.warn('[DocxParser] Failed to extract document properties:', err.message);
     }
 
-    const options = {
-      transformDocument: mammoth.transforms.paragraph((element) => {
-        if (element.alignment && element.alignment !== "left") {
-          const baseName = element.styleName || "p";
-          return {
-            ...element,
-            styleName: `${baseName}-align-${element.alignment}`,
-            styleId: `${baseName}-align-${element.alignment}`
-          };
-        }
-        return element;
-      }),
-      convertImage: mammoth.images.inline((element) => {
-        return element.read("base64").then((imageBuffer) => {
-          const mimeType = element.contentType;
-          const ext = mimeType.split('/')[1] || 'png';
-          const assetId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
-          
-          assets.push({
-            id: assetId,
-            fileName: assetId,
-            mimeType,
-            buffer: Buffer.from(imageBuffer, 'base64'),
-          });
-
-          // We return an image with a custom data-asset-id. Downstream, once the image
-          // is uploaded to GridFS, we can replace the src with the GridFS URL.
-          return {
-            src: `data:${mimeType};base64,${imageBuffer}`,
             "data-asset-id": assetId
           };
         });
