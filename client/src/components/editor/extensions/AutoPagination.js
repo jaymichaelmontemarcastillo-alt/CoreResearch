@@ -169,17 +169,25 @@ export const AutoPagination = Extension.create({
 
                 // Fallback: push entire block to next page
                 if (!injected) {
-                  decorations.push(
-                    Decoration.widget(offset, () => {
-                      return createPageBreakWidget(remainingSpace, gapHeight, marginTop, marginBottom, marginLeft, marginRight, pageWidth, false);
-                    }, {
-                      key: `pb-block-${pageCount}-${offset}`,
-                      side: -1,
-                      destroy: (dom) => { dom.remove(); }
-                    })
-                  );
-                  accumulatedHeight = trueHeight;
-                  pageCount++;
+                  // Only push to next page if the block isn't taller than a full page itself,
+                  // or if it's taller, let it span (don't infinitely push it)
+                  if (trueHeight <= contentHeight || accumulatedHeight > 0) {
+                    decorations.push(
+                      Decoration.widget(offset, () => {
+                        return createPageBreakWidget(remainingSpace, gapHeight, marginTop, marginBottom, marginLeft, marginRight, pageWidth, false);
+                      }, {
+                        key: `pb-block-${pageCount}-${offset}`,
+                        side: -1,
+                        destroy: (dom) => { dom.remove(); }
+                      })
+                    );
+                    accumulatedHeight = trueHeight;
+                    pageCount++;
+                  } else {
+                    // It's a massive block (e.g. huge table) at the top of a page.
+                    // We must let it flow into the accumulated height without injecting a break *before* it.
+                    accumulatedHeight += trueHeight;
+                  }
                 }
               } else {
                 accumulatedHeight += trueHeight;
@@ -229,6 +237,18 @@ export const AutoPagination = Extension.create({
           // Listen for image load events to trigger recalculation
           const handleLoad = () => scheduleRecalc();
           view.dom.addEventListener('load', handleLoad, true);
+          
+          // Wait for custom fonts to load (fonts change line heights drastically)
+          if (document.fonts) {
+            document.fonts.ready.then(() => {
+              scheduleRecalc();
+            });
+          }
+
+          // Initial load delay to let DOM elements and Yjs sync settle
+          setTimeout(() => {
+            scheduleRecalc();
+          }, 300);
 
           return {
             update: (view, prevState) => {

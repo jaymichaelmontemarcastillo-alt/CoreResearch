@@ -906,7 +906,7 @@ export const DocumentEditor = ({
   }
 
   return (
-    <div className="document-editor-container flex justify-center py-8 bg-gray-100 min-h-screen">
+    <div className={`document-editor-container flex justify-center py-8 bg-gray-100 min-h-screen ${sourceType === 'native' ? 'document-is-native' : 'document-is-imported'}`}>
       {/* Editor CSS styles for ProseMirror, Carets, Selection, Tables, Page Breaks, and Image alignment */}
       <style>{`
         .ProseMirror {
@@ -1158,8 +1158,8 @@ export const DocumentEditor = ({
           margin-left: auto;
         }
 
-        /* Manuscript typography defaults */
-        .ProseMirror h1 {
+        /* Manuscript typography defaults - ONLY apply to natively created documents */
+        .document-is-native .ProseMirror h1 {
           font-size: 1.875rem;
           font-weight: 700;
           line-height: 1.25;
@@ -1167,7 +1167,7 @@ export const DocumentEditor = ({
           margin-bottom: 0.75rem;
           color: #0f172a;
         }
-        .ProseMirror h2 {
+        .document-is-native .ProseMirror h2 {
           font-size: 1.5rem;
           font-weight: 600;
           line-height: 1.3;
@@ -1175,7 +1175,7 @@ export const DocumentEditor = ({
           margin-bottom: 0.5rem;
           color: #1e293b;
         }
-        .ProseMirror h3 {
+        .document-is-native .ProseMirror h3 {
           font-size: 1.25rem;
           font-weight: 600;
           line-height: 1.35;
@@ -1187,9 +1187,11 @@ export const DocumentEditor = ({
           margin-top: 0;
           margin-bottom: 0;
           line-height: 1.5;
+          widows: 2;
+          orphans: 2;
         }
-        /* Only apply default spacing to paragraphs without explicit DOCX spacing */
-        .ProseMirror p:not([style*="margin-top"]):not([style*="margin-bottom"]):not([style*="line-height"]) {
+        /* Only apply default spacing to paragraphs without explicit DOCX spacing in native mode */
+        .document-is-native .ProseMirror p:not([style*="margin-top"]):not([style*="margin-bottom"]):not([style*="line-height"]) {
           margin-top: 0;
           margin-bottom: 8pt;
           line-height: 1.5;
