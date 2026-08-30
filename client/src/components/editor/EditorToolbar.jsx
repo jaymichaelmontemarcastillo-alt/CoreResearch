@@ -3,7 +3,7 @@ import {
   FaBold, FaItalic, FaUnderline, FaStrikethrough, FaSubscript, FaSuperscript,
   FaAlignLeft, FaAlignCenter, FaAlignRight, FaAlignJustify,
   FaListUl, FaListOl, FaRotateLeft, FaRotateRight, FaImage, FaTable,
-  FaGripLines, FaGripLinesVertical
+  FaGripLines, FaGripLinesVertical, FaArrowsUpDown
 } from 'react-icons/fa6';
 import { HiChevronDown, HiPlus, HiTrash, HiDocumentText } from 'react-icons/hi2';
 import { Scissors } from 'lucide-react';
@@ -55,6 +55,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
   const fileInputRef = useRef(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showTableMenu, setShowTableMenu] = useState(false);
+  const [showSpacingMenu, setShowSpacingMenu] = useState(false);
 
   if (!editor) return null;
 
@@ -94,7 +95,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
   const currentFontSize = editor.getAttributes('textStyle').fontSize || '';
 
   return (
-    <div className="flex flex-wrap items-center gap-1 overflow-x-auto max-w-full px-2 py-1 scrollbar-hide text-xs sm:text-sm">
+    <div className="flex flex-wrap items-center gap-1 max-w-full px-2 py-1 text-xs sm:text-sm relative z-50">
       
       {/* Undo / Redo */}
       <ToolbarButton
@@ -291,6 +292,118 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
       />
 
+      {/* Line & Paragraph Spacing Dropdown */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => { setShowSpacingMenu(!showSpacingMenu); setShowTableMenu(false); }}
+          title="Line & Paragraph spacing"
+          className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${
+            showSpacingMenu 
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' 
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FaArrowsUpDown className="w-3.5 h-3.5" />
+          <HiChevronDown className="w-3 h-3 text-gray-400" />
+        </button>
+
+        {showSpacingMenu && (
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 text-xs animate-fade-in">
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setLineHeight('1').run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
+            >
+              <span>Single</span>
+              {editor.isActive({ lineHeight: '1' }) && <span className="text-blue-600">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setLineHeight('1.15').run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
+            >
+              <span>1.15</span>
+              {editor.isActive({ lineHeight: '1.15' }) && <span className="text-blue-600">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setLineHeight('1.5').run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
+            >
+              <span>1.5</span>
+              {editor.isActive({ lineHeight: '1.5' }) && <span className="text-blue-600">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setLineHeight('2').run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between text-gray-700 dark:text-gray-200"
+            >
+              <span>Double</span>
+              {editor.isActive({ lineHeight: '2' }) && <span className="text-blue-600">✓</span>}
+            </button>
+            
+            <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
+            
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setSpaceBefore('0').run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Remove space before paragraph
+            </button>
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setSpaceAfter('12pt').run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Add space after paragraph
+            </button>
+            
+            <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
+            
+            <button
+              type="button"
+              onClick={() => { setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Custom spacing
+            </button>
+            
+            <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
+            
+            <button
+              type="button"
+              onClick={() => { setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Keep with next
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Keep lines together
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Prevent single lines
+            </button>
+            <button
+              type="button"
+              onClick={() => { editor.chain().focus().setHorizontalRule().run(); setShowSpacingMenu(false); }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200"
+            >
+              Add page break before
+            </button>
+          </div>
+        )}
+      </div>
+
       <Divider />
 
       {/* Lists */}
@@ -330,7 +443,7 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
       <div className="relative">
         <button
           type="button"
-          onClick={() => setShowTableMenu(!showTableMenu)}
+          onClick={() => { setShowTableMenu(!showTableMenu); setShowSpacingMenu(false); }}
           title="Table Operations"
           className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${
             editor.isActive('table') 
@@ -418,27 +531,6 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
         )}
       </div>
 
-      {/* Insert Page Break Button */}
-      <ToolbarButton
-        icon={Scissors}
-        title="Insert Page Break (Split into New Page)"
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-      >
-        <span className="hidden xl:inline text-xs font-medium">Page Break</span>
-      </ToolbarButton>
-
-      <Divider />
-
-      {/* Page Setup & Margins Button */}
-      {onOpenPageSettings && (
-        <ToolbarButton
-          icon={HiDocumentText}
-          title="Page Setup, Margins & Size"
-          onClick={onOpenPageSettings}
-        >
-          <span className="hidden xl:inline text-xs font-medium">Page Setup</span>
-        </ToolbarButton>
-      )}
     </div>
   );
 };

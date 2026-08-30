@@ -1,7 +1,7 @@
 // server/src/routes/documentRoutes.js
 import express from 'express';
 import multer from 'multer';
-import { importDocument, serveStorageAsset, updatePageSettings } from '../controllers/documentController.js';
+import { importDocument, serveStorageAsset, updatePageSettings, getPageSettings } from '../controllers/documentController.js';
 
 const router = express.Router();
 
@@ -44,5 +44,6 @@ router.get('/assets/*', serveStorageAsset);
 
 // Update Page Settings: PUT /api/documents/:id/page-settings
 router.put('/:id/page-settings', express.json(), updatePageSettings);
+router.get('/:id/page-settings', getPageSettings);
 
 export default router;

@@ -276,6 +276,45 @@ export const LineHeight = Extension.create({
       },
     ];
   },
+  addCommands() {
+    return {
+      setLineHeight: (lineHeight) => ({ tr, state, dispatch }) => {
+        const { selection } = state;
+        let applied = false;
+        
+        tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                lineHeight,
+              });
+            }
+            applied = true;
+          }
+        });
+        
+        return applied;
+      },
+      unsetLineHeight: () => ({ tr, state, dispatch }) => {
+        const { selection } = state;
+        let applied = false;
+        
+        tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) {
+              const newAttrs = { ...node.attrs };
+              delete newAttrs.lineHeight;
+              tr.setNodeMarkup(pos, undefined, newAttrs);
+            }
+            applied = true;
+          }
+        });
+        
+        return applied;
+      },
+    };
+  },
 });
 
 // Custom ParagraphSpacing Extension (spaceBefore & spaceAfter)
@@ -314,6 +353,52 @@ export const ParagraphSpacing = Extension.create({
         },
       },
     ];
+  },
+  addCommands() {
+    return {
+      setSpaceBefore: (spaceBefore) => ({ tr, state, dispatch }) => {
+        const { selection } = state;
+        let applied = false;
+        
+        tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) {
+              const newAttrs = { ...node.attrs };
+              if (spaceBefore === null || spaceBefore === '0' || spaceBefore === '0pt' || spaceBefore === '') {
+                delete newAttrs.spaceBefore;
+              } else {
+                newAttrs.spaceBefore = spaceBefore;
+              }
+              tr.setNodeMarkup(pos, undefined, newAttrs);
+            }
+            applied = true;
+          }
+        });
+        
+        return applied;
+      },
+      setSpaceAfter: (spaceAfter) => ({ tr, state, dispatch }) => {
+        const { selection } = state;
+        let applied = false;
+        
+        tr.doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+          if (this.options.types.includes(node.type.name)) {
+            if (dispatch) {
+              const newAttrs = { ...node.attrs };
+              if (spaceAfter === null || spaceAfter === '0' || spaceAfter === '0pt' || spaceAfter === '') {
+                delete newAttrs.spaceAfter;
+              } else {
+                newAttrs.spaceAfter = spaceAfter;
+              }
+              tr.setNodeMarkup(pos, undefined, newAttrs);
+            }
+            applied = true;
+          }
+        });
+        
+        return applied;
+      },
+    };
   },
 });
 
@@ -527,25 +612,69 @@ export const DocumentEditor = ({
     return createActiveCommentsExtension(() => commentsRef.current);
   }, []);
 
-  const extensions = useMemo(() => {
-    let rawHeight = 1056;
-    if (pageSettings?.size === 'a4') rawHeight = 1123;
-    else if (pageSettings?.size === 'legal') rawHeight = 1344;
-    
-    if (pageSettings?.orientation === 'landscape') {
-      rawHeight = pageSettings?.size === 'a4' ? 794 : 816;
-    }
-
-    const parseMargin = (val) => {
+  // Compute page geometry from pageSettings (physical units)
+  const pageGeometry = useMemo(() => {
+    const parseMarginPx = (val) => {
       if (!val) return 96;
+      if (typeof val === 'number') return val;
       if (val.includes('in')) return parseFloat(val) * 96;
+      if (val.includes('mm')) return parseFloat(val) * (96 / 25.4);
+      if (val.includes('cm')) return parseFloat(val) * (96 / 2.54);
       if (val.includes('px')) return parseFloat(val);
-      if (val.includes('cm')) return parseFloat(val) * 37.8;
+      if (val.includes('pt')) return parseFloat(val) * (96 / 72);
       return 96;
     };
 
-    const contentHeight = rawHeight - parseMargin(pageSettings?.marginTop) - parseMargin(pageSettings?.marginBottom);
+    // Physical dimensions lookup table (mm)
+    const PAPER_SIZES_MM = {
+      letter:  { w: 215.9, h: 279.4 },
+      a4:      { w: 210,   h: 297   },
+      legal:   { w: 215.9, h: 355.6 },
+    };
 
+    // Use exact physical dimensions from DOCX if available, else lookup by size name
+    let widthMm, heightMm;
+    if (pageSettings?.widthMm && pageSettings?.heightMm) {
+      widthMm = pageSettings.widthMm;
+      heightMm = pageSettings.heightMm;
+    } else {
+      const paperDims = PAPER_SIZES_MM[pageSettings?.size] || PAPER_SIZES_MM.letter;
+      widthMm = paperDims.w;
+      heightMm = paperDims.h;
+    }
+
+    // Handle orientation swap
+    if (pageSettings?.orientation === 'landscape') {
+      const temp = widthMm;
+      widthMm = heightMm;
+      heightMm = temp;
+    }
+
+    // Convert mm to px at 96 DPI (1in = 25.4mm, 96px/in)
+    const PX_PER_MM = 96 / 25.4;
+    const pageWidthPx = widthMm * PX_PER_MM;
+    const pageHeightPx = heightMm * PX_PER_MM;
+
+    const marginTopPx = parseMarginPx(pageSettings?.marginTop);
+    const marginBottomPx = parseMarginPx(pageSettings?.marginBottom);
+    const marginLeftPx = parseMarginPx(pageSettings?.marginLeft);
+    const marginRightPx = parseMarginPx(pageSettings?.marginRight);
+    const contentHeightPx = pageHeightPx - marginTopPx - marginBottomPx;
+
+    return {
+      widthMm,
+      heightMm,
+      pageWidthPx: Math.round(pageWidthPx),
+      pageHeightPx: Math.round(pageHeightPx),
+      marginTopPx: Math.round(marginTopPx),
+      marginBottomPx: Math.round(marginBottomPx),
+      marginLeftPx: Math.round(marginLeftPx),
+      marginRightPx: Math.round(marginRightPx),
+      contentHeightPx: Math.round(contentHeightPx),
+    };
+  }, [pageSettings]);
+
+  const extensions = useMemo(() => {
     const list = [
       StarterKit.configure({
         history: previewingVersion ? true : false, // Managed by Yjs collaboration normally, but enable locally for preview mode
@@ -556,7 +685,13 @@ export const DocumentEditor = ({
         underline: false,
       }),
       AutoPagination.configure({
-        contentHeight: contentHeight > 200 ? contentHeight : 864,
+        contentHeight: pageGeometry.contentHeightPx > 200 ? pageGeometry.contentHeightPx : 864,
+        pageHeight: pageGeometry.pageHeightPx,
+        marginTop: pageGeometry.marginTopPx,
+        marginBottom: pageGeometry.marginBottomPx,
+        marginLeft: pageGeometry.marginLeftPx,
+        marginRight: pageGeometry.marginRightPx,
+        pageWidth: pageGeometry.pageWidthPx,
       }),
       Underline,
       Superscript,
@@ -605,7 +740,7 @@ export const DocumentEditor = ({
     }
 
     return list;
-  }, [ydoc, provider, effectiveUser, activeCommentsExt, previewingVersion]);
+  }, [ydoc, provider, effectiveUser, activeCommentsExt, previewingVersion, pageGeometry]);
 
   const editor = useEditor({
     extensions,
@@ -737,53 +872,29 @@ export const DocumentEditor = ({
     }
   }, [editor, previewingVersion]);
 
-  // Compute paper dimension styles based on pageSettings
+  // Compute paper dimension styles based on pageSettings using physical CSS units
   const pageStyle = useMemo(() => {
-    const isLandscape = pageSettings?.orientation === 'landscape';
-    let paperWidth = 816; // Letter 8.5in in px (96 DPI)
-    let paperHeight = 1056; // Letter 11in in px
+    const g = pageGeometry;
 
-    if (pageSettings?.size === 'a4') {
-      paperWidth = 794; // 8.27in
-      paperHeight = 1123; // 11.69in
-    } else if (pageSettings?.size === 'legal') {
-      paperWidth = 816;
-      paperHeight = 1344; // 14in
-    }
-
-    if (isLandscape) {
-      const temp = paperWidth;
-      paperWidth = paperHeight;
-      paperHeight = temp;
-    }
-
-    const parseMargin = (val) => {
-      if (!val) return 96;
-      if (val.includes('in')) return parseFloat(val) * 96;
-      if (val.includes('px')) return parseFloat(val);
-      if (val.includes('cm')) return parseFloat(val) * 37.8;
-      return 96;
-    };
-
-    const marginTop = parseMargin(pageSettings?.marginTop);
-    const marginRight = parseMargin(pageSettings?.marginRight);
-    const marginBottom = parseMargin(pageSettings?.marginBottom);
-    const marginLeft = parseMargin(pageSettings?.marginLeft);
-
-    const padding = `${marginTop}px ${marginRight}px ${marginBottom}px ${marginLeft}px`;
+    // Use mm for width/height to ensure physical accuracy regardless of browser zoom
+    // Padding uses the same px values computed from the imported margins
+    const padding = `${g.marginTopPx}px ${g.marginRightPx}px ${g.marginBottomPx}px ${g.marginLeftPx}px`;
 
     return {
-      '--page-width': `${paperWidth}px`,
-      '--page-height': `${paperHeight}px`,
-      '--page-margin-top': `${marginTop}px`,
-      '--page-margin-right': `${marginRight}px`,
-      '--page-margin-bottom': `${marginBottom}px`,
-      '--page-margin-left': `${marginLeft}px`,
-      width: `${paperWidth}px`,
-      minHeight: `${paperHeight}px`,
+      '--page-width': `${g.widthMm}mm`,
+      '--page-height': `${g.heightMm}mm`,
+      '--page-width-px': `${g.pageWidthPx}px`,
+      '--page-height-px': `${g.pageHeightPx}px`,
+      '--page-margin-top': `${g.marginTopPx}px`,
+      '--page-margin-right': `${g.marginRightPx}px`,
+      '--page-margin-bottom': `${g.marginBottomPx}px`,
+      '--page-margin-left': `${g.marginLeftPx}px`,
+      '--page-content-height': `${g.contentHeightPx}px`,
+      width: `${g.widthMm}mm`,
+      minHeight: `${g.heightMm}mm`,
       padding,
     };
-  }, [pageSettings]);
+  }, [pageGeometry]);
 
   if (!editor) {
     return (
@@ -801,10 +912,13 @@ export const DocumentEditor = ({
         .ProseMirror {
           --page-width: ${pageStyle['--page-width']};
           --page-height: ${pageStyle['--page-height']};
+          --page-width-px: ${pageStyle['--page-width-px']};
+          --page-height-px: ${pageStyle['--page-height-px']};
           --page-margin-top: ${pageStyle['--page-margin-top']};
           --page-margin-right: ${pageStyle['--page-margin-right']};
           --page-margin-bottom: ${pageStyle['--page-margin-bottom']};
           --page-margin-left: ${pageStyle['--page-margin-left']};
+          --page-content-height: ${pageStyle['--page-content-height']};
           
           width: var(--page-width);
           min-height: var(--page-height);
@@ -812,7 +926,8 @@ export const DocumentEditor = ({
           box-sizing: border-box;
           margin: 0 auto;
           background: #ffffff;
-          font-family: inherit;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 12pt;
           text-align: left;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
           position: relative;
@@ -827,25 +942,25 @@ export const DocumentEditor = ({
 
         .ProseMirror .page-break-gap {
           display: block;
-          height: 40px;
-          background-color: #f3f4f6; /* Same as workspace background */
+          background-color: #e5e7eb; /* Workspace gap background */
           
           /* Push out into the page margins to cut the white paper completely */
           margin-left: calc(-1 * var(--page-margin-left));
           margin-right: calc(-1 * var(--page-margin-right));
-          width: var(--page-width);
+          width: calc(var(--page-margin-left) + 100% + var(--page-margin-right));
           
           /* Visual shadow trick to make it look like separate papers */
           box-shadow: 
-            inset 0 4px 6px -4px rgba(0,0,0,0.1),
-            inset 0 -4px 6px -4px rgba(0,0,0,0.1);
+            inset 0 6px 8px -4px rgba(0,0,0,0.12),
+            inset 0 -6px 8px -4px rgba(0,0,0,0.12),
+            0 1px 3px rgba(0,0,0,0.08);
         }
 
         :is(.dark) .ProseMirror .page-break-gap {
           background-color: #0f172a; /* matches dark bg-slate-900 */
           box-shadow: 
-            inset 0 4px 6px -4px rgba(0,0,0,0.3),
-            inset 0 -4px 6px -4px rgba(0,0,0,0.3);
+            inset 0 6px 8px -4px rgba(0,0,0,0.4),
+            inset 0 -6px 8px -4px rgba(0,0,0,0.4);
         }
 
         .ProseMirror:focus {
@@ -1069,9 +1184,17 @@ export const DocumentEditor = ({
           color: #334155;
         }
         .ProseMirror p {
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
-          line-height: 1.625;
+          margin-top: 0;
+          margin-bottom: 0;
+          line-height: 1.5;
+        }
+        /* Only apply default spacing to paragraphs without explicit DOCX spacing */
+        .ProseMirror p:not([style*="margin-top"]):not([style*="margin-bottom"]):not([style*="line-height"]) {
+          margin-top: 0;
+          margin-bottom: 8pt;
+          line-height: 1.5;
+          text-align: justify;
+          text-indent: 0.5in;
         }
         .ProseMirror ul {
           list-style-type: disc;

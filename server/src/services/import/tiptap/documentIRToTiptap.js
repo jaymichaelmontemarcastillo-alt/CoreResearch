@@ -146,8 +146,10 @@ export class DocumentIRToTiptap {
               s.startsWith('font-size') ||
               s.startsWith('color') ||
               s.startsWith('line-height') ||
+              s.startsWith('margin-top') ||
               s.startsWith('margin-bottom') ||
               s.startsWith('margin-left') ||
+              s.startsWith('margin-right') ||
               s.startsWith('text-indent') ||
               s.startsWith('font-weight') ||
               s.startsWith('font-style') ||

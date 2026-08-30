@@ -139,8 +139,47 @@ export const updatePageSettings = async (req, res) => {
   }
 };
 
+export const getPageSettings = async (req, res) => {
+  try {
+    const documentId = req.params.id;
+
+    if (!documentId) {
+      return res.status(400).json({ success: false, message: 'Missing documentId' });
+    }
+
+    const DocumentModel = mongoose.model('Document');
+    const doc = await DocumentModel.findOne({ id: documentId }).lean();
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    // Return pageSettings from MongoDB (authoritative source of truth)
+    // Also return widthMm/heightMm from the import metadata if available
+    const pageSettings = doc.pageSettings || {};
+    
+    // Check if widthMm/heightMm were stored in the flat metadata during import
+    if (!pageSettings.widthMm && doc.widthMm) {
+      pageSettings.widthMm = doc.widthMm;
+    }
+    if (!pageSettings.heightMm && doc.heightMm) {
+      pageSettings.heightMm = doc.heightMm;
+    }
+
+    return res.status(200).json({
+      success: true,
+      pageSettings,
+    });
+  } catch (error) {
+    console.error('[documentController] getPageSettings error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch page settings' });
+  }
+};
+
 export default {
   importDocument,
   serveStorageAsset,
   updatePageSettings,
+  getPageSettings,
 };
+

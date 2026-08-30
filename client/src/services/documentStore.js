@@ -28,11 +28,13 @@ export const DEFAULT_PAGE_SETTINGS = {
   marginBottom: '1in',
   marginLeft: '1in',
   marginRight: '1in',
+  widthMm: null,   // Exact physical width in mm (from DOCX import)
+  heightMm: null,  // Exact physical height in mm (from DOCX import)
 };
 
 export const DEFAULT_EDITOR_SETTINGS = {
-  fontFamily: 'Inter',
-  fontSize: '11pt',
+  fontFamily: 'Arial, Helvetica, sans-serif',
+  fontSize: '12pt',
   lineSpacing: '1.5',
   page: DEFAULT_PAGE_SETTINGS,
 };
@@ -260,6 +262,29 @@ export const documentStore = {
     } catch (error) {
       console.warn(`[documentStore] updatePageSettings error for ${id}:`, error.message);
       return false;
+    }
+  },
+
+  /**
+   * Fetch authoritative page settings from MongoDB (source of truth)
+   * This is used on document open to get the exact imported page geometry.
+   */
+  fetchPageSettingsFromServer: async (id) => {
+    if (!id) return null;
+    try {
+      const res = await fetch(`/api/documents/${id}/page-settings`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.success && data.pageSettings) {
+        return {
+          ...DEFAULT_PAGE_SETTINGS,
+          ...data.pageSettings,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.warn(`[documentStore] fetchPageSettingsFromServer error for ${id}:`, error.message);
+      return null;
     }
   },
 

@@ -6,6 +6,18 @@ export default defineConfig({
   resolve: {
     dedupe: ['y-prosemirror', 'yjs', '@tiptap/core', '@tiptap/pm']
   },
+  optimizeDeps: {
+    include: ['docx']
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          docx: ['docx']
+        }
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

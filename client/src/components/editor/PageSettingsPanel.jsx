@@ -139,12 +139,17 @@ export const PageSettingsPanel = ({ pageSettings, onSaveSettings, onClose }) => 
           <select
             value={size}
             onChange={(e) => setSize(e.target.value)}
-            className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 mb-2"
           >
             <option value="letter">Letter (8.5 × 11 in)</option>
             <option value="a4">A4 (8.27 × 11.69 in)</option>
             <option value="legal">Legal (8.5 × 14 in)</option>
           </select>
+          {pageSettings?.widthMm && pageSettings?.heightMm && (
+            <div className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-800 p-2 rounded-lg border border-gray-100 dark:border-slate-700">
+              <span className="font-medium text-gray-700 dark:text-gray-300">Exact Dimensions:</span> {pageSettings.widthMm}mm × {pageSettings.heightMm}mm
+            </div>
+          )}
         </div>
 
         {/* Margins */}

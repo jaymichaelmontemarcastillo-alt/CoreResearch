@@ -7,6 +7,8 @@ const PageSettingsSchema = new mongoose.Schema({
   marginBottom: { type: String, default: '1in' },
   marginLeft: { type: String, default: '1in' },
   marginRight: { type: String, default: '1in' },
+  widthMm: { type: Number, default: null },   // Exact page width in mm from DOCX
+  heightMm: { type: Number, default: null },  // Exact page height in mm from DOCX
 }, { _id: false });
 
 const DocumentSchema = new mongoose.Schema({

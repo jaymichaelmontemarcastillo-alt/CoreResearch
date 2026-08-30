@@ -13,21 +13,21 @@ import { PageSettingsPanel } from '../components/editor/PageSettingsPanel';
 import { ImportDocumentModal } from './Documents/components/ImportDocumentModal';
 import { useDocumentUpload } from './Documents/hooks/useDocumentUpload';
 import { Button } from '../components/ui/Button';
-import { 
-  HiChevronLeft, 
-  HiChevronRight, 
-  HiCloud, 
-  HiCheckCircle, 
-  HiExclamationCircle, 
-  HiArrowsPointingOut, 
-  HiArrowsPointingIn, 
+import {
+  HiChevronLeft,
+  HiChevronRight,
+  HiCloud,
+  HiCheckCircle,
+  HiExclamationCircle,
+  HiArrowsPointingOut,
+  HiArrowsPointingIn,
   HiXMark,
-  HiSquares2X2, 
-  HiDocumentCheck, 
-  HiFolder, 
-  HiDocumentText, 
-  HiBuildingLibrary, 
-  HiCalendar, 
+  HiSquares2X2,
+  HiDocumentCheck,
+  HiFolder,
+  HiDocumentText,
+  HiBuildingLibrary,
+  HiCalendar,
   HiAcademicCap,
   HiChatBubbleLeftRight,
   HiShare,
@@ -70,8 +70,8 @@ class EditorErrorBoundary extends React.Component {
               {this.state.error.message}
             </div>
           )}
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onClick={() => this.setState({ hasError: false, error: null })}
           >
             Reload Editor
@@ -90,7 +90,7 @@ export const DocumentEditorPage = () => {
   const isFaculty = effectiveRole === 'adviser' || effectiveRole === 'panelist';
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [editor, setEditor] = useState(null);
   const [collaborators, setCollaborators] = useState([]);
   const [activeRightPanel, setActiveRightPanel] = useState(null); // 'comments' | 'versionControl' | 'pageSettings' | null
@@ -106,7 +106,7 @@ export const DocumentEditorPage = () => {
   const [previewingVersion, setPreviewingVersion] = useState(null);
   const [pendingRestoreContent, setPendingRestoreContent] = useState(null);
   const [pendingRestoreVersionLabel, setPendingRestoreVersionLabel] = useState(null);
-  
+
   // Fullscreen Maximize & Drawer Sidebar state
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMaximizedSidebarOpen, setIsMaximizedSidebarOpen] = useState(false);
@@ -204,7 +204,7 @@ export const DocumentEditorPage = () => {
     if (!documentId) return;
 
     let isMounted = true;
-    
+
     // Initial fetch
     const loadDocumentData = async () => {
       try {
@@ -220,9 +220,16 @@ export const DocumentEditorPage = () => {
         if (isMounted && docData) {
           setTitle(docData.title || 'Research Manuscript');
           setSourceType(docData.sourceType || 'native');
-          if (docData.editorSettings?.page) {
+          
+          // 1. Fetch exact authoritative page settings from MongoDB (from DOCX import)
+          const serverPageSettings = await documentStore.fetchPageSettingsFromServer(documentId);
+          if (serverPageSettings) {
+            setPageSettings(serverPageSettings);
+          } else if (docData.editorSettings?.page) {
+            // 2. Fallback to Firestore cache
             setPageSettings(docData.editorSettings.page);
           }
+
           let contentToLoad = docData.content || docData.contentHtml || null;
           // Resilient fallback to localStorage if Firestore content is null or empty
           if (!contentToLoad) {
@@ -231,7 +238,7 @@ export const DocumentEditorPage = () => {
               if (cached) {
                 contentToLoad = JSON.parse(cached);
               }
-            } catch (e) {}
+            } catch (e) { }
           }
           if (contentToLoad) {
             setInitialContent(contentToLoad);
@@ -246,7 +253,7 @@ export const DocumentEditorPage = () => {
             if (cached) {
               setInitialContent(JSON.parse(cached));
             }
-          } catch (e) {}
+          } catch (e) { }
           setDocumentLoaded(true);
         }
       }
@@ -307,13 +314,13 @@ export const DocumentEditorPage = () => {
   // 2. Setup stable Hocuspocus collaboration provider lifecycle
   useEffect(() => {
     if (!documentId || !ydoc) return;
-    
+
     let isSubscribed = true;
     let hocuspocusProvider = null;
-    
+
     const isProduction = import.meta.env.PROD;
-    const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || (isProduction 
-      ? 'wss://coreresearch-api-lspu-40301844.onrender.com/collaboration' 
+    const wsUrl = import.meta.env.VITE_HOCUSPOCUS_URL || (isProduction
+      ? 'wss://coreresearch-api-lspu-40301844.onrender.com/collaboration'
       : 'ws://localhost:5000/collaboration');
     setProviderState({ provider: null, status: 'connecting', error: null });
 
@@ -400,13 +407,13 @@ export const DocumentEditorPage = () => {
         }
       }
     };
-    
+
     initProvider();
 
     return () => {
       isSubscribed = false;
       if (hocuspocusProvider) {
-        try { hocuspocusProvider.destroy(); } catch (e) {}
+        try { hocuspocusProvider.destroy(); } catch (e) { }
       }
     };
   }, [documentId, ydoc, effectiveUserProfile.uid]);
@@ -442,7 +449,7 @@ export const DocumentEditorPage = () => {
     if (json) {
       try {
         localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (autoSaveTimeoutRef.current) {
@@ -473,7 +480,7 @@ export const DocumentEditorPage = () => {
           const html = activeEditor.getHTML();
           const plainText = activeEditor.getText();
           documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
-        } catch (e) {}
+        } catch (e) { }
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -566,12 +573,12 @@ export const DocumentEditorPage = () => {
       // Auto-backup current live state before restoring
       const currentDoc = await documentStore.fetchDocument(documentId);
       if (currentDoc && currentDoc.content) {
-         await documentStore.saveVersion(documentId, currentDoc.content, effectiveUserProfile, `Auto-backup before restore`);
+        await documentStore.saveVersion(documentId, currentDoc.content, effectiveUserProfile, `Auto-backup before restore`);
       }
 
       setPendingRestoreContent(previewingVersion.content);
       setPendingRestoreVersionLabel(previewingVersion.label || formatVersionDateTime(previewingVersion.createdAt));
-      
+
       // Clear preview mode to re-enable live collaboration extensions
       setPreviewingVersion(null);
     } catch (err) {
@@ -588,10 +595,10 @@ export const DocumentEditorPage = () => {
           const contentJson = editor.getJSON();
           const contentHtml = editor.getHTML();
           const plainText = editor.getText();
-          
+
           await documentStore.saveVersion(documentId, contentJson, effectiveUserProfile, `Restored from ${pendingRestoreVersionLabel}`);
           await documentStore.saveDocumentContent(documentId, contentJson, contentHtml, plainText, effectiveUserProfile);
-          
+
         } catch (e) {
           console.error('Error applying restore:', e);
         } finally {
@@ -599,7 +606,7 @@ export const DocumentEditorPage = () => {
           setPendingRestoreVersionLabel(null);
         }
       };
-      
+
       // Delay slightly to let Yjs sync initial state before we override it
       const timer = setTimeout(applyRestore, 800);
       return () => clearTimeout(timer);
@@ -622,11 +629,10 @@ export const DocumentEditorPage = () => {
   };
 
   return (
-    <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
-      isMaximized 
-        ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
-        : 'h-[calc(100vh-4rem)]'
-    }`}>
+    <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${isMaximized
+      ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0'
+      : 'h-[calc(100vh-4rem)]'
+      }`}>
       {/* Hovering Circle Arrow Button to Open Sidebar in Maximized Mode */}
       {isMaximized && (
         <button
@@ -647,7 +653,7 @@ export const DocumentEditorPage = () => {
       {/* Floating Slide-out Sidebar Drawer when maximized */}
       {isMaximized && isMaximizedSidebarOpen && (
         <>
-          <div 
+          <div
             onClick={() => setIsMaximizedSidebarOpen(false)}
             className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[80] transition-opacity animate-fade-in"
           />
@@ -659,7 +665,7 @@ export const DocumentEditorPage = () => {
                 </div>
                 <span className="font-bold text-sm text-gray-900 dark:text-white">CoreResearch</span>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => setIsMaximizedSidebarOpen(false)}
                 className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -737,24 +743,24 @@ export const DocumentEditorPage = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || '/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
             <HiChevronLeft className="w-5 h-5" />
           </Button>
-          
+
           <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+              <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
             </svg>
           </div>
-          
+
           <div className="flex flex-col min-w-0">
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={title}
               onChange={handleTitleChange}
               placeholder="Document Title"
               className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate max-w-[200px] sm:max-w-xs transition-colors"
             />
             {!isFaculty && (
-              <EditorMenuBar 
-                editor={editor} 
+              <EditorMenuBar
+                editor={editor}
                 title={title}
                 onOpenPageSettings={() => setActiveRightPanel('pageSettings')}
                 onNewDocument={handleNewDocument}
@@ -804,12 +810,12 @@ export const DocumentEditorPage = () => {
               </span>
             )}
           </div>
-          
+
           {/* Active Collaborators Presence */}
           <div className="hidden sm:flex items-center -space-x-1.5">
             {collaborators.map((user, i) => (
-              <div 
-                key={user.id || i} 
+              <div
+                key={user.id || i}
                 className="w-7 h-7 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
                 style={{ backgroundColor: user.color || '#3b82f6' }}
                 title={`${user.name || 'Collaborator'} (${user.role || 'Member'})`}
@@ -822,10 +828,10 @@ export const DocumentEditorPage = () => {
 
           {/* Share Dialog Button */}
           {!isFaculty && (
-            <Button 
-              variant="primary" 
-              size="sm" 
-              onClick={() => setShowShareModal(true)} 
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowShareModal(true)}
               className="rounded-full px-3 sm:px-5 shadow-sm"
             >
               <HiShare className="w-4 h-4 sm:mr-1.5" />
@@ -834,16 +840,15 @@ export const DocumentEditorPage = () => {
           )}
 
           {/* Maximize / Minimize Fullscreen Toggle Button */}
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => {
               setIsMaximized(!isMaximized);
               setIsMaximizedSidebarOpen(false);
             }}
-            className={`rounded-full p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-xs ${
-              isMaximized ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''
-            }`}
+            className={`rounded-full p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-xs ${isMaximized ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''
+              }`}
             title={isMaximized ? "Exit full screen (Minimize)" : "Maximize editor (Full screen)"}
           >
             {isMaximized ? (
@@ -857,9 +862,9 @@ export const DocumentEditorPage = () => {
 
       {/* Editor Toolbar */}
       {!isFaculty && (
-        <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 p-1 flex justify-center z-10 shrink-0">
-          <EditorToolbar 
-            editor={editor} 
+        <div className="relative bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 p-1 flex justify-center z-30 shrink-0">
+          <EditorToolbar
+            editor={editor}
             documentId={documentId}
             onOpenPageSettings={() => setActiveRightPanel('pageSettings')}
           />
@@ -895,9 +900,9 @@ export const DocumentEditorPage = () => {
           <div className={`my-6 ${previewingVersion ? 'opacity-80' : ''}`}>
             <EditorErrorBoundary key={documentId}>
               {documentLoaded ? (
-                <DocumentEditor 
-                  documentId={documentId} 
-                  userProfile={effectiveUserProfile} 
+                <DocumentEditor
+                  documentId={documentId}
+                  userProfile={effectiveUserProfile}
                   ydoc={ydoc}
                   provider={providerState.provider}
                   pageSettings={pageSettings}
@@ -925,7 +930,7 @@ export const DocumentEditorPage = () => {
               )}
             </EditorErrorBoundary>
           </div>
-          
+
           {/* Google Docs-Style Floating Contextual Comment Action & Composer */}
           {editor && (
             <FloatingCommentPopover
@@ -943,7 +948,7 @@ export const DocumentEditorPage = () => {
 
         {/* Right Sidebar - Expanded Panels */}
         {activeRightPanel === 'comments' && (
-          <div 
+          <div
             className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
             style={{ width: `${commentsWidth}px` }}
           >
@@ -951,20 +956,18 @@ export const DocumentEditorPage = () => {
             <div
               onPointerDown={handleResizeStart}
               title="Drag horizontally to resize panel"
-              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
-                isResizingComments ? 'bg-blue-500/20' : ''
-              }`}
+              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${isResizingComments ? 'bg-blue-500/20' : ''
+                }`}
             >
-              <div className={`w-1 h-10 rounded-full transition-colors ${
-                isResizingComments 
-                  ? 'bg-blue-600' 
-                  : 'bg-transparent group-hover:bg-blue-500/60'
-              }`} />
+              <div className={`w-1 h-10 rounded-full transition-colors ${isResizingComments
+                ? 'bg-blue-600'
+                : 'bg-transparent group-hover:bg-blue-500/60'
+                }`} />
             </div>
 
-            <CommentsPanel 
-              documentId={documentId} 
-              editor={editor} 
+            <CommentsPanel
+              documentId={documentId}
+              editor={editor}
               highlightedCommentId={highlightedCommentId}
               onClearHighlight={() => setHighlightedCommentId(null)}
               onClose={() => setActiveRightPanel(null)}
@@ -973,7 +976,7 @@ export const DocumentEditorPage = () => {
         )}
 
         {activeRightPanel === 'versionControl' && (
-          <div 
+          <div
             className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
             style={{ width: `${commentsWidth}px` }}
           >
@@ -981,18 +984,16 @@ export const DocumentEditorPage = () => {
             <div
               onPointerDown={handleResizeStart}
               title="Drag horizontally to resize panel"
-              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
-                isResizingComments ? 'bg-blue-500/20' : ''
-              }`}
+              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${isResizingComments ? 'bg-blue-500/20' : ''
+                }`}
             >
-              <div className={`w-1 h-10 rounded-full transition-colors ${
-                isResizingComments 
-                  ? 'bg-blue-600' 
-                  : 'bg-transparent group-hover:bg-blue-500/60'
-              }`} />
+              <div className={`w-1 h-10 rounded-full transition-colors ${isResizingComments
+                ? 'bg-blue-600'
+                : 'bg-transparent group-hover:bg-blue-500/60'
+                }`} />
             </div>
 
-            <VersionControlPanel 
+            <VersionControlPanel
               documentId={documentId}
               editor={editor}
               onClose={() => setActiveRightPanel(null)}
@@ -1009,7 +1010,7 @@ export const DocumentEditorPage = () => {
         )}
 
         {activeRightPanel === 'pageSettings' && (
-          <div 
+          <div
             className="relative shrink-0 h-full border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-20 flex flex-col"
             style={{ width: `${commentsWidth}px` }}
           >
@@ -1017,15 +1018,13 @@ export const DocumentEditorPage = () => {
             <div
               onPointerDown={handleResizeStart}
               title="Drag horizontally to resize panel"
-              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${
-                isResizingComments ? 'bg-blue-500/20' : ''
-              }`}
+              className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 flex items-center justify-center group ${isResizingComments ? 'bg-blue-500/20' : ''
+                }`}
             >
-              <div className={`w-1 h-10 rounded-full transition-colors ${
-                isResizingComments 
-                  ? 'bg-blue-600' 
-                  : 'bg-transparent group-hover:bg-blue-500/60'
-              }`} />
+              <div className={`w-1 h-10 rounded-full transition-colors ${isResizingComments
+                ? 'bg-blue-600'
+                : 'bg-transparent group-hover:bg-blue-500/60'
+                }`} />
             </div>
 
             <PageSettingsPanel
@@ -1038,49 +1037,45 @@ export const DocumentEditorPage = () => {
 
         {/* Compact Right Action Rail */}
         <div className="shrink-0 w-14 border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4 gap-3 z-30 shadow-[-2px_0_10px_rgba(0,0,0,0.02)]">
-          <button 
+          <button
             onClick={() => setActiveRightPanel(activeRightPanel === 'comments' ? null : 'comments')}
-            className={`p-2.5 rounded-xl transition-all ${
-              activeRightPanel === 'comments' 
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm' 
-                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
-            }`}
+            className={`p-2.5 rounded-xl transition-all ${activeRightPanel === 'comments'
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm'
+              : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
+              }`}
             title="Comments"
           >
             <HiChatBubbleLeftRight className="w-5 h-5" />
           </button>
-          
-          <button 
+
+          <button
             onClick={() => setActiveRightPanel(activeRightPanel === 'versionControl' ? null : 'versionControl')}
-            className={`p-2.5 rounded-xl transition-all ${
-              activeRightPanel === 'versionControl' 
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm' 
-                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
-            }`}
+            className={`p-2.5 rounded-xl transition-all ${activeRightPanel === 'versionControl'
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm'
+              : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
+              }`}
             title="Version Control"
           >
             <HiClock className="w-5 h-5" />
           </button>
-
-          <button 
-            onClick={() => setActiveRightPanel(activeRightPanel === 'pageSettings' ? null : 'pageSettings')}
-            className={`p-2.5 rounded-xl transition-all ${
-              activeRightPanel === 'pageSettings' 
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm' 
+          <button
+              onClick={() => setActiveRightPanel(activeRightPanel === 'pageSettings' ? null : 'pageSettings')}
+              className={`p-2.5 rounded-xl transition-all ${activeRightPanel === 'pageSettings'
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shadow-sm'
                 : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-slate-800 dark:hover:text-gray-100'
-            }`}
-            title="Page Setup"
-          >
-            <HiOutlineDocumentText className="w-5 h-5" />
-          </button>
+                }`}
+              title="Page Setup"
+            >
+              <HiOutlineDocumentText className="w-5 h-5" />
+            </button>
         </div>
       </div>
 
       {/* Share Dialog */}
       {showShareModal && (
-        <ShareDialog 
-          documentId={documentId} 
-          onClose={() => setShowShareModal(false)} 
+        <ShareDialog
+          documentId={documentId}
+          onClose={() => setShowShareModal(false)}
         />
       )}
 
