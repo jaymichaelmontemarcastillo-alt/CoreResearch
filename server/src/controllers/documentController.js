@@ -6,7 +6,12 @@ import { getStorageProvider, localStorageProvider } from '../services/storage/st
 
 export const importDocument = async (req, res) => {
   try {
+    console.log(`\n\n========================================`);
+    console.log(`[Import] Received DOCX import request!`);
+    console.log(`[Import] Headers Origin:`, req.headers.origin);
+    
     if (!req.file) {
+      console.log(`[Import] FAILED: No file uploaded.`);
       return res.status(400).json({
         success: false,
         errorCode: 'INVALID_DOCX',
@@ -14,6 +19,8 @@ export const importDocument = async (req, res) => {
         message: 'No file uploaded. Please select a .docx or .pdf file.',
       });
     }
+
+    console.log(`[Import] File accepted: ${req.file.originalname} (${req.file.size} bytes)`);
 
     const file = req.file;
     const userProfile = req.user || {
@@ -28,9 +35,12 @@ export const importDocument = async (req, res) => {
       try {
         groupInfo = typeof req.body.groupInfo === 'string' ? JSON.parse(req.body.groupInfo) : req.body.groupInfo;
       } catch (e) {
-        // ignore
+        console.warn(`[Import] Failed to parse groupInfo:`, e.message);
       }
     }
+
+    console.log(`[Import] Starting DocumentImportService for ${file.originalname}...`);
+    const startTime = Date.now();
 
     const documentRecord = await documentImportService.importDocument({
       filePath: file.path,
@@ -41,18 +51,28 @@ export const importDocument = async (req, res) => {
       groupInfo,
     });
 
+    const elapsed = Date.now() - startTime;
+    console.log(`[Import] DocumentImportService COMPLETED in ${elapsed}ms.`);
+    console.log(`[Import] Generated Document ID: ${documentRecord.id}`);
+
     // Clean up temp file
     if (file.path && fs.existsSync(file.path)) {
       fs.unlinkSync(file.path);
+      console.log(`[Import] Cleaned up temp file: ${file.path}`);
     }
 
+    console.log(`[Import] Sending SUCCESS response (201).`);
+    console.log(`========================================\n\n`);
     return res.status(201).json({
       success: true,
       message: 'Document imported and structured successfully.',
       document: documentRecord,
     });
   } catch (error) {
-    console.error('[documentController] Import error:', error);
+    console.error('\n\n========================================');
+    console.error('[documentController] Import error CAUGHT:');
+    console.error(error);
+    console.error('========================================\n\n');
     
     // Attempt to map error messages to Phase 2 error codes
     let errorCode = 'DOCX_CONVERSION_FAILED';
