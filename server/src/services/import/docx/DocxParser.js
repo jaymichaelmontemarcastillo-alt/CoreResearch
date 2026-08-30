@@ -109,10 +109,39 @@ export class DocxParser {
       console.warn('[DocxParser] Failed to extract document properties:', err.message);
     }
 
-            "data-asset-id": assetId
-          };
-        });
-      }),
+    try {
+      console.log(`[DocxParser] Starting mammoth conversion...`);
+      const options = {
+        transformDocument: mammoth.transforms.paragraph((element) => {
+          if (element.alignment && element.alignment !== "left") {
+            const baseName = element.styleName || "p";
+            return {
+              ...element,
+              styleName: `${baseName}-align-${element.alignment}`,
+              styleId: `${baseName}-align-${element.alignment}`
+            };
+          }
+          return element;
+        }),
+        convertImage: mammoth.images.inline((element) => {
+          return element.read("base64").then((imageBuffer) => {
+            const mimeType = element.contentType;
+            const ext = mimeType.split('/')[1] || 'png';
+            const assetId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+            
+            assets.push({
+              id: assetId,
+              fileName: assetId,
+              mimeType,
+              buffer: Buffer.from(imageBuffer, 'base64'),
+            });
+
+            return {
+              src: `data:${mimeType};base64,${imageBuffer}`,
+              "data-asset-id": assetId
+            };
+          });
+        }),
       styleMap: [
         "p[style-name='Heading 1'] => p:fresh",
         "p[style-name='Heading 1-align-center'] => p.align-center:fresh",
@@ -167,6 +196,10 @@ export class DocxParser {
         pageSettings
       }
     };
+    } catch (err) {
+      console.error(`[DocxParser] Fatal error during parse:`, err);
+      throw err;
+    }
   }
 
   /**
