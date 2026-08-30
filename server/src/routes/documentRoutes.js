@@ -1,13 +1,20 @@
 // server/src/routes/documentRoutes.js
 import express from 'express';
 import multer from 'multer';
+import os from 'os';
+import path from 'path';
 import { importDocument, serveStorageAsset, updatePageSettings, getPageSettings } from '../controllers/documentController.js';
 
 const router = express.Router();
 
-// Memory storage for fast processing without temp files on disk
+// Disk storage for large file processing without blowing up RAM
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (req, file, cb) => {
+      cb(null, `import-${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`);
+    }
+  }),
   limits: {
     fileSize: 30 * 1024 * 1024, // 30MB max
   },

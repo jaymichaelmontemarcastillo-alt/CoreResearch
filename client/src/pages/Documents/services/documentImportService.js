@@ -27,9 +27,9 @@ export const documentImportService = {
     try {
       const response = await api.post('/documents/import', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': null, // Overrides the application/json default in api.js to let the browser set the multipart boundary
           'x-user-id': userProfile?.uid || '',
-          'x-user-name': userProfile?.fullName || userProfile?.first_name || '',
+          'x-user-name': encodeURIComponent(userProfile?.fullName || userProfile?.first_name || ''),
           'x-user-role': userProfile?.role || 'student',
           'x-group-id': groupInfo?.id || '',
         },

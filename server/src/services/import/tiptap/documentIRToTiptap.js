@@ -5,7 +5,6 @@ import { Image } from '@tiptap/extension-image';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
-import { TableCell } from '@tiptap/extension-table-cell';
 import { Underline } from '@tiptap/extension-underline';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Superscript } from '@tiptap/extension-superscript';
@@ -14,7 +13,8 @@ import { Link } from '@tiptap/extension-link';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { Color } from '@tiptap/extension-color';
-import { FontSize, LineSpacing, Indentation, HorizontalRule } from './customExtensions.js';
+import { Highlight } from '@tiptap/extension-highlight';
+import { FontSize, LineSpacing, Indentation, HorizontalRule, CustomTableCell } from './customExtensions.js';
 import sanitizeHtml from 'sanitize-html';
 import * as cheerio from 'cheerio';
 
@@ -27,10 +27,10 @@ export const getTiptapExtensions = () => [
     underline: false,
   }),
   Image,
-  Table,
+  Table.configure({ resizable: true }),
   TableRow,
   TableHeader,
-  TableCell,
+  CustomTableCell,
   Underline,
   Superscript,
   Subscript,
@@ -41,6 +41,7 @@ export const getTiptapExtensions = () => [
   TextStyle,
   FontFamily,
   Color,
+  Highlight.configure({ multicolor: true }),
   FontSize,
   LineSpacing,
   Indentation,
@@ -77,7 +78,11 @@ export class DocumentIRToTiptap {
         $img(this).removeAttr('data-asset-id');
       }
     });
-    const processedHtml = $img.html();
+
+     // Preserve heading semantics from DOCX for document outline fidelity
+     // (Previously converted all headings to <p>, destroying structure)
+     
+     const processedHtml = $img.html();
 
     // 2. Sanitize HTML
     let cleanHtml;
@@ -85,15 +90,16 @@ export class DocumentIRToTiptap {
       cleanHtml = sanitizeHtml(processedHtml, {
         allowedTags: sanitizeHtml.defaults.allowedTags.concat([
           'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 's', 'u', 'a',
-          'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr',
-          'ul', 'ol', 'li', 'blockquote', 'sup', 'sub', 'figcaption'
+          'table', 'thead', 'tbody', 'colgroup', 'col', 'tr', 'th', 'td', 'hr',
+          'ul', 'ol', 'li', 'blockquote', 'sup', 'sub', 'figcaption', 'mark'
         ]),
         allowedAttributes: {
           ...sanitizeHtml.defaults.allowedAttributes,
           a: ['href', 'title', 'target'],
           img: ['src', 'alt', 'width', 'height'],
-          th: ['colspan', 'rowspan'],
-          td: ['colspan', 'rowspan'],
+          th: ['colspan', 'rowspan', 'style', 'data-bg-color', 'data-border-color'],
+          td: ['colspan', 'rowspan', 'style', 'data-bg-color', 'data-border-color'],
+          col: ['style', 'width'],
           p: ['style', 'class'],
           span: ['style', 'class'],
           hr: ['class'],
@@ -102,7 +108,8 @@ export class DocumentIRToTiptap {
           h3: ['style', 'class'],
           h4: ['style', 'class'],
           h5: ['style', 'class'],
-          h6: ['style', 'class']
+          h6: ['style', 'class'],
+          mark: ['style', 'data-color'],
         },
         allowedSchemes: ['http', 'https', 'data'],
       });
@@ -114,14 +121,22 @@ export class DocumentIRToTiptap {
     try {
       const $ = cheerio.load(cleanHtml, null, false);
       
-      // Remove empty paragraphs
-      $('p').each(function() {
-        const text = $(this).text().trim();
-        const hasImg = $(this).find('img').length > 0;
+      // Collapse runs of 3+ consecutive empty paragraphs to 2
+      // (DOCX uses empty paragraphs for intentional spacing; preserve them)
+      const allParagraphs = $('p').toArray();
+      let consecutiveEmpty = 0;
+      for (const el of allParagraphs) {
+        const text = $(el).text().trim();
+        const hasImg = $(el).find('img').length > 0;
         if (text === '' && !hasImg) {
-          $(this).remove();
+          consecutiveEmpty++;
+          if (consecutiveEmpty > 2) {
+            $(el).remove();
+          }
+        } else {
+          consecutiveEmpty = 0;
         }
-      });
+      }
       
       // Handle LibreOffice Page Breaks (usually inline style page-break-before: always)
       $('*[style*="page-break-before"]').each(function() {
@@ -153,7 +168,11 @@ export class DocumentIRToTiptap {
               s.startsWith('text-indent') ||
               s.startsWith('font-weight') ||
               s.startsWith('font-style') ||
-              s.startsWith('text-decoration')
+              s.startsWith('text-decoration') ||
+              s.startsWith('background-color') ||
+              s.startsWith('vertical-align') ||
+              s.startsWith('border-color') ||
+              s.startsWith('border')
             ) {
               supportedStyles.push(s);
             }

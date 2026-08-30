@@ -33,13 +33,18 @@ export const importDocument = async (req, res) => {
     }
 
     const documentRecord = await documentImportService.importDocument({
-      fileBuffer: file.buffer,
+      filePath: file.path,
       fileName: file.originalname,
       mimeType: file.mimetype,
       fileSize: file.size,
       userProfile,
       groupInfo,
     });
+
+    // Clean up temp file
+    if (file.path && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
 
     return res.status(201).json({
       success: true,
@@ -52,10 +57,15 @@ export const importDocument = async (req, res) => {
     // Attempt to map error messages to Phase 2 error codes
     let errorCode = 'DOCX_CONVERSION_FAILED';
     if (error.message.includes('Unsupported document format')) errorCode = 'UNSUPPORTED_FILE_TYPE';
-    if (error.message.includes('No file data')) errorCode = 'INVALID_DOCX';
+    if (error.message.includes('No file data') || error.message.includes('No file path')) errorCode = 'INVALID_DOCX';
     if (error.message.includes('File too large')) errorCode = 'FILE_TOO_LARGE'; // Assuming multer handles this before reaching here usually
     if (error.message.includes('Sanitization failed')) errorCode = 'SANITIZATION_FAILED';
     if (error.message.includes('Tiptap conversion failed')) errorCode = 'TIPTAP_CONVERSION_FAILED';
+
+    // Clean up temp file on error
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    }
 
     return res.status(500).json({
       success: false,

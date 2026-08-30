@@ -5,6 +5,7 @@ import { PdfParser } from './pdf/PdfParser.js';
 import { DocumentIRToTiptap, getTiptapExtensions } from './tiptap/documentIRToTiptap.js';
 import { getStorageProvider } from '../storage/storageManager.js';
 import mongoose from 'mongoose';
+import fs from 'fs/promises';
 import { TiptapTransformer } from '@hocuspocus/transformer';
 import * as Y from 'yjs';
 
@@ -28,15 +29,15 @@ export class DocumentImportService {
    * @returns {Promise<Object>} Created document record
    */
   async importDocument({
-    fileBuffer,
+    filePath,
     fileName,
     mimeType,
     fileSize,
     userProfile = null,
     groupInfo = null,
   }) {
-    if (!fileBuffer || fileBuffer.length === 0) {
-      throw new Error('No file data received for document import.');
+    if (!filePath) {
+      throw new Error('No file path received for document import.');
     }
 
     const documentId = `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -51,13 +52,14 @@ export class DocumentImportService {
     if (ext === 'docx') {
       if (process.env.USE_LIBREOFFICE_IMPORT === 'true') {
         parserName = 'libreoffice';
-        parseResult = await this.libreOfficeParser.parse(fileBuffer, fileName);
+        parseResult = await this.libreOfficeParser.parse(filePath, fileName);
       } else {
         parserName = 'mammoth';
-        parseResult = await this.docxParser.parse(fileBuffer, fileName);
+        parseResult = await this.docxParser.parse(filePath, fileName);
       }
     } else if (ext === 'pdf') {
       parserName = 'pdf-parser';
+      const fileBuffer = await fs.readFile(filePath);
       parseResult = await this.pdfParser.parse(fileBuffer, fileName);
     } else {
       throw new Error(`Unsupported document format '.${ext}'. Supported formats are .docx and .pdf`);
@@ -65,9 +67,10 @@ export class DocumentImportService {
 
     // 2. Upload original source file to persistent object storage (GridFS)
     const originalFileKey = `documents/${documentId}/original/${cleanFileName}`;
+    const fileBufferForUpload = await fs.readFile(filePath);
     const originalUpload = await storageProvider.upload(
       originalFileKey,
-      fileBuffer,
+      fileBufferForUpload,
       mimeType || 'application/octet-stream',
       { documentId, uploadedBy: userProfile?.uid || 'user' }
     );
