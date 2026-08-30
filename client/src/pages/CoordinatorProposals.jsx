@@ -104,7 +104,7 @@ export const CoordinatorProposals = () => {
                   className={`w-5 h-5 text-${stat.color}-600 dark:text-${stat.color}-400`}
                 />
               </div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-medium text-gray-900 dark:text-white">
                 {stat.count}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">

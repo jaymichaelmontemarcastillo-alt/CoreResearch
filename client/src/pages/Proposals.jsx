@@ -191,7 +191,7 @@ export const Proposals = () => {
           <div className="w-20 h-20 bg-blue-50 dark:bg-slate-800/60 rounded-full flex items-center justify-center mb-6">
             <HiUsers className="w-8 h-8 text-blue-500 dark:text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+          <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-3">
             You're not in a research group yet
           </h2>
           <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8 text-sm leading-relaxed">

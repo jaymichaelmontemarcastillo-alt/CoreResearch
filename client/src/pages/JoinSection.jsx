@@ -104,7 +104,7 @@ export const JoinSection = () => {
           <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
             <HiExclamationCircle className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Invitation Not Found</h2>
+          <h2 className="text-xl font-medium text-gray-900 dark:text-white">Invitation Not Found</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
           <Button variant="primary" className="w-full mt-4" onClick={() => navigate("/")}>
             Return Home
@@ -143,7 +143,7 @@ export const JoinSection = () => {
             <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
               <HiAcademicCap className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
+            <h1 className="text-2xl font-medium text-gray-900 dark:text-white tracking-tight mb-2">
               Join Section
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">

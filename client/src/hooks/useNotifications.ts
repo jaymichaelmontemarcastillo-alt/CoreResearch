@@ -8,24 +8,31 @@ export const useNotifications = (userId?: string) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!userId) return;
+  useEffect(() => {
+    if (!userId) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    try {
-      const data = await notificationService.getUserNotifications(userId);
+
+    const unsubscribe = notificationService.subscribeUserNotifications(userId, (data) => {
       setNotifications(data);
       setUnreadCount(data.filter((n) => !n.read).length);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch notifications');
-    } finally {
       setLoading(false);
-    }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [userId]);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  const fetchNotifications = useCallback(async () => {
+    // Kept for backward compatibility if manual refetch is still called,
+    // though the real-time listener handles state automatically.
+  }, []);
 
   const sendNotification = async (input: CreateNotificationInput): Promise<AppNotification> => {
     try {

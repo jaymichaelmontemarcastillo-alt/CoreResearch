@@ -191,7 +191,7 @@ export const Repository = () => {
                   </span>
                 </div>
 
-                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug line-clamp-2">
+                <h3 className="text-base font-medium text-gray-900 dark:text-white leading-snug line-clamp-2">
                   {pub.title}
                 </h3>
 

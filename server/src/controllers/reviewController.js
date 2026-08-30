@@ -1,4 +1,6 @@
+import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
+import { Review as MongoReview } from '../models/Review.js';
 
 // Pre-seed mock reviews if store is empty
 const seedMockReviewsIfEmpty = () => {
@@ -52,31 +54,58 @@ export const addReviewComment = async (req, res) => {
       });
     }
 
-    const newReview = {
-      id: `rev-${Date.now()}`,
-      manuscriptId,
-      chapter: chapter || 'General Comments',
-      comment,
-      reviewerId: user.uid,
-      reviewerName: user.fullName || user.email.split('@')[0],
-      reviewerRole: user.role,
-      status: 'pending',
-      studentResponse: '',
-      createdAt: new Date().toISOString()
-    };
+    const newReviewId = `rev-${Date.now()}`;
+    
+    // [FINAL PRODUCTION ARCHITECTURE]
+    // Strictly write to MongoDB. Hard fail if unavailable.
+    let mongoSuccess = false;
+    let createdReview = null;
 
-    if (isDevMockMode) {
-      seedMockReviewsIfEmpty();
-      const map = mockFirestoreDb.get('reviews');
-      map.set(newReview.id, newReview);
-    } else {
-      await db.collection('reviews').doc(newReview.id).set(newReview);
+    try {
+      if (mongoose.connection.readyState === 1) {
+        createdReview = await MongoReview.create({
+          id: newReviewId,
+          manuscriptId,
+          chapter: chapter || 'General Comments',
+          comment,
+          reviewerId: user.uid,
+          reviewerName: user.fullName || user.email.split('@')[0],
+          reviewerRole: user.role,
+          status: 'pending',
+          studentResponse: ''
+        });
+        mongoSuccess = true;
+      }
+    } catch (mongoErr) {
+      console.error('[ReviewController] MongoDB add review error:', mongoErr.message);
     }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not write review to authoritative database. Operation aborted.'
+      });
+    }
+
+    // Map back for response compatibility
+    const responseData = {
+      id: createdReview.id,
+      manuscriptId: createdReview.manuscriptId,
+      chapter: createdReview.chapter,
+      comment: createdReview.comment,
+      reviewerId: createdReview.reviewerId,
+      reviewerName: createdReview.reviewerName,
+      reviewerRole: createdReview.reviewerRole,
+      status: createdReview.status,
+      studentResponse: createdReview.studentResponse,
+      createdAt: createdReview.createdAt
+    };
 
     return res.status(201).json({
       success: true,
       message: 'Review comment posted successfully.',
-      data: newReview
+      data: responseData
     });
   } catch (error) {
     console.error('[ReviewController] addReviewComment error:', error);
@@ -91,18 +120,47 @@ export const getReviewComments = async (req, res) => {
   try {
     const { manuscriptId } = req.params;
     let list = [];
+    let fetchedFromMongo = false;
 
-    if (isDevMockMode) {
-      seedMockReviewsIfEmpty();
-      const map = mockFirestoreDb.get('reviews');
-      list = Array.from(map.values());
-    } else {
-      const snapshot = await db.collection('reviews').get();
-      list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const query = manuscriptId && manuscriptId !== 'all' ? { manuscriptId } : {};
+        const mongoDocs = await MongoReview.find(query).lean();
+        
+        if (mongoDocs) {
+          list = mongoDocs.map(doc => ({
+            id: doc.id,
+            manuscriptId: doc.manuscriptId,
+            chapter: doc.chapter,
+            comment: doc.comment,
+            reviewerId: doc.reviewerId,
+            reviewerName: doc.reviewerName,
+            reviewerRole: doc.reviewerRole,
+            status: doc.status,
+            studentResponse: doc.studentResponse,
+            createdAt: doc.createdAt
+          }));
+          fetchedFromMongo = true;
+        }
+      }
+    } catch (mongoErr) {
+      console.warn('[ReviewController] MongoDB get reviews warning:', mongoErr.message);
     }
 
-    if (manuscriptId && manuscriptId !== 'all') {
-      list = list.filter(r => r.manuscriptId === manuscriptId);
+    if (!fetchedFromMongo) {
+      // [TEMPORARY MIGRATION COMPATIBILITY]
+      if (isDevMockMode) {
+        seedMockReviewsIfEmpty();
+        const map = mockFirestoreDb.get('reviews');
+        list = Array.from(map.values());
+      } else {
+        const snapshot = await db.collection('reviews').get();
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
+
+      if (manuscriptId && manuscriptId !== 'all') {
+        list = list.filter(r => r.manuscriptId === manuscriptId);
+      }
     }
 
     list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -126,28 +184,52 @@ export const updateReviewStatus = async (req, res) => {
     const { id } = req.params;
     const { status, studentResponse } = req.body;
 
-    let updated = null;
+    // [FINAL PRODUCTION ARCHITECTURE]
+    // Strictly write to MongoDB. Hard fail if unavailable.
+    let mongoSuccess = false;
+    let updatedReview = null;
 
-    if (isDevMockMode) {
-      seedMockReviewsIfEmpty();
-      const map = mockFirestoreDb.get('reviews');
-      const rev = map.get(id);
-      if (!rev) {
-        return res.status(404).json({ success: false, error: 'Review not found' });
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const updateData = {};
+        if (status) updateData.status = status;
+        if (studentResponse !== undefined) updateData.studentResponse = studentResponse;
+        
+        updatedReview = await MongoReview.findOneAndUpdate(
+          { id: id },
+          { $set: updateData },
+          { new: true }
+        );
+
+        if (updatedReview) {
+          mongoSuccess = true;
+        }
       }
-      if (status) rev.status = status;
-      if (studentResponse !== undefined) rev.studentResponse = studentResponse;
-      map.set(id, rev);
-      updated = rev;
-    } else {
-      const ref = db.collection('reviews').doc(id);
-      const updateData = {};
-      if (status) updateData.status = status;
-      if (studentResponse !== undefined) updateData.studentResponse = studentResponse;
-      await ref.update(updateData);
-      const doc = await ref.get();
-      updated = { id: doc.id, ...doc.data() };
+    } catch (mongoErr) {
+      console.error('[ReviewController] MongoDB update review error:', mongoErr.message);
     }
+
+    if (!mongoSuccess) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not update review in authoritative database. Operation aborted.'
+      });
+    }
+
+    // Map back for response compatibility
+    const updated = {
+      id: updatedReview.id,
+      manuscriptId: updatedReview.manuscriptId,
+      chapter: updatedReview.chapter,
+      comment: updatedReview.comment,
+      reviewerId: updatedReview.reviewerId,
+      reviewerName: updatedReview.reviewerName,
+      reviewerRole: updatedReview.reviewerRole,
+      status: updatedReview.status,
+      studentResponse: updatedReview.studentResponse,
+      createdAt: updatedReview.createdAt
+    };
 
     return res.status(200).json({
       success: true,

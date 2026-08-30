@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { User } from '../models/User.js';
 import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 
 // Seed initial mock users into mock storage if empty
@@ -74,13 +76,25 @@ export const getAllUsers = async (req, res) => {
   try {
     const { role, search } = req.query;
     let usersList = [];
+    let fetchedFromMongo = false;
 
-    if (isDevMockMode) {
-      seedMockUsersIfEmpty();
-      usersList = Array.from(mockUsersDb.values());
-    } else {
-      const snapshot = await db.collection('users').get();
-      usersList = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+    try {
+      if (mongoose.connection.readyState === 1) {
+        usersList = await User.find().lean();
+        fetchedFromMongo = true;
+      }
+    } catch (mongoErr) {
+      console.warn('[UserController] MongoDB read warning:', mongoErr.message);
+    }
+
+    if (!fetchedFromMongo) {
+      if (isDevMockMode) {
+        seedMockUsersIfEmpty();
+        usersList = Array.from(mockUsersDb.values());
+      } else {
+        const snapshot = await db.collection('users').get();
+        usersList = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+      }
     }
 
     if (role && role !== 'all') {
@@ -123,21 +137,35 @@ export const updateUserRole = async (req, res) => {
       });
     }
 
-    if (isDevMockMode) {
-      const existing = mockUsersDb.get(uid);
-      if (!existing) {
-        return res.status(404).json({ success: false, error: 'User not found' });
+    let savedToMongo = false;
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await User.findOneAndUpdate(
+          { uid },
+          { role, updatedAt: new Date().toISOString() },
+          { new: true, upsert: false }
+        );
+        savedToMongo = true;
       }
-      existing.role = role;
-      existing.updatedAt = new Date().toISOString();
-      mockUsersDb.set(uid, existing);
-    } else {
-      const userRef = db.collection('users').doc(uid);
-      const doc = await userRef.get();
-      if (!doc.exists) {
-        return res.status(404).json({ success: false, error: 'User not found' });
+    } catch (mongoErr) {
+      console.warn('[UserController] MongoDB update warning:', mongoErr.message);
+    }
+
+    if (!savedToMongo) {
+      if (isDevMockMode) {
+        const existing = mockUsersDb.get(uid);
+        if (existing) {
+          existing.role = role;
+          existing.updatedAt = new Date().toISOString();
+          mockUsersDb.set(uid, existing);
+        }
+      } else if (db) {
+        const userRef = db.collection('users').doc(uid);
+        const doc = await userRef.get();
+        if (doc.exists) {
+          await userRef.update({ role, updatedAt: new Date().toISOString() });
+        }
       }
-      await userRef.update({ role, updatedAt: new Date().toISOString() });
     }
 
     return res.status(200).json({
@@ -159,20 +187,34 @@ export const updateUserProfile = async (req, res) => {
     const { uid } = req.params;
     const updates = req.body;
 
-    if (isDevMockMode) {
-      const existing = mockUsersDb.get(uid);
-      if (!existing) {
-        return res.status(404).json({ success: false, error: 'User not found' });
+    let savedToMongo = false;
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await User.findOneAndUpdate(
+          { uid },
+          { ...updates, updatedAt: new Date().toISOString() },
+          { new: true, upsert: false }
+        );
+        savedToMongo = true;
       }
-      const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
-      mockUsersDb.set(uid, updated);
-    } else {
-      const userRef = db.collection('users').doc(uid);
-      const doc = await userRef.get();
-      if (!doc.exists) {
-        return res.status(404).json({ success: false, error: 'User not found' });
+    } catch (mongoErr) {
+      console.warn('[UserController] MongoDB update warning:', mongoErr.message);
+    }
+
+    if (!savedToMongo) {
+      if (isDevMockMode) {
+        const existing = mockUsersDb.get(uid);
+        if (existing) {
+          const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+          mockUsersDb.set(uid, updated);
+        }
+      } else if (db) {
+        const userRef = db.collection('users').doc(uid);
+        const doc = await userRef.get();
+        if (doc.exists) {
+          await userRef.update({ ...updates, updatedAt: new Date().toISOString() });
+        }
       }
-      await userRef.update({ ...updates, updatedAt: new Date().toISOString() });
     }
 
     return res.status(200).json({
@@ -229,19 +271,35 @@ export const updateMyProfile = async (req, res) => {
     if (Array.isArray(keywords)) updates.keywords = keywords;
     if (Array.isArray(selectedExpertise)) updates.selectedExpertise = selectedExpertise;
 
-    if (isDevMockMode || !db) {
-      const existing = mockUsersDb.get(uid) || {};
-      const updated = { ...existing, uid, ...updates };
-      mockUsersDb.set(uid, updated);
-      return res.status(200).json({
-        success: true,
-        message: 'Profile updated successfully.',
-        data: updated
-      });
+    let savedToMongo = false;
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await User.findOneAndUpdate(
+          { uid },
+          { ...updates, updatedAt: new Date().toISOString() },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        savedToMongo = true;
+      }
+    } catch (mongoErr) {
+      console.warn('[UserController] MongoDB update warning:', mongoErr.message);
     }
 
-    const userRef = db.collection('users').doc(uid);
-    await userRef.set(updates, { merge: true });
+    if (!savedToMongo) {
+      if (isDevMockMode || !db) {
+        const existing = mockUsersDb.get(uid) || {};
+        const updated = { ...existing, uid, ...updates };
+        mockUsersDb.set(uid, updated);
+        return res.status(200).json({
+          success: true,
+          message: 'Profile updated successfully.',
+          data: updated
+        });
+      }
+
+      const userRef = db.collection('users').doc(uid);
+      await userRef.set(updates, { merge: true });
+    }
 
     return res.status(200).json({
       success: true,

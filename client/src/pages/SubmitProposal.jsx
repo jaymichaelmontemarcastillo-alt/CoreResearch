@@ -414,7 +414,7 @@ export const SubmitProposal = () => {
       {uploading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 flex flex-col items-center w-72 text-center border border-gray-200 dark:border-slate-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
               Uploading Document...
             </h3>
             <CircularProgress progress={overallProgress} />
@@ -460,8 +460,7 @@ export const SubmitProposal = () => {
       <Card className="space-y-6">
         {/* Header */}
         <div className="border-b border-gray-200 dark:border-slate-800 pb-5">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-            <HiArrowUpTray className="w-6 h-6 text-primary" />
+          <h1 className="text-2xl font-medium text-gray-900 dark:text-white flex items-center gap-2.5">
             {pageTitle}
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">

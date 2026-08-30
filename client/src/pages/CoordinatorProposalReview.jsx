@@ -253,7 +253,7 @@ export const CoordinatorProposalReview = () => {
             )}
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-snug">
+          <h1 className="text-xl sm:text-2xl font-medium text-gray-900 dark:text-white leading-snug">
             {proposal.title}
           </h1>
 
@@ -348,7 +348,7 @@ export const CoordinatorProposalReview = () => {
       {canEvaluate ? (
         <Card className="space-y-5">
           <div className="pb-4 border-b border-gray-200 dark:border-slate-800">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
               <HiShieldCheck className="w-5 h-5 text-primary" />
               Coordinator Evaluation
             </h2>

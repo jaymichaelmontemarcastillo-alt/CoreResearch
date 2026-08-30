@@ -59,6 +59,7 @@ export const StudentResearchWorkspace = () => {
     let unsubscribeWs = () => {};
     let unsubscribeTasks = () => {};
     let unsubscribeFb = () => {};
+    let unsubscribeRequests = () => {};
 
     const loadWorkspace = async () => {
       setLoading(true);
@@ -76,19 +77,47 @@ export const StudentResearchWorkspace = () => {
             group?.id
           );
 
-          // If no workspace yet, check if student has an accepted Adviser Request to auto-provision
+          // If no workspace yet, subscribe to requests for real-time creation/feedback
           if (!targetWorkspace) {
-            const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
-            const accepted = requests.find((r) => r.status === 'accepted');
-            if (accepted) {
-              targetWorkspace = await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(
-                accepted,
-                userProfile
-              );
-            } else {
-              navigate('/submit-title');
-              return;
-            }
+            setLoading(false); // Done loading initial, waiting on subscriptions
+            unsubscribeRequests = adviserRequestService.subscribeToStudentRequests(
+              currentUser.uid,
+              async (requests) => {
+                const accepted = requests.find((r) => r.status === 'accepted');
+                const declined = requests.find((r) => r.status === 'declined');
+                const pending = requests.find((r) => r.status === 'pending');
+
+                if (accepted && !workspace) {
+                  setToast(`Adviser Request Accepted by ${accepted.adviserName}!`);
+                  const newWs = await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(
+                    accepted,
+                    userProfile
+                  );
+                  setWorkspace(newWs);
+                  
+                  // Now subscribe to the new workspace's inner tasks/feedbacks
+                  unsubscribeWs = researchWorkspaceService.subscribeWorkspace(newWs.id, (u) => { if(u) setWorkspace(u); });
+                  unsubscribeTasks = researchTaskService.subscribeWorkspaceTasks(newWs.id, (t) => setTasks(t));
+                  unsubscribeFb = researchFeedbackService.subscribeWorkspaceFeedback(newWs.id, (f) => setFeedbackList(f));
+                  
+                  // Unsubscribe from requests since we have a workspace now
+                  unsubscribeRequests();
+                } else if (declined) {
+                  setToast(`Adviser Request Declined by ${declined.adviserName}. You may select another adviser.`);
+                  // Clear request after a moment so they can try again
+                  setTimeout(() => {
+                     adviserRequestService.deleteRequest(declined.id).then(() => {
+                       navigate('/submit-title');
+                     });
+                  }, 2000);
+                } else if (!pending && !accepted && !declined) {
+                  // No requests at all, go to submit title
+                  navigate('/submit-title');
+                }
+              },
+              group?.id
+            );
+            return; // stop executing the rest of loadWorkspace
           }
         }
 
@@ -128,6 +157,7 @@ export const StudentResearchWorkspace = () => {
       unsubscribeWs();
       unsubscribeTasks();
       unsubscribeFb();
+      unsubscribeRequests();
     };
   }, [currentUser?.uid, queryWorkspaceId, isStudent, userProfile?.groupId]);
 
@@ -296,7 +326,7 @@ export const StudentResearchWorkspace = () => {
           <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto">
             <AlertCircle className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-gray-900 dark:text-white">
+          <h3 className="text-base font-medium text-gray-900 dark:text-white">
             No Active Research Workspace Found
           </h3>
           <p className="text-xs text-gray-500 max-w-md mx-auto">
@@ -333,82 +363,80 @@ export const StudentResearchWorkspace = () => {
       ) : (
         <div className="space-y-6">
           {/* Top Hero Card: Research Overview + Overall Progress Circle + Open Manuscript CTA */}
-          <Card className="p-6 bg-gradient-to-br from-white to-gray-50 dark:from-slate-900 dark:to-slate-900/60 border border-gray-200 dark:border-slate-800 shadow-sm">
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-              {/* Left Details */}
-              <div className="space-y-3 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="emerald">ACTIVE RESEARCH</Badge>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {workspace.department || 'College of Computer Studies'}
-                  </span>
-                </div>
-
-                <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-snug">
-                  {workspace.title}
-                </h1>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
-                    <Users className="w-4 h-4 text-primary shrink-0" />
-                    <div>
-                      <p className="text-[10px] uppercase font-bold text-gray-400">Research Group</p>
-                      <p className="font-semibold text-gray-800 dark:text-gray-200">
-                        {workspace.groupName} ({workspace.studentName})
-                      </p>
-                    </div>
+          <Card className="p-6 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+              {/* Left Details (75%) */}
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between space-y-4">
+                <div className="space-y-4">
+                  {/* Category */}
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {workspace.department || 'Computer Studies'}
                   </div>
 
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
-                    <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <div>
-                      <p className="text-[10px] uppercase font-bold text-gray-400">Faculty Adviser</p>
-                      <p className="font-semibold text-gray-800 dark:text-gray-200">
-                        {workspace.adviserName || 'Adviser Assignment in Progress'}
-                      </p>
-                    </div>
+                  {/* Title */}
+                  <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white leading-tight line-clamp-3">
+                    {workspace.title}
+                  </h1>
+                </div>
+
+                {/* Metadata */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-6 pt-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                      Research Group
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5 text-sm">
+                      <Users className="w-4 h-4 text-gray-400" />
+                      {workspace.groupName} <span className="text-gray-500 font-normal">({workspace.studentName})</span>
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                      Faculty Adviser
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5 text-sm">
+                      <UserCheck className="w-4 h-4 text-gray-400" />
+                      {workspace.adviserName || 'Adviser Assignment in Progress'}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Center: Dynamic Progress Circle */}
-              <div className="shrink-0 p-3 bg-white dark:bg-slate-800/80 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
-                <ResearchProgressCircle
-                  progress={overallProgress}
-                  status={workspace.status}
-                  phase={workspace.researchPhase}
-                  completedTasks={taskProgress.completed}
-                  totalTasks={taskProgress.total}
-                  subtitle="Research Completion"
-                />
-              </div>
+              {/* Right: Progress Circle & Actions (25%) */}
+              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between items-end w-full">
+                {/* Dynamic Progress Circle */}
+                <div className="flex-1 flex items-center justify-center lg:justify-end w-full lg:pr-8 py-2">
+                  <ResearchProgressCircle
+                    progress={overallProgress}
+                    size={100}
+                    strokeWidth={8}
+                    showDetails={false}
+                  />
+                </div>
 
-              {/* Right: Open Manuscript Button */}
-              <div className="flex flex-col gap-2 shrink-0 w-full lg:w-48">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full justify-center shadow-md"
-                  disabled={openingDoc}
-                  onClick={handleOpenManuscript}
-                >
-                  <FileEdit className="w-4 h-4 mr-2" />
-                  {openingDoc ? 'Opening...' : 'Open Manuscript'}
-                </Button>
-
-                <p className="text-[10px] text-center text-gray-400 dark:text-gray-500 mb-2">
-                  Launches real-time collaborative TipTap / Yjs document editor
-                </p>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-center text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
-                  onClick={handleResetWorkspace}
-                >
-                  <AlertCircle className="w-4 h-4 mr-1.5" />
-                  Abandon Workspace & Restart (Dev)
-                </Button>
+                {/* Actions */}
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full mt-4 lg:mt-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                    onClick={handleResetWorkspace}
+                  >
+                    Restart
+                  </Button>
+                  
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full sm:w-auto shadow-sm"
+                    disabled={openingDoc}
+                    onClick={handleOpenManuscript}
+                  >
+                    <FileEdit className="w-4 h-4 mr-2" />
+                    {openingDoc ? 'Opening...' : 'Open'}
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>

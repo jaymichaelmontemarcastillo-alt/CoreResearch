@@ -123,7 +123,7 @@ export const SubmitTitle = () => {
         {toast && <Toast message={toast} variant="success" onClose={() => setToast('')} />}
         <Card className="p-8 text-center border-t-4 border-t-purple-500">
           <BookOpen className="w-16 h-16 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Workspace Already Active</h2>
+          <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-2">Workspace Already Active</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
             You already have an active Research Workspace. You cannot submit a new title while a workspace is active.
           </p>

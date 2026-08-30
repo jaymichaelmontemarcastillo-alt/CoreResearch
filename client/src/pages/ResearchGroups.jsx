@@ -515,7 +515,7 @@ export const ResearchGroups = () => {
         <div className="space-y-6">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white leading-tight">
                 {courseFullName}
               </h2>
               {specFullName && (

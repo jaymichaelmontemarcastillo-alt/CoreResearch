@@ -23,7 +23,7 @@ export const useDocumentUpload = ({ userProfile, group, onSuccess }) => {
 
   const closeModal = useCallback(() => {
     // Only close if not actively uploading or processing
-    if (stage === UPLOAD_STAGES.UPLOADING || stage === UPLOAD_STAGES.PROCESSING || stage === UPLOAD_STAGES.CREATING_RECORD) {
+    if (stage === UPLOAD_STAGES.UPLOADING || stage === UPLOAD_STAGES.CONVERTING || stage === UPLOAD_STAGES.LOADING || stage === UPLOAD_STAGES.PREPARING || stage === UPLOAD_STAGES.SAVING) {
       return;
     }
     setIsOpen(false);
@@ -48,7 +48,7 @@ export const useDocumentUpload = ({ userProfile, group, onSuccess }) => {
     setSelectedFile(file);
     setErrorMessage('');
     setStage(UPLOAD_STAGES.UPLOADING);
-    setProgress(5);
+    setProgress(0);
 
     try {
       // 2. Dispatch to Document Import Pipeline
@@ -58,19 +58,24 @@ export const useDocumentUpload = ({ userProfile, group, onSuccess }) => {
         groupInfo: group,
         onProgress: (pct) => {
           setProgress(pct);
-          if (pct >= 90 && stage !== UPLOAD_STAGES.PROCESSING) {
-            setStage(UPLOAD_STAGES.PROCESSING);
+          if (pct === 100 && stage !== UPLOAD_STAGES.CONVERTING) {
+            setStage(UPLOAD_STAGES.CONVERTING);
           }
         },
       });
 
+      // API request completed successfully, document is saved in DB
+      setStage(UPLOAD_STAGES.LOADING);
       setCreatedDocument(newDoc);
-      setProgress(100);
-      setStage(UPLOAD_STAGES.COMPLETED);
+      
+      // Short delay to show the LOADING text before navigating
+      setTimeout(() => {
+        setStage(UPLOAD_STAGES.COMPLETED);
+        if (onSuccess) {
+          onSuccess(newDoc);
+        }
+      }, 500);
 
-      if (onSuccess) {
-        onSuccess(newDoc);
-      }
     } catch (err) {
       console.error('[useDocumentUpload] Import error:', err);
       setErrorMessage(err.message || 'An error occurred during document import.');

@@ -1,13 +1,17 @@
 // server/src/services/import/DocumentImportService.js
 import { DocxParser } from './docx/DocxParser.js';
+import { LibreOfficeParser } from './docx/LibreOfficeParser.js';
 import { PdfParser } from './pdf/PdfParser.js';
-import { DocumentIRToTiptap } from './tiptap/documentIRToTiptap.js';
+import { DocumentIRToTiptap, getTiptapExtensions } from './tiptap/documentIRToTiptap.js';
 import { getStorageProvider } from '../storage/storageManager.js';
-import { db, isDevMockMode, mockFirestoreDb } from '../../config/firebaseAdmin.js';
+import mongoose from 'mongoose';
+import { TiptapTransformer } from '@hocuspocus/transformer';
+import * as Y from 'yjs';
 
 export class DocumentImportService {
   constructor() {
     this.docxParser = new DocxParser();
+    this.libreOfficeParser = new LibreOfficeParser();
     this.pdfParser = new PdfParser();
     this.tiptapConverter = new DocumentIRToTiptap();
   }
@@ -40,17 +44,26 @@ export class DocumentImportService {
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storageProvider = getStorageProvider();
 
-    // 1. Select appropriate parser and parse to Document IR
-    let ir;
+    let parseResult;
+    let parserName = '';
+
+    // 1. Parse document to HTML and extract assets
     if (ext === 'docx') {
-      ir = await this.docxParser.parse(fileBuffer, fileName);
+      if (process.env.USE_LIBREOFFICE_IMPORT === 'true') {
+        parserName = 'libreoffice';
+        parseResult = await this.libreOfficeParser.parse(fileBuffer, fileName);
+      } else {
+        parserName = 'mammoth';
+        parseResult = await this.docxParser.parse(fileBuffer, fileName);
+      }
     } else if (ext === 'pdf') {
-      ir = await this.pdfParser.parse(fileBuffer, fileName);
+      parserName = 'pdf-parser';
+      parseResult = await this.pdfParser.parse(fileBuffer, fileName);
     } else {
       throw new Error(`Unsupported document format '.${ext}'. Supported formats are .docx and .pdf`);
     }
 
-    // 2. Upload original source file to persistent object storage
+    // 2. Upload original source file to persistent object storage (GridFS)
     const originalFileKey = `documents/${documentId}/original/${cleanFileName}`;
     const originalUpload = await storageProvider.upload(
       originalFileKey,
@@ -59,10 +72,10 @@ export class DocumentImportService {
       { documentId, uploadedBy: userProfile?.uid || 'user' }
     );
 
-    // 3. Upload extracted image assets to persistent storage
+    // 3. Upload extracted image assets to persistent storage (GridFS)
     const assetUrlMap = new Map();
-    if (Array.isArray(ir.assets) && ir.assets.length > 0) {
-      for (const asset of ir.assets) {
+    if (Array.isArray(parseResult.assets) && parseResult.assets.length > 0) {
+      for (const asset of parseResult.assets) {
         const assetKey = `documents/${documentId}/assets/${asset.fileName}`;
         try {
           const assetUpload = await storageProvider.upload(
@@ -78,74 +91,100 @@ export class DocumentImportService {
       }
     }
 
-    // 4. Convert Document IR into authoritative Tiptap JSON schema
-    const { tiptapJson, contentHtml, plainText } = this.tiptapConverter.convert(ir, assetUrlMap);
+    // 4. Convert to authoritative Tiptap JSON schema
+    const { tiptapJson, contentHtml, plainText } = this.tiptapConverter.convert(parseResult, assetUrlMap);
+
+    if (!tiptapJson || !tiptapJson.content || tiptapJson.content.length === 0) {
+      throw new Error('Tiptap conversion failed: Generated document is empty.');
+    }
 
     const now = new Date().toISOString();
     const ownerId = userProfile?.uid || 'guest-user';
-    const ownerName = userProfile?.fullName || userProfile?.first_name || 'Researcher';
-    const ownerRole = userProfile?.role || 'student';
-    const groupId = groupInfo?.id || userProfile?.groupId || '';
-    const groupName = groupInfo?.name || (groupId ? `Group ${groupId}` : '');
+    
+    // 5. Build authoritative document persistence schema for MongoDB
+    const warnings = parseResult.metadata?.warnings || [];
+    const unsupportedElements = [...new Set(warnings.map(w => {
+      const msg = w.message || '';
+      if (msg.includes('m:oMath')) return 'Equations (OMML)';
+      if (msg.includes('w:drawing')) return 'Floating Shapes/WordArt';
+      if (msg.includes('w:pict')) return 'VML Shapes';
+      if (msg.includes('w:footnote') || msg.includes('w:endnote')) return 'Footnotes/Endnotes';
+      if (msg.includes('w:hdr') || msg.includes('w:ftr')) return 'Headers/Footers';
+      if (msg.includes('w:txbxContent')) return 'Text Boxes';
+      if (msg.includes('unrecognised element')) return 'Unsupported XML Elements';
+      return null;
+    }).filter(Boolean))];
 
-    // 5. Construct Firestore Document Schema
-    const newDocumentRecord = {
-      id: documentId,
-      title: ir.metadata.title || cleanFileName.replace(/\.[^/.]+$/, ''),
-      fileName: cleanFileName,
-      ownerId,
-      ownerName,
-      ownerRole,
-      groupId,
-      groupName,
-      projectId: '',
-      content: tiptapJson,
-      contentHtml,
-      plainText,
-      sourceType: ext,
-      originalFile: {
-        storageProvider: originalUpload.storageProvider,
-        storageKey: originalUpload.storageKey,
-        fileName: cleanFileName,
+    const documentMetadata = {
+      sourceFormat: ext,
+      importMethod: parserName,
+      importStatus: 'completed',
+      sourceDocument: {
+        filename: cleanFileName,
         mimeType: mimeType || 'application/octet-stream',
         size: fileSize || fileBuffer.length,
         url: originalUpload.url,
+        storageKey: originalFileKey
       },
-      editorSettings: {
-        fontFamily: 'Inter',
-        fontSize: '11pt',
-        lineSpacing: '1.5',
-        page: ir.pageSettings,
+      content: {
+        tiptap: tiptapJson,
+        plainText,
+        html: contentHtml
       },
-      createdAt: now,
-      updatedAt: now,
-      lastOpenedAt: now,
-      updatedBy: ownerId,
-      collaboratorCount: 1,
-      isEditorDraft: true,
-      importStatus: 'completed',
-      importVersion: '1.0.0',
+      conversion: {
+        parser: parserName,
+        warnings: warnings,
+        unsupportedElements: unsupportedElements,
+        features: {
+          tables: "supported",
+          images: "supported",
+          captions: "supported",
+          equations: unsupportedElements.includes('Equations (OMML)') ? "unsupported" : "not present",
+          pageBreaks: "supported"
+        }
+      },
+      ...(parseResult.metadata?.pageSettings ? { pageSettings: parseResult.metadata.pageSettings } : {})
     };
 
-    // 6. Save to Firestore
-    if (isDevMockMode) {
-      if (!mockFirestoreDb.has('documents')) {
-        mockFirestoreDb.set('documents', new Map());
-      }
-      mockFirestoreDb.get('documents').set(documentId, newDocumentRecord);
-    } else if (db) {
-      try {
-        await db.collection('documents').doc(documentId).set(newDocumentRecord);
-      } catch (dbErr) {
-        console.warn('[DocumentImportService] Firestore write fallback:', dbErr.message);
-        if (!mockFirestoreDb.has('documents')) {
-          mockFirestoreDb.set('documents', new Map());
-        }
-        mockFirestoreDb.get('documents').set(documentId, newDocumentRecord);
-      }
+    // Generate deterministic Yjs state so Hocuspocus initializes correctly
+    let yjsBinaryState = null;
+    try {
+      const ydoc = TiptapTransformer.toYdoc(tiptapJson, 'default', getTiptapExtensions());
+      const stateUpdate = Y.encodeStateAsUpdate(ydoc);
+      yjsBinaryState = Buffer.from(stateUpdate);
+    } catch (transformerErr) {
+      console.error('[DocumentImportService] Failed to generate Yjs binary state:', transformerErr);
+      throw new Error('Document processing failed during Yjs generation.');
     }
 
-    return newDocumentRecord;
+    // 6. Save directly to MongoDB as the application source of truth
+    try {
+      const MongoDocument = mongoose.model('Document');
+      
+      await MongoDocument.create({
+        id: documentId,
+        title: parseResult.metadata?.title || cleanFileName.replace(/\.[^/.]+$/, ''),
+        abstract: '', 
+        status: 'draft',
+        authors: [ownerId],
+        adviser: null,
+        plainText: plainText,
+        yjsBinaryState, // Prevent race condition when Hocuspocus connects!
+        // Extra structured metadata per Persistence Requirement
+        ...documentMetadata
+      });
+    } catch (mongoErr) {
+      console.warn('[DocumentImportService] MongoDB write error:', mongoErr.message);
+      throw mongoErr;
+    }
+
+    // Return the structure expected by the client API response
+    return {
+      id: documentId,
+      title: parseResult.metadata?.title || cleanFileName.replace(/\.[^/.]+$/, ''),
+      content: tiptapJson,
+      ...documentMetadata
+    };
   }
 }
 

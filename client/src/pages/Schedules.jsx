@@ -156,7 +156,7 @@ export const Schedules = () => {
                   <Badge variant="blue">{(sch.status || "SCHEDULED").toUpperCase()}</Badge>
                 </div>
 
-                <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{sch.projectTitle}</h3>
+                <h3 className="text-base font-medium text-gray-900 dark:text-white leading-snug">{sch.projectTitle}</h3>
 
                 <div className="space-y-2 text-xs text-gray-600 dark:text-gray-300">
                   <div className="flex items-center gap-2">

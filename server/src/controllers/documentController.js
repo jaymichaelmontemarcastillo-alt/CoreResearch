@@ -1,14 +1,15 @@
-// server/src/controllers/documentController.js
 import fs from 'fs';
 import path from 'path';
+import mongoose from 'mongoose';
 import { documentImportService } from '../services/import/DocumentImportService.js';
-import { localStorageProvider } from '../services/storage/storageManager.js';
+import { getStorageProvider, localStorageProvider } from '../services/storage/storageManager.js';
 
 export const importDocument = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
+        errorCode: 'INVALID_DOCX',
         error: 'Bad Request',
         message: 'No file uploaded. Please select a .docx or .pdf file.',
       });
@@ -47,30 +48,34 @@ export const importDocument = async (req, res) => {
     });
   } catch (error) {
     console.error('[documentController] Import error:', error);
+    
+    // Attempt to map error messages to Phase 2 error codes
+    let errorCode = 'DOCX_CONVERSION_FAILED';
+    if (error.message.includes('Unsupported document format')) errorCode = 'UNSUPPORTED_FILE_TYPE';
+    if (error.message.includes('No file data')) errorCode = 'INVALID_DOCX';
+    if (error.message.includes('File too large')) errorCode = 'FILE_TOO_LARGE'; // Assuming multer handles this before reaching here usually
+    if (error.message.includes('Sanitization failed')) errorCode = 'SANITIZATION_FAILED';
+    if (error.message.includes('Tiptap conversion failed')) errorCode = 'TIPTAP_CONVERSION_FAILED';
+
     return res.status(500).json({
       success: false,
+      errorCode,
       error: 'Import Failed',
       message: error.message || 'An error occurred while importing the document.',
     });
   }
 };
 
-export const serveStorageAsset = (req, res) => {
+export const serveStorageAsset = async (req, res) => {
   try {
-    const rawPath = req.params[0] || '';
-    const cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
-    const filePath = localStorageProvider.getFilePath(cleanKey);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: `Asset '${cleanKey}' does not exist.`,
-      });
-    }
+    const rawPath = decodeURIComponent(req.params[0] || '');
+    // Normalize path but ensure we use forward slashes for MongoDB GridFS match
+    let cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
+    cleanKey = cleanKey.replace(/\\/g, '/'); // Crucial fix for Windows
+    const storageProvider = getStorageProvider();
 
     // Determine Content-Type
-    const ext = path.extname(filePath).toLowerCase();
+    const ext = path.extname(cleanKey).toLowerCase();
     const mimeMap = {
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
@@ -80,11 +85,20 @@ export const serveStorageAsset = (req, res) => {
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
 
+    const stream = await storageProvider.downloadStream(cleanKey);
+    
+    if (!stream) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: `Asset '${cleanKey}' does not exist.`,
+      });
+    }
+
     const contentType = mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
 
-    const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   } catch (err) {
     console.error('[documentController] Serve asset error:', err);
@@ -92,7 +106,41 @@ export const serveStorageAsset = (req, res) => {
   }
 };
 
+export const updatePageSettings = async (req, res) => {
+  try {
+    const documentId = req.params.id;
+    const { pageSettings } = req.body;
+
+    if (!documentId || !pageSettings) {
+      return res.status(400).json({ success: false, message: 'Missing documentId or pageSettings' });
+    }
+
+    const DocumentModel = mongoose.model('Document');
+    
+    // Find the document and update pageSettings
+    const updatedDoc = await DocumentModel.findOneAndUpdate(
+      { id: documentId },
+      { $set: { pageSettings: pageSettings } },
+      { new: true } // Return updated doc
+    );
+
+    if (!updatedDoc) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Page settings updated successfully.',
+      pageSettings: updatedDoc.pageSettings,
+    });
+  } catch (error) {
+    console.error('[documentController] updatePageSettings error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update page settings' });
+  }
+};
+
 export default {
   importDocument,
   serveStorageAsset,
+  updatePageSettings,
 };

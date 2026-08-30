@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { User } from '../models/User.js';
 import { auth, db, mockUsersDb } from '../config/firebaseAdmin.js';
 
 /**
@@ -95,9 +97,21 @@ export const verifyToken = async (req, res, next) => {
     const name = decodedToken.name || email.split('@')[0] || 'User';
     const picture = decodedToken.picture || '';
 
-    // 3. Fetch user profile from Firestore or mock DB safely
+    // 3. Fetch user profile from MongoDB, then Firestore, or mock DB safely
     let userData = null;
-    if (db) {
+    
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const userDoc = await User.findOne({ uid }).lean();
+        if (userDoc) {
+          userData = userDoc;
+        }
+      }
+    } catch (dbErr) {
+      console.warn('[AuthMiddleware] MongoDB read warning:', dbErr.message);
+    }
+
+    if (!userData && db) {
       try {
         const userDoc = await db.collection('users').doc(uid).get();
         if (userDoc.exists) {

@@ -13,12 +13,15 @@ import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Image } from '@tiptap/extension-image';
+import { Link } from '@tiptap/extension-link';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import HorizontalRuleBase from '@tiptap/extension-horizontal-rule';
 import * as Y from 'yjs';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
+import { AutoPagination, paginationPluginKey } from './extensions/AutoPagination';
 
 // Custom CommentMark Extension for Google Docs style anchored manuscript comments
 export const CommentMark = Mark.create({
@@ -351,6 +354,45 @@ export const ParagraphIndent = Extension.create({
       },
     ];
   },
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        return this.editor.commands.command(({ tr, state, dispatch }) => {
+          const { $from, empty } = state.selection;
+          if (!empty) return false;
+
+          if ($from.parentOffset === 0 && ($from.parent.type.name === 'paragraph' || $from.parent.type.name === 'heading')) {
+            if (dispatch) {
+              tr.setNodeMarkup($from.before(), null, { ...$from.parent.attrs, textIndent: '0.5in' });
+            }
+            return true;
+          }
+
+          if (dispatch) {
+            tr.insertText('\u00a0\u00a0\u00a0\u00a0');
+          }
+          return true;
+        });
+      },
+      'Shift-Tab': () => {
+        return this.editor.commands.command(({ tr, state, dispatch }) => {
+          const { $from, empty } = state.selection;
+          if (!empty) return false;
+
+          if ($from.parent.type.name === 'paragraph' || $from.parent.type.name === 'heading') {
+            const currentIndent = $from.parent.attrs.textIndent;
+            if (currentIndent) {
+              if (dispatch) {
+                tr.setNodeMarkup($from.before(), null, { ...$from.parent.attrs, textIndent: null });
+              }
+              return true;
+            }
+          }
+          return false;
+        });
+      },
+    };
+  },
 });
 
 // Custom TableCell with background shading & border color support
@@ -428,6 +470,22 @@ export const CustomImage = Image.extend({
   },
 });
 
+// Custom Horizontal Rule to preserve LibreOffice page breaks
+export const CustomHorizontalRule = HorizontalRuleBase.extend({
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('class'),
+        renderHTML: (attributes) => {
+          if (!attributes.class) return {};
+          return { class: attributes.class };
+        },
+      },
+    };
+  },
+});
+
 // A simple hash function for assigning distinct collaborator colors
 const getUserColor = (userId) => {
   const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6'];
@@ -453,9 +511,11 @@ export const DocumentEditor = ({
   onEditorReady,
   onContentChange,
   onCommentSelect,
+  previewingVersion,
 }) => {
   const commentsRef = useRef(comments);
   commentsRef.current = comments;
+  const [pageCount, setPageCount] = React.useState(1);
 
   const effectiveUser = useMemo(() => ({
     name: userProfile?.fullName || userProfile?.first_name || 'Researcher',
@@ -468,13 +528,43 @@ export const DocumentEditor = ({
   }, []);
 
   const extensions = useMemo(() => {
+    let rawHeight = 1056;
+    if (pageSettings?.size === 'a4') rawHeight = 1123;
+    else if (pageSettings?.size === 'legal') rawHeight = 1344;
+    
+    if (pageSettings?.orientation === 'landscape') {
+      rawHeight = pageSettings?.size === 'a4' ? 794 : 816;
+    }
+
+    const parseMargin = (val) => {
+      if (!val) return 96;
+      if (val.includes('in')) return parseFloat(val) * 96;
+      if (val.includes('px')) return parseFloat(val);
+      if (val.includes('cm')) return parseFloat(val) * 37.8;
+      return 96;
+    };
+
+    const contentHeight = rawHeight - parseMargin(pageSettings?.marginTop) - parseMargin(pageSettings?.marginBottom);
+
     const list = [
       StarterKit.configure({
-        history: false, // Managed by Yjs collaboration
+        history: previewingVersion ? true : false, // Managed by Yjs collaboration normally, but enable locally for preview mode
+        // Disable extensions bundled in StarterKit v3 that we register
+        // explicitly below with custom configuration/attributes
+        horizontalRule: false,
+        link: false,
+        underline: false,
+      }),
+      AutoPagination.configure({
+        contentHeight: contentHeight > 200 ? contentHeight : 864,
       }),
       Underline,
       Superscript,
       Subscript,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+      }),
       TextStyle,
       FontFamily,
       FontSize,
@@ -484,6 +574,7 @@ export const DocumentEditor = ({
       Color,
       Highlight.configure({ multicolor: true }),
       activeCommentsExt,
+      CustomHorizontalRule,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       CustomImage.configure({ inline: true, allowBase64: true }),
       Table.configure({ resizable: true }),
@@ -492,7 +583,7 @@ export const DocumentEditor = ({
       CustomTableCell,
     ];
 
-    if (ydoc) {
+    if (ydoc && !previewingVersion) {
       list.push(
         Collaboration.configure({
           document: ydoc,
@@ -500,7 +591,7 @@ export const DocumentEditor = ({
       );
     }
 
-    if (provider && provider.awareness && provider.doc) {
+    if (provider && provider.awareness && provider.doc && !previewingVersion) {
       try {
         list.push(
           CollaborationCursor.configure({
@@ -514,7 +605,7 @@ export const DocumentEditor = ({
     }
 
     return list;
-  }, [ydoc, provider, effectiveUser, activeCommentsExt]);
+  }, [ydoc, provider, effectiveUser, activeCommentsExt, previewingVersion]);
 
   const editor = useEditor({
     extensions,
@@ -522,6 +613,12 @@ export const DocumentEditor = ({
     onUpdate: ({ editor: currentEditor }) => {
       if (onContentChange) {
         onContentChange(currentEditor);
+      }
+    },
+    onTransaction: ({ editor: currentEditor }) => {
+      const state = paginationPluginKey.getState(currentEditor.state);
+      if (state && state.pageCount !== undefined) {
+        setPageCount((prev) => (prev !== state.pageCount ? state.pageCount : prev));
       }
     },
     editorProps: {
@@ -576,24 +673,36 @@ export const DocumentEditor = ({
     }
 
     try {
-      if (initialContent && !initializedContentRef.current) {
-        editor.commands.setContent(initialContent, false);
-        initializedContentRef.current = true;
-      } else if (ydoc) {
-        const fragment = ydoc.getXmlFragment('default');
-        const isFragmentEmpty = fragment.length === 0;
-
-        if (initialContent && (isFragmentEmpty || editor.isEmpty)) {
+      if (!ydoc) {
+        // Non-collaborative mode: safely apply initialContent directly
+        if (initialContent && !initializedContentRef.current) {
           editor.commands.setContent(initialContent, false);
           initializedContentRef.current = true;
-        } else if (isFragmentEmpty && editor.isEmpty && sourceType === 'native' && !initialContent && !initializedContentRef.current) {
-          const heading = title && title !== 'Untitled Document' ? title : '';
-          if (heading) {
-            editor.commands.setContent(`<h1>${heading}</h1><p></p>`, false);
-          } else {
-            editor.commands.setContent(`<p></p>`, false);
+        }
+      } else {
+        // Collaborative mode (Yjs via Hocuspocus)
+        // The provider automatically manages state sync. Do NOT setContent from props
+        // to avoid duplicating the Yjs binary state coming from the server.
+        
+        const initTemplate = () => {
+          if (!initializedContentRef.current) {
+            const fragment = ydoc.getXmlFragment('default');
+            // If the document is natively created (not imported) and genuinely empty after sync, set a default
+            if (fragment.length === 0 && editor.isEmpty && sourceType === 'native') {
+              editor.commands.setContent(`<p></p>`, false);
+            }
+            initializedContentRef.current = true;
           }
-          initializedContentRef.current = true;
+        };
+
+        if (provider && provider.isSynced) {
+          initTemplate();
+        } else if (provider) {
+          provider.on('synced', initTemplate);
+          return () => provider.off('synced', initTemplate);
+        } else {
+          // Fallback if no provider object is explicitly passed but ydoc is
+          initTemplate(); 
         }
       }
 
@@ -620,31 +729,58 @@ export const DocumentEditor = ({
     }
   }, [editor, ydoc, initialContent, sourceType]);
 
+  // Handle previewing a specific version
+  useEffect(() => {
+    if (editor && previewingVersion) {
+      // Temporarily set content to the version snapshot
+      editor.commands.setContent(previewingVersion.content, false);
+    }
+  }, [editor, previewingVersion]);
+
   // Compute paper dimension styles based on pageSettings
   const pageStyle = useMemo(() => {
     const isLandscape = pageSettings?.orientation === 'landscape';
-    let width = 816; // Letter 8.5in in px (96 DPI)
-    let minHeight = 1056; // Letter 11in in px
+    let paperWidth = 816; // Letter 8.5in in px (96 DPI)
+    let paperHeight = 1056; // Letter 11in in px
 
     if (pageSettings?.size === 'a4') {
-      width = 794; // 8.27in
-      minHeight = 1123; // 11.69in
+      paperWidth = 794; // 8.27in
+      paperHeight = 1123; // 11.69in
     } else if (pageSettings?.size === 'legal') {
-      width = 816;
-      minHeight = 1344; // 14in
+      paperWidth = 816;
+      paperHeight = 1344; // 14in
     }
 
     if (isLandscape) {
-      const temp = width;
-      width = minHeight;
-      minHeight = temp;
+      const temp = paperWidth;
+      paperWidth = paperHeight;
+      paperHeight = temp;
     }
 
-    const padding = `${pageSettings?.marginTop || '1in'} ${pageSettings?.marginRight || '1in'} ${pageSettings?.marginBottom || '1in'} ${pageSettings?.marginLeft || '1in'}`;
+    const parseMargin = (val) => {
+      if (!val) return 96;
+      if (val.includes('in')) return parseFloat(val) * 96;
+      if (val.includes('px')) return parseFloat(val);
+      if (val.includes('cm')) return parseFloat(val) * 37.8;
+      return 96;
+    };
+
+    const marginTop = parseMargin(pageSettings?.marginTop);
+    const marginRight = parseMargin(pageSettings?.marginRight);
+    const marginBottom = parseMargin(pageSettings?.marginBottom);
+    const marginLeft = parseMargin(pageSettings?.marginLeft);
+
+    const padding = `${marginTop}px ${marginRight}px ${marginBottom}px ${marginLeft}px`;
 
     return {
-      width: `${width}px`,
-      minHeight: `${minHeight}px`,
+      '--page-width': `${paperWidth}px`,
+      '--page-height': `${paperHeight}px`,
+      '--page-margin-top': `${marginTop}px`,
+      '--page-margin-right': `${marginRight}px`,
+      '--page-margin-bottom': `${marginBottom}px`,
+      '--page-margin-left': `${marginLeft}px`,
+      width: `${paperWidth}px`,
+      minHeight: `${paperHeight}px`,
       padding,
     };
   }, [pageSettings]);
@@ -659,17 +795,57 @@ export const DocumentEditor = ({
   }
 
   return (
-    <div className="document-editor-container flex justify-center py-6">
+    <div className="document-editor-container flex justify-center py-8 bg-gray-100 min-h-screen">
       {/* Editor CSS styles for ProseMirror, Carets, Selection, Tables, Page Breaks, and Image alignment */}
       <style>{`
         .ProseMirror {
-          width: ${pageStyle.width};
-          min-height: ${pageStyle.minHeight};
+          --page-width: ${pageStyle['--page-width']};
+          --page-height: ${pageStyle['--page-height']};
+          --page-margin-top: ${pageStyle['--page-margin-top']};
+          --page-margin-right: ${pageStyle['--page-margin-right']};
+          --page-margin-bottom: ${pageStyle['--page-margin-bottom']};
+          --page-margin-left: ${pageStyle['--page-margin-left']};
+          
+          width: var(--page-width);
+          min-height: var(--page-height);
           padding: ${pageStyle.padding};
           box-sizing: border-box;
           margin: 0 auto;
           background: #ffffff;
           font-family: inherit;
+          text-align: left;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          position: relative;
+        }
+
+        /* Physical Page Visual Split (AutoPagination Gap + Spacer) */
+        .ProseMirror .page-break-widget {
+          user-select: none;
+          pointer-events: none;
+          display: block;
+        }
+
+        .ProseMirror .page-break-gap {
+          display: block;
+          height: 40px;
+          background-color: #f3f4f6; /* Same as workspace background */
+          
+          /* Push out into the page margins to cut the white paper completely */
+          margin-left: calc(-1 * var(--page-margin-left));
+          margin-right: calc(-1 * var(--page-margin-right));
+          width: var(--page-width);
+          
+          /* Visual shadow trick to make it look like separate papers */
+          box-shadow: 
+            inset 0 4px 6px -4px rgba(0,0,0,0.1),
+            inset 0 -4px 6px -4px rgba(0,0,0,0.1);
+        }
+
+        :is(.dark) .ProseMirror .page-break-gap {
+          background-color: #0f172a; /* matches dark bg-slate-900 */
+          box-shadow: 
+            inset 0 4px 6px -4px rgba(0,0,0,0.3),
+            inset 0 -4px 6px -4px rgba(0,0,0,0.3);
         }
 
         .ProseMirror:focus {
@@ -847,6 +1023,7 @@ export const DocumentEditor = ({
           border: 1px solid #334155;
         }
 
+
         /* Image alignment helpers */
         .ProseMirror img {
           max-width: 100%;
@@ -905,6 +1082,17 @@ export const DocumentEditor = ({
           list-style-type: decimal;
           padding-left: 1.5rem;
           margin: 0.5rem 0;
+        }
+        
+        /* Explicit Page Breaks from LibreOffice */
+        .ProseMirror hr.page-break {
+          display: none; /* AutoPagination will render the visual gap, hide this semantic marker */
+        }
+
+        .ProseMirror hr {
+          border: none;
+          border-top: 1px solid #e2e8f0;
+          margin: 1rem 0;
         }
       `}</style>
       

@@ -116,6 +116,8 @@ export const groupService = {
       courseName?: string;
       sectionId?: string;
       sectionName?: string;
+      adviserId?: string;
+      panelists?: any[];
     }
   ): Promise<void> {
     const ref = doc(db, COLLECTION_NAME, groupId);
@@ -129,6 +131,14 @@ export const groupService = {
     
     if (data.adviserName !== undefined) {
       updateData.adviserName = data.adviserName;
+    }
+    
+    if (data.adviserId !== undefined) {
+      updateData.adviserId = data.adviserId;
+    }
+
+    if (data.panelists !== undefined) {
+      updateData.panelists = data.panelists;
     }
     
     if (data.members !== undefined) {

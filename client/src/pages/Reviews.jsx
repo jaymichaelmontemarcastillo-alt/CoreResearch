@@ -109,7 +109,7 @@ export const Reviews = () => {
         {(role === "adviser" || role === "panelist" || role === "admin") && (
           <div className="lg:col-span-5">
             <Card className="space-y-4 sticky top-20">
-              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-base font-medium text-gray-900 dark:text-white flex items-center gap-2">
                 <HiChatBubbleBottomCenterText className="w-5 h-5 text-primary" /> Post Manuscript Review Feedback
               </h2>
 

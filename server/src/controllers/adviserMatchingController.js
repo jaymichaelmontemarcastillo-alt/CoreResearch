@@ -4,33 +4,38 @@
  * Handles HTTP requests for adviser matching.
  * This is the gateway between the React frontend and the NLP service.
  * 
- * Flow:
+ * Flow (Phase 6 Target Architecture):
  *   React → POST /api/adviser-matching/match → This Controller
- *     → Fetch advisers from Firestore/mock
+ *     → Check MongoDB MatchCache
+ *     → Fetch advisers from MongoDB User collection
  *     → Filter eligible advisers
- *     → Call AdviserMatchingService.matchAdvisers()
+ *     → Call AdviserMatchingService.matchAdvisers() (External Provider)
  *     → Validate & normalize results
  *     → Enforce top 5
- *     → Persist match results
+ *     → Persist match results to MongoDB MatchCache
  *     → Return to React
  */
 
-import { db, isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
+import mongoose from 'mongoose';
+import { User } from '../models/User.js';
+import { MatchCache } from '../models/MatchCache.js';
 import adviserMatchingService from '../services/adviserMatchingService.js';
+import { isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
 
 /**
- * Fetch all adviser users from Firestore or mock DB.
+ * Fetch all adviser users from MongoDB.
  * Only returns users with role='adviser' that are active and eligible.
  */
 async function getEligibleAdvisers() {
-  if (!db) {
+  if (mongoose.connection.readyState !== 1) {
     throw new Error('Database connection unavailable');
   }
 
-  console.log('[AdviserMatching] Fetching eligible advisers from Firestore...');
-  const snapshot = await db.collection('users').where('role', '==', 'adviser').get();
-  console.log(`[AdviserMatching] Successfully fetched ${snapshot.docs.length} advisers from Firestore.`);
-  const allUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+  console.log('[AdviserMatching] Fetching eligible advisers from MongoDB...');
+  
+  // Directly query the authoritative MongoDB
+  const allUsers = await User.find({ role: 'adviser' }).lean();
+  console.log(`[AdviserMatching] Successfully fetched ${allUsers.length} advisers from MongoDB.`);
 
   // Filter to eligible advisers only
   const advisers = allUsers.filter(u => {
@@ -42,7 +47,6 @@ async function getEligibleAdvisers() {
 
   return advisers;
 }
-
 
 /**
  * POST /api/adviser-matching/match
@@ -68,15 +72,13 @@ export const matchAdvisers = async (req, res) => {
     const cleanTitle = title.trim();
     const cleanDesc = (description || '').trim();
 
-    // ── Duplicate Submission Protection ────────────────────────────────────
-    // Check if a match was already generated for the same title recently
+    // ── Duplicate Submission Protection (MongoDB Cache) ───────────────────
     const matchCacheKey = `match_${user.uid}_${cleanTitle.toLowerCase().replace(/\s+/g, '_').substring(0, 80)}`;
 
-    if (db) {
+    if (mongoose.connection.readyState === 1) {
       try {
-        const cacheDoc = await db.collection('adviser_matches').doc(matchCacheKey).get();
-        if (cacheDoc.exists) {
-          const existing = cacheDoc.data();
+        const existing = await MatchCache.findOne({ id: matchCacheKey }).lean();
+        if (existing) {
           const ageMs = Date.now() - new Date(existing.generatedAt).getTime();
           if (ageMs < 5 * 60 * 1000) {
             console.log(`[AdviserMatching] Returning cached match for "${cleanTitle.substring(0, 40)}..." (age: ${Math.round(ageMs / 1000)}s)`);
@@ -94,9 +96,14 @@ export const matchAdvisers = async (req, res) => {
           }
         }
       } catch (cacheErr) {
-        // Cache miss is fine, proceed with matching
         console.warn('[AdviserMatching] Cache check warning:', cacheErr.message);
       }
+    } else {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Database is temporarily unavailable.',
+      });
     }
 
     // ── Fetch Eligible Advisers ───────────────────────────────────────────
@@ -105,7 +112,7 @@ export const matchAdvisers = async (req, res) => {
       advisers = await getEligibleAdvisers();
     } catch (dbErr) {
       console.error('[AdviserMatching] Failed to fetch advisers:', dbErr);
-      return res.status(500).json({
+      return res.status(503).json({
         success: false,
         error: 'Database Unavailable',
         message: 'Unable to load adviser data. The adviser matching service could not retrieve the current adviser profiles.',
@@ -124,20 +131,6 @@ export const matchAdvisers = async (req, res) => {
     }
 
     // ── Prepare adviser data for matching (only matching-relevant fields) ─
-    // ── Normalization Layer: Support both legacy text and new selection-based expertise ──
-    //
-    // Each field is normalized INDEPENDENTLY so the Python NLP engine can
-    // compute separate sub-scores (specialization 25%, expertise 15%,
-    // researchInterests 10%) using its weighted scoring model.
-    //
-    // Supported formats per field:
-    //   - Array of strings:  ["Web Dev", "AI"]           (new format)
-    //   - Comma-separated:   "Web Dev, AI"               (legacy format)
-    //   - null / undefined / empty                       (missing data — safe)
-    //
-    // The new `selectedExpertise` field from ProfileSettings is used as a
-    // fallback for `expertise` when the legacy expertise field is empty.
-
     const normalizeField = (field) => {
       if (!field) return [];
       if (Array.isArray(field)) {
@@ -163,13 +156,10 @@ export const matchAdvisers = async (req, res) => {
       const researchInterests = normalizeField(adv.researchInterests);
       const keywords = normalizeField(adv.keywords);
 
-      // If legacy expertise is empty, fall back to the new selectedExpertise field
       if (expertise.length === 0) {
         expertise = normalizeField(adv.selectedExpertise);
       }
 
-      // If the adviser ONLY has selectedExpertise (new UI) and no other fields,
-      // use it to populate specialization as well so they aren't invisible to matching
       const selected = normalizeField(adv.selectedExpertise);
       const hasLegacyData = specialization.length > 0 || researchInterests.length > 0 || keywords.length > 0;
 
@@ -193,13 +183,8 @@ export const matchAdvisers = async (req, res) => {
         adviserProfiles
       );
     } catch (matchError) {
-      // NLP service unavailable or errored
       console.error('[AdviserMatching] Matching service error:', matchError.message);
-
-      const statusCode = matchError.message.includes('unavailable') || matchError.message.includes('timed out')
-        ? 503
-        : 500;
-
+      const statusCode = matchError.message.includes('unavailable') || matchError.message.includes('timed out') ? 503 : 500;
       return res.status(statusCode).json({
         success: false,
         error: statusCode === 503 ? 'Service Unavailable' : 'Matching Error',
@@ -212,12 +197,10 @@ export const matchAdvisers = async (req, res) => {
     const executionTimeMs = Date.now() - startTime;
 
     // ── Validate & Enrich Results ─────────────────────────────────────────
-    // Re-attach adviser display info (name, department) from the full data
     const adviserMap = new Map(advisers.map(a => [a.uid, a]));
 
     const enrichedResults = matchResults
       .filter(r => {
-        // Ensure the adviser is still eligible
         const adv = adviserMap.get(r.adviserId);
         if (!adv) {
           console.warn(`[AdviserMatching] Removing unknown adviser: ${r.adviserId}`);
@@ -231,40 +214,39 @@ export const matchAdvisers = async (req, res) => {
           ...r,
           adviserName: adv.fullName || 'Unknown Adviser',
           department: adv.department || 'N/A',
-          // Normalize score to 0–100
           score: Math.round(Math.min(Math.max(r.score || 0, 0), 100)),
           compatibilityScore: Math.round(Math.min(Math.max(r.score || 0, 0), 100)),
         };
       });
 
-    // ── Sort by score and take Top 5 ──────────────────────────────────────
     enrichedResults.sort((a, b) => b.score - a.score);
     const top5 = enrichedResults.slice(0, 5);
 
-    // ── Persist Match Results ─────────────────────────────────────────────
-    const matchRecord = {
-      id: matchCacheKey,
-      studentId: user.uid,
-      studentName: user.fullName || user.email,
-      title: cleanTitle,
-      description: cleanDesc,
-      results: top5,
-      provider: adviserMatchingService.getProviderName(),
-      algorithmVersion: adviserMatchingService.getAlgorithmVersion(),
-      executionTimeMs,
-      generatedAt: new Date().toISOString(),
-    };
-
+    // ── Persist Match Results (MongoDB) ───────────────────────────────────
     try {
-      if (db) {
-        await db.collection('adviser_matches').doc(matchCacheKey).set(matchRecord);
+      if (mongoose.connection.readyState === 1) {
+        await MatchCache.findOneAndUpdate(
+          { id: matchCacheKey },
+          {
+            $set: {
+              studentId: user.uid,
+              studentName: user.fullName || user.email,
+              title: cleanTitle,
+              description: cleanDesc,
+              results: top5,
+              provider: adviserMatchingService.getProviderName(),
+              algorithmVersion: adviserMatchingService.getAlgorithmVersion(),
+              executionTimeMs,
+              generatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
       }
     } catch (persistErr) {
-      // Non-critical — don't fail the request
       console.warn('[AdviserMatching] Failed to persist match results:', persistErr.message);
     }
 
-    // ── Log Summary ───────────────────────────────────────────────────────
     console.log(
       `[AdviserMatching] Match complete\n` +
       `  Research ID: ${matchCacheKey}\n` +
@@ -275,7 +257,6 @@ export const matchAdvisers = async (req, res) => {
       `  Algorithm: ${adviserMatchingService.getAlgorithmVersion()}`
     );
 
-    // ── Return Results ────────────────────────────────────────────────────
     return res.status(200).json({
       success: true,
       cached: false,
@@ -285,7 +266,7 @@ export const matchAdvisers = async (req, res) => {
         algorithmVersion: adviserMatchingService.getAlgorithmVersion(),
         advisersEvaluated: advisers.length,
         executionTimeMs,
-        generatedAt: matchRecord.generatedAt,
+        generatedAt: new Date().toISOString(),
       },
     });
   } catch (error) {

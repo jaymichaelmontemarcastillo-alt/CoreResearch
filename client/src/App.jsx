@@ -33,6 +33,7 @@ import { Reviews } from './pages/Reviews';
 import { Schedules } from './pages/Schedules';
 import { Repository } from './pages/Repository';
 import { ProfileSettings } from './pages/ProfileSettings';
+import { Scheduling } from './pages/Scheduling';
 
 export default function App() {
   return (
@@ -102,6 +103,7 @@ export default function App() {
                   <Route path="/research-groups" element={<ResearchGroups />} />
                   <Route path="/groups" element={<ResearchGroups />} />
                   <Route path="/admin/groups" element={<ResearchGroups />} />
+                  <Route path="/admin/scheduling" element={<Scheduling />} />
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={['admin']} />}>

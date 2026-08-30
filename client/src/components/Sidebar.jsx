@@ -175,6 +175,12 @@ export const Sidebar = ({
           roles: ["admin", "research_coordinator"],
         },
         {
+          label: "Scheduling",
+          path: "/admin/scheduling",
+          icon: HiCalendarDays,
+          roles: ["admin", "research_coordinator"],
+        },
+        {
           label: "Courses",
           path: "/admin/courses",
           icon: HiBookOpen,

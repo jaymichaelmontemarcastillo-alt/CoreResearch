@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   writeBatch,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { AppNotification, CreateNotificationInput } from '../types/notification.types';
@@ -46,6 +47,25 @@ export const notificationService = {
     return results.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+  },
+
+  /**
+   * Real-time subscription to a user's notifications.
+   */
+  subscribeUserNotifications(userId: string, callback: (notifications: AppNotification[]) => void): () => void {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('userId', '==', userId)
+    );
+    return onSnapshot(q, (querySnap) => {
+      const results = querySnap.docs.map((docSnap) => docSnap.data() as AppNotification);
+      const sorted = results.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      callback(sorted);
+    }, (error) => {
+      console.error('Error subscribing to notifications:', error);
+    });
   },
 
   /**

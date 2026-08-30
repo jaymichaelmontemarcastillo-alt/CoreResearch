@@ -148,7 +148,7 @@ export const Dashboard = () => {
       <div className="p-6 sm:p-8 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
               {getGreeting()}, {displayName} 👋
             </h1>
           </div>
@@ -253,7 +253,7 @@ export const Dashboard = () => {
                       <HiAcademicCap className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Academic Profile</h3>
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">Academic Profile</h3>
                       {userProfile.courseId ? (
                         <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                           <p>
@@ -371,7 +371,7 @@ export const Dashboard = () => {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                    <h4 className="text-base font-medium text-gray-900 dark:text-white">
                       {studentResearch.workspace?.title ||
                         studentResearch.proposal?.title ||
                         studentResearch.documents[0]?.title ||
@@ -726,17 +726,14 @@ const AdviserRequestsWidget = () => {
 
   useEffect(() => {
     if (!currentUser?.uid) return;
-    const fetchRequests = async () => {
-      try {
-        const reqs = await adviserRequestService.getPendingRequestsForAdviser(currentUser.uid);
-        setRequests(reqs);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRequests();
+    
+    setLoading(true);
+    const unsubscribe = adviserRequestService.subscribeToPendingAdviserRequests(currentUser.uid, (reqs) => {
+      setRequests(reqs);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [currentUser]);
 
   const handleAccept = async (reqId) => {
@@ -797,7 +794,7 @@ const AdviserRequestsWidget = () => {
                 <Badge variant="amber">New Request</Badge>
                 <span className="text-xs text-gray-400">Received {new Date(req.createdAt).toLocaleDateString()}</span>
               </div>
-              <h4 className="text-lg font-bold text-gray-900 dark:text-white">{req.researchTitle}</h4>
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white">{req.researchTitle}</h4>
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{req.researchDescription}</p>
               
               <div className="flex gap-4 mt-3 text-xs text-gray-500">
