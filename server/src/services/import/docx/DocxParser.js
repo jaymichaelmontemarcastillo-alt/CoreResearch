@@ -182,8 +182,8 @@ export class DocxParser {
     const result = await mammoth.convertToHtml({ path: filePath }, options);
     
     let finalHtml = result.value || '<p></p>';
-    if (paragraphFormats.length > 0 || runFormats.length > 0 || tableFormats.length > 0) {
-      finalHtml = this._injectFormatting(finalHtml, paragraphFormats, runFormats, tableFormats);
+    if (formatting && (formatting.paragraphs.length > 0 || formatting.runs.length > 0 || formatting.tables.length > 0)) {
+      finalHtml = this._injectFormatting(finalHtml, formatting.paragraphs, formatting.runs, formatting.tables);
     }
 
     return {
