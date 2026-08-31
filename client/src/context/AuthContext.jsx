@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }) => {
   // Pag successful, ginagamit yung returned UID para ma-identify yung user sa backend.
   // Connected ito sa Register page. Kahit incomplete pa yung ibang details (kasi sa Onboarding pa yun),
   // gagawa na tayo ng record sa backend/Firestore via API para may connection na.
-  const register = async (email, password, fullName, role, department, studentIdOrEmployeeId, program = '') => {
+  const register = async (email, password, fullName, role, department, studentIdOrEmployeeId, program = '', programSpecialization = '') => {
     setLoading(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -148,6 +148,7 @@ export const AuthProvider = ({ children }) => {
           department: department || 'Information Technology',
           department_id: department || 'Information Technology',
           program: program || '',
+          programSpecialization: programSpecialization || '',
           studentIdOrEmployeeId: studentIdOrEmployeeId || '',
           status: 'active',
           is_approved: true,

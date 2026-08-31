@@ -92,7 +92,7 @@ export const Login = () => {
             <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
             <input
               type="email"
-              placeholder="Input your email"
+              placeholder="name@company.com"
               className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -110,7 +110,7 @@ export const Login = () => {
             <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
             <input
               type={showPassword ? "text" : "password"}
-              placeholder="Input your password"
+              placeholder="••••••••"
               className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 rounded-xl text-sm pl-10 pr-10 transition"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -128,7 +128,7 @@ export const Login = () => {
 
         {/* Remember Me & Forgot Password Row */}
         <div className="flex items-center justify-between pt-1">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-600 dark:text-[#9396a8]">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-600 dark:text-gray-300">
             <input
               type="checkbox"
               checked={rememberMe}
@@ -139,7 +139,7 @@ export const Login = () => {
           </label>
           <Link
             to="/forgot-password"
-            className="text-xs text-gray-600 dark:text-[#9396a8] hover:text-blue-600 dark:hover:text-blue-400 transition font-medium"
+            className="text-xs text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition font-medium"
           >
             Forgot Password?
           </Link>
@@ -178,7 +178,7 @@ export const Login = () => {
           type="button"
           disabled={googleLoading || loading}
           onClick={handleGoogleSignIn}
-          className="w-full h-11 sm:h-12 px-4 rounded-full bg-white dark:bg-[#0e0f15] hover:bg-gray-50 dark:hover:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#f3f4f8] text-sm font-medium flex items-center justify-center gap-3 transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+          className="w-full h-11 sm:h-12 px-4 rounded-full bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center justify-center gap-3 transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
         >
           {googleLoading ? (
             <span className="flex items-center gap-2">

@@ -30,16 +30,12 @@ const PROGRAM_OPTIONS = [
     label: "Bachelor of Science in Computer Science",
     department: "Computer Science",
   },
-  {
-    value: "Bachelor of Science in Information Systems",
-    label: "Bachelor of Science in Information Systems",
-    department: "Information Systems",
-  },
-  {
-    value: "Bachelor of Science in Computer Engineering",
-    label: "Bachelor of Science in Computer Engineering",
-    department: "Computer Engineering",
-  },
+];
+
+const SPECIALIZATION_OPTIONS = [
+  { value: "Web and Mobile Development (WMAD)", label: "Web and Mobile Development (WMAD)" },
+  { value: "Animation and Motion Graphics (AMG)", label: "Animation and Motion Graphics (AMG)" },
+  { value: "Service Management Program (SMP)", label: "Service Management Program (SMP)" },
 ];
 
 export const Register = () => {
@@ -48,6 +44,7 @@ export const Register = () => {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("student");
   const [program, setProgram] = useState("Bachelor of Science in Information Technology");
+  const [programSpecialization, setProgramSpecialization] = useState("Web and Mobile Development (WMAD)");
   const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -101,7 +98,8 @@ export const Register = () => {
         role || "student",
         department,
         studentIdOrEmployeeId.trim(),
-        program
+        program,
+        program === "Bachelor of Science in Information Technology" ? programSpecialization : ""
       );
       
       setSuccess("Successfully signed up! Redirecting to your workspace...");
@@ -222,6 +220,26 @@ export const Register = () => {
               </div>
             </div>
           </div>
+
+          {/* Conditionally render Specialization for BSIT */}
+          {program === "Bachelor of Science in Information Technology" && (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Specialization</label>
+              <div className="relative">
+                <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
+                <select
+                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
+                  value={programSpecialization}
+                  onChange={(e) => setProgramSpecialization(e.target.value)}
+                  required
+                >
+                  {SPECIALIZATION_OPTIONS.map((spec) => (
+                    <option key={spec.value} value={spec.value}>{spec.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Student / Employee ID Number */}
           <div className="space-y-1.5">

@@ -63,6 +63,8 @@ export const ProfileSettings = () => {
   const [email, setEmail] = useState("");
   const [college, setCollege] = useState("College of Computer Studies");
   const [department, setDepartment] = useState("Department of Computer Science");
+  const [program, setProgram] = useState("Bachelor of Science in Information Technology");
+  const [programSpecialization, setProgramSpecialization] = useState("Web and Mobile Development (WMAD)");
   const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState("");
   const [avatarPreview, setAvatarPreview] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
@@ -113,6 +115,9 @@ export const ProfileSettings = () => {
 
       const userDept = userProfile?.department || "Department of Computer Science";
       setDepartment(userDept);
+      
+      setProgram(userProfile?.program || "Bachelor of Science in Information Technology");
+      setProgramSpecialization(userProfile?.programSpecialization || "Web and Mobile Development (WMAD)");
 
       setStudentIdOrEmployeeId(userProfile?.studentIdOrEmployeeId || "");
       setAvatarPreview(userProfile?.profile_image || currentUser?.photoURL || "");
@@ -239,6 +244,15 @@ export const ProfileSettings = () => {
         studentIdOrEmployeeId: studentIdOrEmployeeId.trim(),
         profile_image: avatarPreview || "",
       };
+
+      if (userProfile?.role === "student") {
+        updatedFields.program = program;
+        if (program === "Bachelor of Science in Information Technology") {
+          updatedFields.programSpecialization = programSpecialization;
+        } else {
+          updatedFields.programSpecialization = "";
+        }
+      }
 
       if (userProfile?.role === "adviser") {
         updatedFields.selectedExpertise = selectedExpertise;
@@ -712,6 +726,48 @@ export const ProfileSettings = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Row 4: Program & Specialization (Student Only) */}
+                {userProfile?.role === "student" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
+                        Program
+                      </label>
+                      <div className="relative">
+                        <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
+                        <select
+                          value={program}
+                          onChange={(e) => setProgram(e.target.value)}
+                          className="w-full h-11 pl-10 pr-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition appearance-none cursor-pointer"
+                        >
+                          <option value="Bachelor of Science in Information Technology">Bachelor of Science in Information Technology</option>
+                          <option value="Bachelor of Science in Computer Science">Bachelor of Science in Computer Science</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {program === "Bachelor of Science in Information Technology" && (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-[#9396a8] uppercase tracking-wider">
+                          Specialization
+                        </label>
+                        <div className="relative">
+                          <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
+                          <select
+                            value={programSpecialization}
+                            onChange={(e) => setProgramSpecialization(e.target.value)}
+                            className="w-full h-11 pl-10 pr-4 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition appearance-none cursor-pointer"
+                          >
+                            <option value="Web and Mobile Development (WMAD)">Web and Mobile Development - WMAD</option>
+                            <option value="Animation and Motion Graphics (AMG)">Animation and Motion Graphics - AMG</option>
+                            <option value="Service Management Program (SMP)">Service Management Program - SMP</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Bottom Action Footer */}

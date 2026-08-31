@@ -59,7 +59,7 @@ export const AuthLayout = ({
   }, [isPaused, slides.length]);
 
   return (
-    <div className="min-h-screen lg:h-screen w-full relative flex p-3 sm:p-5 lg:p-6 xl:p-8 bg-[#050508] text-slate-100 overflow-y-auto lg:overflow-hidden selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen w-full relative flex p-3 sm:p-5 lg:p-6 xl:p-8 bg-[#050508] text-slate-100 overflow-y-auto selection:bg-blue-500 selection:text-white">
       {/* Deep Black & Elegant Wavy Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-[#050508]">
         {/* Ambient glowing depth behind waves */}
@@ -192,11 +192,11 @@ export const AuthLayout = ({
       </div>
 
       {/* Main Container Layout */}
-      <div className="relative z-10 w-full h-full flex flex-col lg:flex-row justify-between gap-6">
+      <div className="relative z-10 w-full min-h-full flex flex-col lg:flex-row justify-center lg:justify-between items-center lg:items-stretch gap-4 sm:gap-6 lg:gap-6 py-6 lg:py-0">
         {/* LEFT COLUMN: Top-Left Logo & Lower-Left Dialogues Slideshow */}
-        <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 lg:p-8 xl:p-10 z-10 min-h-[140px] lg:min-h-full">
+        <div className="w-full lg:flex-1 flex flex-col lg:justify-between px-4 sm:px-6 lg:p-8 xl:p-10 z-10 max-w-[650px] lg:max-w-none">
           {/* Top-Left Logo */}
-          <header className="flex items-center justify-between">
+          <header className="flex items-center justify-center lg:justify-between mb-2 lg:mb-0">
             <Link
               to="/"
               className="inline-flex items-center gap-3.5 group cursor-pointer"
@@ -264,28 +264,21 @@ export const AuthLayout = ({
 
         {/* RIGHT COLUMN: Floating Card with Crisp Outlines */}
         <div
-          className={`w-full ${cardWidthClass} h-full bg-white dark:bg-[#15161e] rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.9)] border border-gray-200 dark:border-[#222433] z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 my-auto lg:my-0 flex flex-col`}
+          className={`w-full ${cardWidthClass} h-auto bg-white dark:bg-[#15161e] rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.9)] border border-gray-200 dark:border-[#222433] z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 lg:my-auto flex flex-col`}
         >
           {/* Scrollable Inner Container with Clean Inset Scrollbar */}
-          <div className="w-full h-full overflow-y-auto p-6 sm:p-8 xl:p-11 flex flex-col justify-between custom-scrollbar">
+          <div className="w-full overflow-y-auto p-6 sm:p-8 lg:p-10 flex flex-col justify-between custom-scrollbar">
             {/* Card Top & Body Container */}
             <div className="w-full flex-1 flex flex-col justify-center py-2">
-              {/* Header inside floating card with top logo badge */}
-              <div className="flex flex-col items-center text-center mb-6 xl:mb-7">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-500/10 dark:bg-white/[0.04] border border-blue-500/20 dark:border-white/10 flex items-center justify-center mb-3.5 shadow-[0_0_25px_rgba(59,130,246,0.15)]">
-                  <img
-                    src={logoImg}
-                    alt="CoreResearch"
-                    className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_12px_rgba(59,130,246,0.6)]"
-                  />
-                </div>
+              {/* Header inside floating card */}
+              <div className="flex flex-col items-start text-left mb-6 xl:mb-7">
                 {title && (
                   <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
                     {title}
                   </h2>
                 )}
                 {subtitle && (
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-[#9396a8] mt-1.5 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-300 mt-1.5 leading-relaxed">
                     {subtitle}
                   </p>
                 )}
