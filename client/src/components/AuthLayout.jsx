@@ -270,21 +270,26 @@ export const AuthLayout = ({
           <div className="w-full h-full overflow-y-auto p-6 sm:p-8 xl:p-11 flex flex-col justify-between custom-scrollbar">
             {/* Card Top & Body Container */}
             <div className="w-full flex-1 flex flex-col justify-center py-2">
-              {/* Header inside floating card */}
-              {(title || subtitle) && (
-                <div className="mb-6 xl:mb-7">
-                  {title && (
-                    <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
-                      {title}
-                    </h2>
-                  )}
-                  {subtitle && (
-                    <p className="text-xs sm:text-sm text-gray-500 dark:text-[#9396a8] mt-1.5 leading-relaxed">
-                      {subtitle}
-                    </p>
-                  )}
+              {/* Header inside floating card with top logo badge */}
+              <div className="flex flex-col items-center text-center mb-6 xl:mb-7">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-500/10 dark:bg-white/[0.04] border border-blue-500/20 dark:border-white/10 flex items-center justify-center mb-3.5 shadow-[0_0_25px_rgba(59,130,246,0.15)]">
+                  <img
+                    src={logoImg}
+                    alt="CoreResearch"
+                    className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_12px_rgba(59,130,246,0.6)]"
+                  />
                 </div>
-              )}
+                {title && (
+                  <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
+                    {title}
+                  </h2>
+                )}
+                {subtitle && (
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-[#9396a8] mt-1.5 leading-relaxed">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
 
               {/* Form Content */}
               {children}
