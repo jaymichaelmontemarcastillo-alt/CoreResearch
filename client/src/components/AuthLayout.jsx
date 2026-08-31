@@ -192,11 +192,11 @@ export const AuthLayout = ({
       </div>
 
       {/* Main Container Layout */}
-      <div className="relative z-10 w-full min-h-full flex flex-col lg:flex-row justify-center lg:justify-between items-center lg:items-stretch gap-4 sm:gap-6 lg:gap-6 py-6 lg:py-0">
+      <div className="relative z-10 w-full flex-1 flex flex-col lg:flex-row justify-center lg:justify-between items-center lg:items-stretch gap-8 lg:gap-12 xl:gap-16 py-6 lg:py-0">
         {/* LEFT COLUMN: Top-Left Logo & Lower-Left Dialogues Slideshow */}
-        <div className="w-full lg:flex-1 flex flex-col lg:justify-between px-4 sm:px-6 lg:p-8 xl:p-10 z-10 max-w-[650px] lg:max-w-none">
+        <div className="w-full lg:flex-1 flex flex-col lg:justify-between z-10 max-w-[650px] lg:max-w-none pb-6 lg:pb-0">
           {/* Top-Left Logo */}
-          <header className="flex items-center justify-center lg:justify-between mb-2 lg:mb-0">
+          <header className="flex items-center justify-center lg:justify-start mb-6 lg:mb-0 pr-8 sm:pr-10 lg:pr-0">
             <Link
               to="/"
               className="inline-flex items-center gap-3.5 group cursor-pointer"
@@ -264,10 +264,10 @@ export const AuthLayout = ({
 
         {/* RIGHT COLUMN: Floating Card with Crisp Outlines */}
         <div
-          className={`w-full ${cardWidthClass} h-auto bg-white dark:bg-[#15161e] rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.9)] border border-gray-200 dark:border-[#222433] z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 lg:my-auto flex flex-col`}
+          className={`w-full ${cardWidthClass} bg-white dark:bg-[#15161e] rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.9)] border border-gray-200 dark:border-[#222433] z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 flex flex-col`}
         >
           {/* Scrollable Inner Container with Clean Inset Scrollbar */}
-          <div className="w-full overflow-y-auto p-6 sm:p-8 lg:p-10 flex flex-col justify-between custom-scrollbar">
+          <div className="w-full h-full overflow-y-auto p-6 sm:p-8 lg:p-10 flex flex-col justify-between custom-scrollbar">
             {/* Card Top & Body Container */}
             <div className="w-full flex-1 flex flex-col justify-center py-2">
               {/* Header inside floating card */}
