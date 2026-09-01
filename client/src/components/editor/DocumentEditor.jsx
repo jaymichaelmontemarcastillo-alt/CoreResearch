@@ -21,7 +21,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import HorizontalRuleBase from '@tiptap/extension-horizontal-rule';
 import * as Y from 'yjs';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
-import { AutoPagination, paginationPluginKey } from './extensions/AutoPagination';
+import { PaginationPlus } from 'tiptap-pagination-plus';
 
 // Custom CommentMark Extension for Google Docs style anchored manuscript comments
 export const CommentMark = Mark.create({
@@ -555,8 +555,24 @@ export const DocumentEditor = ({
         link: false,
         underline: false,
       }),
-      AutoPagination.configure({
-        contentHeight: contentHeight > 200 ? contentHeight : 864,
+      PaginationPlus.configure({
+        enabled: true,
+        pageHeight: rawHeight,
+        pageWidth: pageSettings?.orientation === 'landscape' ? 
+          (pageSettings?.size === 'a4' ? 1123 : (pageSettings?.size === 'legal' ? 1344 : 1056)) : 
+          (pageSettings?.size === 'a4' ? 794 : (pageSettings?.size === 'legal' ? 816 : 816)),
+        marginTop: parseMargin(pageSettings?.marginTop),
+        marginBottom: parseMargin(pageSettings?.marginBottom),
+        marginLeft: parseMargin(pageSettings?.marginLeft),
+        marginRight: parseMargin(pageSettings?.marginRight),
+        pageGap: 40,
+        pageGapBorderSize: 0,
+        pageGapBorderColor: 'transparent',
+        pageBreakBackground: '#f3f4f6', // Matches the bg-gray-100 of the editor container
+        headerLeft: '',
+        headerRight: '',
+        footerLeft: '',
+        footerRight: '',
       }),
       Underline,
       Superscript,
@@ -616,10 +632,8 @@ export const DocumentEditor = ({
       }
     },
     onTransaction: ({ editor: currentEditor }) => {
-      const state = paginationPluginKey.getState(currentEditor.state);
-      if (state && state.pageCount !== undefined) {
-        setPageCount((prev) => (prev !== state.pageCount ? state.pageCount : prev));
-      }
+      // With tiptap-pagination-plus, we can update page count if needed from the storage or a plugin state
+      // For now, we'll let PaginationPlus handle it or update manually if required.
     },
     editorProps: {
       attributes: {
@@ -808,7 +822,7 @@ export const DocumentEditor = ({
           
           width: var(--page-width);
           min-height: var(--page-height);
-          padding: ${pageStyle.padding};
+          padding: 0; /* Let tiptap-pagination-plus manage padding */
           box-sizing: border-box;
           margin: 0 auto;
           background: #ffffff;
@@ -816,6 +830,11 @@ export const DocumentEditor = ({
           text-align: left;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
           position: relative;
+        }
+
+        /* Hide explicit horizontal rules if they exist at the top of the doc */
+        .ProseMirror hr {
+          display: none;
         }
 
         /* Physical Page Visual Split (AutoPagination Gap + Spacer) */
