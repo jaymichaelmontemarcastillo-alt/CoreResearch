@@ -22,6 +22,8 @@ const UserSchema = new mongoose.Schema({
   
   // Academic / NLP Matching fields
   college: { type: String },
+  program: { type: String },
+  programSpecialization: { type: String },
   specialization: [{ type: String }],
   expertise: [{ type: String }],
   researchInterests: [{ type: String }],

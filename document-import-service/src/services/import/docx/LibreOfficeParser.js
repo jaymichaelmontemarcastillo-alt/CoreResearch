@@ -8,12 +8,12 @@ import { convertToHtml } from '../../../utils/execLibreOffice.js';
 
 export class LibreOfficeParser {
   /**
-   * Parse DOCX buffer into HTML and extracted assets using LibreOffice
-   * @param {Buffer} docxBuffer
+   * Parse DOCX file into HTML and extracted assets using LibreOffice
+   * @param {string} filePath
    * @param {string} fileName
    * @returns {Promise<{ html: string, assets: Array, metadata: Object }>}
    */
-  async parse(docxBuffer, fileName = 'Document.docx') {
+  async parse(filePath, fileName = 'Document.docx') {
     const assets = [];
     const title = fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
     
@@ -25,8 +25,8 @@ export class LibreOfficeParser {
     const inputFilePath = path.join(tempDir, `${safeName}.docx`);
     
     try {
-      // 2. Write the buffer to the temporary directory
-      await fs.writeFile(inputFilePath, docxBuffer);
+      // 2. Copy the file to the temporary directory
+      await fs.copyFile(filePath, inputFilePath);
       
       // 3. Convert DOCX to HTML
       const htmlFilePath = await convertToHtml(inputFilePath, tempDir);
