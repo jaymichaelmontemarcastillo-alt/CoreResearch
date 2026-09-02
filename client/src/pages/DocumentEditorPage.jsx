@@ -341,8 +341,9 @@ export const DocumentEditorPage = () => {
           document: ydoc,
           token: token,
           broadcast: false,
-          maxAttempts: 3,
-          timeout: 4000,
+          maxAttempts: 5,
+          delay: 2000,
+          timeout: 15000,
           parameters: {
             userId: effectiveUserProfile.uid,
             role: effectiveUserProfile.role,
