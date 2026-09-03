@@ -51,7 +51,7 @@ const FONT_SIZES = [
   { label: '36 pt', value: '36pt' },
 ];
 
-export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
+export const EditorToolbar = ({ editor, documentId, onOpenPageSettings, layoutMode = 'print', onLayoutModeChange }) => {
   const fileInputRef = useRef(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showTableMenu, setShowTableMenu] = useState(false);
@@ -187,6 +187,27 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
             {s.label}
           </option>
         ))}
+      </select>
+
+      {/* Line Spacing Dropdown */}
+      <select
+        value={editor.getAttributes('paragraph').lineHeight || editor.getAttributes('heading').lineHeight || ''}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (val) {
+            editor.chain().focus().setLineHeight(val).run();
+          } else {
+            editor.chain().focus().unsetLineHeight().run();
+          }
+        }}
+        className="text-xs bg-transparent border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 text-gray-800 dark:text-gray-200 outline-none focus:border-blue-500"
+        title="Line Spacing"
+      >
+        <option value="">Spacing</option>
+        <option value="1">Single</option>
+        <option value="1.15">1.15</option>
+        <option value="1.5">1.5</option>
+        <option value="2">Double</option>
       </select>
 
       <Divider />
@@ -417,28 +438,6 @@ export const EditorToolbar = ({ editor, documentId, onOpenPageSettings }) => {
           </div>
         )}
       </div>
-
-      {/* Insert Page Break Button */}
-      <ToolbarButton
-        icon={Scissors}
-        title="Insert Page Break (Split into New Page)"
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-      >
-        <span className="hidden xl:inline text-xs font-medium">Page Break</span>
-      </ToolbarButton>
-
-      <Divider />
-
-      {/* Page Setup & Margins Button */}
-      {onOpenPageSettings && (
-        <ToolbarButton
-          icon={HiDocumentText}
-          title="Page Setup, Margins & Size"
-          onClick={onOpenPageSettings}
-        >
-          <span className="hidden xl:inline text-xs font-medium">Page Setup</span>
-        </ToolbarButton>
-      )}
     </div>
   );
 };

@@ -159,6 +159,7 @@ export class DocumentImportService {
         title: parseResult.metadata?.title || cleanFileName.replace(/\.[^/.]+$/, ''),
         abstract: '', 
         status: 'draft',
+        sourceType: 'imported', // Flag so client knows to use yjsBinaryState, NOT Firestore content
         authors: [ownerId],
         adviser: null,
         plainText: plainText,

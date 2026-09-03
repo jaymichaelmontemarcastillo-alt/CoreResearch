@@ -101,6 +101,7 @@ export const DocumentEditorPage = () => {
   const [initialContent, setInitialContent] = useState(null);
   const [documentLoaded, setDocumentLoaded] = useState(false);
   const [sourceType, setSourceType] = useState('native');
+  const loadTimestampRef = useRef(null);
   const [comments, setComments] = useState([]);
   const [highlightedCommentId, setHighlightedCommentId] = useState(null);
   const [previewingVersion, setPreviewingVersion] = useState(null);
@@ -110,6 +111,9 @@ export const DocumentEditorPage = () => {
   // Fullscreen Maximize & Drawer Sidebar state
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMaximizedSidebarOpen, setIsMaximizedSidebarOpen] = useState(false);
+
+  // Layout Mode ('print' | 'continuous')
+  const [layoutMode, setLayoutMode] = useState('print');
 
   // Document Import Hook
   const {
@@ -219,23 +223,33 @@ export const DocumentEditorPage = () => {
 
         if (isMounted && docData) {
           setTitle(docData.title || 'Research Manuscript');
-          setSourceType(docData.sourceType || 'native');
+          const detectedSourceType = docData.sourceType || 'native';
+          setSourceType(detectedSourceType);
           if (docData.editorSettings?.page) {
             setPageSettings(docData.editorSettings.page);
           }
-          let contentToLoad = docData.content || docData.contentHtml || null;
-          // Resilient fallback to localStorage if Firestore content is null or empty
-          if (!contentToLoad) {
-            try {
-              const cached = localStorage.getItem(`coreresearch_doc_content_${documentId}`);
-              if (cached) {
-                contentToLoad = JSON.parse(cached);
-              }
-            } catch (e) {}
+
+          // CRITICAL: For imported documents, the authoritative content lives in MongoDB
+          // as yjsBinaryState. Hocuspocus loads it via onLoadDocument. Do NOT also set
+          // initialContent from Firestore — that causes the content duplication bug
+          // (20 pages → 40 pages).
+          if (detectedSourceType !== 'imported') {
+            let contentToLoad = docData.content || docData.contentHtml || null;
+            // Resilient fallback to localStorage if Firestore content is null or empty
+            if (!contentToLoad) {
+              try {
+                const cached = localStorage.getItem(`coreresearch_doc_content_${documentId}`);
+                if (cached) {
+                  contentToLoad = JSON.parse(cached);
+                }
+              } catch (e) {}
+            }
+            if (contentToLoad) {
+              setInitialContent(contentToLoad);
+            }
           }
-          if (contentToLoad) {
-            setInitialContent(contentToLoad);
-          }
+
+          loadTimestampRef.current = Date.now();
           setDocumentLoaded(true);
         }
       } catch (err) {
@@ -258,18 +272,29 @@ export const DocumentEditorPage = () => {
     const unsubscribe = documentStore.subscribeDocument(documentId, (docData) => {
       if (!isMounted || !docData) return;
 
+      // Always sync metadata (title, page settings)
       if (docData.title) setTitle(docData.title);
       if (docData.editorSettings?.page) {
         setPageSettings(docData.editorSettings.page);
       }
 
-      // If Hocuspocus is active, ignore incoming document content updates from Firestore
-      // to avoid dual-sync race conditions. Firestore is just a 1-way backup at this point.
-      if (providerStatusRef.current === 'connected') {
+      // CRITICAL: When Hocuspocus is active (connected OR connecting), NEVER inject
+      // content from Firestore. Yjs/Hocuspocus is the single source of truth for content.
+      // This prevents the duplication bug where Firestore content gets layered on top
+      // of the already-loaded Yjs content.
+      const hpStatus = providerStatusRef.current;
+      if (hpStatus === 'connected' || hpStatus === 'connecting') {
         return;
       }
 
-      // Check if update originated from another collaborator
+      // Also skip content injection within the first 5 seconds of page load
+      // to prevent race conditions during initial Yjs sync
+      if (loadTimestampRef.current && (Date.now() - loadTimestampRef.current) < 5000) {
+        return;
+      }
+
+      // Cloud-sync fallback: only apply remote content updates from other users
+      // when Hocuspocus is fully disconnected (offline / cloud-sync mode)
       const isFromOtherUser = docData.updatedBy && docData.updatedBy !== myUidRef.current;
       if (isFromOtherUser && docData.content) {
         const activeEditor = editorRef.current;
@@ -430,6 +455,13 @@ export const DocumentEditorPage = () => {
 
   // 4. Handle Editor Content Change & Firestore auto-save
   const handleContentChange = useCallback((editorOrJson) => {
+    // GUARD: Skip auto-save during the initial content loading phase (first 3 seconds)
+    // to prevent saving potentially doubled content back to Firestore.
+    // During this window, Yjs is still syncing and the editor content may not be final.
+    if (loadTimestampRef.current && (Date.now() - loadTimestampRef.current) < 3000) {
+      return;
+    }
+
     isTypingRef.current = true;
     setSaveStatus('saving');
 
@@ -861,6 +893,8 @@ export const DocumentEditorPage = () => {
           <EditorToolbar 
             editor={editor} 
             documentId={documentId}
+            layoutMode={layoutMode}
+            onLayoutModeChange={setLayoutMode}
             onOpenPageSettings={() => setActiveRightPanel('pageSettings')}
           />
         </div>
@@ -903,6 +937,7 @@ export const DocumentEditorPage = () => {
                   pageSettings={pageSettings}
                   initialContent={initialContent}
                   sourceType={sourceType}
+                  layoutMode={layoutMode}
                   title={title}
                   comments={comments}
                   isReadOnly={isFaculty || previewingVersion !== null}

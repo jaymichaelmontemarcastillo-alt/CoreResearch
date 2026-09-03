@@ -64,7 +64,20 @@ export const useDocumentUpload = ({ userProfile, group, onSuccess }) => {
         },
       });
 
-      // API request completed successfully, document is saved in DB
+      // API request completed successfully, document is saved in MongoDB.
+      // Also save document metadata to Firestore with sourceType: 'imported'
+      // so the editor knows to use yjsBinaryState from Hocuspocus, NOT Firestore content.
+      try {
+        const { documentStore } = await import('../../../services/documentStore');
+        await documentStore.createDocument(newDoc.title || 'Imported Document', userProfile, {
+          id: newDoc.id,
+          sourceType: 'imported',
+          // Do NOT save content to Firestore for imported docs — Hocuspocus/MongoDB is authoritative
+        });
+      } catch (firestoreErr) {
+        console.warn('[useDocumentUpload] Firestore metadata save warning:', firestoreErr.message);
+      }
+
       setStage(UPLOAD_STAGES.LOADING);
       setCreatedDocument(newDoc);
       

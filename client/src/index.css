@@ -183,6 +183,13 @@
   .auth-dark-panel {
     background: linear-gradient(160deg, #090a0e 0%, #101117 50%, #0b0c10 100%);
   }
+
+  /* Large Document Virtualization & Page Styling */
+  .prose .page, .prose .tiptap-page, page {
+    content-visibility: auto;
+    contain-intrinsic-size: 1056px; /* Approx letter size page height at 96dpi */
+    @apply border border-gray-200 dark:border-slate-800 rounded-sm shadow-sm;
+  }
 }
 
 @layer utilities {

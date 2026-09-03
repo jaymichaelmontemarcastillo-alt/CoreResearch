@@ -512,6 +512,7 @@ export const DocumentEditor = ({
   onContentChange,
   onCommentSelect,
   previewingVersion,
+  layoutMode = 'print',
 }) => {
   const commentsRef = useRef(comments);
   commentsRef.current = comments;
@@ -556,7 +557,7 @@ export const DocumentEditor = ({
         underline: false,
       }),
       PaginationPlus.configure({
-        enabled: true,
+        enabled: layoutMode === 'print',
         pageHeight: rawHeight,
         pageWidth: pageSettings?.orientation === 'landscape' ? 
           (pageSettings?.size === 'a4' ? 1123 : (pageSettings?.size === 'legal' ? 1344 : 1056)) : 
@@ -568,7 +569,7 @@ export const DocumentEditor = ({
         pageGap: 40,
         pageGapBorderSize: 0,
         pageGapBorderColor: 'transparent',
-        pageBreakBackground: '#f3f4f6', // Matches the bg-gray-100 of the editor container
+        pageBreakBackground: 'transparent',
         headerLeft: '',
         headerRight: '',
         footerLeft: '',
@@ -621,7 +622,7 @@ export const DocumentEditor = ({
     }
 
     return list;
-  }, [ydoc, provider, effectiveUser, activeCommentsExt, previewingVersion]);
+  }, [ydoc, provider, effectiveUser, activeCommentsExt, previewingVersion, layoutMode, pageSettings]);
 
   const editor = useEditor({
     extensions,
@@ -678,6 +679,7 @@ export const DocumentEditor = ({
   }, [editor, onCommentSelect]);
 
   const initializedContentRef = useRef(false);
+  const providerSyncedRef = useRef(false);
 
   useEffect(() => {
     if (!editor) return;
@@ -686,41 +688,70 @@ export const DocumentEditor = ({
       onEditorReady(editor);
     }
 
+    // Skip if we already initialized content for this editor instance
+    if (initializedContentRef.current) return;
+
     try {
       if (!ydoc) {
         // Non-collaborative mode: safely apply initialContent directly
-        if (initialContent && !initializedContentRef.current) {
+        if (initialContent) {
           editor.commands.setContent(initialContent, false);
           initializedContentRef.current = true;
         }
       } else {
         // Collaborative mode (Yjs via Hocuspocus)
-        // The provider automatically manages state sync. Do NOT setContent from props
-        // to avoid duplicating the Yjs binary state coming from the server.
+        // CRITICAL: The provider loads yjsBinaryState from MongoDB via onLoadDocument.
+        // If the document was imported, yjsBinaryState already contains the FULL content.
+        // We must NOT also inject initialContent from Firestore — that causes duplication.
         
-        const initTemplate = () => {
-          if (!initializedContentRef.current) {
-            const fragment = ydoc.getXmlFragment('default');
-            // If the document is natively created (not imported) and genuinely empty after sync, set a default
-            if (fragment.length === 0 && editor.isEmpty && sourceType === 'native') {
-              editor.commands.setContent(`<p></p>`, false);
-            }
+        const handlePostSync = () => {
+          if (initializedContentRef.current) return;
+          providerSyncedRef.current = true;
+
+          const fragment = ydoc.getXmlFragment('default');
+          const yjsHasContent = fragment.length > 0;
+
+          if (yjsHasContent) {
+            // Yjs document already has content from the server (imported or previously saved).
+            // Do NOT inject initialContent — the Collaboration extension already rendered it.
+            console.log('[DocumentEditor] Yjs has content from server, skipping initialContent injection');
             initializedContentRef.current = true;
+            return;
           }
+
+          // Yjs document is empty after sync — this is a brand new native document
+          // or the server had no yjsBinaryState. Use initialContent as fallback.
+          if (initialContent && sourceType !== 'imported') {
+            // Only inject if this is NOT an imported doc (imported docs should always
+            // have yjsBinaryState; if empty, something went wrong — don't double-inject)
+            editor.commands.setContent(initialContent, false);
+          } else if (sourceType === 'native') {
+            // Brand new empty native document — set a blank paragraph
+            editor.commands.setContent(`<p></p>`, false);
+          }
+
+          initializedContentRef.current = true;
         };
 
         if (provider && provider.isSynced) {
-          initTemplate();
+          handlePostSync();
         } else if (provider) {
-          provider.on('synced', initTemplate);
-          return () => provider.off('synced', initTemplate);
+          provider.on('synced', handlePostSync);
+          return () => provider.off('synced', handlePostSync);
         } else {
-          // Fallback if no provider object is explicitly passed but ydoc is
-          initTemplate(); 
+          // No provider yet — wait for it. Don't inject content prematurely.
+          // The effect will re-run when provider becomes available.
         }
       }
+    } catch (e) {
+      console.warn('[DocumentEditor] initialContent load warning:', e);
+    }
+  }, [editor, ydoc, provider, initialContent, sourceType]);
 
-      // Clean up any legacy baked comment marks from document content
+  // Clean up legacy baked comment marks from document content (run once after editor ready)
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    try {
       if (editor.state?.schema?.marks?.comment) {
         const { tr } = editor.state;
         let hasCommentMarks = false;
@@ -739,9 +770,9 @@ export const DocumentEditor = ({
         }
       }
     } catch (e) {
-      console.warn('[DocumentEditor] initialContent load warning:', e);
+      // ignore
     }
-  }, [editor, ydoc, initialContent, sourceType]);
+  }, [editor]);
 
   // Handle previewing a specific version
   useEffect(() => {

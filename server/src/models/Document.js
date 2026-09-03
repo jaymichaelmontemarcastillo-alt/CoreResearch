@@ -16,6 +16,7 @@ const DocumentSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   abstract: { type: String, default: '' },
   status: { type: String, default: 'draft' },
+  sourceType: { type: String, default: 'native' }, // 'native' | 'imported' — controls how editor loads content
   authors: [{ type: String }], // Array of User UIDs
   adviser: { type: String, default: '' }, // User UID
   panelists: [{ type: String }], // Array of User UIDs
