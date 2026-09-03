@@ -366,8 +366,9 @@ export const DocumentEditorPage = () => {
           document: ydoc,
           token: token,
           broadcast: false,
-          maxAttempts: 3,
-          timeout: 4000,
+          maxAttempts: 5,
+          delay: 2000,
+          timeout: 15000,
           parameters: {
             userId: effectiveUserProfile.uid,
             role: effectiveUserProfile.role,
@@ -465,24 +466,24 @@ export const DocumentEditorPage = () => {
     isTypingRef.current = true;
     setSaveStatus('saving');
 
-    const activeEditor = editorOrJson?.getJSON ? editorOrJson : editor;
-    const json = activeEditor?.getJSON ? activeEditor.getJSON() : (editorOrJson && typeof editorOrJson === 'object' ? editorOrJson : null);
-    const html = activeEditor?.getHTML ? activeEditor.getHTML() : '';
-    const plainText = activeEditor?.getText ? activeEditor.getText() : '';
-
-    // Immediately cache in localStorage so reload never loses edits
-    if (json) {
-      try {
-        localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
-      } catch (e) {}
-    }
-
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
       try {
+        const activeEditor = editorOrJson?.getJSON ? editorOrJson : editor;
+        const json = activeEditor?.getJSON ? activeEditor.getJSON() : (editorOrJson && typeof editorOrJson === 'object' ? editorOrJson : null);
+        const html = activeEditor?.getHTML ? activeEditor.getHTML() : '';
+        const plainText = activeEditor?.getText ? activeEditor.getText() : '';
+
+        // Cache in localStorage to prevent lost edits
+        if (json) {
+          try {
+            localStorage.setItem(`coreresearch_doc_content_${documentId}`, JSON.stringify(json));
+          } catch (e) {}
+        }
+        
         await documentStore.saveDocumentContent(documentId, json, html, plainText, effectiveUserProfile);
         setSaveStatus('saved');
       } catch (err) {
