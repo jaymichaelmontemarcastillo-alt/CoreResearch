@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { UPLOAD_STAGES } from '../constants/documentConstants';
 import { validateDocumentFile } from '../utils/documentValidation';
 import { documentImportService } from '../services/documentImportService';
+import { documentStore } from '../../../services/documentStore';
 
 export const useDocumentUpload = ({ userProfile, group, onSuccess }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +69,6 @@ export const useDocumentUpload = ({ userProfile, group, onSuccess }) => {
       // Also save document metadata to Firestore with sourceType: 'imported'
       // so the editor knows to use yjsBinaryState from Hocuspocus, NOT Firestore content.
       try {
-        const { documentStore } = await import('../../../services/documentStore');
         await documentStore.createDocument(newDoc.title || 'Imported Document', userProfile, {
           id: newDoc.id,
           sourceType: 'imported',

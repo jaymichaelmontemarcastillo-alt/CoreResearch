@@ -115,6 +115,13 @@ export const DocumentEditorPage = () => {
   // Layout Mode ('print' | 'continuous')
   const [layoutMode, setLayoutMode] = useState('print');
 
+  const effectiveUserProfile = useMemo(() => userProfile || {
+    uid: currentUser?.uid || 'guest-user',
+    fullName: userProfile?.fullName || userProfile?.first_name || 'Researcher',
+    first_name: userProfile?.first_name || 'Researcher',
+    role: userProfile?.role || 'student'
+  }, [userProfile, currentUser]);
+
   // Document Import Hook
   const {
     isOpen: isImportModalOpen,
@@ -128,7 +135,7 @@ export const DocumentEditorPage = () => {
     handleUploadFile,
     resetUpload,
   } = useDocumentUpload({
-    userProfile,
+    userProfile: effectiveUserProfile,
     group: null, // Depending on context, group might not be needed here as we overwrite existing doc
     onSuccess: (importedData) => {
       // In DocumentEditorPage, we don't navigate to the new document,
@@ -160,14 +167,6 @@ export const DocumentEditorPage = () => {
     status: 'connecting', // 'connecting', 'connected', 'disconnected', 'cloud-sync'
     error: null
   });
-
-  const effectiveUserProfile = userProfile || {
-    uid: currentUser?.uid || 'guest-user',
-    fullName: userProfile?.fullName || userProfile?.first_name || 'Researcher',
-    first_name: userProfile?.first_name || 'Researcher',
-    role: userProfile?.role || 'student'
-  };
-
   const autoSaveTimeoutRef = useRef(null);
   const titleSaveTimeoutRef = useRef(null);
   const editorRef = useRef(null);
@@ -541,6 +540,23 @@ export const DocumentEditorPage = () => {
     }
   };
 
+  // Delete document
+  const handleDeleteDocument = async () => {
+    if (window.confirm("Are you sure you want to delete this document? This action cannot be undone.")) {
+      try {
+        const success = await documentStore.deleteDocument(documentId);
+        if (success) {
+          navigate('/documents');
+        } else {
+          alert('Failed to delete the document. Please try again.');
+        }
+      } catch (e) {
+        console.error('Failed to delete doc:', e);
+        alert('An error occurred while deleting the document.');
+      }
+    }
+  };
+
   // Resizable Comments panel logic
   const [commentsWidth, setCommentsWidth] = useState(() => {
     try {
@@ -792,6 +808,7 @@ export const DocumentEditorPage = () => {
                 onOpenPageSettings={() => setActiveRightPanel('pageSettings')}
                 onNewDocument={handleNewDocument}
                 onImportDocument={handleImportRequest}
+                onDeleteDocument={handleDeleteDocument}
               />
             )}
           </div>

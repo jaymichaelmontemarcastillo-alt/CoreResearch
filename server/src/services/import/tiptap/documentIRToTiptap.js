@@ -281,6 +281,52 @@ export class DocumentIRToTiptap {
     } catch (e) {
       throw new Error(`Tiptap conversion failed: ${e.message}`);
     }
+
+    // 4.5 Improve Academic Formatting for Body Paragraphs
+    try {
+      if (tiptapJson && tiptapJson.content) {
+        const processNode = (node, inList = false, inTable = false) => {
+          if (node.type === 'bulletList' || node.type === 'orderedList') {
+            inList = true;
+          }
+          if (node.type === 'table') {
+            inTable = true;
+          }
+
+          if (node.type === 'paragraph' && !inList && !inTable) {
+            node.attrs = node.attrs || {};
+            
+            // Check if paragraph is just an image or empty
+            const isSpecial = !node.content || node.content.every(child => child.type === 'image' || (child.type === 'text' && !child.text.trim()));
+            
+            if (!isSpecial) {
+              // 1. Justify
+              if (!node.attrs.textAlign) {
+                node.attrs.textAlign = 'justify';
+              }
+              
+              // 2. First-line indentation
+              if (node.attrs.textIndent === undefined && node.attrs.marginLeft === undefined) {
+                node.attrs.textIndent = '0.5in';
+              }
+
+              // 3. Sensible spacing
+              if (node.attrs.spaceAfter === undefined && node.attrs.spaceBefore === undefined) {
+                node.attrs.spaceAfter = '1rem';
+              }
+            }
+          }
+
+          if (node.content && Array.isArray(node.content)) {
+            node.content.forEach(child => processNode(child, inList, inTable));
+          }
+        };
+
+        tiptapJson.content.forEach(child => processNode(child, false, false));
+      }
+    } catch (e) {
+      console.warn('[DocumentIRToTiptap] Academic formatting warning:', e.message);
+    }
     
     // 5. Extract plain text
     const extractText = (node) => {

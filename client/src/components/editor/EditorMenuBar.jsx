@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { exportToDocx, exportToPdf } from '../../utils/manuscriptExporter';
 
-export const EditorMenuBar = ({ editor, title = 'Manuscript', onOpenPageSettings, onNewDocument, onImportDocument }) => {
+export const EditorMenuBar = ({ editor, title = 'Manuscript', onOpenPageSettings, onNewDocument, onImportDocument, onDeleteDocument }) => {
   const [openMenu, setOpenMenu] = useState(null);
   const menuRef = useRef(null);
 
@@ -85,6 +85,18 @@ export const EditorMenuBar = ({ editor, title = 'Manuscript', onOpenPageSettings
           >
             Download as PDF (.pdf)
           </button>
+          {onDeleteDocument && (
+            <>
+              <div className="h-[1px] bg-gray-200 dark:bg-slate-700 my-1" />
+              <button 
+                type="button"
+                onClick={() => { onDeleteDocument(); closeMenu(); }} 
+                className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-medium"
+              >
+                Delete Document
+              </button>
+            </>
+          )}
           </div>
         )}
       </div>

@@ -186,8 +186,8 @@
 
   /* Large Document Virtualization & Page Styling */
   .prose .page, .prose .tiptap-page, page {
-    content-visibility: auto;
-    contain-intrinsic-size: 1056px; /* Approx letter size page height at 96dpi */
+    position: relative;
+    box-sizing: content-box;
     @apply border border-gray-200 dark:border-slate-800 rounded-sm shadow-sm;
   }
 }

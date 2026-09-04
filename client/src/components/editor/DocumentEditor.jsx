@@ -21,10 +21,10 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import HorizontalRuleBase from '@tiptap/extension-horizontal-rule';
 import * as Y from 'yjs';
 import { DEFAULT_PAGE_SETTINGS } from '../../services/documentStore';
-import { PaginationPlus } from 'tiptap-pagination-plus';
+import { PaginationPlus } from './extensions/pagination';
 
 // Custom CommentMark Extension for Google Docs style anchored manuscript comments
-export const CommentMark = Mark.create({
+const CommentMark = Mark.create({
   name: 'comment',
   addOptions() {
     return {
@@ -58,7 +58,7 @@ export const CommentMark = Mark.create({
   },
 });
 
-export const activeCommentsPluginKey = new PluginKey('activeCommentsPlugin');
+const activeCommentsPluginKey = new PluginKey('activeCommentsPlugin');
 
 function buildCommentDecorations(doc, comments = []) {
   if (!doc || !comments || comments.length === 0) {
@@ -142,7 +142,7 @@ function buildCommentDecorations(doc, comments = []) {
   }
 }
 
-export const createActiveCommentsExtension = (getComments) => {
+const createActiveCommentsExtension = (getComments) => {
   return Extension.create({
     name: 'activeComments',
     addProseMirrorPlugins() {
@@ -172,7 +172,7 @@ export const createActiveCommentsExtension = (getComments) => {
 };
 
 // Custom Tiptap 2 Font Family Extension using TextStyle mark
-export const FontFamily = Extension.create({
+const FontFamily = Extension.create({
   name: 'fontFamily',
   addOptions() {
     return {
@@ -211,7 +211,7 @@ export const FontFamily = Extension.create({
 });
 
 // Custom Tiptap 2 Font Size Extension using TextStyle mark
-export const FontSize = Extension.create({
+const FontSize = Extension.create({
   name: 'fontSize',
   addOptions() {
     return {
@@ -250,7 +250,7 @@ export const FontSize = Extension.create({
 });
 
 // Custom LineHeight Extension for Paragraph & Heading blocks
-export const LineHeight = Extension.create({
+const LineHeight = Extension.create({
   name: 'lineHeight',
   addOptions() {
     return {
@@ -279,7 +279,7 @@ export const LineHeight = Extension.create({
 });
 
 // Custom ParagraphSpacing Extension (spaceBefore & spaceAfter)
-export const ParagraphSpacing = Extension.create({
+const ParagraphSpacing = Extension.create({
   name: 'paragraphSpacing',
   addOptions() {
     return {
@@ -318,7 +318,7 @@ export const ParagraphSpacing = Extension.create({
 });
 
 // Custom ParagraphIndent Extension (textIndent & marginLeft)
-export const ParagraphIndent = Extension.create({
+const ParagraphIndent = Extension.create({
   name: 'paragraphIndent',
   addOptions() {
     return {
@@ -396,7 +396,7 @@ export const ParagraphIndent = Extension.create({
 });
 
 // Custom TableCell with background shading & border color support
-export const CustomTableCell = TableCell.extend({
+const CustomTableCell = TableCell.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -425,7 +425,7 @@ export const CustomTableCell = TableCell.extend({
 });
 
 // Custom Image with explicit width/height & alignment
-export const CustomImage = Image.extend({
+const CustomImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -471,7 +471,7 @@ export const CustomImage = Image.extend({
 });
 
 // Custom Horizontal Rule to preserve LibreOffice page breaks
-export const CustomHorizontalRule = HorizontalRuleBase.extend({
+const CustomHorizontalRule = HorizontalRuleBase.extend({
   addAttributes() {
     return {
       class: {
@@ -522,20 +522,34 @@ export const DocumentEditor = ({
     name: userProfile?.fullName || userProfile?.first_name || 'Researcher',
     id: userProfile?.uid || 'user-1',
     color: getUserColor(userProfile?.uid || 'user-1'),
-  }), [userProfile]);
+  }), [userProfile?.fullName, userProfile?.first_name, userProfile?.uid]);
 
   const activeCommentsExt = useMemo(() => {
     return createActiveCommentsExtension(() => commentsRef.current);
   }, []);
 
-  const extensions = useMemo(() => {
-    let rawHeight = 1056;
-    if (pageSettings?.size === 'a4') rawHeight = 1123;
-    else if (pageSettings?.size === 'legal') rawHeight = 1344;
-    
-    if (pageSettings?.orientation === 'landscape') {
-      rawHeight = pageSettings?.size === 'a4' ? 794 : 816;
+  const paperDimensions = useMemo(() => {
+    const isLandscape = pageSettings?.orientation === 'landscape';
+    let width = 816; // Letter 8.5in
+    let height = 1056; // Letter 11in
+
+    if (pageSettings?.size === 'a4') {
+      width = 794;
+      height = 1123;
+    } else if (pageSettings?.size === 'legal') {
+      width = 816;
+      height = 1344;
     }
+
+    if (isLandscape) {
+      const temp = width;
+      width = height;
+      height = temp;
+    }
+    return { width, height };
+  }, [pageSettings?.size, pageSettings?.orientation]);
+
+  const extensions = useMemo(() => {
 
     const parseMargin = (val) => {
       if (!val) return 96;
@@ -545,23 +559,17 @@ export const DocumentEditor = ({
       return 96;
     };
 
-    const contentHeight = rawHeight - parseMargin(pageSettings?.marginTop) - parseMargin(pageSettings?.marginBottom);
-
     const list = [
       StarterKit.configure({
-        history: previewingVersion ? true : false, // Managed by Yjs collaboration normally, but enable locally for preview mode
-        // Disable extensions bundled in StarterKit v3 that we register
-        // explicitly below with custom configuration/attributes
+        history: previewingVersion ? true : false,
         horizontalRule: false,
         link: false,
         underline: false,
       }),
       PaginationPlus.configure({
         enabled: layoutMode === 'print',
-        pageHeight: rawHeight,
-        pageWidth: pageSettings?.orientation === 'landscape' ? 
-          (pageSettings?.size === 'a4' ? 1123 : (pageSettings?.size === 'legal' ? 1344 : 1056)) : 
-          (pageSettings?.size === 'a4' ? 794 : (pageSettings?.size === 'legal' ? 816 : 816)),
+        pageHeight: paperDimensions.height,
+        pageWidth: paperDimensions.width,
         marginTop: parseMargin(pageSettings?.marginTop),
         marginBottom: parseMargin(pageSettings?.marginBottom),
         marginLeft: parseMargin(pageSettings?.marginLeft),
@@ -638,10 +646,32 @@ export const DocumentEditor = ({
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-slate max-w-none focus:outline-none bg-white text-gray-900 shadow-xl transition-all duration-200 border border-gray-200/80 dark:border-slate-800 ring-1 ring-black/5',
+        class: 'focus:outline-none bg-white text-gray-900 shadow-xl transition-all duration-200 border border-gray-200/80 dark:border-slate-800 ring-1 ring-black/5',
       },
     },
   }, [documentId, extensions]);
+
+  // Update PaginationPlus when pageSettings change dynamically
+  useEffect(() => {
+    if (!editor || !editor.commands || !editor.commands.updatePageSize) return;
+    
+    const parseMargin = (val) => {
+      if (!val) return 96;
+      if (val.includes('in')) return parseFloat(val) * 96;
+      if (val.includes('px')) return parseFloat(val);
+      if (val.includes('cm')) return parseFloat(val) * 37.8;
+      return 96;
+    };
+
+    editor.commands.updatePageSize({
+      pageHeight: paperDimensions.height,
+      pageWidth: paperDimensions.width,
+      marginTop: parseMargin(pageSettings?.marginTop),
+      marginBottom: parseMargin(pageSettings?.marginBottom),
+      marginLeft: parseMargin(pageSettings?.marginLeft),
+      marginRight: parseMargin(pageSettings?.marginRight),
+    });
+  }, [editor, paperDimensions, pageSettings]);
 
   // Update decorations when comments change
   useEffect(() => {
@@ -748,6 +778,33 @@ export const DocumentEditor = ({
     }
   }, [editor, ydoc, provider, initialContent, sourceType]);
 
+  // Separate effect to handle editor re-creations and layout mode changes for pagination
+  useEffect(() => {
+    if (!editor || !editor.view) return;
+    
+    const makeReady = () => {
+      // Let the DOM, fonts, and Yjs hydration settle before calculating pages
+      setTimeout(() => {
+        if (!editor.isDestroyed) {
+          editor.view.dom.dataset.paginationReady = "true";
+          const tr = editor.state.tr.setMeta('PAGINATION_READY', true);
+          editor.view.dispatch(tr);
+        }
+      }, 150);
+    };
+
+    if (!ydoc) {
+      makeReady();
+    } else if (provider) {
+      if (provider.isSynced) {
+        makeReady();
+      } else {
+        provider.on('synced', makeReady);
+        return () => provider.off('synced', makeReady);
+      }
+    }
+  }, [editor, ydoc, provider, layoutMode]);
+
   // Clean up legacy baked comment marks from document content (run once after editor ready)
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
@@ -784,24 +841,6 @@ export const DocumentEditor = ({
 
   // Compute paper dimension styles based on pageSettings
   const pageStyle = useMemo(() => {
-    const isLandscape = pageSettings?.orientation === 'landscape';
-    let paperWidth = 816; // Letter 8.5in in px (96 DPI)
-    let paperHeight = 1056; // Letter 11in in px
-
-    if (pageSettings?.size === 'a4') {
-      paperWidth = 794; // 8.27in
-      paperHeight = 1123; // 11.69in
-    } else if (pageSettings?.size === 'legal') {
-      paperWidth = 816;
-      paperHeight = 1344; // 14in
-    }
-
-    if (isLandscape) {
-      const temp = paperWidth;
-      paperWidth = paperHeight;
-      paperHeight = temp;
-    }
-
     const parseMargin = (val) => {
       if (!val) return 96;
       if (val.includes('in')) return parseFloat(val) * 96;
@@ -818,17 +857,17 @@ export const DocumentEditor = ({
     const padding = `${marginTop}px ${marginRight}px ${marginBottom}px ${marginLeft}px`;
 
     return {
-      '--page-width': `${paperWidth}px`,
-      '--page-height': `${paperHeight}px`,
+      '--page-width': `${paperDimensions.width}px`,
+      '--page-height': `${paperDimensions.height}px`,
       '--page-margin-top': `${marginTop}px`,
       '--page-margin-right': `${marginRight}px`,
       '--page-margin-bottom': `${marginBottom}px`,
       '--page-margin-left': `${marginLeft}px`,
-      width: `${paperWidth}px`,
-      minHeight: `${paperHeight}px`,
+      width: `${paperDimensions.width}px`,
+      minHeight: `${paperDimensions.height}px`,
       padding,
     };
-  }, [pageSettings]);
+  }, [pageSettings, paperDimensions]);
 
   if (!editor) {
     return (
@@ -840,7 +879,7 @@ export const DocumentEditor = ({
   }
 
   return (
-    <div className="document-editor-container flex justify-center py-8 bg-gray-100 min-h-screen">
+    <div className={`document-editor-container flex justify-center py-8 bg-gray-100 min-h-screen tiptap-${layoutMode}-mode`}>
       {/* Editor CSS styles for ProseMirror, Carets, Selection, Tables, Page Breaks, and Image alignment */}
       <style>{`
         .ProseMirror {
@@ -875,27 +914,20 @@ export const DocumentEditor = ({
           display: block;
         }
 
-        .ProseMirror .page-break-gap {
-          display: block;
-          height: 40px;
-          background-color: #f3f4f6; /* Same as workspace background */
-          
-          /* Push out into the page margins to cut the white paper completely */
-          margin-left: calc(-1 * var(--page-margin-left));
-          margin-right: calc(-1 * var(--page-margin-right));
-          width: var(--page-width);
+        .ProseMirror .rm-pagination-gap {
+          background-color: #f3f4f6 !important; /* Same as workspace background */
           
           /* Visual shadow trick to make it look like separate papers */
           box-shadow: 
             inset 0 4px 6px -4px rgba(0,0,0,0.1),
-            inset 0 -4px 6px -4px rgba(0,0,0,0.1);
+            inset 0 -4px 6px -4px rgba(0,0,0,0.1) !important;
         }
 
-        :is(.dark) .ProseMirror .page-break-gap {
-          background-color: #0f172a; /* matches dark bg-slate-900 */
+        :is(.dark) .ProseMirror .rm-pagination-gap {
+          background-color: #0f172a !important; /* matches dark bg-slate-900 */
           box-shadow: 
             inset 0 4px 6px -4px rgba(0,0,0,0.3),
-            inset 0 -4px 6px -4px rgba(0,0,0,0.3);
+            inset 0 -4px 6px -4px rgba(0,0,0,0.3) !important;
         }
 
         .ProseMirror:focus {
@@ -1015,63 +1047,38 @@ export const DocumentEditor = ({
         }
 
         /* Real Physical Multi-Page Separation (Google Docs / MS Word Print Layout) */
+        /* The semantic page break markers are hidden; PaginationPlus draws the physical gap. */
         .ProseMirror hr,
         .ProseMirror .page-break {
           display: block;
-          box-sizing: content-box;
-          height: 48px;
-          background-color: #f8f9fa !important;
-          margin: ${pageSettings?.marginBottom || '1in'} -${pageSettings?.marginRight || '1in'} ${pageSettings?.marginTop || '1in'} -${pageSettings?.marginLeft || '1in'} !important;
-          border: none !important;
-          border-top: 1px solid #cbd5e1 !important;
-          border-bottom: 1px solid #cbd5e1 !important;
-          box-shadow: 
-            0 10px 15px -3px rgba(0, 0, 0, 0.08),
-            0 4px 6px -4px rgba(0, 0, 0, 0.05),
-            inset 0 6px 10px -3px rgba(0, 0, 0, 0.07), 
-            inset 0 -6px 10px -3px rgba(0, 0, 0, 0.07) !important;
-          position: relative;
-          cursor: default;
-          user-select: none;
-          z-index: 10;
-        }
-
-        .ProseMirror hr::after,
-        .ProseMirror .page-break::after {
-          content: "PAGE BREAK • NEXT PAGE";
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background: #ffffff;
-          color: #475569;
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          padding: 4px 14px;
-          border-radius: 9999px;
-          border: 1px solid #cbd5e1;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+          height: 0;
+          border: none;
+          margin: 0;
+          padding: 0;
+          opacity: 0;
           pointer-events: none;
         }
 
-        :is(.dark) .ProseMirror hr,
-        :is(.dark) .ProseMirror .page-break {
-          background-color: #020617 !important;
-          border-top: 1px solid #334155 !important;
-          border-bottom: 1px solid #334155 !important;
-          box-shadow: 
-            0 10px 15px -3px rgba(0, 0, 0, 0.5),
-            inset 0 6px 10px -3px rgba(0, 0, 0, 0.5), 
-            inset 0 -6px 10px -3px rgba(0, 0, 0, 0.5) !important;
+        /* Continuous Layout Padding */
+        .tiptap-continuous-mode .ProseMirror {
+          padding: 2rem 15% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
         }
 
-        :is(.dark) .ProseMirror hr::after,
-        :is(.dark) .ProseMirror .page-break::after {
-          background: #0f172a;
-          color: #94a3b8;
-          border: 1px solid #334155;
+        .tiptap-print-mode .ProseMirror {
+          padding: 0 !important;
+          background: #ffffff !important;
+          min-height: 100vh;
         }
+
+        :is(.dark) .tiptap-print-mode .ProseMirror {
+          background: #1e293b !important;
+        }
+
 
 
         /* Image alignment helpers */
@@ -1093,45 +1100,57 @@ export const DocumentEditor = ({
           margin-left: auto;
         }
 
-        /* Manuscript typography defaults */
+        /* Manuscript typography defaults (using padding to avoid margin collapse bugs in pagination) */
         .ProseMirror h1 {
           font-size: 1.875rem;
           font-weight: 700;
           line-height: 1.25;
-          margin-top: 1rem;
-          margin-bottom: 0.75rem;
+          padding-top: 1rem;
+          padding-bottom: 0.75rem;
+          margin: 0;
           color: #0f172a;
         }
         .ProseMirror h2 {
           font-size: 1.5rem;
           font-weight: 600;
           line-height: 1.3;
-          margin-top: 1rem;
-          margin-bottom: 0.5rem;
+          padding-top: 1rem;
+          padding-bottom: 0.5rem;
+          margin: 0;
           color: #1e293b;
         }
         .ProseMirror h3 {
           font-size: 1.25rem;
           font-weight: 600;
           line-height: 1.35;
-          margin-top: 0.75rem;
-          margin-bottom: 0.5rem;
+          padding-top: 0.75rem;
+          padding-bottom: 0.5rem;
+          margin: 0;
           color: #334155;
         }
         .ProseMirror p {
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          padding-top: 0.5rem;
+          padding-bottom: 0.5rem;
+          margin: 0;
           line-height: 1.625;
         }
         .ProseMirror ul {
           list-style-type: disc;
           padding-left: 1.5rem;
-          margin: 0.5rem 0;
+          padding-top: 0.5rem;
+          padding-bottom: 0.5rem;
+          margin: 0;
         }
         .ProseMirror ol {
           list-style-type: decimal;
           padding-left: 1.5rem;
-          margin: 0.5rem 0;
+          padding-top: 0.5rem;
+          padding-bottom: 0.5rem;
+          margin: 0;
+        }
+        .ProseMirror li > p {
+          padding-top: 0;
+          padding-bottom: 0;
         }
         
         /* Explicit Page Breaks from LibreOffice */

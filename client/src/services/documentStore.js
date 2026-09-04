@@ -171,6 +171,7 @@ export const documentStore = {
       content: initialData.content || null,
       contentHtml: initialData.contentHtml || '',
       plainText: initialData.plainText || '',
+      sourceType: initialData.sourceType || 'native',
       editorSettings: {
         ...DEFAULT_EDITOR_SETTINGS,
         ...(initialData.editorSettings || {})
@@ -701,6 +702,24 @@ export const documentStore = {
     } catch (error) {
       console.warn(`[documentStore] subscribeVersions exception:`, error.message);
       return () => {};
+    }
+  },
+
+  /**
+   * Delete a document by ID
+   */
+  deleteDocument: async (documentId) => {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, documentId);
+      await deleteDoc(docRef);
+      // Remove from memory cache
+      if (memoryDocCache.has(documentId)) {
+        memoryDocCache.delete(documentId);
+      }
+      return true;
+    } catch (error) {
+      console.error(`[documentStore] deleteDocument error for ${documentId}:`, error);
+      return false;
     }
   }
 };
