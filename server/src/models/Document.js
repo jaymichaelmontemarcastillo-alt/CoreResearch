@@ -25,6 +25,10 @@ const DocumentSchema = new mongoose.Schema({
   yjsBinaryState: { type: Buffer },
   plainText: { type: String, default: '' },
   
+  // Phase 5 - ONLYOFFICE Migration
+  onlyofficeFileKey: { type: String, default: null }, // GridFS storage reference to the .docx file
+  editorType: { type: String, default: 'tiptap' }, // 'tiptap' | 'onlyoffice' (for gradual migration/fallback)
+
   // Phase 4E - True Document Page Engine
   pageSettings: { type: PageSettingsSchema, default: () => ({}) },
 }, { 

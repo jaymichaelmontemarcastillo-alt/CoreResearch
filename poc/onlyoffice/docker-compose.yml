@@ -1,15 +1,11 @@
 version: '3'
 services:
-  onlyoffice-document-server:
+  onlyoffice:
     image: onlyoffice/documentserver:latest
-    container_name: onlyoffice-docs-poc
+    container_name: onlyoffice_poc
     ports:
       - "8080:80"
     environment:
-      - JWT_ENABLED=false # Disabled for POC simplicity
-    volumes:
-      - document_data:/var/www/onlyoffice/Data
-      - document_log:/var/log/onlyoffice
-volumes:
-  document_data:
-  document_log:
+      - JWT_SECRET=super_secret_key_123
+      - JWT_ENABLED=true
+    restart: always
