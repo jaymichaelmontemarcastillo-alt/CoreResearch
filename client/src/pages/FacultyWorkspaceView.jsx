@@ -58,7 +58,12 @@ export const FacultyWorkspaceView = () => {
           throw new Error('Workspace ID is missing.');
         }
 
-        const targetWorkspace = await researchWorkspaceService.getWorkspaceById(workspaceId);
+        let targetWorkspace = await researchWorkspaceService.getWorkspaceById(workspaceId);
+        
+        // If not found by ID, it might be a Group ID passed from the Adviser list
+        if (!targetWorkspace) {
+          targetWorkspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', workspaceId);
+        }
         
         if (targetWorkspace) {
           setWorkspace(targetWorkspace);

@@ -32,6 +32,8 @@ export const importDocument = async (req, res) => {
       }
     }
 
+    const existingDocumentId = req.body?.documentId || null;
+
     const documentRecord = await documentImportService.importDocument({
       fileBuffer: file.buffer,
       fileName: file.originalname,
@@ -39,6 +41,7 @@ export const importDocument = async (req, res) => {
       fileSize: file.size,
       userProfile,
       groupInfo,
+      existingDocumentId,
     });
 
     return res.status(201).json({

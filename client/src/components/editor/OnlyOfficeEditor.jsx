@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DocumentEditor } from '@onlyoffice/document-editor-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+
 export const OnlyOfficeEditor = ({ documentId }) => {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -97,7 +98,7 @@ export const OnlyOfficeEditor = ({ documentId }) => {
   const documentServerUrl = import.meta.env.VITE_ONLYOFFICE_SERVER_URL || 'http://localhost:8080/';
 
   return (
-    <div className="w-full h-full flex flex-col relative">
+    <div className="w-full h-full flex flex-col relative rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <DocumentEditor
         id="onlyoffice-editor"
         documentServerUrl={documentServerUrl}

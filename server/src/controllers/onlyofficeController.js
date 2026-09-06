@@ -27,8 +27,11 @@ export const generateConfig = async (req, res) => {
 
     const user = req.user || {
       uid: req.headers['x-user-id'] || 'guest-user',
-      fullName: req.headers['x-user-name'] || 'Researcher'
+      fullName: req.headers['x-user-name'] || 'Researcher',
+      role: req.headers['x-user-role'] || 'student'
     };
+
+    const isAdviserOrPanelist = user.role === 'adviser' || user.role === 'panelist';
 
     // The document URL must be reachable by the ONLYOFFICE server (which runs in Docker)
     const backendHost = process.env.BACKEND_PUBLIC_URL || `http://host.docker.internal:5000`;
@@ -42,7 +45,9 @@ export const generateConfig = async (req, res) => {
         title: document.title || 'Untitled Document',
         url: documentUrl,
         permissions: {
-          edit: true, // adjust based on user role
+          edit: !isAdviserOrPanelist,
+          comment: true,
+          chat: true,
           download: true,
           print: true
         }
@@ -191,8 +196,17 @@ export const createDocument = async (req, res) => {
       }
     }
 
-    // Generate a blank DOCX
+    // Generate a blank DOCX with Inter font
     const doc = new DocxDocument({
+      styles: {
+        default: {
+          document: {
+            run: {
+              font: "Inter",
+            },
+          },
+        },
+      },
       sections: [{
         properties: {},
         children: [

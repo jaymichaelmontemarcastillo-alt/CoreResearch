@@ -20,12 +20,13 @@ export class DocumentImportService {
     fileSize,
     userProfile = null,
     groupInfo = null,
+    existingDocumentId = null,
   }) {
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new Error('No file data received for document import.');
     }
 
-    const documentId = `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const documentId = existingDocumentId || `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storageProvider = getStorageProvider();
@@ -64,18 +65,31 @@ export class DocumentImportService {
     try {
       const MongoDocument = mongoose.model('Document');
       
-      await MongoDocument.create({
-        id: documentId,
+      const updateData = {
         title: title,
-        abstract: '', 
-        status: 'draft',
         sourceType: 'imported',
-        authors: [ownerId],
-        adviser: null,
         editorType: 'onlyoffice',
         onlyofficeFileKey: originalFileKey,
+        updated_at: new Date(), // Important for cache invalidation
         ...documentMetadata
-      });
+      };
+
+      if (existingDocumentId) {
+        await MongoDocument.findOneAndUpdate(
+          { id: existingDocumentId },
+          { $set: updateData },
+          { upsert: true, new: true }
+        );
+      } else {
+        await MongoDocument.create({
+          id: documentId,
+          abstract: '', 
+          status: 'draft',
+          authors: [ownerId],
+          adviser: null,
+          ...updateData
+        });
+      }
     } catch (mongoErr) {
       console.warn('[DocumentImportService] MongoDB write error:', mongoErr.message);
       throw mongoErr;

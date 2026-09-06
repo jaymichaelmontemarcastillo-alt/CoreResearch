@@ -15,6 +15,7 @@ export const documentImportService = {
     file,
     userProfile = null,
     groupInfo = null,
+    documentId = null,
     onProgress = () => {},
   }) => {
     onProgress(10);
@@ -22,6 +23,9 @@ export const documentImportService = {
     formData.append('file', file);
     if (groupInfo) {
       formData.append('groupInfo', JSON.stringify(groupInfo));
+    }
+    if (documentId) {
+      formData.append('documentId', documentId);
     }
 
     try {
