@@ -13,7 +13,7 @@ import {
   HiChevronDown,
 } from "react-icons/hi2";
 
-export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
+export const Header = ({ onOpenMobileMenu }) => {
   const { userProfile, currentUser, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
@@ -58,7 +58,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
     // Simple navigation rules based on notification title/type
     if (notif.title.toLowerCase().includes('adviser request')) {
       if (userProfile?.role === 'adviser') {
-        navigate('/dashboard'); // Or wherever adviser requests are
+        navigate('/dashboard');
       } else {
         navigate('/research-workspace');
       }
@@ -75,6 +75,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const getPageTitle = () => {
     const path = location.pathname;
     if (path === "/dashboard") return "Dashboard";
+    if (path === "/notifications") return "Notifications";
     if (path === "/masterlist") return "Section Masterlist";
     if (path === "/my-group") return "My Research Group";
     if (path === "/panelists") return "Panelist Defense Schedules";
@@ -114,21 +115,12 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
       ? "Panelist"
       : "Student";
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
   return (
     <header
-      className={`sticky top-0 z-30 h-16 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-[#1c1d28]/60 px-8 sm:px-12 lg:px-16 flex items-center justify-between shrink-0 transition-all duration-300 ${
-        sidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[280px]"
-      }`}
+      className="sticky top-0 z-20 h-16 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-[#1c1d28]/60 px-6 sm:px-8 lg:px-12 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
     >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <button
           onClick={onOpenMobileMenu}
           className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-600 dark:text-[#9396a8] transition shrink-0"
@@ -137,23 +129,12 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
           <HiBars3 className="w-6 h-6" />
         </button>
 
-        {location.pathname === "/dashboard" ? (
-          <div>
-            <span className="text-[11px] text-gray-500 dark:text-[#888ca3] font-medium leading-none block">
-              {getGreeting()},
-            </span>
-            <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
-              {displayName}
-            </h1>
-          </div>
-        ) : (
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">
-            {getPageTitle()}
-          </h1>
-        )}
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+          {getPageTitle()}
+        </h1>
       </div>
 
-      {/* RIGHT SECTION — Notification, Divider, User Avatar & Menu */}
+      {/* RIGHT SECTION — DASHBOARD ------------- bell --- profile */}
       <div className="flex items-center gap-3 shrink-0">
         {/* Notification Icon & Dropdown */}
         <div className="relative" ref={notificationDropdownRef}>
@@ -162,7 +143,8 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
               setNotificationDropdownOpen(!notificationDropdownOpen);
               setProfileDropdownOpen(false);
             }}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-500 dark:text-[#9396a8] relative transition"
+            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-500 dark:text-[#9396a8] relative transition border border-transparent hover:border-gray-200/80 dark:hover:border-[#222433]"
+            title="Notifications"
           >
             <HiBell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -185,7 +167,6 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                   </button>
                 )}
               </div>
-              
               <div className="overflow-y-auto flex-1 p-1">
                 {loading && notifications.length === 0 ? (
                   <div className="p-8 text-center text-xs text-gray-500">Loading...</div>
@@ -196,7 +177,7 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {notifications.map((notif) => (
+                    {notifications.slice(0, 6).map((notif) => (
                       <div 
                         key={notif.id}
                         onClick={() => handleNotificationClick(notif)}
@@ -225,25 +206,41 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
                   </div>
                 )}
               </div>
+
+              {/* See all link — shown when there are more than 6 notifications */}
+              {notifications.length > 6 && (
+                <div className="border-t border-gray-100 dark:border-[#222433] p-2">
+                  <Link
+                    to="/notifications"
+                    onClick={() => setNotificationDropdownOpen(false)}
+                    className="flex items-center justify-center w-full py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-xl hover:bg-gray-50 dark:hover:bg-[#1c1d28]/60 transition-colors"
+                  >
+                    See all notifications ({notifications.length}) →
+                  </Link>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* 3. Vertical Divider */}
+        {/* Subtle Divider */}
         <div className="h-5 w-px bg-gray-200 dark:bg-[#222433] mx-0.5" />
 
-        {/* 4. User Profile Dropdown Pill */}
+        {/* User Profile Dropdown Pill */}
         <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-            className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1a1b26] transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 group"
+            onClick={() => {
+              setProfileDropdownOpen(!profileDropdownOpen);
+              setNotificationDropdownOpen(false);
+            }}
+            className="flex items-center gap-2.5 p-1 sm:px-3 sm:py-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1a1b26] transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 group border border-transparent hover:border-gray-200/80 dark:hover:border-[#222433]"
             title="Account & Profile Settings"
           >
             <Avatar name={displayName} src={avatarSrc} size="sm" color="blue" />
-            <span className="hidden md:inline-block text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px] text-left">
+            <span className="hidden sm:inline-block text-sm font-semibold text-gray-900 dark:text-white truncate max-w-[150px] text-left">
               {displayName}
             </span>
-            <HiChevronDown className={`hidden md:block w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+            <HiChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Profile Dropdown Menu */}
@@ -312,3 +309,4 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   );
 };
 
+export default Header;

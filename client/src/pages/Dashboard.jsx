@@ -38,6 +38,23 @@ import { adviserRequestService } from '../services/adviserRequest.service';
 import { useNotifications } from "../hooks/useNotifications";
 import { userService } from "../services/user.service";
 
+/* Shared helper — converts a date string/object to a relative time string */
+const formatRelativeTime = (dateStr) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
 export const Dashboard = () => {
   const { userProfile, currentUser, role, currentFacultyMode, setFacultyMode } = useAuth();
 
@@ -824,10 +841,10 @@ const AdviserRequestsWidget = () => {
   if (loading) return null;
   if (requests.length === 0) {
     return (
-      <Card className="p-6 flex flex-col items-center justify-center text-gray-500 min-h-[160px]">
-        <HiCheckCircle className="w-8 h-8 text-gray-300 mb-2" />
-        <p>No pending adviser requests.</p>
-      </Card>
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1a1b26]/50 text-xs text-gray-500 dark:text-[#9396a8]">
+        <HiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+        <span>No pending adviser requests.</span>
+      </div>
     );
   }
 
@@ -867,22 +884,8 @@ const AdviserRequestsWidget = () => {
 const RecentActivityWidget = ({ currentUser }) => {
   const { notifications, loading } = useNotifications(currentUser?.uid);
 
-  const formatActivityTime = (dateStr) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
-  };
+  // Use shared module-level formatRelativeTime helper
+  const formatActivityTime = formatRelativeTime;
 
   const getBadgeVariant = (type) => {
     switch (type) {
@@ -1025,7 +1028,7 @@ const InstitutionalActiveProposalsWidget = () => {
                 </Link>
                 <div className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
                   {prop.groupName || prop.studentName || prop.submittedByName || "Research Team"}
-                  {prop.createdAt && ` · ${new Date(prop.createdAt).toLocaleDateString()}`}
+                  {prop.createdAt && ` · ${formatRelativeTime(prop.createdAt)}`}
                 </div>
               </div>
               <Badge

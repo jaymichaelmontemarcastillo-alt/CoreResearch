@@ -34,6 +34,7 @@ import { ProfileSettings } from './pages/ProfileSettings';
 import { Scheduling } from './pages/Scheduling';
 import { Masterlist } from './pages/Masterlist';
 import { Panelists } from './pages/Panelists';
+import { Notifications } from './pages/Notifications';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
 
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/notifications" element={<Notifications />} />
                 <Route path="/profile" element={<ProfileSettings />} />
                 <Route path="/profile-settings" element={<ProfileSettings />} />
                 <Route path="/settings" element={<ProfileSettings />} />
