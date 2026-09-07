@@ -73,6 +73,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Public Client Config Endpoint — serves runtime config to the frontend
+// so env vars like ONLYOFFICE_SERVER_URL don't need to be baked into the build.
+app.get('/api/config', (req, res) => {
+  res.status(200).json({
+    onlyofficeServerUrl: process.env.ONLYOFFICE_SERVER_URL || 'http://localhost:8080/',
+  });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

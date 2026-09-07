@@ -5,6 +5,7 @@ import api from '../../services/api';
 
 export const OnlyOfficeEditor = ({ documentId }) => {
   const [config, setConfig] = useState(null);
+  const [documentServerUrl, setDocumentServerUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { userProfile } = useAuth();
@@ -14,6 +15,21 @@ export const OnlyOfficeEditor = ({ documentId }) => {
 
     const fetchConfig = async () => {
       try {
+        // 1. Fetch the runtime server config (ONLYOFFICE URL) from backend.
+        //    This avoids baking the URL into the frontend build — no rebuild needed when tunnel changes!
+        let serverUrl = import.meta.env.VITE_ONLYOFFICE_SERVER_URL || 'http://localhost:8080/';
+        try {
+          const configResponse = await api.get('/config');
+          if (configResponse.data?.onlyofficeServerUrl) {
+            serverUrl = configResponse.data.onlyofficeServerUrl;
+          }
+        } catch (configErr) {
+          console.warn('[OnlyOfficeEditor] Could not fetch runtime config, using fallback URL:', serverUrl);
+        }
+
+        if (isMounted) setDocumentServerUrl(serverUrl);
+
+        // 2. Fetch the ONLYOFFICE document config (JWT token, permissions, etc.)
         let response;
         try {
           response = await api.get(`/onlyoffice/config/${documentId}`);
@@ -31,7 +47,6 @@ export const OnlyOfficeEditor = ({ documentId }) => {
         const data = response.data;
 
         if (data.success && isMounted) {
-          // Add the JWT token to the config object itself, as required by ONLYOFFICE
           const finalConfig = {
             ...data.config,
             token: data.token
@@ -90,12 +105,9 @@ export const OnlyOfficeEditor = ({ documentId }) => {
     );
   }
 
-  if (!config) {
+  if (!config || !documentServerUrl) {
     return null;
   }
-
-  // documentServerUrl must point to the ONLYOFFICE server (e.g., http://localhost:8080 or docker IP)
-  const documentServerUrl = import.meta.env.VITE_ONLYOFFICE_SERVER_URL || 'http://localhost:8080/';
 
   return (
     <div className="w-full h-full flex flex-col relative rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
