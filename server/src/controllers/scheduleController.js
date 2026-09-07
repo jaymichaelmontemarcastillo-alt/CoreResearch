@@ -35,13 +35,22 @@ const seedMockSchedulesIfEmpty = () => {
  */
 export const createSchedule = async (req, res) => {
   try {
-    const { projectId, projectTitle, studentName, defenseType, date, startTime, endTime, venue, panelistIds } = req.body;
+    const { projectId, projectTitle, studentName, defenseType, date, startTime, endTime, venue, panelistIds, adviserId, adviserName } = req.body;
 
     if (!projectTitle || !date || !startTime) {
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
         message: 'projectTitle, date, and startTime are required.'
+      });
+    }
+
+    // Enforce Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
+    if (adviserId && Array.isArray(panelistIds) && panelistIds.includes(adviserId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Panelist Assignment',
+        message: 'Invalid Panelist Assignment: The assigned adviser of this research group cannot serve as a panelist for the same group.'
       });
     }
 
@@ -262,6 +271,15 @@ export const updateSchedule = async (req, res) => {
     const { id } = req.params;
     const { date, startTime, endTime, venue, adviserId, adviserName, panelists } = req.body;
 
+    // Enforce Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
+    if (adviserId && Array.isArray(panelists) && panelists.some(p => (p.id || p.uid) === adviserId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Panelist Assignment',
+        message: 'Invalid Panelist Assignment: The assigned adviser of this research group cannot serve as a panelist for the same group.'
+      });
+    }
+
     let mongoSuccess = false;
     let updatedSchedule = null;
 
@@ -285,14 +303,45 @@ export const updateSchedule = async (req, res) => {
       if (updatedSchedule) mongoSuccess = true;
     }
 
-    if (!mongoSuccess) {
+    // Sync to Firestore / Dev store
+    try {
+      if (db) {
+        await db.collection('schedules').doc(id).set({
+          date,
+          time: startTime,
+          startTime,
+          endTime,
+          venue,
+          location: venue,
+          adviserId,
+          adviserName,
+          panelists: panelists || [],
+          panelistIds: (panelists || []).map(p => p.id || p.uid).filter(Boolean),
+          panelistNames: (panelists || []).map(p => p.name || p.fullName).filter(Boolean),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        mongoSuccess = true;
+      } else if (isDevMockMode) {
+        seedMockSchedulesIfEmpty();
+        const map = mockFirestoreDb.get('schedules');
+        if (map && map.has(id)) {
+          const existing = map.get(id);
+          map.set(id, { ...existing, date, startTime, endTime, venue, adviserId, adviserName, panelists });
+        }
+        mongoSuccess = true;
+      }
+    } catch (fsErr) {
+      console.warn('[ScheduleController] Firestore sync error:', fsErr.message);
+    }
+
+    if (!mongoSuccess && !updatedSchedule) {
       return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'Could not update schedule' });
     }
 
     return res.status(200).json({
       success: true,
       message: `Schedule updated successfully.`,
-      data: updatedSchedule
+      data: updatedSchedule || { id, date, startTime, endTime, venue, adviserId, adviserName, panelists }
     });
   } catch (error) {
     console.error('[ScheduleController] updateSchedule error:', error);
@@ -356,8 +405,40 @@ export const bulkCreateSchedules = async (req, res) => {
       return res.status(400).json({ success: false, error: 'No schedules provided.' });
     }
 
+    // Enforce Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
+    for (const s of schedules) {
+      if (s.adviserId && Array.isArray(s.panelists) && s.panelists.some(p => (p.id || p.uid) === s.adviserId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid Panelist Assignment',
+          message: `Invalid Panelist Assignment: The assigned adviser (${s.adviserName || s.adviserId}) cannot serve as a panelist for group "${s.projectTitle || s.projectId}".`
+        });
+      }
+    }
+
     let mongoSuccess = false;
     let createdCount = 0;
+
+    const docsToInsert = schedules.map(s => ({
+      id: s.id || `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      projectId: s.projectId,
+      projectTitle: s.projectTitle,
+      date: s.date,
+      time: s.startTime, // Keeping 'time' for backward compatibility
+      startTime: s.startTime,
+      endTime: s.endTime,
+      location: s.venue,
+      venue: s.venue,
+      type: s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
+      defenseType: s.defenseType || 'proposal_defense',
+      status: 'scheduled',
+      adviserId: s.adviserId,
+      adviserName: s.adviserName,
+      panelists: s.panelists || [],
+      panelistIds: (s.panelists || []).map(p => p.id || p.uid).filter(Boolean),
+      panelistNames: (s.panelists || []).map(p => p.name || p.fullName).filter(Boolean),
+      createdAt: new Date().toISOString()
+    }));
 
     if (mongoose.connection.readyState === 1) {
       const projectIds = schedules.map(s => s.projectId);
@@ -369,24 +450,32 @@ export const bulkCreateSchedules = async (req, res) => {
         type: { $in: defenseTypes }
       });
 
-      const docsToInsert = schedules.map(s => ({
-        id: `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        projectId: s.projectId,
-        projectTitle: s.projectTitle,
-        date: s.date,
-        time: s.startTime, // Keeping 'time' for backward compatibility
-        endTime: s.endTime,
-        location: s.venue,
-        type: s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
-        status: 'scheduled',
-        adviserId: s.adviserId,
-        adviserName: s.adviserName,
-        panelists: s.panelists
-      }));
-
       await MongoSchedule.insertMany(docsToInsert);
       mongoSuccess = true;
       createdCount = docsToInsert.length;
+    }
+
+    // Also sync to Firestore / Dev store
+    try {
+      if (db) {
+        const batch = db.batch();
+        docsToInsert.forEach(d => {
+          const docRef = db.collection('schedules').doc(d.id);
+          batch.set(docRef, d);
+        });
+        await batch.commit();
+        mongoSuccess = true;
+        createdCount = docsToInsert.length;
+      } else if (isDevMockMode) {
+        seedMockSchedulesIfEmpty();
+        const map = mockFirestoreDb.get('schedules') || new Map();
+        docsToInsert.forEach(d => map.set(d.id, d));
+        mockFirestoreDb.set('schedules', map);
+        mongoSuccess = true;
+        createdCount = docsToInsert.length;
+      }
+    } catch (fsErr) {
+      console.warn('[ScheduleController] Firestore bulk sync warning:', fsErr.message);
     }
 
     if (!mongoSuccess) {
@@ -397,12 +486,10 @@ export const bulkCreateSchedules = async (req, res) => {
       });
     }
 
-    // Existing notification hooks can be triggered here if there is a notification service
-    // e.g. await notificationService.notifySchedulesCreated(docsToInsert);
-
     return res.status(201).json({
       success: true,
       message: `${createdCount} schedules successfully generated.`,
+      data: docsToInsert
     });
 
   } catch (error) {

@@ -31,7 +31,48 @@ export const generateConfig = async (req, res) => {
       role: req.headers['x-user-role'] || 'student'
     };
 
-    const isAdviserOrPanelist = user.role === 'adviser' || user.role === 'panelist';
+    const isExplicitPanelistMode = req.query.mode === 'panelist';
+    const isAdviserOrPanelist = user.role === 'adviser' || user.role === 'panelist' || isExplicitPanelistMode;
+    const isAdmin = user.role === 'admin' || user.role === 'coordinator';
+
+    // Authorization Check for Panelists/Advisers (if document or schedule has assigned personnel)
+    if (!isAdmin && isAdviserOrPanelist && user.uid !== 'guest-user') {
+      const docAuthors = document.authors || [];
+      const docPanelists = document.panelists || [];
+      const docAdviser = document.adviser || '';
+
+      const isAuthor = docAuthors.includes(user.uid);
+      const isDocAdviser = docAdviser === user.uid;
+      const isDocPanelist = docPanelists.includes(user.uid);
+
+      if (!isAuthor && !isDocAdviser && !isDocPanelist && (docAuthors.length > 0 || docPanelists.length > 0 || docAdviser)) {
+        // Also check Schedule model to see if assigned in defense schedule
+        try {
+          const { Schedule } = await import('../models/Schedule.js');
+          const schedule = await Schedule.findOne({
+            $or: [
+              { projectId: document.id },
+              { projectId: document.groupId },
+              { projectTitle: document.title }
+            ]
+          }).lean();
+
+          if (schedule) {
+            const inSchedulePanelists = (schedule.panelists || []).some(p => p.id === user.uid || p.uid === user.uid);
+            const inScheduleAdviser = schedule.adviserId === user.uid;
+
+            if (!inSchedulePanelists && !inScheduleAdviser) {
+              return res.status(403).json({
+                success: false,
+                message: 'Access Restricted: You do not have permission to access this manuscript. Only officially assigned panelists can review this document.'
+              });
+            }
+          }
+        } catch (authErr) {
+          console.warn('[onlyofficeController] Schedule auth check warning:', authErr.message);
+        }
+      }
+    }
 
     // The document URL must be reachable by the ONLYOFFICE server (which runs in Docker)
     const backendHost = process.env.BACKEND_PUBLIC_URL || `http://host.docker.internal:5000`;
@@ -49,7 +90,9 @@ export const generateConfig = async (req, res) => {
           comment: true,
           chat: true,
           download: true,
-          print: true
+          print: true,
+          review: true,
+          fillForms: false
         }
       },
       documentType: 'word',
@@ -59,7 +102,7 @@ export const generateConfig = async (req, res) => {
           id: user.uid,
           name: user.fullName
         },
-        mode: 'edit',
+        mode: isAdviserOrPanelist ? 'view' : 'edit',
         customization: {
           compactHeader: false,
           toolbarNoTabs: false,

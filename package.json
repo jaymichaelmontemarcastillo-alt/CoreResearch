@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@onlyoffice/document-editor-react": "^2.2.0",
     "docs": "^0.4.0"
   },
   "devDependencies": {

@@ -135,12 +135,6 @@ export const Proposals = () => {
 
   const isLoading = groupLoading || loading;
 
-  // Coordinator redirects to dedicated coordinator page
-  if (isCoordinator) {
-    navigate("/coordinator/proposals", { replace: true });
-    return null;
-  }
-
   // Define table columns based on Google Classroom-inspired clean look
   const tableColumns = [
     { label: "Proposal", className: "w-full min-w-[300px]" },

@@ -1,6 +1,7 @@
 // src/components/ui/LogoPreloader.jsx
 import React, { useState, useEffect } from "react";
 import logoImg from "../../assets/logo.png";
+import { useTheme } from "../../context/ThemeContext";
 
 const DEFAULT_MESSAGES = [
   "Initializing your research workspace...",
@@ -15,6 +16,14 @@ export const LogoPreloader = ({
   fullScreen = true,
   className = "",
 }) => {
+  let isDark = false;
+  try {
+    const themeContext = useTheme();
+    isDark = themeContext?.theme === 'dark';
+  } catch {
+    isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  }
+
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
   useEffect(() => {
@@ -31,11 +40,11 @@ export const LogoPreloader = ({
     <div className={`relative flex flex-col items-center justify-center text-center select-none ${className}`}>
       {/* Pure Standalone Logo Fill (No Box / No Outlines / No External Bleed) */}
       <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center mb-5">
-        {/* Base Layer: Dark Silhouette Logo Shape */}
+        {/* Base Layer: Silhouette Logo Shape */}
         <img
           src={logoImg}
           alt="CoreResearch Logo Background"
-          className="w-full h-full object-contain opacity-20 grayscale brightness-75 select-none pointer-events-none"
+          className="w-full h-full object-contain opacity-20 grayscale brightness-90 dark:brightness-75 select-none pointer-events-none"
         />
 
         {/* Foreground Layer: Crisp Pure Logo Fill (Clips strictly within logo bounds) */}
@@ -49,23 +58,23 @@ export const LogoPreloader = ({
       </div>
 
       {/* Brand Title */}
-      <div className="flex items-center gap-1.5 text-lg font-semibold tracking-tight mb-2">
-        <span className="text-white">Core</span>
-        <span className="text-blue-500">Research</span>
+      <div className="flex items-center gap-1.5 text-lg font-bold tracking-tight mb-2">
+        <span className="text-gray-900 dark:text-white">Core</span>
+        <span className="text-blue-600 dark:text-blue-500">Research</span>
       </div>
 
       {/* Sleek Gradient Progress Track */}
-      <div className="w-48 sm:w-56 h-1 bg-[#1c1d28] border border-[#222433] rounded-full overflow-hidden mb-3 relative">
-        <div className="absolute inset-y-0 bg-gradient-to-r from-blue-600 via-blue-400 to-cyan-400 rounded-full w-full progress-bar-shimmer" />
+      <div className="w-48 sm:w-56 h-1.5 bg-gray-200/90 dark:bg-[#1c1d28] border border-gray-300/60 dark:border-[#222433] rounded-full overflow-hidden mb-3 relative shadow-inner">
+        <div className="absolute inset-y-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 rounded-full w-full progress-bar-shimmer" />
       </div>
 
       {/* Dialogue Message */}
-      <p className="text-xs sm:text-sm font-medium text-[#9396a8] transition-all duration-300 min-h-[20px]">
+      <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-[#9396a8] transition-all duration-300 min-h-[20px]">
         {activeMessage}
       </p>
 
       {subtext && (
-        <p className="text-[11px] text-[#6b6f84] mt-1">
+        <p className="text-[11px] text-gray-400 dark:text-[#6b6f84] mt-1">
           {subtext}
         </p>
       )}
@@ -77,12 +86,14 @@ export const LogoPreloader = ({
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0b0c10] text-[#f3f4f8] relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 dark:bg-[#0b0c10] text-gray-900 dark:text-[#f3f4f8] relative overflow-hidden transition-colors duration-200">
       {/* Background Tech Dot Grid Pattern */}
       <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-[0.03]"
         style={{
-          backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.7) 1px, transparent 1px)`,
+          backgroundImage: isDark
+            ? `radial-gradient(rgba(255, 255, 255, 0.7) 1px, transparent 1px)`
+            : `radial-gradient(rgba(0, 0, 0, 0.15) 1px, transparent 1px)`,
           backgroundSize: "24px 24px",
         }}
       />

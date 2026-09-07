@@ -1,7 +1,7 @@
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { UserProfile } from '../types/user.types';
-import { ResearchGroup } from '../types/researchGroup.types';
+import { ResearchGroup } from '../types/group.types';
 import { DefenseSchedule } from '../types/schedule.types';
 import { groupService } from './group.service';
 import progressService from './progress.service';
@@ -107,8 +107,10 @@ export const facultyService = {
     await Promise.all(
       groups.map(async (group) => {
         try {
-          const progress = await progressService.getGroupProgress(group.id);
-          progressMap[group.id] = progress.overallProgress || 0;
+          const progress = typeof (progressService as any).getGroupProgress === 'function'
+            ? await (progressService as any).getGroupProgress(group.id)
+            : null;
+          progressMap[group.id] = progress?.overallProgress || 0;
         } catch (err) {
           progressMap[group.id] = 0;
         }

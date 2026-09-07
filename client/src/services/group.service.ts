@@ -19,14 +19,25 @@ const COLLECTION_NAME = 'research_groups';
 export const groupService = {
   /**
    * Create a new research group.
-   * Auto-generates the name based on the count of groups in that section.
+   * Enforces One Group Per Student rule and auto-associates academic details.
    */
   async createGroup(input: CreateResearchGroupInput): Promise<ResearchGroup> {
-    // Determine the next group number for this section
+    // 1. Enforce One Group Per Student rule for all initial members
+    for (const memberId of input.memberIds) {
+      const existing = await this.getGroupByStudentId(memberId);
+      if (existing) {
+        throw new Error('Already in a Group: You are already a member of a research group and cannot join another group.');
+      }
+    }
+
+    // 2. Determine the next group number for this section if name not provided
     const existingGroups = await this.getGroupsBySection(input.sectionId);
-    const groupNumber = existingGroups.length + 1;
-    const paddedNumber = groupNumber.toString().padStart(2, '0');
-    const name = `Group ${paddedNumber}`;
+    let name = input.name?.trim();
+    if (!name) {
+      const groupNumber = existingGroups.length + 1;
+      const paddedNumber = groupNumber.toString().padStart(2, '0');
+      name = `Group ${paddedNumber}`;
+    }
 
     const groupRef = doc(collection(db, COLLECTION_NAME));
     const now = new Date().toISOString();
@@ -35,13 +46,91 @@ export const groupService = {
       id: groupRef.id,
       name,
       ...input,
-      status: input.memberIds.length === 3 ? 'ready' : 'incomplete',
+      status: input.memberIds.length >= 3 ? 'ready' : 'incomplete',
       createdAt: now,
       updatedAt: now,
     };
     
     await setDoc(groupRef, newGroup);
     return newGroup;
+  },
+
+  /**
+   * Add a student member to an existing group.
+   * Validates:
+   * 1. Student does not already belong to any research group.
+   * 2. Student is not already in this group.
+   */
+  async addMemberToGroup(
+    groupId: string,
+    newMember: { uid: string; fullName: string; email: string; studentNumber?: string }
+  ): Promise<ResearchGroup> {
+    const group = await this.getGroupById(groupId);
+    if (!group) {
+      throw new Error('Research group not found.');
+    }
+
+    // Validate if student is already in this group
+    if (group.memberIds.includes(newMember.uid)) {
+      throw new Error('This student is already a member of this research group.');
+    }
+
+    // Validate if student is already in ANY other research group
+    const existingGroup = await this.getGroupByStudentId(newMember.uid);
+    if (existingGroup) {
+      throw new Error('Already in a Group: This student is already a member of a research group and cannot join another group.');
+    }
+
+    const updatedMembers = [...group.members, newMember];
+    const updatedMemberIds = [...group.memberIds, newMember.uid];
+    const updatedStatus = updatedMemberIds.length >= 3 ? 'ready' : 'incomplete';
+
+    const groupRef = doc(db, COLLECTION_NAME, groupId);
+    const now = new Date().toISOString();
+
+    await updateDoc(groupRef, {
+      members: updatedMembers,
+      memberIds: updatedMemberIds,
+      status: updatedStatus,
+      updatedAt: now,
+    });
+
+    return {
+      ...group,
+      members: updatedMembers,
+      memberIds: updatedMemberIds,
+      status: updatedStatus,
+      updatedAt: now,
+    };
+  },
+
+  /**
+   * Remove a student member from a research group.
+   */
+  async removeMemberFromGroup(groupId: string, memberUid: string): Promise<ResearchGroup> {
+    const group = await this.getGroupById(groupId);
+    if (!group) throw new Error('Research group not found.');
+
+    const updatedMembers = group.members.filter(m => m.uid !== memberUid);
+    const updatedMemberIds = group.memberIds.filter(id => id !== memberUid);
+    const updatedStatus = updatedMemberIds.length >= 3 ? 'ready' : 'incomplete';
+    const now = new Date().toISOString();
+
+    const groupRef = doc(db, COLLECTION_NAME, groupId);
+    await updateDoc(groupRef, {
+      members: updatedMembers,
+      memberIds: updatedMemberIds,
+      status: updatedStatus,
+      updatedAt: now,
+    });
+
+    return {
+      ...group,
+      members: updatedMembers,
+      memberIds: updatedMemberIds,
+      status: updatedStatus,
+      updatedAt: now,
+    };
   },
 
   /**

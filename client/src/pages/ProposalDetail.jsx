@@ -200,11 +200,11 @@ export const ProposalDetail = () => {
       {/* Back navigation + student actions */}
       <div className="flex items-center justify-between gap-4">
         <Link
-          to={isCoordinator ? "/coordinator/proposals" : "/proposals"}
+          to="/proposals"
           className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-xs font-semibold"
         >
           <HiArrowLeft className="w-4 h-4" />
-          {isCoordinator ? "Back to Review Queue" : "Back to Proposals"}
+          Back to Proposals
         </Link>
 
         {isStudent && (
@@ -242,17 +242,6 @@ export const ProposalDetail = () => {
               </Button>
             )}
           </div>
-        )}
-
-        {isCoordinator && proposal.status === "submitted" && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => navigate(`/coordinator/proposals/${proposal.id}`)}
-          >
-            <HiShieldCheck className="w-4 h-4 mr-1.5" />
-            Review This Proposal
-          </Button>
         )}
       </div>
 

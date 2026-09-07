@@ -2,14 +2,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
 import { useNotifications } from "../hooks/useNotifications";
 import { Avatar } from "./ui/Avatar";
 import {
   HiBars3,
-  HiMagnifyingGlass,
-  HiMoon,
-  HiSun,
   HiBell,
   HiArrowRightOnRectangle,
   HiUserCircle,
@@ -19,7 +15,6 @@ import {
 
 export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const { userProfile, currentUser, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -80,11 +75,16 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
   const getPageTitle = () => {
     const path = location.pathname;
     if (path === "/dashboard") return "Dashboard";
+    if (path === "/masterlist") return "Section Masterlist";
+    if (path === "/my-group") return "My Research Group";
+    if (path === "/panelists") return "Panelist Defense Schedules";
+    if (path === "/advisees") return "My Advisees";
     if (path === "/profile" || path === "/profile-settings" || path === "/settings") return "Account Settings";
     if (path.startsWith("/proposals")) return "Title Proposals";
     if (path.startsWith("/documents")) return "Documents";
     if (path.startsWith("/projects")) return "Research Projects";
     if (path.startsWith("/schedules")) return "Defense Schedules";
+    if (path.startsWith("/admin/scheduling")) return "Defense Scheduling";
     if (path.startsWith("/reviews")) return "Reviews & Annotations";
     if (path.startsWith("/grading")) return "Digital Rubric & Grading";
     if (path.startsWith("/repository")) return "Research Repository";
@@ -114,47 +114,48 @@ export const Header = ({ onOpenMobileMenu, sidebarCollapsed }) => {
       ? "Panelist"
       : "Student";
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
   return (
     <header
-      className={`sticky top-0 z-30 h-16 bg-white dark:bg-[#111218] border-b border-gray-200 dark:border-[#222433] px-8 sm:px-12 lg:px-16 flex items-center justify-between shrink-0 transition-all duration-200 ${
-        sidebarCollapsed ? "lg:ml-20" : "lg:ml-64"
+      className={`sticky top-0 z-30 h-16 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-[#1c1d28]/60 px-8 sm:px-12 lg:px-16 flex items-center justify-between shrink-0 transition-all duration-300 ${
+        sidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[280px]"
       }`}
     >
-      {/* LEFT SECTION — Mobile Menu + Left-Aligned Search Bar */}
-      <div className="flex items-center gap-3 flex-1 max-w-md">
+      {/* LEFT SECTION — Mobile Menu + Page Title */}
+      <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileMenu}
           className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-600 dark:text-[#9396a8] transition shrink-0"
+          aria-label="Open navigation menu"
         >
           <HiBars3 className="w-6 h-6" />
         </button>
 
-        <div className="relative w-full max-w-sm">
-          <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Type here to start searching..."
-            className="w-full h-10 bg-gray-50/70 dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm pl-10 pr-3.5 text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 transition-all"
-          />
-        </div>
+        {location.pathname === "/dashboard" ? (
+          <div>
+            <span className="text-[11px] text-gray-500 dark:text-[#888ca3] font-medium leading-none block">
+              {getGreeting()},
+            </span>
+            <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              {displayName}
+            </h1>
+          </div>
+        ) : (
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">
+            {getPageTitle()}
+          </h1>
+        )}
       </div>
 
-      {/* RIGHT SECTION — Theme toggle, Notification, Divider, User Avatar & Menu */}
+      {/* RIGHT SECTION — Notification, Divider, User Avatar & Menu */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* 1. Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-500 dark:text-[#9396a8] transition"
-          title={theme === "dark" ? "Light Mode" : "Dark Mode"}
-        >
-          {theme === "dark" ? (
-            <HiSun className="w-5 h-5 text-amber-400" />
-          ) : (
-            <HiMoon className="w-5 h-5" />
-          )}
-        </button>
-
-        {/* 2. Notification Icon & Dropdown */}
+        {/* Notification Icon & Dropdown */}
         <div className="relative" ref={notificationDropdownRef}>
           <button 
             onClick={() => {

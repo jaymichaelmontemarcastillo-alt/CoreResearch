@@ -3,7 +3,7 @@ import { DocumentEditor } from '@onlyoffice/document-editor-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
-export const OnlyOfficeEditor = ({ documentId }) => {
+export const OnlyOfficeEditor = ({ documentId, mode }) => {
   const [config, setConfig] = useState(null);
   const [documentServerUrl, setDocumentServerUrl] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,14 +31,15 @@ export const OnlyOfficeEditor = ({ documentId }) => {
 
         // 2. Fetch the ONLYOFFICE document config (JWT token, permissions, etc.)
         let response;
+        const configUrl = `/onlyoffice/config/${documentId}${mode ? `?mode=${encodeURIComponent(mode)}` : ''}`;
         try {
-          response = await api.get(`/onlyoffice/config/${documentId}`);
+          response = await api.get(configUrl);
         } catch (err) {
           // If document not found or not migrated, attempt to create/initialize it
           if (err.response && (err.response.status === 404 || err.response.status === 400)) {
             console.log('[OnlyOfficeEditor] Document not found, attempting to auto-create...');
             await api.post('/onlyoffice/create', { documentId, title: 'Research Manuscript' });
-            response = await api.get(`/onlyoffice/config/${documentId}`);
+            response = await api.get(configUrl);
           } else {
             throw err;
           }

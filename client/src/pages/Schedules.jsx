@@ -83,10 +83,12 @@ export const Schedules = () => {
   });
 
   const tableColumns = [
-    { label: "Time / Venue", className: "min-w-[160px]" },
+    { label: "Time/Venue", className: "min-w-[170px]" },
     { label: "Name of Students", className: "min-w-[150px]" },
     { label: "Title", className: "min-w-[200px]" },
-    { label: "Panelists", className: "min-w-[200px]" },
+    { label: "Subject Specialist", className: "min-w-[150px]" },
+    { label: "Statistician", className: "min-w-[140px]" },
+    { label: "Technical", className: "min-w-[140px]" },
   ];
 
   return (
@@ -126,7 +128,7 @@ export const Schedules = () => {
         <DataTable columns={tableColumns} className="shadow-sm">
           {loading ? (
             <TableRow>
-              <TableCell colSpan={4} className="py-12 text-center text-gray-400">
+              <TableCell colSpan={6} className="py-12 text-center text-gray-400">
                 <div className="flex flex-col items-center justify-center space-y-3">
                   <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
                   <span className="text-sm">Loading defense schedules...</span>
@@ -135,7 +137,7 @@ export const Schedules = () => {
             </TableRow>
           ) : filteredSchedules.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="py-16 text-center text-gray-400">
+              <TableCell colSpan={6} className="py-16 text-center text-gray-400">
                 <div className="flex flex-col items-center justify-center space-y-2">
                   <HiCalendarDays className="w-12 h-12 text-gray-300 dark:text-[#6b6f84]" />
                   <span className="text-sm font-medium">No defense schedules found</span>
@@ -147,14 +149,6 @@ export const Schedules = () => {
             </TableRow>
           ) : (
             filteredSchedules.map((sch) => {
-              // Get panelist names from various possible fields
-              let panelistNames = [];
-              if (sch.panelistNames && Array.isArray(sch.panelistNames)) {
-                panelistNames = sch.panelistNames;
-              } else if (sch.panelists && Array.isArray(sch.panelists)) {
-                panelistNames = sch.panelists.map(p => p.name || p.fullName || "");
-              }
-              
               // Get student names from various possible fields
               let studentNames = [];
               if (sch.studentNames && Array.isArray(sch.studentNames)) {
@@ -165,21 +159,44 @@ export const Schedules = () => {
                 studentNames = [sch.studentName];
               }
 
+              // Resolve panelists by role
+              const panelists = Array.isArray(sch.panelists) ? sch.panelists : [];
+
+              const subjectSpecialist = 
+                panelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.name || 
+                panelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.fullName ||
+                (panelists.length > 0 && !panelists.some(p => (p.role || '').toLowerCase().includes('subject')) ? (panelists[0]?.name || panelists[0]?.fullName) : null) ||
+                (Array.isArray(sch.panelistNames) && sch.panelistNames[0] ? sch.panelistNames[0] : null);
+
+              const statistician = 
+                panelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.name || 
+                panelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.fullName ||
+                (panelists.length > 1 && !panelists.some(p => (p.role || '').toLowerCase().includes('stat')) ? (panelists[1]?.name || panelists[1]?.fullName) : null) ||
+                (Array.isArray(sch.panelistNames) && sch.panelistNames[1] ? sch.panelistNames[1] : null);
+
+              const technical = 
+                panelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.name || 
+                panelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.fullName ||
+                (panelists.length > 2 && !panelists.some(p => (p.role || '').toLowerCase().includes('tech')) ? (panelists[2]?.name || panelists[2]?.fullName) : null) ||
+                (Array.isArray(sch.panelistNames) && sch.panelistNames[2] ? sch.panelistNames[2] : null);
+
               return (
                 <TableRow key={sch.id || sch._id}>
+                  {/* Time/Venue */}
                   <TableCell>
-                    <div className="flex flex-col space-y-1">
+                    <div className="flex flex-col space-y-1.5">
                       {sch.date || sch.startTime ? (
                         <>
                           <div className="flex items-center gap-1.5">
-                            <HiClock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            <span className="font-bold text-sm text-gray-900 dark:text-white">
+                            <HiClock className="w-4 h-4 text-blue-500 shrink-0" />
+                            <span className="font-semibold text-sm text-gray-900 dark:text-white">
                               {sch.date ? new Date(sch.date).toLocaleDateString(undefined, { 
                                 month: 'short', 
-                                day: 'numeric'
+                                day: 'numeric',
+                                year: 'numeric'
                               }) : ''}
                               {sch.startTime ? ` · ${formatTime12Hour(sch.startTime)}` : ''}
-                              {sch.endTime ? ` - ${formatTime12Hour(sch.endTime)}` : ''}
+                              {sch.endTime ? ` – ${formatTime12Hour(sch.endTime)}` : ''}
                             </span>
                           </div>
                           {sch.venue && (
@@ -197,41 +214,47 @@ export const Schedules = () => {
                     </div>
                   </TableCell>
 
+                  {/* Name of Students */}
                   <TableCell>
                     {studentNames.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {studentNames.map((name, idx) => (
-                          <div key={idx} className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                          <div key={idx} className="font-medium text-sm text-gray-800 dark:text-gray-200">
                             {name}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-gray-400 italic text-sm">No students</span>
+                      <span className="text-gray-400 italic text-sm">Not assigned</span>
                     )}
                   </TableCell>
 
+                  {/* Title */}
                   <TableCell>
-                    <div className="font-semibold text-gray-900 dark:text-white line-clamp-3 text-sm">
+                    <div className="font-medium text-gray-900 dark:text-white line-clamp-3 text-sm">
                       {sch.projectTitle || sch.title || 'Untitled'}
                     </div>
                   </TableCell>
 
+                  {/* Subject Specialist */}
                   <TableCell>
-                    {panelistNames.length > 0 ? (
-                      <div className="flex flex-col gap-1.5">
-                        {panelistNames.map((pname, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <HiUsers className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                            <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
-                              {pname}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 italic text-sm">No panelists assigned</span>
-                    )}
+                    <span className="font-medium text-sm text-gray-800 dark:text-gray-200">
+                      {subjectSpecialist || <span className="text-gray-400 italic text-sm">Not Assigned</span>}
+                    </span>
+                  </TableCell>
+
+                  {/* Statistician */}
+                  <TableCell>
+                    <span className="font-medium text-sm text-gray-800 dark:text-gray-200">
+                      {statistician || <span className="text-gray-400 italic text-sm">Not Assigned</span>}
+                    </span>
+                  </TableCell>
+
+                  {/* Technical */}
+                  <TableCell>
+                    <span className="font-medium text-sm text-gray-800 dark:text-gray-200">
+                      {technical || <span className="text-gray-400 italic text-sm">Not Assigned</span>}
+                    </span>
                   </TableCell>
                 </TableRow>
               );

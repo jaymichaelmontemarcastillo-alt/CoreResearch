@@ -13,7 +13,15 @@ export const useTheme = () => {
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('core_research_theme');
-    return saved || 'light';
+    const initialTheme = saved || 'light';
+    if (typeof document !== 'undefined') {
+      if (initialTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+    return initialTheme;
   });
 
   useEffect(() => {

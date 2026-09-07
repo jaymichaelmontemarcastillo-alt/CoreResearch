@@ -1,4 +1,3 @@
-// src/components/Sidebar.jsx
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -10,9 +9,8 @@ import groupService from "../services/group.service";
 import {
   HiSquares2X2,
   HiDocumentText,
-  HiClipboardDocumentCheck,
+  HiClipboardDocumentList,
   HiBuildingLibrary,
-  HiChatBubbleLeftRight,
   HiCalendarDays,
   HiUsers,
   HiUserGroup,
@@ -22,9 +20,9 @@ import {
   HiChevronRight,
   HiArrowRightOnRectangle,
   HiSparkles,
-  HiMoon,
-  HiSun,
   HiViewColumns,
+  HiSun,
+  HiMoon,
 } from "react-icons/hi2";
 
 export const Sidebar = ({
@@ -88,56 +86,64 @@ export const Sidebar = ({
           icon: HiSquares2X2,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
         },
-        ...(!hasWorkspace && effectiveRole === "student"
+        ...(effectiveRole === "student"
           ? [
-              {
-                label: "Submit Title",
-                path: "/submit-title",
-                icon: HiDocumentText,
-                roles: ["student"],
-              },
-            ]
-          : []),
-        {
-          label: "Proposal Review",
-          path: "/coordinator/proposals",
-          icon: HiClipboardDocumentCheck,
-          roles: ["research_coordinator", "admin"],
-        },
-        ...(hasWorkspace && effectiveRole === "student"
-          ? [
-              {
-                label: "Research Workspace",
-                path: "/research/workspace",
-                icon: HiBookOpen,
-                roles: ["student"],
-              },
               {
                 label: "My Group",
                 path: "/my-group",
                 icon: HiUserGroup,
                 roles: ["student"],
               },
+              {
+                label: "Masterlist",
+                path: "/masterlist",
+                icon: HiClipboardDocumentList,
+                roles: ["student"],
+              },
+              ...(!hasWorkspace
+                ? [
+                    {
+                      label: "Submit Title",
+                      path: "/submit-title",
+                      icon: HiDocumentText,
+                      roles: ["student"],
+                    },
+                  ]
+                : [
+                    {
+                      label: "Research Workspace",
+                      path: "/research/workspace",
+                      icon: HiBookOpen,
+                      roles: ["student"],
+                    },
+                  ]),
             ]
           : []),
         ...(effectiveRole === "adviser" ||
         effectiveRole === "research_coordinator" ||
-        effectiveRole === "admin"
+        effectiveRole === "admin" ||
+        effectiveRole === "faculty"
           ? [
               {
                 label: "My Advisees",
                 path: "/advisees",
                 icon: HiUsers,
-                roles: ["adviser", "research_coordinator", "admin"],
+                roles: ["adviser", "research_coordinator", "admin", "faculty"],
+              },
+              {
+                label: "Panelists",
+                path: "/panelists",
+                icon: HiUserGroup,
+                roles: ["adviser", "research_coordinator", "admin", "faculty", "panelist"],
               },
             ]
           : []),
         ...(effectiveRole === "panelist"
           ? [
               {
-                label: "Panel Assignments",
-                path: "/panelist/defendees",
-                icon: HiUsers,
+                label: "Panelists",
+                path: "/panelists",
+                icon: HiUserGroup,
                 roles: ["panelist"],
               },
             ]
@@ -161,16 +167,10 @@ export const Sidebar = ({
       category: "ACADEMIC",
       items: [
         {
-          label: "Reviews",
-          path: "/reviews",
-          icon: HiChatBubbleLeftRight,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
-        },
-        {
-          label: "Schedules",
+          label: "Schedule",
           path: "/schedules",
           icon: HiCalendarDays,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator"],
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
         },
       ],
     },
@@ -214,56 +214,63 @@ export const Sidebar = ({
   const isItemActive = (path) => {
     const currentPath = location.pathname;
     if (path === "/proposals") return currentPath.startsWith("/proposals");
-    if (path === "/coordinator/proposals")
-      return currentPath.startsWith("/coordinator/proposals");
     if (path === "/admin/users") return currentPath.startsWith("/admin/users");
     if (path === "/admin/courses") return currentPath.startsWith("/admin/courses");
     return currentPath === path;
   };
 
   const renderContent = () => (
-    <div className="flex flex-col h-full bg-white dark:bg-[#111218] border-r border-gray-200 dark:border-[#222433] transition-all duration-200 select-none overflow-x-hidden">
+    <div className="flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 transition-all duration-300 select-none overflow-hidden">
       {/* BRANDING / COLLAPSE HEADER SECTION */}
-      <div className="h-16 flex items-center border-b border-gray-100 dark:border-[#222433] shrink-0 px-4 overflow-x-hidden">
+      <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] transition-all duration-300 ${
+        collapsed ? "h-20 flex-col justify-center gap-1.5 py-2 px-1" : "h-16 px-4 justify-between"
+      }`}>
         {collapsed ? (
-          <div className="w-full flex items-center justify-center">
+          <>
+            <Link to="/dashboard" className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-colors" title="CoreResearch Dashboard">
+              <img
+                src={logoImg}
+                alt="CoreResearch Logo"
+                className="w-8 h-8 object-contain shrink-0 drop-shadow-sm"
+              />
+            </Link>
             <button
               onClick={onToggleCollapse}
-              className="w-10 h-10 rounded-xl text-gray-500 dark:text-[#9396a8] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1a1b26] flex items-center justify-center transition-all shrink-0 border border-transparent dark:border-[#222433]"
+              className="p-1 rounded-lg text-gray-400 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-all"
               title="Expand Sidebar"
             >
-              <HiChevronRight className="w-5 h-5" />
+              <HiChevronRight className="w-4 h-4" />
             </button>
-          </div>
+          </>
         ) : (
-          <div className="w-full flex items-center justify-between">
+          <>
             <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
               <img
                 src={logoImg}
                 alt="CoreResearch Logo"
-                className="w-8 h-8 object-contain shrink-0"
+                className="w-8 h-8 object-contain shrink-0 drop-shadow-sm"
               />
               <span className="text-base tracking-tight truncate">
-                <span className="font-semibold text-gray-900 dark:text-white">Core</span>
-                <span className="font-semibold text-blue-600 dark:text-blue-500">Research</span>
+                <span className="font-bold text-gray-900 dark:text-white">Core</span>
+                <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
               </span>
             </Link>
 
             {/* Sidebar Collapse Toggle Button */}
             <button
               onClick={onToggleCollapse}
-              className="p-1.5 rounded-lg text-gray-400 dark:text-[#9396a8] hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1a1b26] border border-transparent dark:border-[#222433] transition-all hidden lg:flex items-center justify-center shrink-0"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-all hidden lg:flex items-center justify-center shrink-0"
               title="Collapse Sidebar"
             >
               <HiChevronLeft className="w-4 h-4" />
             </button>
-          </div>
+          </>
         )}
       </div>
 
       {/* CATEGORIZED NAVIGATION */}
       <div
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-5 custom-scrollbar ${
+        className={`flex-1 overflow-y-auto no-scrollbar py-3 space-y-4 ${
           collapsed ? "px-2" : "px-3"
         }`}
       >
@@ -274,9 +281,9 @@ export const Sidebar = ({
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={sec.category} className="space-y-1.5">
+            <div key={sec.category} className="space-y-1">
               {!collapsed && (
-                <div className="px-3 text-[10px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider truncate">
+                <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 dark:text-[#72768f] uppercase tracking-wider truncate">
                   {sec.category}
                 </div>
               )}
@@ -290,28 +297,30 @@ export const Sidebar = ({
                     <Link
                       key={item.label}
                       to={item.path}
-                      className={`relative group flex items-center transition-all duration-150 ${
+                      className={`relative group flex items-center transition-all duration-200 ${
                         collapsed
                           ? "justify-center h-10 w-10 mx-auto rounded-xl shrink-0"
                           : "gap-3 h-10 px-3 rounded-xl text-sm font-medium"
                       } ${
                         active
-                          ? "bg-blue-600 text-white font-medium shadow-md shadow-blue-600/25"
-                          : "text-gray-600 dark:text-[#9396a8] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-[#1a1b26] dark:hover:border dark:hover:border-[#222433]"
+                          ? "bg-gray-100 dark:bg-[#1f212d] text-gray-900 dark:text-white border border-gray-200 dark:border-[#2c2f42] font-semibold shadow-sm"
+                          : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26]"
                       }`}
                     >
                       <Icon
-                        className={`w-5 h-5 shrink-0 transition-colors ${
+                        className={`transition-colors shrink-0 ${
+                          collapsed ? "w-5 h-5" : "w-5 h-5"
+                        } ${
                           active
-                            ? "text-white"
-                            : "text-gray-500 dark:text-[#9396a8] group-hover:text-gray-700 dark:group-hover:text-white"
+                            ? "text-gray-900 dark:text-white"
+                            : "text-gray-500 dark:text-[#888ca3] group-hover:text-gray-800 dark:group-hover:text-white"
                         }`}
                       />
 
                       {!collapsed && <span className="truncate text-[13px]">{item.label}</span>}
 
                       {collapsed && (
-                        <div className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-[#15161e] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none shadow-lg border border-transparent dark:border-[#222433] z-50 transition-opacity duration-150">
+                        <div className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900/95 dark:bg-[#1d1f2e] backdrop-blur-md text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none shadow-xl border border-gray-700/50 dark:border-[#2e3146] z-50 transition-all duration-150 -translate-x-1 group-hover:translate-x-0">
                           {item.label}
                         </div>
                       )}
@@ -324,67 +333,63 @@ export const Sidebar = ({
         })}
       </div>
 
-      {/* FOOTER SECTION: DARK MODE TOGGLE + LOGOUT */}
+      {/* BOTTOM SECTION: THEME SWITCH & LOGOUT */}
       <div
-        className={`p-3 border-t border-gray-200 dark:border-[#222433] shrink-0 space-y-2 overflow-x-hidden ${
+        className={`p-3 border-t border-gray-100 dark:border-[#202230] shrink-0 space-y-2 ${
           collapsed ? "px-2" : "px-3"
         }`}
       >
-        {/* Dark Mode Toggle Row */}
-        {!collapsed ? (
-          <div
-            onClick={toggleTheme}
-            className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-[#9396a8] hover:bg-gray-100 dark:hover:bg-[#1a1b26] hover:text-gray-900 dark:hover:text-white cursor-pointer transition select-none border border-transparent dark:hover:border-[#222433]"
-          >
-            <div className="flex items-center gap-2.5">
-              {theme === "dark" ? (
-                <HiMoon className="w-4 h-4 text-blue-400" />
-              ) : (
-                <HiSun className="w-4 h-4 text-amber-500" />
-              )}
-              <span>Dark Mode</span>
-            </div>
-
+        {/* THEME TOGGLE SWITCH */}
+        {collapsed ? (
+          <div className="relative group flex justify-center">
             <button
-              type="button"
-              role="switch"
-              aria-checked={theme === "dark"}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleTheme();
-              }}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                theme === "dark" ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700"
-              }`}
+              onClick={toggleTheme}
+              className="h-10 w-10 rounded-xl flex items-center justify-center text-gray-500 dark:text-[#9ea3be] hover:text-amber-500 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-all border border-transparent dark:border-[#222433]"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  theme === "dark" ? "translate-x-4" : "translate-x-0"
-                }`}
-              />
+              {theme === "dark" ? (
+                <HiSun className="w-5 h-5 text-amber-400" />
+              ) : (
+                <HiMoon className="w-5 h-5 text-gray-600" />
+              )}
             </button>
+            <div className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900/95 dark:bg-[#1d1f2e] backdrop-blur-md text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none shadow-xl border border-gray-700/50 dark:border-[#2e3146] z-50 transition-all duration-150 -translate-x-1 group-hover:translate-x-0">
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </div>
           </div>
         ) : (
-          <button
-            onClick={toggleTheme}
-            className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-xl text-gray-500 dark:text-[#9396a8] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1a1b26] border border-transparent dark:border-[#222433] transition shrink-0"
-            title="Toggle Dark Mode"
-          >
-            {theme === "dark" ? (
-              <HiMoon className="w-5 h-5 text-blue-400" />
-            ) : (
-              <HiSun className="w-5 h-5 text-amber-500" />
-            )}
-            <div className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-[#15161e] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none shadow-lg border border-transparent dark:border-[#222433] z-50 transition-opacity duration-150">
-              Toggle Theme
-            </div>
-          </button>
+          <div className="bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl flex items-center gap-1 border border-gray-200/60 dark:border-[#252839]">
+            <button
+              type="button"
+              onClick={() => { if (theme === "dark") toggleTheme(); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                theme === "light"
+                  ? "bg-white text-gray-900 shadow-sm font-semibold"
+                  : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <HiSun className={`w-3.5 h-3.5 ${theme === "light" ? "text-amber-500" : ""}`} />
+              <span>Light</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (theme === "light") toggleTheme(); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                theme === "dark"
+                  ? "bg-[#252839] text-white shadow-sm font-semibold"
+                  : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <HiMoon className="w-3.5 h-3.5 text-amber-300 dark:text-white" />
+              <span>Dark</span>
+            </button>
+          </div>
         )}
 
-        {/* Dedicated Logout Button */}
+        {/* LOGOUT BUTTON */}
         <button
           onClick={handleLogout}
-          className={`relative group flex items-center text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 dark:hover:border dark:hover:border-red-900/40 transition-all ${
+          className={`relative group flex items-center text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all ${
             collapsed
               ? "justify-center h-10 w-10 mx-auto rounded-xl shrink-0"
               : "gap-2.5 h-9 px-3 w-full rounded-xl"
@@ -394,7 +399,7 @@ export const Sidebar = ({
           {!collapsed && <span>Logout</span>}
 
           {collapsed && (
-            <div className="absolute left-full ml-3 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none shadow-lg z-50 transition-opacity duration-150">
+            <div className="absolute left-full ml-3 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none shadow-xl z-50 transition-all duration-150 -translate-x-1 group-hover:translate-x-0">
               Logout
             </div>
           )}
@@ -405,9 +410,9 @@ export const Sidebar = ({
 
   return (
     <>
-      {/* Desktop Fixed Sidebar */}
+      {/* Desktop Container-like Floating Sidebar */}
       <aside
-        className={`hidden lg:block fixed left-0 top-0 bottom-0 z-40 transition-all duration-200 ${
+        className={`hidden lg:block fixed left-3 top-3 bottom-3 z-40 transition-all duration-300 ease-in-out ${
           collapsed ? "w-20" : "w-64"
         }`}
       >
@@ -416,12 +421,12 @@ export const Sidebar = ({
 
       {/* Mobile Drawer Overlay */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex p-3">
           <div
-            className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={onCloseMobile}
           />
-          <div className="relative w-64 h-full bg-white dark:bg-[#111218] shadow-xl border-r border-gray-200 dark:border-[#222433] z-50 animate-slide-in">
+          <div className="relative w-64 h-full z-50 animate-slide-in">
             {renderContent()}
           </div>
         </div>

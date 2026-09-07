@@ -132,122 +132,151 @@ export const DocumentEditorPage = () => {
     }
   };
 
-  return (
-    <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
-      isMaximized 
-        ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
-        : isHeightMaximized
-          ? 'h-screen absolute top-0 left-0 right-0 z-40'
-          : 'h-[calc(100vh-4rem)]'
-    }`}>
-      
-      {/* Hidden file input for import */}
-      <input 
-        type="file" 
-        accept=".docx" 
-        className="hidden" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-      />
+    const searchParams = new URLSearchParams(location.search);
+    const isPanelistMode = searchParams.get('mode') === 'panelist' || userProfile?.role === 'panelist';
 
-      {/* Floating Restore Button when Height is Maximized */}
-      {isHeightMaximized && !isMaximized && (
-        <button
-          onClick={() => setIsHeightMaximized(false)}
-          className="fixed top-4 right-6 z-[70] p-2 bg-white dark:bg-slate-800 shadow-md border border-gray-200 dark:border-slate-700 rounded-full text-gray-600 dark:text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          title="Restore headers"
-        >
-          <HiChevronDown className="w-5 h-5" />
-        </button>
-      )}
+    return (
+      <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
+        isMaximized 
+          ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
+          : isHeightMaximized
+            ? 'h-screen absolute top-0 left-0 right-0 z-40'
+            : 'h-[calc(100vh-4rem)]'
+      }`}>
+        
+        {/* Hidden file input for import */}
+        <input 
+          type="file" 
+          accept=".docx" 
+          className="hidden" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+        />
 
-      {/* Top Header Row - hidden when height is maximized */}
-      {!isHeightMaximized && (
-        <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-20 shrink-0 shadow-sm">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || '/documents')} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
-              <HiChevronLeft className="w-5 h-5" />
-            </Button>
-            
-            <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-              </svg>
+        {/* Floating Restore Button when Height is Maximized */}
+        {isHeightMaximized && !isMaximized && (
+          <button
+            onClick={() => setIsHeightMaximized(false)}
+            className="fixed top-4 right-6 z-[70] p-2 bg-white dark:bg-slate-800 shadow-md border border-gray-200 dark:border-slate-700 rounded-full text-gray-600 dark:text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            title="Restore headers"
+          >
+            <HiChevronDown className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Top Header Row - hidden when height is maximized */}
+        {!isHeightMaximized && (
+          <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-20 shrink-0 shadow-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || (isPanelistMode ? '/panelists' : '/documents'))} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
+                <HiChevronLeft className="w-5 h-5" />
+              </Button>
+              
+              <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>
+              </div>
+              
+              <div className="flex flex-col min-w-0">
+                {isPanelistMode ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-xs">
+                      {title || 'Research Manuscript'}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                      Read-Only
+                    </span>
+                  </div>
+                ) : (
+                  <input 
+                    type="text" 
+                    value={title}
+                    onChange={handleTitleChange}
+                    placeholder="Document Title"
+                    className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate max-w-[200px] sm:max-w-xs transition-colors"
+                  />
+                )}
+              </div>
             </div>
-            
-            <div className="flex flex-col min-w-0">
-              <input 
-                type="text" 
-                value={title}
-                onChange={handleTitleChange}
-                placeholder="Document Title"
-                className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate max-w-[200px] sm:max-w-xs transition-colors"
-              />
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="hidden md:flex items-center text-xs text-gray-500">
-              <span className="flex items-center gap-1 text-gray-400">
-                <HiCheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                Synced via ONLYOFFICE
-              </span>
-            </div>
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <div className="hidden md:flex items-center text-xs text-gray-500">
+                <span className="flex items-center gap-1 text-gray-400">
+                  <HiCheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  Synced via ONLYOFFICE
+                </span>
+              </div>
 
-            {/* Import Document Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImportClick}
-              disabled={isImporting}
-              className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-              title="Import local .docx file"
-            >
-              <HiArrowUpTray className="w-4 h-4" />
-              <span className="hidden lg:inline">{isImporting ? 'Importing...' : 'Import'}</span>
-            </Button>
-
-            {/* Height Maximize (Up Arrow) Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsHeightMaximized(true)}
-              className="p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg shadow-xs"
-              title="Maximize height (hide headers)"
-            >
-              <HiChevronUp className="w-4 h-4" />
-            </Button>
-
-            <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1"></div>
-
-            {/* Maximize / Minimize Fullscreen Toggle Button */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsMaximized(!isMaximized)}
-              className={`rounded-full p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-xs ${
-                isMaximized ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''
-              }`}
-              title={isMaximized ? "Exit full screen (Minimize)" : "Maximize editor (Full screen)"}
-            >
-              {isMaximized ? (
-                <HiArrowsPointingIn className="w-4 h-4" />
-              ) : (
-                <HiArrowsPointingOut className="w-4 h-4" />
+              {/* Import Document Button - Hidden in Panelist Review Mode */}
+              {!isPanelistMode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportClick}
+                  disabled={isImporting}
+                  className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  title="Import local .docx file"
+                >
+                  <HiArrowUpTray className="w-4 h-4" />
+                  <span className="hidden lg:inline">{isImporting ? 'Importing...' : 'Import'}</span>
+                </Button>
               )}
-            </Button>
-          </div>
-        </div>
-      )}
 
-      {/* Main Document Workspace */}
-      <div className="flex-1 flex overflow-hidden relative">
-        <div className="flex-1 w-full h-full p-0">
-          <OnlyOfficeEditor documentId={documentId} />
+              {/* Height Maximize (Up Arrow) Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsHeightMaximized(true)}
+                className="p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg shadow-xs"
+                title="Maximize height (hide headers)"
+              >
+                <HiChevronUp className="w-4 h-4" />
+              </Button>
+
+              <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1"></div>
+
+              {/* Maximize / Minimize Fullscreen Toggle Button */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsMaximized(!isMaximized)}
+                className={`rounded-full p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-xs ${
+                  isMaximized ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''
+                }`}
+                title={isMaximized ? "Exit full screen (Minimize)" : "Maximize editor (Full screen)"}
+              >
+                {isMaximized ? (
+                  <HiArrowsPointingIn className="w-4 h-4" />
+                ) : (
+                  <HiArrowsPointingOut className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Panelist Review Mode Banner */}
+        {isPanelistMode && (
+          <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between z-10 shrink-0">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs sm:text-sm font-medium">
+              <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+              <span><strong>Panelist Review Mode:</strong> You have view and comment privileges only. Direct editing of the manuscript is restricted.</span>
+            </div>
+            <span className="text-[11px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-amber-200/60 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200">
+              Comment Only
+            </span>
+          </div>
+        )}
+
+        {/* Main Document Workspace */}
+        <div className="flex-1 flex overflow-hidden relative">
+          <div className="flex-1 w-full h-full p-0">
+            <OnlyOfficeEditor documentId={documentId} mode={isPanelistMode ? 'panelist' : 'edit'} />
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 };
 
 export default DocumentEditorPage;

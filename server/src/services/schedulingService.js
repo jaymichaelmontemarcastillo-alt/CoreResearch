@@ -78,33 +78,53 @@ export const generateTimeSlots = (config, groups, existingSchedules) => {
   const proposedSchedules = [];
   const errors = [];
   
+  // Enforce Section 5.1: Research Groups must automatically be arranged according to createdAt ASC (Oldest -> Newest)
+  const sortedGroups = [...groups].sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeA - timeB;
+  });
+
   // Track assigned for conflict checking within the generated batch
   const allSchedulesToCheck = [...existingSchedules];
 
-  for (const group of groups) {
+  for (const group of sortedGroups) {
     let slotFound = false;
 
     // Find next available slot
     while (currentMinutes + durationMinutes <= endOfDayMin) {
       const potentialEnd = currentMinutes + durationMinutes;
 
-      // Skip break
+      // Skip break period (Section 6.3: unavailable scheduling time)
       if (currentMinutes < breakEndMin && potentialEnd > breakStartMin) {
         currentMinutes = breakEndMin;
         continue;
       }
 
+      // Automatically pair existing assigned Adviser (Section 5.2)
+      const adviserId = group.adviserId || group.assignedAdviserId || '';
+      const adviserName = group.adviserName || group.assignedAdviserName || 'Assigned Adviser';
+
+      // Verify Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
+      const rawPanelists = group.panelists || [];
+      const cleanPanelists = rawPanelists.filter(p => {
+        const pId = p.id || p.uid;
+        return pId && pId !== adviserId;
+      });
+
+      const panelistIds = cleanPanelists.map(p => p.id || p.uid);
+
       const proposed = {
         projectId: group.id,
-        projectTitle: group.title || 'Untitled',
+        projectTitle: group.title || group.name || 'Research Group',
         date,
         startTime: formatTime(currentMinutes),
         endTime: formatTime(potentialEnd),
         venue,
         defenseType,
-        adviserId: group.adviserId,
-        adviserName: group.adviserName,
-        panelistIds: group.panelistIds || [],
+        adviserId,
+        adviserName,
+        panelistIds,
         panelists: (() => {
           const pList = (group.panelists || []).map(p => ({
              id: p.uid || p.id,

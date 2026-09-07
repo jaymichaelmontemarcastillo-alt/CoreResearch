@@ -20,8 +20,6 @@ import { Courses } from './pages/Courses';
 import { Sections } from './pages/Sections';
 import { SubmitTitle } from './pages/SubmitTitle';
 import { AdviserMatching } from './pages/AdviserMatching';
-import { CoordinatorProposals } from './pages/CoordinatorProposals';
-import { CoordinatorProposalReview } from './pages/CoordinatorProposalReview';
 import { Projects } from './pages/Projects';
 import { StudentResearchWorkspace } from './pages/StudentResearchWorkspace';
 import { AdviserAdvisees } from './pages/AdviserAdvisees';
@@ -34,6 +32,8 @@ import { Schedules } from './pages/Schedules';
 import { Repository } from './pages/Repository';
 import { ProfileSettings } from './pages/ProfileSettings';
 import { Scheduling } from './pages/Scheduling';
+import { Masterlist } from './pages/Masterlist';
+import { Panelists } from './pages/Panelists';
 
 export default function App() {
   return (
@@ -63,17 +63,12 @@ export default function App() {
                 {/* Student specific */}
                 <Route element={<ProtectedRoute allowedRoles={['student']} />}>
                   <Route path="/my-group" element={<MyGroup />} />
+                  <Route path="/masterlist" element={<Masterlist />} />
                 </Route>
 
                 {/* Title & Adviser Matching Routes */}
                 <Route path="/submit-title" element={<SubmitTitle />} />
                 <Route path="/adviser-matching" element={<AdviserMatching />} />
-
-                {/* Coordinator Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['research_coordinator', 'admin']} />}>
-                  <Route path="/coordinator/proposals" element={<CoordinatorProposals />} />
-                  <Route path="/coordinator/proposals/:id" element={<CoordinatorProposalReview />} />
-                </Route>
 
                 {/* Research Projects & Workspace */}
                 <Route path="/projects" element={<Projects />} />
@@ -81,6 +76,7 @@ export default function App() {
                 <Route path="/workspace" element={<StudentResearchWorkspace />} />
                 <Route path="/advisees" element={<AdviserAdvisees />} />
                 <Route path="/faculty/workspace/:id" element={<FacultyWorkspaceView />} />
+                <Route path="/panelists" element={<Panelists />} />
                 <Route path="/panelist/defendees" element={<PanelistDefendees />} />
 
                 {/* Real-time Documents Editor */}

@@ -106,7 +106,23 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
     const { name, value } = e.target;
     if (name === 'adviserId') {
       const adv = advisers.find(a => a.uid === value);
-      setFormData(prev => ({ ...prev, adviserId: value, adviserName: adv?.fullName || '' }));
+      setFormData(prev => {
+        // If the newly chosen adviser was in any panelist slot, clear that slot
+        const updates = { ...prev, adviserId: value, adviserName: adv?.fullName || '' };
+        if (updates.subjectSpecialistId === value) {
+          updates.subjectSpecialistId = '';
+          updates.subjectSpecialistName = '';
+        }
+        if (updates.statId === value) {
+          updates.statId = '';
+          updates.statName = '';
+        }
+        if (updates.techId === value) {
+          updates.techId = '';
+          updates.techName = '';
+        }
+        return updates;
+      });
     } else if (name === 'subjectSpecialistId') {
       const pan = panelists.find(p => p.uid === value);
       setFormData(prev => ({ ...prev, subjectSpecialistId: value, subjectSpecialistName: pan?.fullName || '' }));
@@ -122,6 +138,20 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
   };
 
   const handleSave = async () => {
+    // Validate Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
+    const chosenPanelistIds = [formData.subjectSpecialistId, formData.statId, formData.techId].filter(Boolean);
+    if (formData.adviserId && chosenPanelistIds.includes(formData.adviserId)) {
+      alert('Invalid Panelist Assignment: The assigned adviser of this research group cannot serve as a panelist for the same group.');
+      return;
+    }
+
+    // Validate duplicate panelists
+    const uniquePanelists = new Set(chosenPanelistIds);
+    if (uniquePanelists.size < chosenPanelistIds.length) {
+      alert('Invalid Panelist Assignment: A faculty member cannot be assigned to more than one panelist role for the same group.');
+      return;
+    }
+
     setLoading(true);
     try {
       const updatedPanelists = [];
@@ -169,7 +199,7 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
       onSaved();
     } catch (err) {
       console.error(err);
-      alert('Failed to save schedule');
+      alert(err.response?.data?.message || err.message || 'Failed to save schedule');
     } finally {
       setLoading(false);
     }
@@ -235,7 +265,14 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
                   className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Panelist...</option>
-                  {panelists.map(p => <option key={p.uid} value={p.uid}>{p.fullName}</option>)}
+                  {panelists.map(p => {
+                    const isIneligible = p.uid === formData.adviserId;
+                    return (
+                      <option key={p.uid} value={p.uid} disabled={isIneligible}>
+                        {p.fullName} {isIneligible ? ' (Assigned Adviser - Ineligible)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -247,7 +284,14 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
                   className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Panelist...</option>
-                  {panelists.map(p => <option key={p.uid} value={p.uid}>{p.fullName}</option>)}
+                  {panelists.map(p => {
+                    const isIneligible = p.uid === formData.adviserId;
+                    return (
+                      <option key={p.uid} value={p.uid} disabled={isIneligible}>
+                        {p.fullName} {isIneligible ? ' (Assigned Adviser - Ineligible)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -259,7 +303,14 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
                   className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
                   <option value="">Select Panelist...</option>
-                  {panelists.map(p => <option key={p.uid} value={p.uid}>{p.fullName}</option>)}
+                  {panelists.map(p => {
+                    const isIneligible = p.uid === formData.adviserId;
+                    return (
+                      <option key={p.uid} value={p.uid} disabled={isIneligible}>
+                        {p.fullName} {isIneligible ? ' (Assigned Adviser - Ineligible)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
