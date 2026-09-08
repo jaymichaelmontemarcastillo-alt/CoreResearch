@@ -30,20 +30,8 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
         if (isMounted) setDocumentServerUrl(serverUrl);
 
         // 2. Fetch the ONLYOFFICE document config (JWT token, permissions, etc.)
-        let response;
         const configUrl = `/onlyoffice/config/${documentId}${mode ? `?mode=${encodeURIComponent(mode)}` : ''}`;
-        try {
-          response = await api.get(configUrl);
-        } catch (err) {
-          // If document not found or not migrated, attempt to create/initialize it
-          if (err.response && (err.response.status === 404 || err.response.status === 400)) {
-            console.log('[OnlyOfficeEditor] Document not found, attempting to auto-create...');
-            await api.post('/onlyoffice/create', { documentId, title: 'Research Manuscript' });
-            response = await api.get(configUrl);
-          } else {
-            throw err;
-          }
-        }
+        const response = await api.get(configUrl);
 
         const data = response.data;
 

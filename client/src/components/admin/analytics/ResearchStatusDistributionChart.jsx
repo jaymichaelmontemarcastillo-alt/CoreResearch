@@ -43,7 +43,7 @@ export const ResearchStatusDistributionChart = ({ data = [], loading = false }) 
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 w-full h-full py-2">
         {/* Donut Chart */}
         <div className="w-full md:w-1/2 h-[220px] relative flex items-center justify-center">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" debounce={200}>
             <PieChart>
               <Tooltip content={<CustomTooltip />} />
               <Pie

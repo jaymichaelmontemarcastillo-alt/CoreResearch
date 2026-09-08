@@ -46,6 +46,15 @@ export const manuscriptDocumentAdapter = {
       sourceType: 'native',
     });
 
+    // 3. Initialize ONLYOFFICE Document in MongoDB
+    try {
+      const { default: api } = await import('./api');
+      await api.post('/onlyoffice/create', { documentId: newDoc.id, title: documentTitle });
+    } catch (err) {
+      console.warn('[ManuscriptAdapter] Failed to provision ONLYOFFICE document in MongoDB:', err);
+      throw new Error('Failed to initialize document on the server. Please try again.');
+    }
+
     return {
       documentId: newDoc.id,
       editorUrl: `/documents/${newDoc.id}`,

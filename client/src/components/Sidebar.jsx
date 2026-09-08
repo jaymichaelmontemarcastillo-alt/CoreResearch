@@ -20,25 +20,34 @@ import {
   HiSun,
   HiMoon,
   HiBell,
+  HiChevronRight,
+  HiChevronLeft,
 } from "react-icons/hi2";
 
 export const Sidebar = ({
   mobileOpen,
   onCloseMobile,
-  isHovered: externalHovered,
-  onHoverChange,
+  isExpanded: externalExpanded,
+  onToggle,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { role, logout, currentFacultyMode, currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const [internalHovered, setInternalHovered] = useState(false);
-  const isExpanded = externalHovered !== undefined ? externalHovered : internalHovered;
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const isExpanded = externalExpanded !== undefined ? externalExpanded : internalExpanded;
 
-  const handleHover = (state) => {
-    setInternalHovered(state);
-    if (onHoverChange) onHoverChange(state);
+  const toggleSidebar = () => {
+    if (mobileOpen && onCloseMobile) {
+      onCloseMobile();
+      return;
+    }
+    if (onToggle) {
+      onToggle();
+    } else {
+      setInternalExpanded(!isExpanded);
+    }
   };
 
   const [hasWorkspace, setHasWorkspace] = useState(false);
@@ -230,30 +239,38 @@ export const Sidebar = ({
   };
 
   const renderContent = (expanded) => (
-    <div className="flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden transition-all duration-300 ease-in-out">
-      {/* BRANDING HEADER SECTION — NO TOGGLE ARROW */}
-      <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 overflow-hidden transition-all duration-300 ease-in-out ${
-        expanded ? "px-3.5" : "px-0 justify-center"
+    <div className="flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden transition-all duration-150 ease-in-out">
+      {/* HEADER SECTION */}
+      <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 transition-all duration-150 ease-in-out ${
+        expanded ? "px-3.5 justify-between" : "px-2 justify-center"
       }`}>
         <Link
           to="/dashboard"
-          className={`flex items-center transition-all duration-300 ease-in-out ${
-            expanded ? "gap-3 w-full min-w-0" : "justify-center w-full h-full"
+          className={`flex items-center transition-all duration-150 ease-in-out overflow-hidden ${
+            expanded ? "gap-3 opacity-100 min-w-0" : "gap-0 opacity-0 w-0 pointer-events-none"
           }`}
           title="CoreResearch Dashboard"
         >
           <img
             src={logoImg}
             alt="CoreResearch Logo"
-            className="w-8 h-8 object-contain shrink-0 drop-shadow-sm transition-transform duration-300"
+            className="w-8 h-8 object-contain shrink-0 drop-shadow-sm transition-transform duration-150"
           />
-          {expanded && (
-            <span className="text-base tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out opacity-100 max-w-[160px]">
-              <span className="font-bold text-gray-900 dark:text-white">Core</span>
-              <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
-            </span>
-          )}
+          <span className="text-base tracking-tight whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out">
+            <span className="font-bold text-gray-900 dark:text-white">Core</span>
+            <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
+          </span>
         </Link>
+
+        <button
+          onClick={toggleSidebar}
+          className={`flex items-center justify-center shrink-0 transition-all duration-150 ease-in-out text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white ${
+            expanded ? "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1f212d]" : "h-10 w-10 mx-auto rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1c26]"
+          }`}
+          title={expanded ? "Collapse Sidebar" : "Expand Sidebar"}
+        >
+          {expanded ? <HiChevronLeft className="w-5 h-5" /> : <HiChevronRight className="w-5 h-5" />}
+        </button>
       </div>
 
       {/* CATEGORIZED NAVIGATION */}
@@ -267,7 +284,7 @@ export const Sidebar = ({
           return (
             <div key={sec.category} className="space-y-1">
               <div
-                className={`px-3 text-[10px] font-semibold text-gray-400 dark:text-[#72768f] uppercase tracking-wider whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+                className={`px-3 text-[10px] font-semibold text-gray-400 dark:text-[#72768f] uppercase tracking-wider whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out ${
                   expanded ? "opacity-100 max-h-6 py-1" : "opacity-0 max-h-0 py-0 pointer-events-none"
                 }`}
               >
@@ -283,7 +300,7 @@ export const Sidebar = ({
                     <Link
                       key={item.label}
                       to={item.path}
-                      className={`relative flex items-center transition-all duration-300 ease-in-out rounded-xl font-medium ${
+                      className={`relative flex items-center transition-all duration-150 ease-in-out rounded-xl font-medium ${
                         expanded
                           ? "gap-3 h-10 px-3 text-sm"
                           : "justify-center h-10 w-10 mx-auto"
@@ -303,7 +320,7 @@ export const Sidebar = ({
                       />
 
                       <span
-                        className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out text-[13px] ${
+                        className={`whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out text-[13px] ${
                           expanded
                             ? "opacity-100 max-w-[160px]"
                             : "opacity-0 max-w-0 pointer-events-none"
@@ -338,7 +355,7 @@ export const Sidebar = ({
             </button>
           </div>
         ) : (
-          <div className="bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl flex items-center gap-1 border border-gray-200/60 dark:border-[#252839] transition-all duration-300 ease-in-out">
+          <div className="bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl flex items-center gap-1 border border-gray-200/60 dark:border-[#252839] transition-all duration-150 ease-in-out">
             <button
               type="button"
               onClick={() => { if (theme === "dark") toggleTheme(); }}
@@ -369,7 +386,7 @@ export const Sidebar = ({
         {/* LOGOUT BUTTON */}
         <button
           onClick={handleLogout}
-          className={`relative flex items-center text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-300 ease-in-out rounded-xl ${
+          className={`relative flex items-center text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-150 ease-in-out rounded-xl ${
             expanded
               ? "gap-2.5 h-9 px-3 w-full"
               : "justify-center h-10 w-10 mx-auto"
@@ -378,7 +395,7 @@ export const Sidebar = ({
         >
           <HiArrowRightOnRectangle className="w-4 h-4 shrink-0 text-red-500 dark:text-red-400" />
           <span
-            className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+            className={`whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out ${
               expanded ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"
             }`}
           >
@@ -393,9 +410,7 @@ export const Sidebar = ({
     <>
       {/* Desktop Container-like Sidebar in Flexbox flow that actively pushes content */}
       <aside
-        onMouseEnter={() => handleHover(true)}
-        onMouseLeave={() => handleHover(false)}
-        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen p-3 z-30 transition-all duration-300 ease-in-out select-none ${
+        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen p-3 z-30 transition-all duration-150 ease-in-out select-none ${
           isExpanded ? "w-64" : "w-[88px]"
         }`}
       >

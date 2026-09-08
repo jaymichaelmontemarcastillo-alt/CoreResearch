@@ -72,7 +72,7 @@ export const AdviserWorkloadChart = ({ data = [], loading = false }) => {
       }
     >
       <div className="w-full h-[260px] pt-1">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" debounce={200}>
           <BarChart
             layout="vertical"
             data={displayData}

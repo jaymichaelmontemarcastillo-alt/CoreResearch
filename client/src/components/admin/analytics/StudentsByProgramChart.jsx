@@ -60,7 +60,7 @@ export const StudentsByProgramChart = ({ data = [], loading = false }) => {
       }
     >
       <div className="w-full h-[260px] pt-1">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" debounce={200}>
           <BarChart data={data} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
             <CartesianGrid
               strokeDasharray="3 3"
