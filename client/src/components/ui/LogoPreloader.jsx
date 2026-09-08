@@ -38,23 +38,17 @@ export const LogoPreloader = ({
 
   const content = (
     <div className={`relative flex flex-col items-center justify-center text-center select-none ${className}`}>
-      {/* Pure Standalone Logo Fill (No Box / No Outlines / No External Bleed) */}
+      {/* Crisp Logo with Ambient Glow and Gentle Breathe Animation */}
       <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center mb-5">
-        {/* Base Layer: Silhouette Logo Shape */}
+        {/* Ambient Soft Glow Behind Logo */}
+        <div className="absolute inset-0 bg-blue-500/25 dark:bg-blue-500/20 blur-2xl rounded-full animate-pulse pointer-events-none" />
+
+        {/* Clean, Full-Color Logo with Smooth Breathe Effect */}
         <img
           src={logoImg}
-          alt="CoreResearch Logo Background"
-          className="w-full h-full object-contain opacity-20 grayscale brightness-90 dark:brightness-75 select-none pointer-events-none"
+          alt="CoreResearch Logo"
+          className="relative w-full h-full object-contain select-none pointer-events-none drop-shadow-md animate-logo-breathe"
         />
-
-        {/* Foreground Layer: Crisp Pure Logo Fill (Clips strictly within logo bounds) */}
-        <div className="absolute inset-0 flex items-center justify-center logo-fill-liquid pointer-events-none select-none">
-          <img
-            src={logoImg}
-            alt="CoreResearch Logo"
-            className="w-full h-full object-contain"
-          />
-        </div>
       </div>
 
       {/* Brand Title */}
@@ -63,9 +57,9 @@ export const LogoPreloader = ({
         <span className="text-blue-600 dark:text-blue-500">Research</span>
       </div>
 
-      {/* Sleek Gradient Progress Track */}
+      {/* Sleek Gradient Progress Track (Fluid Forward Motion) */}
       <div className="w-48 sm:w-56 h-1.5 bg-gray-200/90 dark:bg-[#1c1d28] border border-gray-300/60 dark:border-[#222433] rounded-full overflow-hidden mb-3 relative shadow-inner">
-        <div className="absolute inset-y-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 rounded-full w-full progress-bar-shimmer" />
+        <div className="absolute inset-y-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 rounded-full progress-bar-fluid" />
       </div>
 
       {/* Dialogue Message */}

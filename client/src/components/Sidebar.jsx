@@ -233,11 +233,13 @@ export const Sidebar = ({
     <div className="flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden transition-all duration-300 ease-in-out">
       {/* BRANDING HEADER SECTION — NO TOGGLE ARROW */}
       <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 overflow-hidden transition-all duration-300 ease-in-out ${
-        expanded ? "px-3.5" : "px-2 justify-center"
+        expanded ? "px-3.5" : "px-0 justify-center"
       }`}>
         <Link
           to="/dashboard"
-          className="flex items-center gap-3 w-full min-w-0"
+          className={`flex items-center transition-all duration-300 ease-in-out ${
+            expanded ? "gap-3 w-full min-w-0" : "justify-center w-full h-full"
+          }`}
           title="CoreResearch Dashboard"
         >
           <img
@@ -245,16 +247,12 @@ export const Sidebar = ({
             alt="CoreResearch Logo"
             className="w-8 h-8 object-contain shrink-0 drop-shadow-sm transition-transform duration-300"
           />
-          <span
-            className={`text-base tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
-              expanded
-                ? "opacity-100 max-w-[160px]"
-                : "opacity-0 max-w-0 pointer-events-none"
-            }`}
-          >
-            <span className="font-bold text-gray-900 dark:text-white">Core</span>
-            <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
-          </span>
+          {expanded && (
+            <span className="text-base tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out opacity-100 max-w-[160px]">
+              <span className="font-bold text-gray-900 dark:text-white">Core</span>
+              <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
+            </span>
+          )}
         </Link>
       </div>
 

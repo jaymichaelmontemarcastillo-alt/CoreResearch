@@ -67,6 +67,7 @@ export const ProfileSettings = () => {
   const [programSpecialization, setProgramSpecialization] = useState("Web and Mobile Development (WMAD)");
   const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState("");
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [avatarError, setAvatarError] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState(null);
 
@@ -121,6 +122,7 @@ export const ProfileSettings = () => {
 
       setStudentIdOrEmployeeId(userProfile?.studentIdOrEmployeeId || "");
       setAvatarPreview(userProfile?.profile_image || currentUser?.photoURL || "");
+      setAvatarError(false);
 
       // Initialize academic fields (combining old fields for backward compatibility)
       let existingExpertise;
@@ -199,6 +201,7 @@ export const ProfileSettings = () => {
   // Callback when crop adjustment is applied in modal
   const handleApplyCrop = (croppedDataUrl) => {
     setAvatarPreview(croppedDataUrl);
+    setAvatarError(false);
     setProfileFeedback({
       type: "success",
       message: "Photo adjusted! Click 'Save Changes' to update your profile.",
@@ -208,7 +211,7 @@ export const ProfileSettings = () => {
   // Delete avatar handler
   const handleDeleteAvatar = () => {
     setAvatarPreview("");
-    setRawImageForCrop(null);
+    setAvatarError(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -548,14 +551,15 @@ export const ProfileSettings = () => {
                 {/* Circular Avatar with Camera Badge */}
                 <div className="relative group shrink-0">
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full ring-4 ring-gray-100 dark:ring-[#222433] overflow-hidden bg-gray-100 dark:bg-[#1c1d28] flex items-center justify-center shadow-inner">
-                    {avatarPreview ? (
+                    {avatarPreview && !avatarError ? (
                       <img
                         src={avatarPreview}
-                        alt="Profile avatar"
+                        alt=""
+                        onError={() => setAvatarError(true)}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-medium text-3xl flex items-center justify-center tracking-wider">
+                      <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-medium text-3xl flex items-center justify-center tracking-wider select-none">
                         {getInitials()}
                       </div>
                     )}
@@ -596,7 +600,7 @@ export const ProfileSettings = () => {
                     <button
                       type="button"
                       onClick={handleDeleteAvatar}
-                      disabled={!avatarPreview}
+                      disabled={!avatarPreview || avatarError}
                       className="px-4 py-2 bg-gray-100 dark:bg-[#1c1d28] hover:bg-gray-200 dark:hover:bg-[#252839] border border-transparent dark:border-[#222433] text-gray-700 dark:text-[#9396a8] font-medium text-sm rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       <HiTrash className="w-4 h-4 text-gray-500 dark:text-[#6b6f84]" />

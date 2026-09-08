@@ -37,6 +37,7 @@ import { facultyService } from '../services/faculty.service';
 import { adviserRequestService } from '../services/adviserRequest.service';
 import { useNotifications } from "../hooks/useNotifications";
 import { userService } from "../services/user.service";
+import { AdminAnalyticsSection } from "../components/admin/analytics/AdminAnalyticsSection";
 
 /* Shared helper — converts a date string/object to a relative time string */
 const formatRelativeTime = (dateStr) => {
@@ -248,7 +249,7 @@ export const Dashboard = () => {
       {effectiveRole === "student" && <StudentDashboardMetrics research={studentResearch} userProfile={userProfile} />}
       {effectiveRole === "adviser" && <AdviserDashboardMetrics />}
       {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
-      {effectiveRole === "admin" && <AdminDashboardMetrics />}
+      {effectiveRole === "admin" && <AdminAnalyticsSection />}
 
       {/* Main Content Grid: Pipeline + Active Papers + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">

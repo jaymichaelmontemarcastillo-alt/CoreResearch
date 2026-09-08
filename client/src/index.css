@@ -238,41 +238,42 @@
     scrollbar-width: none;
   }
 
-  /* Pure Standalone Logo Fill Preloader Animations (No Box, No Bleed) */
-  .logo-fill-liquid {
-    animation: logoFillLiquid 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  /* Modern Brand Preloader Animations (Smooth Breathe & Fluid Progress Bar) */
+  .animate-logo-breathe {
+    animation: logoBreathe 2.4s ease-in-out infinite;
   }
 
-  .progress-bar-shimmer {
-    animation: progressBarShimmer 1.8s ease-in-out infinite;
+  .progress-bar-fluid {
+    animation: progressBarFluid 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 }
 
-@keyframes logoFillLiquid {
-  0% {
-    clip-path: inset(100% 0 0 0);
+@keyframes logoBreathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.92;
+    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.25));
   }
   50% {
-    clip-path: inset(0% 0 0 0);
-  }
-  75% {
-    clip-path: inset(0% 0 0 0);
-  }
-  100% {
-    clip-path: inset(100% 0 0 0);
+    transform: scale(1.06);
+    opacity: 1;
+    filter: drop-shadow(0 0 18px rgba(59, 130, 246, 0.55));
   }
 }
 
-
-@keyframes progressBarShimmer {
+@keyframes progressBarFluid {
   0% {
-    transform: translateX(-100%);
+    left: -35%;
+    width: 35%;
   }
   50% {
-    transform: translateX(0%);
+    left: 25%;
+    width: 60%;
   }
   100% {
-    transform: translateX(100%);
+    left: 100%;
+    width: 35%;
   }
 }
+
 

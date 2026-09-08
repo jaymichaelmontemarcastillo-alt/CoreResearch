@@ -1,5 +1,5 @@
 // src/components/ui/Avatar.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 const sizeVariants = {
   xs: "w-6 h-6 text-[10px]",
@@ -26,20 +26,29 @@ export const Avatar = ({
   className = "",
   ...props
 }) => {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
   const initials = name
     ? name
+        .trim()
         .split(" ")
+        .filter(Boolean)
         .map((n) => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
     : "?";
 
-  if (src) {
+  if (src && !imgError && typeof src === "string" && src.trim() !== "") {
     return (
       <img
         src={src}
         alt={name || "Avatar"}
+        onError={() => setImgError(true)}
         className={`rounded-full object-cover ${sizeVariants[size]} ${className}`}
         {...props}
       />
@@ -48,10 +57,11 @@ export const Avatar = ({
 
   return (
     <div
-      className={`rounded-full flex items-center justify-center font-semibold ${sizeVariants[size]} ${colorVariants[color]} ${className}`}
+      className={`rounded-full flex items-center justify-center font-semibold select-none ${sizeVariants[size]} ${colorVariants[color]} ${className}`}
       {...props}
     >
       {initials}
     </div>
   );
 };
+
