@@ -29,7 +29,8 @@ import { ImageCropModal } from "../components/ui/ImageCropModal";
 const COLLEGES_DATA = {
   "College of Computer Studies": [
     "Department of Computer Science",
-    "Department of Information Technology",]
+    "Department of Information Technology",
+  ]
 };
 
 const EXPERTISE_CATEGORIES = {
@@ -98,6 +99,12 @@ export const ProfileSettings = () => {
 
   const fileInputRef = useRef(null);
 
+  // State to track if form has unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Store initial values for comparison
+  const [initialFormData, setInitialFormData] = useState({});
+
   // Initialize form with user data
   useEffect(() => {
     if (userProfile || currentUser) {
@@ -107,24 +114,26 @@ export const ProfileSettings = () => {
       const fName = userProfile?.first_name || (parts.length > 0 ? parts[0] : "");
       const lName = userProfile?.last_name || (parts.length > 1 ? parts.slice(1).join(" ") : "");
 
+      const userCollege = userProfile?.college || "College of Computer Studies";
+      const userDept = userProfile?.department || "Department of Computer Science";
+      const userProgram = userProfile?.program || "Bachelor of Science in Information Technology";
+      const userProgramSpecialization = userProfile?.programSpecialization || "Web and Mobile Development (WMAD)";
+      const userId = userProfile?.studentIdOrEmployeeId || "";
+      const userAvatar = userProfile?.profile_image || currentUser?.photoURL || "";
+
+      // Set form values
       setFirstName(fName || "");
       setLastName(lName || "");
       setEmail(userProfile?.email || currentUser?.email || "");
-
-      const userCollege = userProfile?.college || "College of Computer Studies";
       setCollege(userCollege);
-
-      const userDept = userProfile?.department || "Department of Computer Science";
       setDepartment(userDept);
-      
-      setProgram(userProfile?.program || "Bachelor of Science in Information Technology");
-      setProgramSpecialization(userProfile?.programSpecialization || "Web and Mobile Development (WMAD)");
-
-      setStudentIdOrEmployeeId(userProfile?.studentIdOrEmployeeId || "");
-      setAvatarPreview(userProfile?.profile_image || currentUser?.photoURL || "");
+      setProgram(userProgram);
+      setProgramSpecialization(userProgramSpecialization);
+      setStudentIdOrEmployeeId(userId);
+      setAvatarPreview(userAvatar);
       setAvatarError(false);
 
-      // Initialize academic fields (combining old fields for backward compatibility)
+      // Initialize academic fields
       let existingExpertise;
       if (userProfile?.selectedExpertise !== undefined) {
         existingExpertise = new Set(userProfile.selectedExpertise);
@@ -137,8 +146,42 @@ export const ProfileSettings = () => {
         ]);
       }
       setSelectedExpertise(Array.from(existingExpertise));
+
+      // Store initial values for comparison
+      setInitialFormData({
+        firstName: fName || "",
+        lastName: lName || "",
+        college: userCollege,
+        department: userDept,
+        program: userProgram,
+        programSpecialization: userProgramSpecialization,
+        studentIdOrEmployeeId: userId,
+        avatarPreview: userAvatar,
+        selectedExpertise: Array.from(existingExpertise)
+      });
+
+      // Reset unsaved changes flag
+      setHasUnsavedChanges(false);
     }
   }, [userProfile, currentUser]);
+
+  // Check for unsaved changes whenever form fields change
+  useEffect(() => {
+    if (Object.keys(initialFormData).length === 0) return;
+
+    const hasChanges = 
+      firstName !== initialFormData.firstName ||
+      lastName !== initialFormData.lastName ||
+      college !== initialFormData.college ||
+      department !== initialFormData.department ||
+      program !== initialFormData.program ||
+      programSpecialization !== initialFormData.programSpecialization ||
+      studentIdOrEmployeeId !== initialFormData.studentIdOrEmployeeId ||
+      avatarPreview !== initialFormData.avatarPreview ||
+      JSON.stringify(selectedExpertise.sort()) !== JSON.stringify(initialFormData.selectedExpertise?.sort() || []);
+
+    setHasUnsavedChanges(hasChanges);
+  }, [firstName, lastName, college, department, program, programSpecialization, studentIdOrEmployeeId, avatarPreview, selectedExpertise, initialFormData]);
 
   const toggleExpertise = (tag) => {
     setSelectedExpertise((prev) => 
@@ -190,7 +233,6 @@ export const ProfileSettings = () => {
     reader.onloadend = () => {
       setRawImageForCrop(reader.result);
       setIsCropModalOpen(true);
-      // Reset input value so same file can be selected again if cancelled
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -267,12 +309,25 @@ export const ProfileSettings = () => {
       
       await api.put("/users/me", updatedFields);
 
+      // Update initial form data after successful save
+      setInitialFormData({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        college,
+        department,
+        program,
+        programSpecialization,
+        studentIdOrEmployeeId: studentIdOrEmployeeId.trim(),
+        avatarPreview: avatarPreview || "",
+        selectedExpertise: [...selectedExpertise]
+      });
+      setHasUnsavedChanges(false);
+
       setProfileFeedback({
         type: "success",
         message: "Profile updated successfully!",
       });
 
-      // Auto dismiss success toast after 4 seconds
       setTimeout(() => {
         setProfileFeedback(null);
       }, 4000);
@@ -327,7 +382,6 @@ export const ProfileSettings = () => {
 
     try {
       if (devMode || !auth.currentUser) {
-        // Dev Mode Simulation & Backend call
         await new Promise((resolve) => setTimeout(resolve, 600));
         try {
           await api.post("/users/me/password", { newPassword });
@@ -342,7 +396,6 @@ export const ProfileSettings = () => {
         setNewPassword("");
         setConfirmNewPassword("");
       } else {
-        // Real Firebase Auth flow
         const user = auth.currentUser;
         const credential = EmailAuthProvider.credential(user.email, currentPassword);
 
@@ -455,24 +508,7 @@ export const ProfileSettings = () => {
               )}
             </button>
 
-            {/* Tab: Notifications */}
-            <button
-              onClick={() => handleTabChange("notifications")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "notifications"
-                  ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
-                  : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <HiBell className="w-4 h-4 shrink-0" />
-                <span>Notifications</span>
-              </div>
-              {activeTab === "notifications" && (
-                <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
-              )}
-            </button>
-
-            {/* Tab: Verification */}
+            {/* Tab: Verification - MOVED TO THIRD POSITION */}
             <button
               onClick={() => handleTabChange("verification")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "verification"
@@ -485,6 +521,23 @@ export const ProfileSettings = () => {
                 <span>Verification</span>
               </div>
               {activeTab === "verification" && (
+                <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+              )}
+            </button>
+
+            {/* Tab: Notifications - MOVED TO FOURTH POSITION */}
+            <button
+              onClick={() => handleTabChange("notifications")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "notifications"
+                  ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                  : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
+                }`}
+            >
+              <div className="flex items-center gap-3">
+                <HiBell className="w-4 h-4 shrink-0" />
+                <span>Notifications</span>
+              </div>
+              {activeTab === "notifications" && (
                 <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
               )}
             </button>
@@ -585,7 +638,7 @@ export const ProfileSettings = () => {
                   className="hidden"
                 />
 
-                {/* Upload & Delete Avatar Action Buttons (Matching Reference Design) */}
+                {/* Upload & Delete Avatar Action Buttons */}
                 <div className="flex flex-col items-center sm:items-start gap-2.5">
                   <div className="flex items-center gap-3">
                     <button
@@ -774,44 +827,52 @@ export const ProfileSettings = () => {
                 )}
               </div>
 
-              {/* Bottom Action Footer */}
+              {/* Bottom Action Footer - Conditional Save Button */}
               <div className="pt-6 border-t border-gray-100 dark:border-[#222433] flex items-center justify-end gap-3">
-                <button
-                  type="submit"
-                  disabled={profileSaving}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {profileSaving ? (
-                    <>
-                      <svg
-                        className="animate-spin h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Saving Changes...
-                    </>
-                  ) : (
-                    <>
-                      <HiCheck className="w-4 h-4" />
-                      Save Changes
-                    </>
-                  )}
-                </button>
+                {hasUnsavedChanges && (
+                  <button
+                    type="submit"
+                    disabled={profileSaving}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-fade-in"
+                  >
+                    {profileSaving ? (
+                      <>
+                        <svg
+                          className="animate-spin h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Saving Changes...
+                      </>
+                    ) : (
+                      <>
+                        <HiCheck className="w-4 h-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </button>
+                )}
+                {!hasUnsavedChanges && (
+                  <div className="text-sm text-gray-400 dark:text-[#6b6f84] italic flex items-center gap-2">
+                    <HiCheck className="w-4 h-4 text-emerald-500" />
+                    All changes saved
+                  </div>
+                )}
               </div>
             </form>
           )}
@@ -1009,7 +1070,65 @@ export const ProfileSettings = () => {
             </form>
           )}
 
-          {/* TAB 3: NOTIFICATIONS SETTINGS */}
+          {/* TAB 3: VERIFICATION SETTINGS - MOVED TO THIRD POSITION */}
+          {activeTab === "verification" && (
+            <div className="space-y-6">
+              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  Institutional Verification
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
+                  View and confirm your institution membership and verification credentials.
+                </p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/60 dark:from-[#1c1d28] dark:via-[#15161e] dark:to-[#1c1d28] border border-blue-100 dark:border-[#222433] space-y-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+                      <HiShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        Institutional Member
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400">
+                          Active & Verified
+                        </span>
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
+                        University Academic Directory
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200/60 dark:border-[#222433] text-xs">
+                  <div>
+                    <span className="text-gray-400 dark:text-[#6b6f84] block">Assigned Role</span>
+                    <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block">
+                      {roleLabel}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 dark:text-[#6b6f84] block">Department</span>
+                    <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block truncate">
+                      {department}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 dark:text-[#6b6f84] block">ID Reference</span>
+                    <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block">
+                      {studentIdOrEmployeeId || "Verified by SSO"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: NOTIFICATIONS SETTINGS - MOVED TO FOURTH POSITION */}
           {activeTab === "notifications" && (
             <div className="space-y-6">
               <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
@@ -1111,64 +1230,6 @@ export const ProfileSettings = () => {
                     }}
                     className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: VERIFICATION SETTINGS */}
-          {activeTab === "verification" && (
-            <div className="space-y-6">
-              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  Institutional Verification
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
-                  View and confirm your institution membership and verification credentials.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/60 dark:from-[#1c1d28] dark:via-[#15161e] dark:to-[#1c1d28] border border-blue-100 dark:border-[#222433] space-y-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-                      <HiShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        Institutional Member
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400">
-                          Active & Verified
-                        </span>
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
-                        University Academic Directory
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200/60 dark:border-[#222433] text-xs">
-                  <div>
-                    <span className="text-gray-400 dark:text-[#6b6f84] block">Assigned Role</span>
-                    <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block">
-                      {roleLabel}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-gray-400 dark:text-[#6b6f84] block">Department</span>
-                    <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block truncate">
-                      {department}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-gray-400 dark:text-[#6b6f84] block">ID Reference</span>
-                    <span className="font-semibold text-gray-900 dark:text-white mt-0.5 block">
-                      {studentIdOrEmployeeId || "Verified by SSO"}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1297,24 +1358,32 @@ export const ProfileSettings = () => {
 
               {/* Save Footer */}
               <div className="pt-6 border-t border-gray-100 dark:border-[#222433] flex items-center justify-end gap-4">
-                <button
-                  type="button"
-                  onClick={handleSaveProfile}
-                  disabled={profileSaving}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {profileSaving ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </button>
+                {hasUnsavedChanges && (
+                  <button
+                    type="button"
+                    onClick={handleSaveProfile}
+                    disabled={profileSaving}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 animate-fade-in"
+                  >
+                    {profileSaving ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </button>
+                )}
+                {!hasUnsavedChanges && (
+                  <div className="text-sm text-gray-400 dark:text-[#6b6f84] italic flex items-center gap-2">
+                    <HiCheck className="w-4 h-4 text-emerald-500" />
+                    All changes saved
+                  </div>
+                )}
               </div>
             </div>
           )}
