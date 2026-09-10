@@ -380,21 +380,21 @@ export const Dashboard = () => {
                 </Card>
               </div>
 
-              {/* Active Proposal Card */}
+              {/* Active Proposal Card - REMOVED Proposal Status metric, keeping workspace info */}
               <Card className="p-5 sm:p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
-                    Active Proposal
+                    Active Research
                   </h3>
-                  {studentResearch.proposal ? (
+                  {studentResearch.workspace ? (
+                    <Badge variant="purple">Active Workspace</Badge>
+                  ) : studentResearch.proposal ? (
                     <Badge variant={
                       studentResearch.proposal.status === 'approved' ? 'emerald' :
                         studentResearch.proposal.status === 'needs_revision' ? 'amber' : 'blue'
                     }>
                       {studentResearch.proposal.status.replace('_', ' ').toUpperCase()}
                     </Badge>
-                  ) : studentResearch.workspace ? (
-                    <Badge variant="purple">Active Workspace</Badge>
                   ) : (
                     <Link to="/submit-title" className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                       Submit Proposal →
@@ -405,7 +405,7 @@ export const Dashboard = () => {
                 {studentResearch.loading ? (
                   <div className="py-8 flex flex-col items-center justify-center space-y-2 text-gray-400">
                     <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-                    <span className="text-xs">Loading proposal...</span>
+                    <span className="text-xs">Loading research data...</span>
                   </div>
                 ) : (studentResearch.proposal || studentResearch.workspace) ? (
                   <div className="space-y-3">
@@ -465,10 +465,10 @@ export const Dashboard = () => {
                   <div className="text-center py-8">
                     <HiDocumentText className="w-10 h-10 mx-auto text-gray-300 dark:text-[#6b6f84] mb-2" />
                     <h4 className="font-semibold text-gray-900 dark:text-white text-base">
-                      No Active Proposals
+                      No Active Research
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
-                      There are currently no active research proposals.
+                      Start by submitting a research proposal.
                     </p>
                   </div>
                 )}
@@ -479,7 +479,6 @@ export const Dashboard = () => {
           {/* ====== ADMIN CONTENT ====== */}
           {effectiveRole === "admin" && (
             <div className="space-y-5">
-              <InstitutionalActiveProposalsWidget />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
                   <div className="flex items-center justify-between">
@@ -530,10 +529,7 @@ export const Dashboard = () => {
           {(effectiveRole === "adviser" || effectiveRole === "panelist") && (
             <div className="space-y-5">
               {effectiveRole === "adviser" && (
-                <>
-                  <AdviserRequestsWidget />
-                  <InstitutionalActiveProposalsWidget />
-                </>
+                <AdviserRequestsWidget />
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
@@ -569,12 +565,8 @@ export const Dashboard = () => {
   );
 };
 
-/* Student Metrics */
+/* Student Metrics - REMOVED Proposal Status ONLY */
 const StudentDashboardMetrics = ({ research, userProfile }) => {
-  const proposalStatus = research?.proposal
-    ? research.proposal.status.replace('_', ' ').toUpperCase()
-    : 'No Proposal';
-
   const manuscriptProgress = research?.workspace?.overallProgress
     ? `${research.workspace.overallProgress}%`
     : (research?.documents?.length || 0) > 0
@@ -585,14 +577,7 @@ const StudentDashboardMetrics = ({ research, userProfile }) => {
   const departmentStatus = userProfile?.department || 'Computer Studies';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-      <StatCard
-        label="Proposal Status"
-        value={proposalStatus}
-        trend={research?.proposal?.status === 'approved' ? '✓ Approved' : 'In Review'}
-        trendType={research?.proposal?.status === 'approved' ? 'positive' : 'neutral'}
-        valueColor={research?.proposal?.status === 'approved' ? 'text-emerald-500 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}
-      />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
       <StatCard
         label="Manuscript Progress"
         value={manuscriptProgress}
@@ -818,7 +803,6 @@ const AdviserRequestsWidget = () => {
       }
 
       // 3. Provision the Research Workspace
-      // We pass a dummy userProfile, or we can fetch it, but getOrCreateWorkspaceForAdviserRequest handles it fine
       await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(request, userProfile);
 
       // Remove from pending list
@@ -881,25 +865,12 @@ const AdviserRequestsWidget = () => {
   );
 };
 
-/* Recent Activity Widget — Real Database Records */
+/* Recent Activity Widget — Cleaned up to remove redundant info */
 const RecentActivityWidget = ({ currentUser }) => {
   const { notifications, loading } = useNotifications(currentUser?.uid);
 
   // Use shared module-level formatRelativeTime helper
   const formatActivityTime = formatRelativeTime;
-
-  const getBadgeVariant = (type) => {
-    switch (type) {
-      case "schedule":
-        return "purple";
-      case "proposal":
-        return "emerald";
-      case "comment":
-        return "amber";
-      default:
-        return "blue";
-    }
-  };
 
   const getDotColor = (type) => {
     switch (type) {
@@ -944,11 +915,6 @@ const RecentActivityWidget = ({ currentUser }) => {
                     {formatActivityTime(item.createdAt)}
                   </div>
                 </div>
-                {item.type && (
-                  <Badge variant={getBadgeVariant(item.type)}>
-                    {item.type.toUpperCase()}
-                  </Badge>
-                )}
               </div>
             ))}
           </div>
@@ -964,99 +930,6 @@ const RecentActivityWidget = ({ currentUser }) => {
           </div>
         )}
       </div>
-    </Card>
-  );
-};
-
-/* Institutional Active Proposals Widget — Real Database Records */
-const InstitutionalActiveProposalsWidget = () => {
-  const [proposals, setProposals] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      try {
-        const list = await titleProposalService.getSubmittedProposals();
-        if (isMounted) {
-          setProposals(list);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (isMounted) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  return (
-    <Card className="p-5 sm:p-6 space-y-4">
-      <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
-          Active Proposals
-        </h3>
-        {proposals.length > 0 && (
-          <Link
-            to="/proposals"
-            className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
-          >
-            View all ({proposals.length}) →
-          </Link>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="py-8 flex flex-col items-center justify-center space-y-2 text-gray-400">
-          <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-          <span className="text-xs">Loading proposals...</span>
-        </div>
-      ) : proposals.length > 0 ? (
-        <div className="space-y-3">
-          {proposals.slice(0, 3).map((prop) => (
-            <div
-              key={prop.id}
-              className="p-3.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1a1b26]/50 flex items-center justify-between gap-3"
-            >
-              <div className="min-w-0 flex-1">
-                <Link
-                  to={`/proposals/${prop.id}`}
-                  className="font-semibold text-gray-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 line-clamp-1"
-                >
-                  {prop.title}
-                </Link>
-                <div className="text-xs text-gray-500 dark:text-[#9396a8] mt-0.5">
-                  {prop.groupName || prop.studentName || prop.submittedByName || "Research Team"}
-                  {prop.createdAt && ` · ${formatRelativeTime(prop.createdAt)}`}
-                </div>
-              </div>
-              <Badge
-                variant={
-                  prop.status === "approved"
-                    ? "emerald"
-                    : prop.status === "needs_revision"
-                      ? "amber"
-                      : "blue"
-                }
-              >
-                {(prop.status || "submitted").replace("_", " ").toUpperCase()}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-10">
-          <HiDocumentText className="w-10 h-10 mx-auto text-gray-300 dark:text-[#6b6f84] mb-2" />
-          <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
-            No Active Proposals
-          </h4>
-          <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
-            There are currently no active research proposals.
-          </p>
-        </div>
-      )}
     </Card>
   );
 };
