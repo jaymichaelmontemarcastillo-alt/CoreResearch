@@ -29,7 +29,7 @@ export const Layout = () => {
 
         <main
           className={`flex-1 transition-all duration-150 ease-in-out ${
-            isDocumentEditor ? "p-0" : "px-8 py-6 sm:px-12 sm:py-8 lg:px-16 lg:py-8"
+            isDocumentEditor ? "p-0" : "px-6 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-8"
           }`}
         >
           <div className={isDocumentEditor ? "w-full h-full" : "w-full"}>

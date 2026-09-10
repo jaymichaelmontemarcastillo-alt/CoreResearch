@@ -168,7 +168,7 @@ export const Dashboard = () => {
       <div className="px-6 py-8 sm:px-8 sm:py-9 lg:px-10 lg:py-10 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all shadow-sm">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-900 dark:text-white tracking-tight">
               {getGreeting()}, {displayName}
             </h1>
           </div>

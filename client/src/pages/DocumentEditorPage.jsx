@@ -29,6 +29,7 @@ export const DocumentEditorPage = () => {
   
   const titleSaveTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
+  const containerRef = useRef(null);
 
   // Load authoritative document metadata
   useEffect(() => {
@@ -60,17 +61,26 @@ export const DocumentEditorPage = () => {
     };
   }, [documentId]);
 
+  // Sync fullscreen state
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsMaximized(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   // Keyboard shortcut listener for Escape to exit maximized mode
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (isMaximized) setIsMaximized(false);
         if (isHeightMaximized) setIsHeightMaximized(false);
+        // Browser handles Escape for Native Fullscreen, so we don't need to manually exit it here.
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMaximized, isHeightMaximized]);
+  }, [isHeightMaximized]);
 
   // Manage DOM for height maximization
   useEffect(() => {
@@ -86,6 +96,20 @@ export const DocumentEditorPage = () => {
       if (systemHeader) systemHeader.style.display = '';
     };
   }, [isHeightMaximized]);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      if (containerRef.current?.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   const handleTitleChange = (e) => {
     const newTitle = e.target.value;
@@ -136,12 +160,14 @@ export const DocumentEditorPage = () => {
     const isPanelistMode = searchParams.get('mode') === 'panelist' || userProfile?.role === 'panelist';
 
     return (
-      <div className={`flex flex-col flex-1 w-full bg-[#f8f9fa] dark:bg-slate-950 overflow-hidden transition-all ${
+      <div 
+        ref={containerRef}
+        className={`flex flex-col flex-1 w-auto bg-white dark:bg-slate-900 overflow-hidden transition-all relative ${
         isMaximized 
-          ? 'fixed inset-0 z-[60] w-screen h-screen m-0 p-0' 
+          ? 'w-screen h-screen m-0 p-0 rounded-none border-none' 
           : isHeightMaximized
-            ? 'h-screen absolute top-0 left-0 right-0 z-40'
-            : 'h-[calc(100vh-4rem)]'
+            ? 'h-[calc(100vh-1.5rem)] m-3 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-xl shadow-gray-200/50 dark:shadow-black/60'
+            : 'h-[calc(100vh-4rem-1.5rem)] m-3 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-xl shadow-gray-200/50 dark:shadow-black/60'
       }`}>
         
         {/* Hidden file input for import */}
@@ -153,20 +179,8 @@ export const DocumentEditorPage = () => {
           onChange={handleFileChange} 
         />
 
-        {/* Floating Restore Button when Height is Maximized */}
-        {isHeightMaximized && !isMaximized && (
-          <button
-            onClick={() => setIsHeightMaximized(false)}
-            className="fixed top-4 right-6 z-[70] p-2 bg-white dark:bg-slate-800 shadow-md border border-gray-200 dark:border-slate-700 rounded-full text-gray-600 dark:text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-            title="Restore headers"
-          >
-            <HiChevronDown className="w-5 h-5" />
-          </button>
-        )}
-
-        {/* Top Header Row - hidden when height is maximized */}
-        {!isHeightMaximized && (
-          <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-20 shrink-0 shadow-sm">
+        {/* Top Header Row - always visible */}
+        <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 z-20 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || (isPanelistMode ? '/panelists' : '/documents'))} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
                 <HiChevronLeft className="w-5 h-5" />
@@ -223,15 +237,15 @@ export const DocumentEditorPage = () => {
                 </Button>
               )}
 
-              {/* Height Maximize (Up Arrow) Button */}
+              {/* Height Maximize (Up/Down Arrow) Button */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsHeightMaximized(true)}
+                onClick={() => setIsHeightMaximized(!isHeightMaximized)}
                 className="p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg shadow-xs"
-                title="Maximize height (hide headers)"
+                title={isHeightMaximized ? "Restore system headers" : "Maximize height (hide system headers)"}
               >
-                <HiChevronUp className="w-4 h-4" />
+                {isHeightMaximized ? <HiChevronDown className="w-4 h-4" /> : <HiChevronUp className="w-4 h-4" />}
               </Button>
 
               <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1"></div>
@@ -240,7 +254,7 @@ export const DocumentEditorPage = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setIsMaximized(!isMaximized)}
+                onClick={toggleFullScreen}
                 className={`rounded-full p-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-xs ${
                   isMaximized ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''
                 }`}
@@ -254,7 +268,6 @@ export const DocumentEditorPage = () => {
               </Button>
             </div>
           </div>
-        )}
 
         {/* Panelist Review Mode Banner */}
         {isPanelistMode && (

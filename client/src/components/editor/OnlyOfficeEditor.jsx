@@ -108,7 +108,7 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col relative rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div className="w-full h-full flex flex-col relative bg-white dark:bg-slate-900">
       <DocumentEditor
         id="onlyoffice-editor"
         documentServerUrl={documentServerUrl}
