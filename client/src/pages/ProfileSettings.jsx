@@ -20,11 +20,14 @@ import {
   HiKey,
   HiCheck,
   HiSparkles,
+  HiDocumentText,
+  HiDocumentPlus,
 } from "react-icons/hi2";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth } from "../services/firebase";
 import api from "../services/api";
 import { ImageCropModal } from "../components/ui/ImageCropModal";
+import { AdviserResearchTab } from "../components/adviser/AdviserResearchTab";
 
 const COLLEGES_DATA = {
   "College of Computer Studies": [
@@ -556,6 +559,25 @@ export const ProfileSettings = () => {
                   <span>Expertise</span>
                 </div>
                 {activeTab === "expertise" && (
+                  <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                )}
+              </button>
+            )}
+
+            {/* Tab: Research Documents (Adviser Only) */}
+            {userProfile?.role === "adviser" && (
+              <button
+                onClick={() => handleTabChange("research")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "research"
+                    ? "bg-blue-50 dark:bg-blue-600/15 text-blue-600 dark:text-blue-400 font-semibold shadow-xs"
+                    : "text-gray-600 dark:text-[#9396a8] hover:bg-gray-50 dark:hover:bg-[#1c1d28] hover:text-gray-900 dark:hover:text-white"
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <HiDocumentText className="w-4 h-4 shrink-0" />
+                  <span>Research Documents</span>
+                </div>
+                {activeTab === "research" && (
                   <div className="w-1.5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full" />
                 )}
               </button>
@@ -1385,6 +1407,28 @@ export const ProfileSettings = () => {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB 6: RESEARCH DOCUMENTS (Adviser Only) */}
+          {activeTab === "research" && userProfile?.role === "adviser" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="pb-4 border-b border-gray-100 dark:border-[#222433]">
+                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <HiDocumentText className="w-5 h-5 text-blue-500" />
+                  Research Documents
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
+                  Upload your published research papers, journals, or articles (PDF/DOCX). 
+                  These documents are used to accurately match you with students based on actual research content rather than just tags.
+                </p>
+              </div>
+              
+              <div className="text-sm text-gray-500 dark:text-[#9396a8]">
+                This feature is newly designed. Please use the Adviser Research section in the main navigation to manage your documents.
+              </div>
+              {/* Note: I will build a dedicated component for this tab later if requested, or just keep it simple here. Let's make it a dedicated component since it has its own complex state. */}
+              <AdviserResearchTab />
             </div>
           )}
         </div>

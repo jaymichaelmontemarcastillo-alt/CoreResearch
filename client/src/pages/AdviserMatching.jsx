@@ -386,10 +386,10 @@ export const AdviserMatching = () => {
                 {/* Score Breakdown */}
                 {adviser.textSimilarity !== undefined && (
                   <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 dark:text-gray-400">
-                    <span>Text: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.textSimilarity)}%</strong></span>
-                    <span>Specialization: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.specializationMatch)}%</strong></span>
-                    <span>Expertise: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.expertiseMatch)}%</strong></span>
-                    <span>Interest: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.researchInterestMatch)}%</strong></span>
+                    <span>Semantic Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.textSimilarity)}%</strong></span>
+                    <span>Keyword Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.specializationMatch)}%</strong></span>
+                    <span>Phrase Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.expertiseMatch)}%</strong></span>
+                    <span>Concept Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.researchInterestMatch)}%</strong></span>
                   </div>
                 )}
 

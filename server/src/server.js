@@ -1,8 +1,10 @@
+import dotenv from 'dotenv';
+dotenv.config(); // MUST be first — services read env vars in their constructors
+
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 
 import { db, auth, isDevMockMode, mockUsersDb, mockFirestoreDb } from './config/firebaseAdmin.js';
 import mongoose from 'mongoose';
@@ -24,8 +26,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import workspaceRoutes from './routes/workspaceRoutes.js';
 import adviserMatchingRoutes from './routes/adviserMatchingRoutes.js';
 import onlyofficeRoutes from './routes/onlyofficeRoutes.js';
-
-dotenv.config();
+import adviserResearchRoutes from './routes/adviserResearchRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -88,6 +89,7 @@ app.use('/api/proposals', proposalRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/workspace', workspaceRoutes);
 app.use('/api/adviser-matching', adviserMatchingRoutes);
+app.use('/api/adviser-research', adviserResearchRoutes);
 app.use('/api/manuscripts', manuscriptRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/schedules', scheduleRoutes);

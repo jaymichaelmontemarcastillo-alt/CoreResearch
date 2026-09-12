@@ -218,6 +218,7 @@ export class NLPAdviserMatchingProvider {
 // ── Gemini Provider ───────────────────────────────────────────────────────────
 
 import { GoogleGenAI } from '@google/genai';
+import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 
 // Simple in-memory cache for adviser embeddings to save API calls
 const adviserEmbeddingCache = new Map();
@@ -271,12 +272,7 @@ export class GeminiAdviserMatchingProvider {
   constructor(options = {}) {
     this.name = 'gemini';
     this.version = 'v2.0-gemini';
-    this.apiKey = process.env.GEMINI_API_KEY;
-    if (this.apiKey) {
-      this.ai = new GoogleGenAI({ apiKey: this.apiKey });
-    } else {
-      console.warn('[GeminiProvider] GEMINI_API_KEY is not set. Matching will fail.');
-    }
+    this._ai = null; // Lazy — initialized on first use
     
     // Configurable Scoring Weights
     this.WEIGHTS = {
@@ -285,6 +281,23 @@ export class GeminiAdviserMatchingProvider {
       expertise: 0.15,
       researchInterest: 0.10
     };
+  }
+
+  /** Lazy-init Gemini client so env vars are guaranteed to be loaded */
+  get ai() {
+    if (!this._ai) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn('[GeminiProvider] GEMINI_API_KEY is not set. Matching will fail.');
+        return null;
+      }
+      this._ai = new GoogleGenAI({ apiKey });
+    }
+    return this._ai;
+  }
+
+  get apiKey() {
+    return process.env.GEMINI_API_KEY;
   }
 
   async isHealthy() {
@@ -298,7 +311,7 @@ export class GeminiAdviserMatchingProvider {
     if (!text || text.trim() === '') return new Array(768).fill(0); // Dummy empty embedding
     try {
       const response = await this.ai.models.embedContent({
-        model: 'gemini-embedding-2',
+        model: 'text-embedding-004',
         contents: text,
       });
       return response.embeddings[0].values;
@@ -319,80 +332,95 @@ export class GeminiAdviserMatchingProvider {
     console.log(`[GeminiProvider] Generating semantic embedding for research: "${title.substring(0, 40)}..."`);
     const studentEmbedding = await this._getEmbedding(researchText);
     
-    console.log(`[GeminiProvider] Scoring ${advisers.length} advisers against semantic representation...`);
-    
-    const results = [];
-    
-    for (const adv of advisers) {
-      // 1. Generate/Retrieve Semantic Representation for Adviser
-      const adviserText = [
-        ...(adv.specialization || []),
-        ...(adv.expertise || []),
-        ...(adv.researchInterests || []),
-        ...(adv.keywords || [])
-      ].join(' ');
-      
-      let advEmbedding;
-      const cacheKey = `adv_emb_${adv.adviserId}_${adviserText.length}`;
-      
-      if (adviserEmbeddingCache.has(cacheKey)) {
-        advEmbedding = adviserEmbeddingCache.get(cacheKey);
-      } else {
-        advEmbedding = await this._getEmbedding(adviserText);
-        if (adviserText.trim() !== '') {
-          adviserEmbeddingCache.set(cacheKey, advEmbedding);
-        }
-      }
-      
-      // 2. Calculate Sub-scores
-      // Semantic Score (Cosine Similarity scaled)
-      // Gemini embeddings typically range from ~0.65 (unrelated) to 1.0 (identical)
-      const cosineSim = cosineSimilarity(studentEmbedding, advEmbedding);
-      
+    // 1. Fetch all READY research documents for the eligible advisers
+    const eligibleAdviserIds = advisers.map(a => a.adviserId);
+    const researchDocs = await AdviserResearchDocument.find({
+      adviserId: { $in: eligibleAdviserIds },
+      processingStatus: 'READY'
+    }).lean();
+
+    console.log(`[GeminiProvider] Found ${researchDocs.length} processed research documents for eligible advisers.`);
+
+    const adviserDocScores = new Map();
+
+    // 2. Score each document
+    for (const doc of researchDocs) {
+      if (!doc.embedding || doc.embedding.length === 0) continue;
+
+      // Semantic Score
+      const cosineSim = cosineSimilarity(studentEmbedding, doc.embedding);
       const BASELINE = 0.65;
       let rawSemanticScore = 0;
       if (cosineSim > BASELINE) {
         rawSemanticScore = ((cosineSim - BASELINE) / (1.0 - BASELINE)) * 100;
       }
+
+      // Keyword & Concept Overlap Scores
+      const specScore = calculateOverlapScore(researchText, doc.keywords || []);
+      const expScore = calculateOverlapScore(researchText, doc.keyPhrases || []);
+      const intScore = calculateOverlapScore(researchText, doc.researchConcepts || []);
       
-      // Keyword Overlap Scores
-      const specScore = calculateOverlapScore(researchText, adv.specialization);
-      const expScore = calculateOverlapScore(researchText, adv.expertise);
-      const intScore = calculateOverlapScore(researchText, adv.researchInterests);
-      
-      // 3. Final Weighted Score
       const finalScore = 
         (rawSemanticScore * this.WEIGHTS.semantic) +
         (specScore * this.WEIGHTS.specialization) +
         (expScore * this.WEIGHTS.expertise) +
         (intScore * this.WEIGHTS.researchInterest);
-        
-      // 4. Generate Recommendation Reason
-      let explanation = 'Moderate compatibility based on general research domain.';
-      if (finalScore > 85) {
-        explanation = "Exceptional semantic match with adviser's core expertise and specialization.";
-      } else if (finalScore > 70) {
-        explanation = 'Strong match in specialization and research interests.';
-      } else if (finalScore > 50) {
-        explanation = 'Good compatibility with relevant expertise overlap.';
+
+      const scoreEntry = {
+        score: finalScore,
+        rawSemanticScore,
+        specScore,
+        expScore,
+        intScore,
+        documentTitle: doc.title,
+        matchedKeywords: (doc.researchConcepts || []).slice(0, 4)
+      };
+
+      if (!adviserDocScores.has(doc.adviserId)) {
+        adviserDocScores.set(doc.adviserId, []);
       }
+      adviserDocScores.get(doc.adviserId).push(scoreEntry);
+    }
+
+    // 3. Aggregate by adviser
+    const results = [];
+    
+    for (const adv of advisers) {
+      const docScores = adviserDocScores.get(adv.adviserId) || [];
       
-      const matchedKeywords = (adv.specialization || []).slice(0, 3);
-      
+      if (docScores.length === 0) {
+        // Fallback: If no documents, we don't match them well or give them a very low score
+        // Or we could fallback to expertise matching here if we wanted to preserve legacy
+        continue; // For this architecture, let's only rank advisers with documents, or give 0. We'll skip them.
+      }
+
+      // Find the highest scoring document for this adviser
+      docScores.sort((a, b) => b.score - a.score);
+      const bestDoc = docScores[0];
+
+      let explanation = 'Moderate compatibility based on general research domain.';
+      if (bestDoc.score > 85) {
+        explanation = `Exceptional semantic match with adviser's actual research: "${bestDoc.documentTitle}".`;
+      } else if (bestDoc.score > 70) {
+        explanation = `Strong match with adviser's research concepts in: "${bestDoc.documentTitle}".`;
+      } else if (bestDoc.score > 50) {
+        explanation = `Good compatibility with relevant expertise overlap in: "${bestDoc.documentTitle}".`;
+      }
+
       results.push({
         adviserId: adv.adviserId,
-        score: Math.round(finalScore),
-        textSimilarity: Math.round(rawSemanticScore),
-        specializationMatch: Math.round(specScore),
-        expertiseMatch: Math.round(expScore),
-        researchInterestMatch: Math.round(intScore),
-        matchedKeywords,
+        score: Math.round(bestDoc.score),
+        textSimilarity: Math.round(bestDoc.rawSemanticScore),
+        specializationMatch: Math.round(bestDoc.specScore),
+        expertiseMatch: Math.round(bestDoc.expScore),
+        researchInterestMatch: Math.round(bestDoc.intScore),
+        matchedKeywords: bestDoc.matchedKeywords,
         explanation,
         algorithmVersion: this.version
       });
     }
-    
-    // 5. Rank
+
+    // 4. Rank
     results.sort((a, b) => b.score - a.score);
     
     console.log(`[GeminiProvider] Match complete in ${Date.now() - startTime}ms. Top score: ${results[0]?.score}`);
