@@ -7,11 +7,19 @@ export interface AdviserMatchResult {
   compatibilityScore: number;
   score: number;
   textSimilarity?: number;
-  specializationMatch?: number;
-  expertiseMatch?: number;
-  researchInterestMatch?: number;
+  topicMatch?: number;
+  conceptMatch?: number;
+  methodologyMatch?: number;
+  profileMatch?: number;
   matchedKeywords?: string[];
   matchedAreas: string[];
+  matchedPaperTitle?: string | null;
+  matchedResearch?: Array<{
+    documentId: string;
+    title: string;
+    similarity: number;
+    relevance: string;
+  }>;
   explanation: string;
   algorithmVersion?: string;
 }
@@ -53,11 +61,14 @@ class AdviserMatchingService {
         compatibilityScore: r.compatibilityScore ?? r.score ?? 0,
         score: r.score ?? r.compatibilityScore ?? 0,
         textSimilarity: r.textSimilarity,
-        specializationMatch: r.specializationMatch,
-        expertiseMatch: r.expertiseMatch,
-        researchInterestMatch: r.researchInterestMatch,
+        topicMatch: r.topicMatch,
+        conceptMatch: r.conceptMatch,
+        methodologyMatch: r.methodologyMatch,
+        profileMatch: r.profileMatch,
         matchedKeywords: r.matchedKeywords || [],
         matchedAreas: r.matchedKeywords || r.matchedAreas || [],
+        matchedPaperTitle: r.matchedPaperTitle,
+        matchedResearch: r.matchedResearch || [],
         explanation: r.explanation || 'Match based on research compatibility analysis.',
         algorithmVersion: r.algorithmVersion || meta?.algorithmVersion,
       }));

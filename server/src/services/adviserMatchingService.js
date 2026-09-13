@@ -31,7 +31,7 @@ class AdviserMatchingService {
    * Initialize the matching provider based on MATCHING_PROVIDER env var.
    */
   _initProvider() {
-    const providerType = (process.env.MATCHING_PROVIDER || 'nlp').toLowerCase().trim();
+    const providerType = (process.env.MATCHING_PROVIDER || 'gemini').toLowerCase().trim();
 
     switch (providerType) {
       case 'mock':

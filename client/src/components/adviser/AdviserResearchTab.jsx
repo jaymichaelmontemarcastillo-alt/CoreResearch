@@ -115,14 +115,25 @@ export const AdviserResearchTab = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, stage) => {
+    const stageLabels = {
+      'UPLOADED': 'Uploaded',
+      'EXTRACTING_TEXT': 'Extracting Text',
+      'ANALYZING_RESEARCH': 'Analyzing NLP',
+      'GENERATING_EMBEDDING': 'Generating Embedding',
+      'SAVING_RESULTS': 'Saving Results',
+      'READY': 'Ready',
+      'FAILED': 'Failed'
+    };
+    const displayStage = stageLabels[stage] || stage || status;
+
     switch (status) {
       case 'READY':
-        return <span className="px-2 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-xs rounded-md font-semibold flex items-center gap-1"><HiCheckCircle className="w-3.5 h-3.5"/> Indexed</span>;
+        return <span className="px-2 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-xs rounded-md font-semibold flex items-center gap-1 shrink-0"><HiCheckCircle className="w-3.5 h-3.5"/> Indexed</span>;
       case 'FAILED':
-        return <span className="px-2 py-1 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 text-xs rounded-md font-semibold flex items-center gap-1"><HiXCircle className="w-3.5 h-3.5"/> Failed</span>;
+        return <span className="px-2 py-1 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 text-xs rounded-md font-semibold flex items-center gap-1 shrink-0"><HiXCircle className="w-3.5 h-3.5"/> Failed</span>;
       default:
-        return <span className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 text-xs rounded-md font-semibold flex items-center gap-1"><HiCog8Tooth className="w-3.5 h-3.5 animate-spin"/> Processing</span>;
+        return <span className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 text-xs rounded-md font-semibold flex items-center gap-1 shrink-0"><HiCog8Tooth className="w-3.5 h-3.5 animate-spin"/> {displayStage}</span>;
     }
   };
 
@@ -203,9 +214,15 @@ export const AdviserResearchTab = () => {
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={doc.originalFilename}>
                       {doc.originalFilename || doc.title}
                     </h3>
-                    {getStatusBadge(doc.processingStatus)}
+                    {getStatusBadge(doc.processingStatus, doc.processingStage)}
                   </div>
                   
+                  {doc.processingStatus === 'FAILED' && doc.processingError && (
+                    <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded text-xs text-red-600 dark:text-red-400">
+                      <strong>Error:</strong> {doc.processingError}
+                    </div>
+                  )}
+
                   {doc.abstract ? (
                     <p className="text-xs text-gray-500 dark:text-[#9396a8] line-clamp-2 mb-3">
                       {doc.abstract}
