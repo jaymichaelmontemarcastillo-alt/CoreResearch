@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../hooks/useNotifications";
+import { useConfirm } from "../context/ConfirmContext";
 import { Avatar } from "./ui/Avatar";
 import {
   HiBars3,
@@ -15,6 +16,7 @@ import {
 
 export const Header = ({ onOpenMobileMenu }) => {
   const { userProfile, currentUser, logout } = useAuth();
+  const { confirm } = useConfirm();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -67,8 +69,18 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   const handleLogout = async () => {
     setProfileDropdownOpen(false);
-    await logout();
-    navigate("/login");
+    
+    const isConfirmed = await confirm({
+      title: "Confirm Logout",
+      message: "Are you sure you want to log out of your account?",
+      confirmText: "Log Out",
+      variant: "danger",
+    });
+    
+    if (isConfirmed) {
+      await logout();
+      navigate("/login");
+    }
   };
 
   // Map route to clean real page title

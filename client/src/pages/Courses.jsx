@@ -16,8 +16,10 @@ import {
 } from "react-icons/hi2";
 import { Link } from "react-router-dom";
 import { courseService } from "../services/course.service";
+import { useConfirm } from "../context/ConfirmContext";
 
 export const Courses = () => {
+  const { confirm } = useConfirm();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState("");
@@ -89,7 +91,13 @@ export const Courses = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this course?")) return;
+    const isConfirmed = await confirm({
+      title: "Delete Course",
+      message: "Are you sure you want to delete this course?",
+      confirmText: "Delete",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
     try {
       await courseService.deleteCourse(id);
       showToast("Course deleted.");

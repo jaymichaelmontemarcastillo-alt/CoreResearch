@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { useConfirm } from "../context/ConfirmContext";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -40,6 +41,7 @@ const STATUS_ICON = {
 
 export const Proposals = () => {
   const { currentUser, userProfile, role } = useAuth();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
 
   // ── Resolve the user's groups (student or adviser) ────────────────────────
@@ -112,7 +114,13 @@ export const Proposals = () => {
   });
 
   const handleDelete = async (id, title) => {
-    if (!window.confirm(`Delete proposal: "${title}"?`)) return;
+    const isConfirmed = await confirm({
+      title: "Delete Proposal",
+      message: `Are you sure you want to delete proposal: "${title}"?`,
+      confirmText: "Delete",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
     setDeletingId(id);
     try {
       await deleteProposal(id);

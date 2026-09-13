@@ -18,10 +18,12 @@ import {
 } from "react-icons/hi2";
 import { sectionService } from "../services/section.service";
 import { courseService } from "../services/course.service";
+import { useConfirm } from "../context/ConfirmContext";
 
 export const Sections = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const { confirm } = useConfirm();
 
   const [course, setCourse] = useState(null);
   const [sections, setSections] = useState([]);
@@ -115,7 +117,13 @@ export const Sections = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this section?")) return;
+    const isConfirmed = await confirm({
+      title: "Delete Section",
+      message: "Are you sure you want to delete this section?",
+      confirmText: "Delete",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
     try {
       await sectionService.deleteSection(id);
       showToast("Section deleted.");

@@ -10,9 +10,11 @@ import { BookOpen, CheckCircle2 } from 'lucide-react';
 import groupService from '../services/group.service';
 import adviserRequestService from '../services/adviserRequest.service';
 import researchWorkspaceService from '../services/researchWorkspace.service';
+import { useConfirm } from '../context/ConfirmContext';
 
 export const SubmitTitle = () => {
   const { currentUser, userProfile } = useAuth();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
 
   const [title, setTitle] = useState('');
@@ -85,8 +87,13 @@ export const SubmitTitle = () => {
 
   const handleResetWorkspace = async () => {
     if (!existingWorkspace) return;
-    const confirm = window.confirm("WARNING: This will permanently delete your current workspace so you can restart the title submission process. Proceed?");
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: "Restart Submission",
+      message: "WARNING: This will permanently delete your current workspace so you can restart the title submission process. Proceed?",
+      confirmText: "Restart",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
 
     setLoading(true);
     try {

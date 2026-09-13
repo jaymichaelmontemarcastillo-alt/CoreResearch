@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -25,6 +26,7 @@ const LOADING_MESSAGES = [
 
 export const AdviserMatching = () => {
   const { currentUser, userProfile } = useAuth();
+  const { confirm } = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -138,8 +140,13 @@ export const AdviserMatching = () => {
   }, [currentUser, location.state, navigate]);
 
   const handleSelectAdviser = async (adviser) => {
-    const confirm = window.confirm(`Are you sure you want to select ${adviser.adviserName} as your preferred adviser?`);
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: 'Confirm Adviser Selection',
+      message: `Are you sure you want to select ${adviser.adviserName} as your preferred adviser?`,
+      confirmText: 'Select Adviser',
+      variant: 'primary'
+    });
+    if (!isConfirmed) return;
 
     setSubmittingId(adviser.adviserId);
     try {
@@ -185,8 +192,13 @@ export const AdviserMatching = () => {
 
   const handleCancelRequest = async () => {
     if (!pendingRequest) return;
-    const confirm = window.confirm("Are you sure you want to cancel this request and restart your title submission?");
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: 'Cancel Request',
+      message: 'Are you sure you want to cancel this request and restart your title submission?',
+      confirmText: 'Cancel Request',
+      variant: 'danger'
+    });
+    if (!isConfirmed) return;
 
     setLoading(true);
     try {

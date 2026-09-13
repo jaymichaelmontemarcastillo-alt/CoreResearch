@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useConfirm } from "../context/ConfirmContext";
 import logoImg from "../assets/logo.png";
 import { adviserRequestService } from "../services/adviserRequest.service";
 import researchWorkspaceService from "../services/researchWorkspace.service";
@@ -34,6 +35,7 @@ export const Sidebar = ({
   const navigate = useNavigate();
   const { role, logout, currentFacultyMode, currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { confirm } = useConfirm();
 
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = externalExpanded !== undefined ? externalExpanded : internalExpanded;
@@ -85,8 +87,17 @@ export const Sidebar = ({
   }, [effectiveRole, currentUser]);
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/login");
+    const isConfirmed = await confirm({
+      title: "Confirm Logout",
+      message: "Are you sure you want to log out of your account?",
+      confirmText: "Log Out",
+      variant: "danger",
+    });
+    
+    if (isConfirmed) {
+      await logout();
+      navigate("/login");
+    }
   };
 
   const navigationCategories = [
@@ -100,10 +111,10 @@ export const Sidebar = ({
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
         },
         {
-          label: "Notifications",
-          path: "/notifications",
-          icon: HiBell,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
+          label: "Research Documents",
+          path: "/research-documents",
+          icon: HiDocumentText,
+          roles: ["adviser", "research_coordinator", "faculty"],
         },
         ...(effectiveRole === "student"
           ? [
@@ -191,6 +202,12 @@ export const Sidebar = ({
           icon: HiCalendarDays,
           roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
         },
+        {
+          label: "Notifications",
+          path: "/notifications",
+          icon: HiBell,
+          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
+        },
       ],
     },
     {
@@ -239,24 +256,24 @@ export const Sidebar = ({
   };
 
   const renderContent = (expanded) => (
-    <div className="flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden transition-all duration-150 ease-in-out">
+    <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden`}>
       {/* HEADER SECTION */}
-      <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 transition-all duration-150 ease-in-out ${
+      <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 ${
         expanded ? "px-3.5 justify-between" : "px-2 justify-center"
       }`}>
         <Link
           to="/dashboard"
-          className={`flex items-center transition-all duration-150 ease-in-out overflow-hidden ${
-            expanded ? "gap-3 opacity-100 min-w-0" : "gap-0 opacity-0 w-0 pointer-events-none"
+          className={`flex items-center overflow-hidden ${
+            expanded ? "gap-3 opacity-100" : "hidden"
           }`}
           title="CoreResearch Dashboard"
         >
           <img
             src={logoImg}
             alt="CoreResearch Logo"
-            className="w-8 h-8 object-contain shrink-0 drop-shadow-sm transition-transform duration-150"
+            className="w-8 h-8 object-contain shrink-0 drop-shadow-sm"
           />
-          <span className="text-base tracking-tight whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out">
+          <span className="text-base tracking-tight whitespace-nowrap overflow-hidden">
             <span className="font-bold text-gray-900 dark:text-white">Core</span>
             <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
           </span>
@@ -264,17 +281,17 @@ export const Sidebar = ({
 
         <button
           onClick={toggleSidebar}
-          className={`flex items-center justify-center shrink-0 transition-all duration-150 ease-in-out text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white ${
+          className={`flex items-center justify-center shrink-0 text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white transition-colors duration-150 ${
             expanded ? "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1f212d]" : "h-10 w-10 mx-auto rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1c26]"
           }`}
           title={expanded ? "Collapse Sidebar" : "Expand Sidebar"}
         >
-          {expanded ? <HiChevronLeft className="w-5 h-5" /> : <HiChevronRight className="w-5 h-5" />}
+          <HiChevronLeft className={`w-5 h-5 transition-transform duration-150 ${expanded ? "" : "rotate-180"}`} />
         </button>
       </div>
 
       {/* CATEGORIZED NAVIGATION */}
-      <div className={`flex-1 overflow-y-auto no-scrollbar py-3 space-y-4 ${expanded ? "px-3" : "px-2"}`}>
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar py-3 space-y-4 ${expanded ? "px-3" : "px-2"}`}>
         {navigationCategories.map((sec) => {
           const visibleItems = sec.items.filter((item) =>
             item.roles.includes(role || "student")
@@ -283,13 +300,11 @@ export const Sidebar = ({
 
           return (
             <div key={sec.category} className="space-y-1">
-              <div
-                className={`px-3 text-[10px] font-semibold text-gray-400 dark:text-[#72768f] uppercase tracking-wider whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out ${
-                  expanded ? "opacity-100 max-h-6 py-1" : "opacity-0 max-h-0 py-0 pointer-events-none"
-                }`}
-              >
-                {sec.category}
-              </div>
+              {expanded && (
+                <div className="px-3 text-[10px] font-semibold text-gray-400 dark:text-[#72768f] uppercase tracking-wider whitespace-nowrap py-1">
+                  {sec.category}
+                </div>
+              )}
 
               <div className="space-y-1">
                 {visibleItems.map((item) => {
@@ -300,7 +315,7 @@ export const Sidebar = ({
                     <Link
                       key={item.label}
                       to={item.path}
-                      className={`relative flex items-center transition-all duration-150 ease-in-out rounded-xl font-medium ${
+                      className={`relative flex items-center rounded-xl font-medium transition-colors duration-150 ${
                         expanded
                           ? "gap-3 h-10 px-3 text-sm"
                           : "justify-center h-10 w-10 mx-auto"
@@ -312,22 +327,18 @@ export const Sidebar = ({
                       title={!expanded ? item.label : undefined}
                     >
                       <Icon
-                        className={`w-5 h-5 shrink-0 transition-colors ${
+                        className={`w-5 h-5 shrink-0 transition-colors duration-150 ${
                           active
                             ? "text-gray-900 dark:text-white"
                             : "text-gray-500 dark:text-[#888ca3] group-hover:text-gray-800 dark:group-hover:text-white"
                         }`}
                       />
 
-                      <span
-                        className={`whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out text-[13px] ${
-                          expanded
-                            ? "opacity-100 max-w-[160px]"
-                            : "opacity-0 max-w-0 pointer-events-none"
-                        }`}
-                      >
-                        {item.label}
-                      </span>
+                      {expanded && (
+                        <span className="whitespace-nowrap text-[13px]">
+                          {item.label}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -339,68 +350,70 @@ export const Sidebar = ({
 
       {/* BOTTOM SECTION: THEME SWITCH & LOGOUT */}
       <div className={`p-3 border-t border-gray-100 dark:border-[#202230] shrink-0 space-y-2 ${expanded ? "px-3" : "px-2"}`}>
+        
         {/* THEME TOGGLE SWITCH */}
-        {!expanded ? (
-          <div className="flex justify-center">
+        <div className={`relative flex items-center ${expanded ? "bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl border border-gray-200/60 dark:border-[#252839]" : "justify-center h-10"}`}>
+          {expanded ? (
+            <>
+              <button
+                type="button"
+                onClick={() => { if (theme === "dark") toggleTheme(); }}
+                className={`flex items-center justify-center rounded-lg text-xs font-medium overflow-hidden flex-1 gap-1.5 py-1.5 transition-colors duration-150 ${
+                  theme === "light"
+                    ? "bg-white text-gray-900 shadow-sm font-semibold"
+                    : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
+                }`}
+                title="Light Mode"
+              >
+                <HiSun className={`w-4 h-4 shrink-0 ${theme === "light" ? "text-amber-500" : ""}`} />
+                <span className="whitespace-nowrap w-auto">Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (theme === "light") toggleTheme(); }}
+                className={`flex items-center justify-center rounded-lg text-xs font-medium overflow-hidden flex-1 gap-1.5 py-1.5 transition-colors duration-150 ${
+                  theme === "dark"
+                    ? "bg-[#252839] text-white shadow-sm font-semibold"
+                    : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
+                }`}
+                title="Dark Mode"
+              >
+                <HiMoon className={`w-4 h-4 shrink-0 ${theme === "dark" ? "text-amber-300 dark:text-white" : ""}`} />
+                <span className="whitespace-nowrap w-auto">Dark</span>
+              </button>
+            </>
+          ) : (
             <button
+              type="button"
               onClick={toggleTheme}
-              className="h-10 w-10 rounded-xl flex items-center justify-center text-gray-500 dark:text-[#9ea3be] hover:text-amber-500 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-all border border-transparent dark:border-[#222433]"
-              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              className="flex items-center justify-center rounded-xl h-10 w-10 text-gray-500 dark:text-[#9ea3be] hover:text-amber-500 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-colors duration-150"
+              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
             >
-              {theme === "dark" ? (
-                <HiSun className="w-5 h-5 text-amber-400" />
+              {theme === "light" ? (
+                <HiMoon className="w-5 h-5 shrink-0" />
               ) : (
-                <HiMoon className="w-5 h-5 text-gray-600" />
+                <HiSun className="w-5 h-5 shrink-0 text-amber-300" />
               )}
             </button>
-          </div>
-        ) : (
-          <div className="bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl flex items-center gap-1 border border-gray-200/60 dark:border-[#252839] transition-all duration-150 ease-in-out">
-            <button
-              type="button"
-              onClick={() => { if (theme === "dark") toggleTheme(); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                theme === "light"
-                  ? "bg-white text-gray-900 shadow-sm font-semibold"
-                  : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <HiSun className={`w-3.5 h-3.5 ${theme === "light" ? "text-amber-500" : ""}`} />
-              <span>Light</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { if (theme === "light") toggleTheme(); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                theme === "dark"
-                  ? "bg-[#252839] text-white shadow-sm font-semibold"
-                  : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <HiMoon className="w-3.5 h-3.5 text-amber-300 dark:text-white" />
-              <span>Dark</span>
-            </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* LOGOUT BUTTON */}
         <button
           onClick={handleLogout}
-          className={`relative flex items-center text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-150 ease-in-out rounded-xl ${
+          className={`relative flex items-center text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors duration-150 rounded-xl overflow-hidden ${
             expanded
               ? "gap-2.5 h-9 px-3 w-full"
               : "justify-center h-10 w-10 mx-auto"
           }`}
           title={!expanded ? "Logout" : undefined}
         >
-          <HiArrowRightOnRectangle className="w-4 h-4 shrink-0 text-red-500 dark:text-red-400" />
-          <span
-            className={`whitespace-nowrap overflow-hidden transition-all duration-150 ease-in-out ${
-              expanded ? "opacity-100 max-w-[120px]" : "opacity-0 max-w-0 pointer-events-none"
-            }`}
-          >
-            Logout
-          </span>
+          <HiArrowRightOnRectangle className={`shrink-0 text-red-500 dark:text-red-400 ${expanded ? "w-4 h-4" : "w-5 h-5"}`} />
+          {expanded && (
+            <span className="whitespace-nowrap">
+              Logout
+            </span>
+          )}
         </button>
       </div>
     </div>
@@ -410,8 +423,8 @@ export const Sidebar = ({
     <>
       {/* Desktop Container-like Sidebar in Flexbox flow that actively pushes content */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen p-3 z-30 transition-all duration-150 ease-in-out select-none ${
-          isExpanded ? "w-64" : "w-[88px]"
+        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen p-3 z-30 select-none whitespace-nowrap overflow-x-hidden ${
+          isExpanded ? "w-[260px]" : "w-[80px]"
         }`}
       >
         {renderContent(isExpanded)}

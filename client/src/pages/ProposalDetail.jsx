@@ -5,6 +5,7 @@ import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Toast } from "../components/ui/Toast";
+import { useConfirm } from "../context/ConfirmContext";
 import {
   HiArrowLeft,
   HiCheckCircle,
@@ -101,6 +102,7 @@ export const ProposalDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentUser, userProfile, role } = useAuth();
+  const { confirm } = useConfirm();
 
   const [proposal, setProposal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,7 +150,13 @@ export const ProposalDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this proposal draft?")) return;
+    const isConfirmed = await confirm({
+      title: "Delete Proposal Draft",
+      message: "Are you sure you want to delete this proposal draft?",
+      confirmText: "Delete",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
     setDeleting(true);
     try {
       await titleProposalService.deleteProposal(proposal.id, uid);

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -35,19 +36,21 @@ import { Scheduling } from './pages/Scheduling';
 import { Masterlist } from './pages/Masterlist';
 import { Panelists } from './pages/Panelists';
 import { Notifications } from './pages/Notifications';
+import { ResearchDocumentsPage } from './pages/ResearchDocumentsPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Routes>
+          <ConfirmProvider>
+            <Routes>
             {/* Public Auth Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
-            
+
             {/* Public/Shared Routes */}
             <Route path="/join/:inviteId" element={<JoinSection />} />
 
@@ -102,6 +105,7 @@ export default function App() {
                   <Route path="/groups" element={<ResearchGroups />} />
                   <Route path="/admin/groups" element={<ResearchGroups />} />
                   <Route path="/admin/scheduling" element={<Scheduling />} />
+                  <Route path="/research-documents" element={<ResearchDocumentsPage />} />
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
@@ -115,6 +119,7 @@ export default function App() {
             {/* Fallback Redirect */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          </ConfirmProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
