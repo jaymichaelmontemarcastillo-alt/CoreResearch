@@ -21,6 +21,8 @@ import {
 import { AdviserRequest } from './adviserRequest.service';
 import { UserProfile } from '../types/user.types';
 import progressService from './progress.service';
+import { systemActivityService } from './systemActivity.service';
+import { researchFeedbackService } from './researchFeedback.service';
 
 const COLLECTION_NAME = 'manuscript_workspaces';
 
@@ -61,7 +63,7 @@ export const researchWorkspaceService = {
       status: 'in_progress',
       researchPhase: 'CHAPTERS_1_3',
       sections: DEFAULT_MANUSCRIPT_SECTIONS,
-      overallProgress: 20, // Base progress for approved proposal + setup
+      overallProgress: 0, // Manuscript progress starts at 0% until chapters are completed
       createdAt: now,
       updatedAt: now,
     };
@@ -199,7 +201,7 @@ export const researchWorkspaceService = {
       return s;
     });
 
-    const newOverall = progressService.calculateOverallProgress({
+    const newOverall = progressService.calculateWorkspaceProgress({
       ...ws,
       sections: updatedSections,
     });
@@ -208,6 +210,234 @@ export const researchWorkspaceService = {
     await updateDoc(docRef, {
       sections: updatedSections,
       overallProgress: newOverall,
+      ...(newOverall >= 100
+        ? { status: 'approved' }
+        : status === 'revision_required'
+        ? { status: 'revision_required' }
+        : {}),
+      updatedAt: now,
+    });
+  },
+
+  /**
+   * Student submits a chapter for adviser review
+   */
+  async submitChapter(
+    workspaceId: string,
+    chapterId: string,
+    studentUid?: string,
+    studentName?: string
+  ): Promise<void> {
+    const ws = await this.getWorkspaceById(workspaceId);
+    if (!ws) throw new Error('Workspace not found.');
+
+    const now = new Date().toISOString();
+    const updatedSections = (ws.sections || DEFAULT_MANUSCRIPT_SECTIONS).map((s) => {
+      if (s.id === chapterId) {
+        return {
+          ...s,
+          status: 'submitted' as SectionStatus,
+          progress: 75,
+          submittedAt: now,
+          updatedAt: now,
+        };
+      }
+      return s;
+    });
+
+    const newOverall = progressService.calculateWorkspaceProgress({
+      ...ws,
+      sections: updatedSections,
+    });
+
+    const docRef = doc(db, COLLECTION_NAME, workspaceId);
+    await updateDoc(docRef, {
+      sections: updatedSections,
+      overallProgress: newOverall,
+      status: 'submitted_for_review',
+      updatedAt: now,
+    });
+
+    const targetSection = updatedSections.find((s) => s.id === chapterId);
+    systemActivityService
+      .logActivity({
+        title: `Chapter Submitted for Review`,
+        description: `${studentName || 'Student'} submitted ${targetSection?.name || chapterId} for adviser review.`,
+        category: 'workspace',
+        actorRole: 'student',
+        actorName: studentName || ws.studentName || 'Student Researcher',
+      })
+      .catch(console.warn);
+  },
+
+  /**
+   * Adviser approves a chapter
+   */
+  async approveChapter(
+    workspaceId: string,
+    chapterId: string,
+    adviserUid?: string,
+    adviserName?: string
+  ): Promise<number> {
+    const ws = await this.getWorkspaceById(workspaceId);
+    if (!ws) throw new Error('Workspace not found.');
+
+    const now = new Date().toISOString();
+    const updatedSections = (ws.sections || DEFAULT_MANUSCRIPT_SECTIONS).map((s) => {
+      if (s.id === chapterId) {
+        // Clear any old revision feedback notes on chapter approval
+        const { feedbackComment, ...prev } = s;
+        return {
+          ...prev,
+          status: 'completed' as SectionStatus,
+          progress: 100,
+          reviewedAt: now,
+          completedAt: now,
+          updatedAt: now,
+        };
+      }
+      return s;
+    });
+
+    const newOverall = progressService.calculateWorkspaceProgress({
+      ...ws,
+      sections: updatedSections,
+    });
+
+    const isAllCompleted = newOverall >= 100;
+
+    const docRef = doc(db, COLLECTION_NAME, workspaceId);
+    await updateDoc(docRef, {
+      sections: updatedSections,
+      overallProgress: newOverall,
+      status: isAllCompleted ? 'approved' : 'in_progress',
+      updatedAt: now,
+    });
+
+    const targetSection = updatedSections.find((s) => s.id === chapterId);
+    systemActivityService
+      .logActivity({
+        title: `Chapter Approved`,
+        description: `${adviserName || 'Faculty Adviser'} approved ${targetSection?.name || chapterId}. Progress is now ${newOverall}%.`,
+        category: 'workspace',
+        actorRole: 'adviser',
+        actorName: adviserName || ws.adviserName || 'Faculty Adviser',
+      })
+      .catch(console.warn);
+
+    return newOverall;
+  },
+
+  /**
+   * Faculty / Adviser / Panelist requests revisions for a chapter
+   */
+  async requestRevisionChapter(
+    workspaceId: string,
+    chapterId: string,
+    feedbackComment: string,
+    reviewerUid?: string,
+    reviewerName?: string,
+    reviewerRole: 'adviser' | 'panelist' | 'coordinator' | 'admin' = 'adviser'
+  ): Promise<number> {
+    const ws = await this.getWorkspaceById(workspaceId);
+    if (!ws) throw new Error('Workspace not found.');
+
+    const now = new Date().toISOString();
+    const updatedSections = (ws.sections || DEFAULT_MANUSCRIPT_SECTIONS).map((s) => {
+      if (s.id === chapterId) {
+        // Clear completedAt when reverting an approved chapter to revision_required
+        const { completedAt, ...prev } = s;
+        return {
+          ...prev,
+          status: 'revision_required' as SectionStatus,
+          progress: 50,
+          reviewedAt: now,
+          feedbackComment: feedbackComment || 'Revision required by reviewer',
+          updatedAt: now,
+        };
+      }
+      return s;
+    });
+
+    const newOverall = progressService.calculateWorkspaceProgress({
+      ...ws,
+      sections: updatedSections,
+    });
+
+    const docRef = doc(db, COLLECTION_NAME, workspaceId);
+    await updateDoc(docRef, {
+      sections: updatedSections,
+      overallProgress: newOverall,
+      status: 'revision_required',
+      updatedAt: now,
+    });
+
+    const targetSection = updatedSections.find((s) => s.id === chapterId);
+    const displayRole =
+      reviewerRole === 'panelist'
+        ? 'Defense Panelist'
+        : reviewerRole === 'coordinator'
+        ? 'Research Coordinator'
+        : 'Faculty Adviser';
+
+    systemActivityService
+      .logActivity({
+        title: `Revision Requested`,
+        description: `${reviewerName || displayRole} requested revisions for ${targetSection?.name || chapterId}: "${feedbackComment}".`,
+        category: 'feedback',
+        actorRole: reviewerRole,
+        actorName: reviewerName || ws.adviserName || displayRole,
+      })
+      .catch(console.warn);
+
+    // Create research feedback entry for advisees to track and resolve
+    if (feedbackComment) {
+      researchFeedbackService
+        .createFeedback({
+          workspaceId,
+          studentId: ws.studentId || '',
+          authorId: reviewerUid || ws.adviserId,
+          authorName: reviewerName || ws.adviserName || displayRole,
+          authorRole: reviewerRole,
+          sectionId: chapterId,
+          comment: feedbackComment,
+        })
+        .catch(console.warn);
+    }
+
+    return newOverall;
+  },
+
+  /**
+   * Start working on a chapter (transitions from not_started/revision_required to in_progress)
+   */
+  async startChapter(workspaceId: string, chapterId: string): Promise<void> {
+    const ws = await this.getWorkspaceById(workspaceId);
+    if (!ws) throw new Error('Workspace not found.');
+
+    const now = new Date().toISOString();
+    const updatedSections = (ws.sections || DEFAULT_MANUSCRIPT_SECTIONS).map((s) => {
+      if (s.id === chapterId && (s.status === 'not_started' || s.status === 'pending' || s.status === 'revision_required')) {
+        return {
+          ...s,
+          status: 'in_progress' as SectionStatus,
+          progress: Math.max(25, s.progress || 25),
+          updatedAt: now,
+        };
+      }
+      return s;
+    });
+
+    const newOverall = progressService.calculateWorkspaceProgress({
+      ...ws,
+      sections: updatedSections,
+    });
+
+    const docRef = doc(db, COLLECTION_NAME, workspaceId);
+    await updateDoc(docRef, {
+      sections: updatedSections,
+      overallProgress: newOverall,
+      status: 'in_progress',
       updatedAt: now,
     });
   },

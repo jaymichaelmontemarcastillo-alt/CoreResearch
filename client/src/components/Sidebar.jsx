@@ -110,6 +110,12 @@ export const Sidebar = ({
                 icon: HiClipboardDocumentList,
                 roles: ["student"],
               },
+              {
+                label: "Faculty Advisers",
+                path: "/advisers",
+                icon: HiAcademicCap,
+                roles: ["student"],
+              },
               ...(!hasWorkspace
                 ? [
                     {

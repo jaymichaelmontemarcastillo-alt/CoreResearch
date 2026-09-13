@@ -10,6 +10,7 @@ import { BookOpen, CheckCircle2 } from 'lucide-react';
 import groupService from '../services/group.service';
 import adviserRequestService from '../services/adviserRequest.service';
 import researchWorkspaceService from '../services/researchWorkspace.service';
+import { MatchingModal } from '../components/adviser/MatchingModal';
 
 export const SubmitTitle = () => {
   const { currentUser, userProfile } = useAuth();
@@ -21,6 +22,7 @@ export const SubmitTitle = () => {
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
   const [existingWorkspace, setExistingWorkspace] = useState(null);
+  const [isMatchingModalOpen, setIsMatchingModalOpen] = useState(false);
 
   // Before allowing submission, check if student already has a pending/accepted request or workspace
   useEffect(() => {
@@ -40,9 +42,14 @@ export const SubmitTitle = () => {
         const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
         const activeRequest = requests.find(r => r.status === 'pending' || r.status === 'accepted');
         if (activeRequest) {
-          // Send to matching page to view their pending status or to workspace if accepted
-          navigate('/adviser-matching');
-          return;
+          if (activeRequest.status === 'accepted') {
+            navigate('/research/workspace');
+            return;
+          }
+          // Set title & open modal
+          setTitle(activeRequest.researchTitle || '');
+          setDescription(activeRequest.researchDescription || '');
+          setIsMatchingModalOpen(true);
         }
 
         setLoading(false);
@@ -64,19 +71,7 @@ export const SubmitTitle = () => {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      // Navigate to matching screen and pass the title/description in state
-      navigate('/adviser-matching', {
-        state: {
-          title: title.trim(),
-          description: description.trim()
-        }
-      });
-    } catch (err) {
-      setToast('Submission error: ' + err.message);
-      setIsSubmitting(false);
-    }
+    setIsMatchingModalOpen(true);
   };
 
   if (loading) {
@@ -202,6 +197,18 @@ export const SubmitTitle = () => {
           </div>
         </form>
       </Card>
+
+      <MatchingModal
+        isOpen={isMatchingModalOpen}
+        onClose={() => setIsMatchingModalOpen(false)}
+        title={title.trim()}
+        description={description.trim()}
+        currentUser={currentUser}
+        userProfile={userProfile}
+        onSuccess={() => {
+          setToast('Adviser selection submitted successfully.');
+        }}
+      />
     </div>
   );
 };

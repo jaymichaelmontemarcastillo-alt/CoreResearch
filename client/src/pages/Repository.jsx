@@ -22,6 +22,7 @@ import {
   HiPlusCircle,
 } from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
+import { PublicationDetailModal } from "../components/research/PublicationDetailModal";
 
 export const Repository = () => {
   const { role } = useAuth();
@@ -239,64 +240,12 @@ export const Repository = () => {
         </div>
       )}
 
-      {/* Abstract & Citation Modal */}
-      <Modal
+      {/* Publication Detail Modal (Title, Authors, Abstract Highlights, and Full Content) */}
+      <PublicationDetailModal
         isOpen={Boolean(selectedPub)}
         onClose={() => setSelectedPub(null)}
-        title={selectedPub?.title}
-        maxWidth="max-w-2xl"
-      >
-        {selectedPub && (
-          <div className="space-y-4 text-left">
-            <div className="flex items-center gap-2">
-              <Badge variant="blue">
-                {selectedPub.department} • {selectedPub.publicationYear}
-              </Badge>
-            </div>
-
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              Authors: <strong className="text-gray-800 dark:text-gray-200">{Array.isArray(selectedPub.authors) ? selectedPub.authors.join(", ") : selectedPub.authors}</strong> | Adviser: <strong className="text-gray-800 dark:text-gray-200">{selectedPub.adviserName}</strong>
-            </div>
-
-            <div className="space-y-1 pt-2">
-              <h4 className="text-xs uppercase font-bold text-gray-500 dark:text-gray-400 tracking-wider">Abstract</h4>
-              <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-800 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                {selectedPub.abstract}
-              </div>
-            </div>
-
-            {/* Citation Box */}
-            <div className="space-y-1.5 pt-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs uppercase font-bold text-primary dark:text-blue-400 tracking-wider">
-                  APA Academic Citation
-                </h4>
-                <button
-                  onClick={() => handleCopyCitation(selectedPub.citation)}
-                  className="text-xs text-primary dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
-                >
-                  {copied ? <HiCheck className="w-3.5 h-3.5 text-emerald-500" /> : <HiDocumentDuplicate className="w-3.5 h-3.5" />}
-                  {copied ? "Copied to Clipboard!" : "Copy Citation"}
-                </button>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 font-mono text-xs text-gray-800 dark:text-gray-200">
-                {selectedPub.citation}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-slate-800 pt-3">
-              <Button variant="outline" onClick={() => setSelectedPub(null)}>
-                Close
-              </Button>
-              <a href={selectedPub.pdfUrl} target="_blank" rel="noopener noreferrer">
-                <Button variant="primary">
-                  <HiArrowDownTray className="w-4 h-4 mr-2" /> Download Full PDF
-                </Button>
-              </a>
-            </div>
-          </div>
-        )}
-      </Modal>
+        publication={selectedPub}
+      />
 
       {/* Admin Publish Modal */}
       <Modal

@@ -17,6 +17,7 @@ export type ResearchPhase =
   | 'COMPLETED';
 
 export type SectionStatus =
+  | 'not_started'
   | 'pending'
   | 'in_progress'
   | 'submitted'
@@ -36,13 +37,15 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type FeedbackStatus = 'open' | 'addressed' | 'resolved';
 
 export interface ManuscriptSection {
-  id: string; // 'chapter_1' | 'chapter_2' | 'chapter_3' | 'chapter_4' | 'chapter_5' | 'references' | 'final_manuscript'
+  id: string; // 'chapter_1' | 'chapter_2' | 'chapter_3' | 'chapter_4' | 'chapter_5'
   name: string;
   order: number;
   status: SectionStatus;
   progress: number; // 0 - 100
   submittedAt?: string;
   reviewedAt?: string;
+  completedAt?: string;
+  feedbackComment?: string;
   updatedAt?: string;
 }
 
@@ -136,57 +139,47 @@ export interface ResearchMilestone {
   description: string;
   completed: boolean;
   active: boolean;
+  status?: SectionStatus;
+  order?: number;
+  submittedAt?: string;
+  reviewedAt?: string;
   completedAt?: string;
 }
 
 export const DEFAULT_MANUSCRIPT_SECTIONS: ManuscriptSection[] = [
   {
     id: 'chapter_1',
-    name: 'Chapter 1: Introduction & Background',
+    name: 'Chapter 1: The Problem and Its Background',
     order: 1,
-    status: 'in_progress',
-    progress: 25,
+    status: 'not_started',
+    progress: 0,
   },
   {
     id: 'chapter_2',
-    name: 'Chapter 2: Review of Related Literature',
+    name: 'Chapter 2: Review of Related Literature and Studies',
     order: 2,
-    status: 'pending',
+    status: 'not_started',
     progress: 0,
   },
   {
     id: 'chapter_3',
-    name: 'Chapter 3: Methodology & System Architecture',
+    name: 'Chapter 3: Methodology',
     order: 3,
-    status: 'pending',
+    status: 'not_started',
     progress: 0,
   },
   {
     id: 'chapter_4',
-    name: 'Chapter 4: Results, Implementation & Discussion',
+    name: 'Chapter 4: Results and Discussion',
     order: 4,
-    status: 'pending',
+    status: 'not_started',
     progress: 0,
   },
   {
     id: 'chapter_5',
-    name: 'Chapter 5: Summary, Conclusions & Recommendations',
+    name: 'Chapter 5: Summary, Conclusions, and Recommendations',
     order: 5,
-    status: 'pending',
-    progress: 0,
-  },
-  {
-    id: 'references',
-    name: 'References & Appendices',
-    order: 6,
-    status: 'pending',
-    progress: 0,
-  },
-  {
-    id: 'final_manuscript',
-    name: 'Final Integrated Manuscript',
-    order: 7,
-    status: 'pending',
+    status: 'not_started',
     progress: 0,
   },
 ];

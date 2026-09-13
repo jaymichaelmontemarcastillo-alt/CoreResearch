@@ -78,8 +78,17 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
     };
   }, [documentId]);
 
+  const [loadError, setLoadError] = useState(null);
+
   const onDocumentReady = () => {
     console.log('[ONLYOFFICE] Document is loaded and ready.');
+  };
+
+  const onLoadComponentError = (errorCode, errorDescription) => {
+    console.warn('[OnlyOfficeEditor] DocsAPI load error:', errorCode, errorDescription);
+    setLoadError(
+      `Unable to reach ONLYOFFICE Document Server at ${documentServerUrl}. Please ensure Docker Desktop is started and the ONLYOFFICE container is running on port 8080.`
+    );
   };
 
   if (loading) {
@@ -91,17 +100,31 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
     );
   }
 
-  if (error) {
+  if (error || loadError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center min-h-[500px]">
-        <div className="text-red-500 text-5xl mb-4">⚠️</div>
-        <h3 className="text-lg font-medium text-slate-800 mb-2">Editor Initialization Failed</h3>
-        <p className="text-slate-600 mb-4">{error}</p>
-        <div className="text-left text-xs text-slate-400 bg-slate-50 p-4 rounded mt-4 max-w-lg overflow-auto">
-          <p><strong>Debug Info:</strong></p>
-          <p>Document ID: {documentId}</p>
-          <p>API Endpoint: /api/onlyoffice/config/{documentId}</p>
+      <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center min-h-[500px] bg-slate-900/50 rounded-xl border border-slate-800 text-slate-200">
+        <div className="text-amber-400 text-5xl mb-4">⚠️</div>
+        <h3 className="text-lg font-bold text-white mb-2">ONLYOFFICE Document Server Offline</h3>
+        <p className="text-slate-400 text-sm max-w-md mb-4">{loadError || error}</p>
+        <div className="text-left text-xs bg-slate-950 p-4 rounded-xl border border-slate-800 max-w-lg space-y-2 text-slate-300">
+          <p className="font-semibold text-white">How to fix this:</p>
+          <ol className="list-decimal list-inside space-y-1 text-slate-400">
+            <li>Open <strong className="text-white">Docker Desktop</strong> on your computer.</li>
+            <li>In terminal, start the ONLYOFFICE container:</li>
+          </ol>
+          <code className="block p-2 rounded bg-slate-900 border border-slate-700 text-emerald-400 font-mono text-[11px]">
+            docker run -i -t -d -p 8080:80 --restart=always onlyoffice/documentserver
+          </code>
+          <p className="text-[11px] text-slate-500">
+            Or if using a tunnel URL, set <span className="text-blue-300">VITE_ONLYOFFICE_SERVER_URL</span> in your client environment file.
+          </p>
         </div>
+        <button
+          onClick={() => { setLoadError(null); setError(null); window.location.reload(); }}
+          className="mt-5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs"
+        >
+          Retry Connection
+        </button>
       </div>
     );
   }
@@ -117,6 +140,7 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
         documentServerUrl={documentServerUrl}
         config={config}
         events_onDocumentReady={onDocumentReady}
+        onLoadComponentError={onLoadComponentError}
         height="100%"
       />
     </div>

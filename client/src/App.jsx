@@ -35,6 +35,7 @@ import { Scheduling } from './pages/Scheduling';
 import { Masterlist } from './pages/Masterlist';
 import { Panelists } from './pages/Panelists';
 import { Notifications } from './pages/Notifications';
+import { AdvisersList } from './pages/AdvisersList';
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
                 <Route element={<ProtectedRoute allowedRoles={['student']} />}>
                   <Route path="/my-group" element={<MyGroup />} />
                   <Route path="/masterlist" element={<Masterlist />} />
+                  <Route path="/advisers" element={<AdvisersList />} />
                 </Route>
 
                 {/* Title & Adviser Matching Routes */}

@@ -214,6 +214,10 @@ export const matchAdvisers = async (req, res) => {
           ...r,
           adviserName: adv.fullName || 'Unknown Adviser',
           department: adv.department || 'N/A',
+          profile_image: adv.profile_image || adv.photoURL || '',
+          email: adv.email || '',
+          college: adv.college || '',
+          expertise: adv.expertise || adv.selectedExpertise || [],
           score: Math.round(Math.min(Math.max(r.score || 0, 0), 100)),
           compatibilityScore: Math.round(Math.min(Math.max(r.score || 0, 0), 100)),
         };

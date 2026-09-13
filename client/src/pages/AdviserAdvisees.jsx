@@ -13,6 +13,8 @@ import { facultyService } from '../services/faculty.service';
 import { courseService } from '../services/course.service';
 import { sectionService } from '../services/section.service';
 import { scheduleService } from '../services/schedule.service';
+import { researchWorkspaceService } from '../services/researchWorkspace.service';
+import { groupService } from '../services/group.service';
 
 export const AdviserAdvisees = () => {
   const { currentUser } = useAuth();
@@ -29,12 +31,39 @@ export const AdviserAdvisees = () => {
   const fetchAdviseeData = async () => {
     setLoading(true);
     try {
-      const [fetchedGroups, allCourses, allSections, allSchedules] = await Promise.all([
+      const [fetchedGroups, allCourses, allSections, allSchedules, allWorkspaces] = await Promise.all([
         facultyService.getAdviserGroups(currentUser.uid),
         courseService.getAllCourses(),
         sectionService.getAllSections(),
         scheduleService.getAllSchedules().catch(() => []),
+        researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid).catch(() => []),
       ]);
+
+      const wsMap = {};
+      (allWorkspaces || []).forEach((w) => {
+        if (w.groupId) wsMap[w.groupId] = w;
+        if (w.id) wsMap[w.id] = w;
+      });
+
+      // Also ensure any group missing in allWorkspaces gets checked
+      await Promise.all(
+        (fetchedGroups || []).map(async (grp) => {
+          if (!wsMap[grp.id]) {
+            try {
+              let ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', grp.id);
+              if (!ws && Array.isArray(grp.members) && grp.members.length > 0) {
+                for (const m of grp.members) {
+                  if (m.uid) {
+                    ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(m.uid);
+                    if (ws) break;
+                  }
+                }
+              }
+              if (ws) wsMap[grp.id] = ws;
+            } catch (err) {}
+          }
+        })
+      );
 
       const progress = await facultyService.getGroupsProgressSummary(fetchedGroups);
       setProgressMap(progress);
@@ -52,8 +81,19 @@ export const AdviserAdvisees = () => {
       const enriched = fetchedGroups.map((group) => {
         const course = allCourses.find((c) => c.id === group.courseId);
         const section = allSections.find((s) => s.id === group.sectionId);
+        const ws = wsMap[group.id];
+        const resolvedTitle = group.title || ws?.title || '';
+
+        // Auto-sync missing title back to group document in Firestore
+        if (group.id && ws?.title && (!group.title || group.title !== ws.title)) {
+          groupService.updateGroup(group.id, { title: ws.title }).catch((err) => {
+            console.warn('[AdviserAdvisees] auto-sync title failed:', err);
+          });
+        }
+
         return {
           ...group,
+          title: resolvedTitle,
           programCode: course?.code || course?.name || 'N/A',
           sectionName: section?.name || 'N/A',
           yearLevelDisplay: `${group.yearLevel || 4}th Year`,

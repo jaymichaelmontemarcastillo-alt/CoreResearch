@@ -349,14 +349,39 @@ export const AdviserMatching = () => {
           <Card key={adviser.adviserId} className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
             
             <div className="flex items-start gap-4 flex-1">
-              {/* Ranking Number */}
-              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 font-bold text-gray-500 flex items-center justify-center shrink-0">
-                #{idx + 1}
+              {/* Profile Picture with Ranking Badge */}
+              <div className="relative shrink-0">
+                {adviser.profile_image ? (
+                  <img
+                    src={adviser.profile_image}
+                    alt={adviser.adviserName}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-base items-center justify-center shadow-sm ${
+                    adviser.profile_image ? 'hidden' : 'flex'
+                  }`}
+                >
+                  {adviser.adviserName
+                    ?.split(' ')
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase() || 'AD'}
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-slate-800 text-[10px] font-bold text-gray-700 dark:text-gray-300 flex items-center justify-center border border-gray-200 dark:border-slate-700 shadow-xs">
+                  #{idx + 1}
+                </span>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-2 flex-1 min-w-0">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
                     {adviser.adviserName}
                     {adviser.compatibilityScore >= 90 && (
                       <Badge variant="emerald" size="sm">High Match</Badge>

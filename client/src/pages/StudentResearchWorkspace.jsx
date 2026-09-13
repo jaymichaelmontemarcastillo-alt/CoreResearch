@@ -19,6 +19,8 @@ import {
   Calendar,
   AlertCircle,
   Lock,
+  Play,
+  Send,
 } from 'lucide-react';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
@@ -284,26 +286,48 @@ export const StudentResearchWorkspace = () => {
   };
 
   // Dynamic progress calculations
-  const overallProgress = progressService.calculateWorkspaceProgress(workspace, tasks);
-  const taskProgress = progressService.calculateTaskProgress(tasks);
-  const milestones = progressService.getResearchMilestones(workspace, tasks);
+  const dynamicSections = progressService.getDynamicSections(workspace, tasks, feedbackList);
+  const overallProgress = progressService.calculateWorkspaceProgress(workspace, tasks, feedbackList);
+  const taskProgress = progressService.calculateTaskProgress(tasks, feedbackList);
+  const milestones = progressService.getResearchMilestones(workspace, tasks, feedbackList);
+  const currentFocusArea = progressService.getCurrentFocusArea(workspace, tasks, feedbackList);
+
+  const handleSubmitChapter = async (chapterId, chapterName) => {
+    const confirmSubmit = window.confirm(
+      `Are you ready to submit ${chapterName} to your adviser for review?`
+    );
+    if (!confirmSubmit) return;
+
+    try {
+      await researchWorkspaceService.submitChapter(
+        workspace.id,
+        chapterId,
+        currentUser.uid,
+        currentUser.displayName || userProfile?.fullName || 'Student'
+      );
+      setToast(`${chapterName} submitted for adviser review!`);
+    } catch (err) {
+      console.error('[StudentResearchWorkspace] submitChapter error:', err);
+      setToast('Failed to submit chapter: ' + err.message);
+    }
+  };
+
+  const handleStartChapter = async (chapterId, chapterName) => {
+    try {
+      await researchWorkspaceService.startChapter(workspace.id, chapterId);
+      setToast(`Started working on ${chapterName}.`);
+    } catch (err) {
+      console.error('[StudentResearchWorkspace] startChapter error:', err);
+      setToast('Failed to start chapter: ' + err.message);
+    }
+  };
 
   const filteredTasks = tasks.filter((t) => {
-    if (taskFilter === 'active') return t.status !== 'completed';
-    if (taskFilter === 'completed') return t.status === 'completed';
+    const isDone = t.status === 'completed' || t.status === 'resolved';
+    if (taskFilter === 'active') return !isDone;
+    if (taskFilter === 'completed') return isDone;
     return true;
   });
-
-  const isSectionLocked = (secId) => {
-    const phase = workspace?.researchPhase || 'CHAPTERS_1_3';
-    if (phase === 'CHAPTERS_1_3' || phase === 'PROPOSAL_DEFENSE') {
-      return ['chapter_4', 'chapter_5', 'final_manuscript'].includes(secId);
-    }
-    if (phase === 'CHAPTERS_4_5') {
-      return ['final_manuscript'].includes(secId);
-    }
-    return false;
-  };
 
   return (
     <div className="space-y-6">
@@ -406,13 +430,21 @@ export const StudentResearchWorkspace = () => {
               {/* Right: Progress Circle & Actions (25%) */}
               <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between items-end w-full">
                 {/* Dynamic Progress Circle */}
-                <div className="flex-1 flex items-center justify-center lg:justify-end w-full lg:pr-8 py-2">
+                <div className="flex-1 flex flex-col items-center justify-center lg:items-end w-full lg:pr-8 py-2">
                   <ResearchProgressCircle
                     progress={overallProgress}
                     size={100}
                     strokeWidth={8}
                     showDetails={false}
                   />
+                  <div className="text-center lg:text-right mt-2">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 block tracking-wide">
+                      {currentFocusArea}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
+                      Current Focus Area
+                    </span>
+                  </div>
                 </div>
 
                 {/* Actions */}
@@ -451,77 +483,134 @@ export const StudentResearchWorkspace = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">
-                  Manuscript Chapters &amp; Section Status
+                  Manuscript Chapters (Chapters 1–5)
                 </h3>
                 <p className="text-xs text-gray-400 dark:text-[#6b6f84] mt-0.5">
-                  Track individual progress and advisory evaluation across all manuscript sections
+                  Track individual progress, submit for advisory review, and monitor approvals across all 5 chapters
                 </p>
               </div>
             </div>
 
             <div className="divide-y divide-gray-100 dark:divide-[#222433]">
-              {(workspace.sections || []).map((sec) => {
-                const locked = isSectionLocked(sec.id);
+              {(dynamicSections || []).map((sec) => {
+                const isCompleted = sec.status === 'completed';
+                const isSubmitted = sec.status === 'submitted' || sec.status === 'under_review';
+                const isRevision = sec.status === 'revision_required';
+                const isInProgress = sec.status === 'in_progress';
+                const isNotStarted = sec.status === 'not_started' || sec.status === 'pending';
+
                 return (
                   <div
                     key={sec.id}
-                    className={`py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${locked ? 'opacity-50' : ''}`}
+                    className="py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3"
                   >
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-semibold text-gray-900 dark:text-white">
                           {sec.name}
                         </span>
-                        {locked ? (
-                          <Badge variant="gray">
-                            <Lock className="w-3 h-3 mr-1 inline" /> LOCKED
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant={
-                              sec.status === 'completed'
-                                ? 'emerald'
-                                : sec.status === 'under_review' || sec.status === 'submitted'
-                                ? 'blue'
-                                : sec.status === 'revision_required'
-                                ? 'rose'
-                                : 'gray'
-                            }
-                          >
-                            {sec.status.replace('_', ' ').toUpperCase()}
-                          </Badge>
-                        )}
+                        
+                        <Badge
+                          variant={
+                            isCompleted
+                              ? 'emerald'
+                              : isSubmitted
+                              ? 'blue'
+                              : isRevision
+                              ? 'rose'
+                              : isInProgress
+                              ? 'amber'
+                              : 'gray'
+                          }
+                        >
+                          {isCompleted
+                            ? 'Approved'
+                            : isSubmitted
+                            ? 'Submitted (Under Review)'
+                            : isRevision
+                            ? 'Revision Required'
+                            : isInProgress
+                            ? 'In Progress'
+                            : 'Not Started'}
+                        </Badge>
                       </div>
+
+                      {/* Feedback comment if revision required */}
+                      {sec.feedbackComment && (
+                        <p className="text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-2 rounded border border-rose-200 dark:border-rose-900/50">
+                          <strong>Adviser Notes:</strong> {sec.feedbackComment}
+                        </p>
+                      )}
 
                       <div className="w-full max-w-xs bg-gray-100 dark:bg-[#1c1d28] h-1.5 rounded-full overflow-hidden border border-transparent dark:border-[#222433]">
                         <div
-                          className="bg-blue-600 h-full transition-all duration-500"
+                          className={`h-full transition-all duration-500 ${
+                            isCompleted ? 'bg-emerald-500' : 'bg-blue-600'
+                          }`}
                           style={{
-                            width: `${locked ? 0 : (sec.status === 'completed' ? 100 : sec.progress || 0)}%`,
+                            width: `${isCompleted ? 100 : sec.progress || 0}%`,
                           }}
                         />
                       </div>
                     </div>
 
-                  {/* Section Controls for Adviser / Coordinator */}
-                  {(isAdviser || isCoordinator) && !locked && (
-                    <div className="flex items-center gap-2">
-                      <select
-                        className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-700 dark:text-[#f3f4f8]"
-                        value={sec.status}
-                        onChange={(e) => handleSectionStatusChange(sec.id, e.target.value)}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="revision_required">Revision Required</option>
-                        <option value="completed">Completed / Approved</option>
-                      </select>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isStudent && (
+                        <>
+                          {isNotStarted && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/60 dark:hover:bg-blue-500/15 transition-all shadow-xs gap-1.5"
+                              onClick={() => handleStartChapter(sec.id, sec.name)}
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              Start Working
+                            </Button>
+                          )}
+                          {(isInProgress || isRevision) && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              className="text-xs font-semibold shadow-xs gap-1.5"
+                              onClick={() => handleSubmitChapter(sec.id, sec.name)}
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              Submit for Review
+                            </Button>
+                          )}
+                          {isSubmitted && (
+                            <span className="text-xs text-blue-500 font-medium px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 animate-pulse" /> Awaiting Adviser Review
+                            </span>
+                          )}
+                          {isCompleted && (
+                            <span className="text-xs text-emerald-500 font-medium px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+                            </span>
+                          )}
+                        </>
+                      )}
+
+                      {/* Adviser / Coordinator override controls */}
+                      {(isAdviser || isCoordinator) && (
+                        <select
+                          className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-700 dark:text-[#f3f4f8]"
+                          value={sec.status}
+                          onChange={(e) => handleSectionStatusChange(sec.id, e.target.value)}
+                        >
+                          <option value="not_started">Not Started</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="submitted">Submitted</option>
+                          <option value="revision_required">Revision Required</option>
+                          <option value="completed">Completed / Approved</option>
+                        </select>
+                      )}
                     </div>
-                  )}
-                </div>
-              )})}
+                  </div>
+                );
+              })}
             </div>
           </Card>
 

@@ -4,197 +4,367 @@ import {
   ManuscriptSection,
   ResearchTask,
   ResearchMilestone,
+  ResearchFeedback,
+  DEFAULT_MANUSCRIPT_SECTIONS,
 } from '../types/researchWorkspace.types';
+
+export const MANUSCRIPT_CHAPTERS = [
+  {
+    id: 'chapter_1',
+    order: 1,
+    title: 'Chapter 1: The Problem and Its Background',
+    shortTitle: 'Chapter 1: Introduction',
+    focusTitle: 'CHAPTER 1 — THE PROBLEM & ITS BACKGROUND',
+    description: 'Introduction, statement of the problem, and research objectives',
+  },
+  {
+    id: 'chapter_2',
+    order: 2,
+    title: 'Chapter 2: Review of Related Literature and Studies',
+    shortTitle: 'Chapter 2: Literature Review',
+    focusTitle: 'CHAPTER 2 — LITERATURE REVIEW',
+    description: 'Theoretical framework, related research, and literature matrix',
+  },
+  {
+    id: 'chapter_3',
+    order: 3,
+    title: 'Chapter 3: Methodology',
+    shortTitle: 'Chapter 3: Methodology',
+    focusTitle: 'CHAPTER 3 — METHODOLOGY',
+    description: 'Research design, data collection, and system architecture',
+  },
+  {
+    id: 'chapter_4',
+    order: 4,
+    title: 'Chapter 4: Results and Discussion',
+    shortTitle: 'Chapter 4: Results & Discussion',
+    focusTitle: 'CHAPTER 4 — RESULTS & DISCUSSION',
+    description: 'Empirical data analysis, system evaluation, and findings',
+  },
+  {
+    id: 'chapter_5',
+    order: 5,
+    title: 'Chapter 5: Summary, Conclusions, and Recommendations',
+    shortTitle: 'Chapter 5: Summary & Conclusions',
+    focusTitle: 'CHAPTER 5 — SUMMARY & RECOMMENDATIONS',
+    description: 'Synthesis of findings, conclusions, and institutional recommendations',
+  },
+];
 
 export const progressService = {
   /**
-   * Calculate task completion statistics
+   * Helper to determine if a task is resolved or completed
    */
-  calculateTaskProgress(tasks: ResearchTask[]): {
+  isTaskResolved(task: ResearchTask | any): boolean {
+    if (!task) return false;
+    return task.status === 'completed' || task.status === 'resolved';
+  },
+
+  /**
+   * Helper to determine if a feedback item is resolved
+   */
+  isFeedbackResolved(feedback: ResearchFeedback | any): boolean {
+    if (!feedback) return false;
+    return feedback.status === 'resolved' || feedback.status === 'addressed';
+  },
+
+  /**
+   * Calculate task & adviser action item completion statistics
+   */
+  calculateTaskProgress(
+    tasks: ResearchTask[] = [],
+    feedbacks: any[] = []
+  ): {
     completed: number;
     total: number;
     percentage: number;
   } {
-    if (!tasks || tasks.length === 0) {
+    const validTasks = tasks || [];
+    const validFeedbacks = feedbacks || [];
+
+    const completedTasks = validTasks.filter((t) => this.isTaskResolved(t)).length;
+    const completedFeedbacks = validFeedbacks.filter((f) => this.isFeedbackResolved(f)).length;
+
+    const total = validTasks.length + validFeedbacks.length;
+    const completed = completedTasks + completedFeedbacks;
+
+    if (total === 0) {
       return { completed: 0, total: 0, percentage: 0 };
     }
 
-    const completed = tasks.filter(
-      (t) => t.status === 'completed'
-    ).length;
-    const total = tasks.length;
     const percentage = Math.round((completed / total) * 100);
-
     return { completed, total, percentage };
   },
 
   /**
-   * Calculate manuscript sections average completion
+   * Dynamically augment sections strictly for Chapters 1 through 5
    */
-  calculateSectionProgress(sections: ManuscriptSection[]): {
+  getDynamicSections(
+    workspace: ManuscriptWorkspace | null,
+    tasks: ResearchTask[] = [],
+    feedbacks: any[] = []
+  ): ManuscriptSection[] {
+    const existingSections = workspace?.sections || [];
+    const validTasks = tasks || [];
+    const validFeedbacks = feedbacks || [];
+
+    return MANUSCRIPT_CHAPTERS.map((chapDef, idx) => {
+      // Find matching section in workspace by ID or order
+      let sec = existingSections.find(
+        (s) => s.id === chapDef.id || s.order === chapDef.order
+      );
+
+      if (!sec) {
+        sec = {
+          id: chapDef.id,
+          name: chapDef.title,
+          order: chapDef.order,
+          status: 'not_started',
+          progress: 0,
+        };
+      }
+
+      // Find tasks assigned to this specific chapter
+      const secTasks = validTasks.filter(
+        (t) =>
+          t.sectionId === sec.id ||
+          (t.title && t.title.toLowerCase().includes(sec.id.replace('_', ' '))) ||
+          (t.title && sec.name && t.title.toLowerCase().includes(sec.name.toLowerCase()))
+      );
+
+      // Find feedback assigned to this section
+      const secFeedbacks = validFeedbacks.filter(
+        (f) =>
+          f.sectionId === sec.id ||
+          (f.comment && f.comment.toLowerCase().includes(sec.id.replace('_', ' ')))
+      );
+
+      const totalItems = secTasks.length + secFeedbacks.length;
+      let dynamicStatus = sec.status || 'not_started';
+
+      if (dynamicStatus === 'pending') {
+        dynamicStatus = 'not_started';
+      }
+
+      // If already approved/completed by adviser, it remains completed
+      if (sec.status === 'completed') {
+        return {
+          ...sec,
+          name: chapDef.title,
+          order: idx + 1,
+          status: 'completed',
+          progress: 100,
+        };
+      }
+
+      // If submitted, it is waiting for review
+      if (sec.status === 'submitted' || sec.status === 'under_review') {
+        return {
+          ...sec,
+          name: chapDef.title,
+          order: idx + 1,
+          status: 'submitted',
+          progress: 75,
+        };
+      }
+
+      // If revision required, mark as revision_required
+      if (sec.status === 'revision_required') {
+        return {
+          ...sec,
+          name: chapDef.title,
+          order: idx + 1,
+          status: 'revision_required',
+          progress: 50,
+        };
+      }
+
+      // If students have active tasks or resolved items, advance from not_started to in_progress
+      if (totalItems > 0) {
+        const resolvedItems =
+          secTasks.filter((t) => this.isTaskResolved(t)).length +
+          secFeedbacks.filter((f) => this.isFeedbackResolved(f)).length;
+
+        if (resolvedItems > 0 || secTasks.length > 0) {
+          dynamicStatus = 'in_progress';
+        }
+
+        const dynamicPercentage = Math.max(
+          25,
+          Math.round((resolvedItems / totalItems) * 100)
+        );
+
+        return {
+          ...sec,
+          name: chapDef.title,
+          order: idx + 1,
+          status: dynamicStatus,
+          progress: dynamicPercentage,
+        };
+      }
+
+      return {
+        ...sec,
+        name: chapDef.title,
+        order: idx + 1,
+        status: dynamicStatus,
+        progress: dynamicStatus === 'in_progress' ? Math.max(25, sec.progress || 25) : 0,
+      };
+    });
+  },
+
+  /**
+   * Calculate manuscript sections completion (strictly 5 chapters, up to 20% each)
+   */
+  calculateSectionProgress(
+    sections: ManuscriptSection[] = []
+  ): {
     completed: number;
     total: number;
     percentage: number;
   } {
-    if (!sections || sections.length === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
+    const chapterIds = MANUSCRIPT_CHAPTERS.map((c) => c.id);
+    const chapters = (sections || []).filter((s) => chapterIds.includes(s.id));
+    const completedCount = chapters.filter((s) => s.status === 'completed').length;
 
-    let totalPoints = 0;
-    let completedCount = 0;
-
-    sections.forEach((sec) => {
-      if (sec.status === 'completed') {
-        totalPoints += 100;
-        completedCount += 1;
-      } else if (sec.status === 'under_review' || sec.status === 'submitted') {
-        totalPoints += 75;
-      } else if (sec.status === 'revision_required') {
-        totalPoints += 50;
-      } else if (sec.status === 'in_progress') {
-        totalPoints += sec.progress || 35;
-      }
+    let totalProgress = 0;
+    chapters.forEach((chap) => {
+      const chapterPct =
+        typeof chap.progress === 'number'
+          ? chap.progress
+          : chap.status === 'completed'
+          ? 100
+          : 0;
+      const clampedPct = Math.min(100, Math.max(0, chapterPct));
+      totalProgress += (clampedPct / 100) * 20;
     });
 
-    const percentage = Math.round(totalPoints / (sections.length * 100) * 100);
     return {
       completed: completedCount,
-      total: sections.length,
-      percentage: Math.min(100, Math.max(0, percentage)),
+      total: 5,
+      percentage: Math.min(100, Math.max(0, Math.round(totalProgress))),
     };
   },
 
   /**
-   * Calculate overall dynamic workspace progress combining sections and tasks
+   * Calculate overall manuscript progress based on Chapters 1–5.
+   * Each chapter represents 20% of total manuscript progress.
+   * In-progress chapters contribute their proportional percentage (up to 20% each)
+   * so that overall progress dynamically and fluidly reflects real manuscript advancement
+   * (e.g. 25%, 30%, 35%, etc. instead of only jumping at 20, 40, 60, 80, 100).
    */
   calculateWorkspaceProgress(
     workspace: ManuscriptWorkspace | null,
-    tasks: ResearchTask[] = []
+    tasks: ResearchTask[] = [],
+    feedbacks: any[] = []
   ): number {
     if (!workspace) return 0;
-    
-    const sectionStats = this.calculateSectionProgress(workspace.sections);
-    
-    // If no tasks, progress is purely based on sections
-    if (!tasks || tasks.length === 0) {
-      return sectionStats.percentage;
-    }
-    
-    const taskStats = this.calculateTaskProgress(tasks);
-    
-    // Weighted progress: 80% sections, 20% tasks
-    const weightedSection = (sectionStats.percentage * 0.8);
-    const weightedTask = (taskStats.percentage * 0.2);
-    
-    return Math.round(weightedSection + weightedTask);
+
+    const dynamicSections = this.getDynamicSections(workspace, tasks, feedbacks);
+    const chapterIds = MANUSCRIPT_CHAPTERS.map((c) => c.id);
+    const chapters = dynamicSections.filter((s) => chapterIds.includes(s.id));
+
+    let totalProgress = 0;
+    chapters.forEach((chap) => {
+      const chapterPct =
+        typeof chap.progress === 'number'
+          ? chap.progress
+          : chap.status === 'completed'
+          ? 100
+          : 0;
+      const clampedPct = Math.min(100, Math.max(0, chapterPct));
+      totalProgress += (clampedPct / 100) * 20;
+    });
+
+    return Math.min(100, Math.max(0, Math.round(totalProgress)));
   },
 
   /**
-   * Determine milestone step progression
+   * Determine exactly 5 research manuscript milestones for Chapters 1 through 5
    */
   getResearchMilestones(
     workspace: ManuscriptWorkspace | null,
-    tasks: ResearchTask[] = []
+    tasks: ResearchTask[] = [],
+    feedbacks: any[] = []
   ): ResearchMilestone[] {
-    const isProposalApproved = Boolean(workspace?.proposalId);
-    const isAdviserAssigned = Boolean(workspace?.adviserId);
+    const sections = this.getDynamicSections(workspace, tasks, feedbacks);
+    let foundActive = false;
 
-    const sections = workspace?.sections || [];
-    const ch1 = sections.find((s) => s.id === 'chapter_1');
-    const ch2 = sections.find((s) => s.id === 'chapter_2');
-    const ch3 = sections.find((s) => s.id === 'chapter_3');
-    const ch4 = sections.find((s) => s.id === 'chapter_4');
-    const ch5 = sections.find((s) => s.id === 'chapter_5');
-    const finalDoc = sections.find((s) => s.id === 'final_manuscript');
+    return MANUSCRIPT_CHAPTERS.map((chap, idx) => {
+      const sec = sections.find((s) => s.id === chap.id);
+      const isCompleted = sec?.status === 'completed';
 
-    return [
-      {
-        id: 'm1_proposal',
-        title: 'Title Proposal Approved',
-        description: 'Research concept & problem formulation verified by coordinator',
-        completed: isProposalApproved,
-        active: !isProposalApproved,
-      },
-      {
-        id: 'm2_adviser',
-        title: 'Adviser Assigned',
-        description: 'Faculty mentor matched and confirmed to guide study',
-        completed: isAdviserAssigned,
-        active: isProposalApproved && !isAdviserAssigned,
-      },
-      {
-        id: 'm3_ch1',
-        title: 'Chapter 1: Introduction',
-        description: 'Rationale, problem statement, and study objectives drafted',
-        completed: ch1?.status === 'completed',
-        active: isAdviserAssigned && ch1?.status !== 'completed',
-      },
-      {
-        id: 'm4_ch2',
-        title: 'Chapter 2: Literature Review',
-        description: 'Theoretical framework and literature matrix compiled',
-        completed: ch2?.status === 'completed',
-        active: ch1?.status === 'completed' && ch2?.status !== 'completed',
-      },
-      {
-        id: 'm5_ch3',
-        title: 'Chapter 3: Methodology',
-        description: 'System architecture, design, and research methods defined',
-        completed: ch3?.status === 'completed',
-        active: ch2?.status === 'completed' && ch3?.status !== 'completed',
-      },
-      {
-        id: 'm6_ch4_5',
-        title: 'Chapters 4–5: Results & Discussion',
-        description: 'Implementation, analysis, and recommendations concluded',
-        completed: ch4?.status === 'completed' && ch5?.status === 'completed',
-        active: ch3?.status === 'completed' && (ch4?.status !== 'completed' || ch5?.status !== 'completed'),
-      },
-      {
-        id: 'm7_final',
-        title: 'Final Manuscript Defense Ready',
-        description: 'Complete manuscript approved for defense and institutional archiving',
-        completed: finalDoc?.status === 'completed' || workspace?.status === 'completed',
-        active: ch4?.status === 'completed' && ch5?.status === 'completed' && finalDoc?.status !== 'completed',
-      },
-    ];
+      let isActive = false;
+      if (!isCompleted && !foundActive) {
+        isActive = true;
+        foundActive = true;
+      }
+
+      return {
+        id: chap.id,
+        title: chap.title,
+        description: chap.description,
+        completed: isCompleted,
+        active: isActive,
+        status: sec?.status || 'not_started',
+        order: idx + 1,
+        progress: typeof sec?.progress === 'number' ? sec.progress : (isCompleted ? 100 : 0),
+        submittedAt: sec?.submittedAt,
+        reviewedAt: sec?.reviewedAt,
+        completedAt: sec?.completedAt,
+      } as ResearchMilestone;
+    });
   },
 
   /**
-   * Centralized dynamic calculation of overall research progress percentage
-   * Weighted formula:
-   * - Proposal & Adviser Milestones: 20%
-   * - Manuscript Sections: 50%
-   * - Assigned Tasks: 30% (or 0% if no tasks yet, gracefully redistributing to sections)
+   * Determine the current single focus area chapter (e.g. "CHAPTER 3 — METHODOLOGY")
+   */
+  getCurrentFocusArea(
+    workspace: ManuscriptWorkspace | null,
+    tasks: ResearchTask[] = [],
+    feedbacks: any[] = []
+  ): string {
+    const milestones = this.getResearchMilestones(workspace, tasks, feedbacks);
+    const activeMilestone = milestones.find((m) => !m.completed);
+
+    if (!activeMilestone) {
+      return 'COMPLETED — ALL CHAPTERS APPROVED';
+    }
+
+    const chapDef = MANUSCRIPT_CHAPTERS.find((c) => c.id === activeMilestone.id);
+    return chapDef?.focusTitle || `CHAPTER ${activeMilestone.order || 1}`;
+  },
+
+  /**
+   * Calculate group progress for a research group ID (5 chapters basis)
+   */
+  async getGroupProgress(
+    groupId: string
+  ): Promise<{ overallProgress: number; completedChapters: number }> {
+    try {
+      const { researchWorkspaceService } = await import('./researchWorkspace.service');
+      const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', groupId);
+      if (!ws) return { overallProgress: 0, completedChapters: 0 };
+      const dynamicSections = this.getDynamicSections(ws, [], []);
+      const chapterIds = MANUSCRIPT_CHAPTERS.map((c) => c.id);
+      const completedCount = dynamicSections.filter(
+        (s) => chapterIds.includes(s.id) && s.status === 'completed'
+      ).length;
+      const overallProgress = Math.min(100, Math.max(0, Math.round((completedCount / 5) * 100)));
+      return { overallProgress, completedChapters: completedCount };
+    } catch (err) {
+      return { overallProgress: 0, completedChapters: 0 };
+    }
+  },
+
+  /**
+   * Backward-compatible calculateOverallProgress
    */
   calculateOverallProgress(
     workspace: ManuscriptWorkspace | null,
     tasks: ResearchTask[] = []
   ): number {
-    if (!workspace) return 0;
-
-    // 1. Milestones component (Base 20%)
-    let milestoneScore = 0;
-    if (workspace.proposalId) milestoneScore += 10;
-    if (workspace.adviserId) milestoneScore += 10;
-
-    // 2. Sections component (Max 50%)
-    const { percentage: sectionPct } = this.calculateSectionProgress(
-      workspace.sections || []
-    );
-
-    // 3. Tasks component (Max 30%)
-    if (tasks && tasks.length > 0) {
-      const { percentage: taskPct } = this.calculateTaskProgress(tasks);
-      const overall = Math.round(
-        milestoneScore + (sectionPct * 0.5) + (taskPct * 0.3)
-      );
-      return Math.min(100, Math.max(0, overall));
-    } else {
-      // If no tasks created yet by adviser, distribute 80% to sections
-      const overall = Math.round(milestoneScore + (sectionPct * 0.8));
-      return Math.min(100, Math.max(0, overall));
-    }
+    return this.calculateWorkspaceProgress(workspace, tasks, []);
   },
 };
 

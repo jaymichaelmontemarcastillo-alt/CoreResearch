@@ -38,6 +38,8 @@ import { adviserRequestService } from '../services/adviserRequest.service';
 import { useNotifications } from "../hooks/useNotifications";
 import { userService } from "../services/user.service";
 import { AdminAnalyticsSection } from "../components/admin/analytics/AdminAnalyticsSection";
+import { systemActivityService } from "../services/systemActivity.service";
+import { AdviserDashboardView } from "../components/dashboard/AdviserDashboardView";
 
 /* Shared helper — converts a date string/object to a relative time string */
 const formatRelativeTime = (dateStr) => {
@@ -215,23 +217,16 @@ export const Dashboard = () => {
             </>
           )}
           {effectiveRole === "adviser" && (
-            <>
-              <Link to="/advisees">
-                <Button variant="primary" size="md">
-                  My Advisees
-                </Button>
-              </Link>
-              <Link to="/reviews">
-                <Button variant="secondary" size="md">
-                  Feedback Threads
-                </Button>
-              </Link>
-            </>
+            <Link to="/advisees">
+              <Button variant="primary" size="md">
+                My Advisees
+              </Button>
+            </Link>
           )}
           {effectiveRole === "panelist" && (
-            <Link to="/reviews">
+            <Link to="/panelist/defendees">
               <Button variant="primary" size="md">
-                View Feedback Threads
+                Panel Defendees
               </Button>
             </Link>
           )}
@@ -245,16 +240,20 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Metric Cards Row */}
-      {effectiveRole === "student" && <StudentDashboardMetrics research={studentResearch} userProfile={userProfile} />}
-      {effectiveRole === "adviser" && <AdviserDashboardMetrics />}
-      {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
-      {effectiveRole === "admin" && <AdminAnalyticsSection />}
+      {/* Role-Specific Dashboard Content */}
+      {effectiveRole === "adviser" ? (
+        <AdviserDashboardView />
+      ) : (
+        <>
+          {/* Metric Cards Row */}
+          {effectiveRole === "student" && <StudentDashboardMetrics research={studentResearch} userProfile={userProfile} />}
+          {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
+          {effectiveRole === "admin" && <AdminAnalyticsSection />}
 
-      {/* Main Content Grid: Pipeline + Active Papers + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
-        {/* Left 2 Cols: Role-Specific Content */}
-        <div className="lg:col-span-2 space-y-6">
+          {/* Main Content Grid: Pipeline + Active Papers + Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
+            {/* Left 2 Cols: Role-Specific Content */}
+            <div className="lg:col-span-2 space-y-6">
 
           {/* ====== STUDENT CONTENT ====== */}
           {(!effectiveRole || effectiveRole === "student") && (
@@ -526,34 +525,9 @@ export const Dashboard = () => {
           )}
 
           {/* ====== ADVISER & PANELIST CONTENT ====== */}
-          {(effectiveRole === "adviser" || effectiveRole === "panelist") && (
+          {effectiveRole === "adviser" && (
             <div className="space-y-5">
-              {effectiveRole === "adviser" && (
-                <AdviserRequestsWidget />
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Collaboration</span>
-                    <Badge variant="purple">Feedback Hub</Badge>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      Feedback Threads
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
-                      Provide feedback on ongoing manuscript drafts and revisions.
-                    </p>
-                  </div>
-                  <Link
-                    to="/reviews"
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                  >
-                    View Reviews →
-                  </Link>
-                </Card>
-              </div>
+              <AdviserRequestsWidget />
             </div>
           )}
         </div>
@@ -561,8 +535,10 @@ export const Dashboard = () => {
         {/* Right Col: Recent Activity */}
         <RecentActivityWidget currentUser={currentUser} />
       </div>
-    </div>
-  );
+    </>
+  )}
+</div>
+);
 };
 
 /* Student Metrics - REMOVED Proposal Status ONLY */
@@ -865,23 +841,50 @@ const AdviserRequestsWidget = () => {
   );
 };
 
-/* Recent Activity Widget — Cleaned up to remove redundant info */
-const RecentActivityWidget = ({ currentUser }) => {
-  const { notifications, loading } = useNotifications(currentUser?.uid);
+/* Recent Activity Widget — Displays real system activities across research workflow */
+const RecentActivityWidget = () => {
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Use shared module-level formatRelativeTime helper
-  const formatActivityTime = formatRelativeTime;
+  useEffect(() => {
+    const unsubscribe = systemActivityService.subscribeRecentActivities((items) => {
+      setActivities(items);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const getDotColor = (type) => {
-    switch (type) {
-      case "schedule":
-        return "bg-purple-500";
-      case "proposal":
-        return "bg-emerald-500";
-      case "comment":
-        return "bg-amber-500";
+  const getCategoryBadge = (category) => {
+    switch (category) {
+      case 'task':
+        return <Badge variant="emerald" size="sm">Task</Badge>;
+      case 'adviser':
+        return <Badge variant="blue" size="sm">Adviser</Badge>;
+      case 'repository':
+        return <Badge variant="purple" size="sm">Repository</Badge>;
+      case 'feedback':
+        return <Badge variant="amber" size="sm">Feedback</Badge>;
+      case 'schedule':
+        return <Badge variant="indigo" size="sm">Schedule</Badge>;
       default:
-        return "bg-blue-500";
+        return <Badge variant="gray" size="sm">System</Badge>;
+    }
+  };
+
+  const getDotColor = (category) => {
+    switch (category) {
+      case 'task':
+        return 'bg-emerald-500';
+      case 'adviser':
+        return 'bg-blue-500';
+      case 'repository':
+        return 'bg-purple-500';
+      case 'feedback':
+        return 'bg-amber-500';
+      case 'schedule':
+        return 'bg-indigo-500';
+      default:
+        return 'bg-gray-400';
     }
   };
 
@@ -889,30 +892,37 @@ const RecentActivityWidget = ({ currentUser }) => {
     <Card className="p-5 sm:p-6 space-y-4 flex flex-col justify-between">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
-            Recent Activity
-          </h3>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
+              Recent System Activity
+            </h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">Real-time actions &amp; milestone events across CoreResearch</p>
+          </div>
         </div>
 
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center space-y-2 text-gray-400">
             <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-            <span className="text-xs">Loading activity...</span>
+            <span className="text-xs">Loading system events...</span>
           </div>
-        ) : notifications && notifications.length > 0 ? (
+        ) : activities && activities.length > 0 ? (
           <div className="space-y-3.5 text-xs">
-            {notifications.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-start gap-3">
-                <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${getDotColor(item.type)}`} />
-                <div className="space-y-0.5 min-w-0 flex-1">
-                  <div className="font-semibold text-gray-900 dark:text-white truncate">
-                    {item.title}
+            {activities.slice(0, 6).map((item) => (
+              <div key={item.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50/70 dark:hover:bg-[#1c1d28]/60 transition-colors">
+                <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${getDotColor(item.category)}`} />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold text-gray-900 dark:text-white truncate">
+                      {item.title}
+                    </div>
+                    {getCategoryBadge(item.category)}
                   </div>
-                  <div className="text-gray-500 dark:text-[#9396a8] line-clamp-2">
-                    {item.message}
+                  <div className="text-gray-500 dark:text-[#9396a8] line-clamp-2 leading-relaxed">
+                    {item.description}
                   </div>
-                  <div className="text-[10px] text-gray-400 dark:text-[#6b6f84]">
-                    {formatActivityTime(item.createdAt)}
+                  <div className="flex items-center justify-between pt-0.5 text-[10px] text-gray-400 dark:text-[#6b6f84]">
+                    <span>{item.actorName || 'System'}</span>
+                    <span>{formatRelativeTime(item.timestamp)}</span>
                   </div>
                 </div>
               </div>
@@ -925,7 +935,7 @@ const RecentActivityWidget = ({ currentUser }) => {
               No Recent Activity
             </h4>
             <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
-              No recent activity to display.
+              System activities will appear here as researchers and faculty take action.
             </p>
           </div>
         )}
