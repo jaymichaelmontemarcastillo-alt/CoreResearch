@@ -5,7 +5,7 @@ import { Header } from "./Header";
 
 export const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const location = useLocation();
 
   // Check if we are on the document editor page (which needs full width)
@@ -17,19 +17,19 @@ export const Layout = () => {
       <Sidebar
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
-        isHovered={sidebarHovered}
-        onHoverChange={setSidebarHovered}
+        isExpanded={sidebarExpanded}
+        onToggle={() => setSidebarExpanded(!sidebarExpanded)}
       />
 
       {/* Main Viewport Column (Header + Page Body) — dynamically shrinks/shifts in real time */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-150 ease-in-out">
         <Header
           onOpenMobileMenu={() => setMobileOpen(true)}
         />
 
         <main
-          className={`flex-1 transition-all duration-300 ease-in-out ${
-            isDocumentEditor ? "p-0" : "px-8 py-6 sm:px-12 sm:py-8 lg:px-16 lg:py-8"
+          className={`flex-1 transition-all duration-150 ease-in-out ${
+            isDocumentEditor ? "p-0" : "px-6 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-8"
           }`}
         >
           <div className={isDocumentEditor ? "w-full h-full" : "w-full"}>

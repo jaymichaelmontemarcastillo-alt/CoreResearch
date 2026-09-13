@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -25,6 +26,7 @@ const LOADING_MESSAGES = [
 
 export const AdviserMatching = () => {
   const { currentUser, userProfile } = useAuth();
+  const { confirm } = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -138,8 +140,13 @@ export const AdviserMatching = () => {
   }, [currentUser, location.state, navigate]);
 
   const handleSelectAdviser = async (adviser) => {
-    const confirm = window.confirm(`Are you sure you want to select ${adviser.adviserName} as your preferred adviser?`);
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: 'Confirm Adviser Selection',
+      message: `Are you sure you want to select ${adviser.adviserName} as your preferred adviser?`,
+      confirmText: 'Select Adviser',
+      variant: 'primary'
+    });
+    if (!isConfirmed) return;
 
     setSubmittingId(adviser.adviserId);
     try {
@@ -185,8 +192,13 @@ export const AdviserMatching = () => {
 
   const handleCancelRequest = async () => {
     if (!pendingRequest) return;
-    const confirm = window.confirm("Are you sure you want to cancel this request and restart your title submission?");
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: 'Cancel Request',
+      message: 'Are you sure you want to cancel this request and restart your title submission?',
+      confirmText: 'Cancel Request',
+      variant: 'danger'
+    });
+    if (!isConfirmed) return;
 
     setLoading(true);
     try {
@@ -408,17 +420,41 @@ export const AdviserMatching = () => {
                   </div>
                 )}
 
-                {/* Score Breakdown */}
-                {adviser.textSimilarity !== undefined && (
-                  <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 dark:text-gray-400">
-                    <span>Text: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.textSimilarity)}%</strong></span>
-                    <span>Specialization: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.specializationMatch)}%</strong></span>
-                    <span>Expertise: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.expertiseMatch)}%</strong></span>
-                    <span>Interest: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.researchInterestMatch)}%</strong></span>
+                {/* Matched Paper Title (If applicable) */}
+                {adviser.matchedPaperTitle && (
+                  <div className="text-xs text-blue-700 dark:text-blue-300 mb-1">
+                    <strong className="font-semibold">Why this adviser?</strong> Strong similarity with their paper: <span className="italic">"{adviser.matchedPaperTitle}"</span>
+                  </div>
+                )}
+                
+                {/* Supporting Research Evidence */}
+                {adviser.matchedResearch && adviser.matchedResearch.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-gray-500">Relevant Research Evidence:</p>
+                    <ul className="text-xs space-y-1">
+                      {adviser.matchedResearch.map(paper => (
+                        <li key={paper.documentId} className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                           <span className={`w-2 h-2 rounded-full ${paper.relevance === 'strong' ? 'bg-emerald-500' : paper.relevance === 'moderate' ? 'bg-blue-500' : 'bg-gray-400'}`}></span>
+                           <span className="truncate max-w-[250px] sm:max-w-[350px]">{paper.title}</span>
+                           <span className="font-semibold text-blue-600 dark:text-blue-400">{paper.similarity}%</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
-                <p className="text-xs text-gray-500 bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-100 dark:border-slate-700 italic">
+                {/* Score Breakdown */}
+                {adviser.textSimilarity !== undefined && (
+                  <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 dark:text-gray-400 mt-2">
+                    {adviser.textSimilarity !== undefined && <span>Research Semantic: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.textSimilarity)}%</strong></span>}
+                    {adviser.topicMatch !== undefined && <span>Topic Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.topicMatch)}%</strong></span>}
+                    {adviser.conceptMatch !== undefined && <span>Concept Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.conceptMatch)}%</strong></span>}
+                    {adviser.methodologyMatch !== undefined && <span>Methodology Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.methodologyMatch)}%</strong></span>}
+                    {adviser.profileMatch !== undefined && <span>Profile Match: <strong className="text-gray-700 dark:text-gray-300">{Math.round(adviser.profileMatch)}%</strong></span>}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500 bg-gray-50 dark:bg-slate-800 p-2 rounded border border-gray-100 dark:border-slate-700 italic mt-2">
                   "{adviser.explanation}"
                 </p>
               </div>

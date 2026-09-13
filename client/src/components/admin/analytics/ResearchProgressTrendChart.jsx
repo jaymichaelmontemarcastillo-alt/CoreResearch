@@ -48,7 +48,7 @@ export const ResearchProgressTrendChart = ({ data = [], loading = false }) => {
       emptyMessage="No historical timeline data available"
     >
       <div className="w-full h-[260px] pt-2">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" debounce={200}>
           <LineChart data={data} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
             <CartesianGrid
               strokeDasharray="3 3"

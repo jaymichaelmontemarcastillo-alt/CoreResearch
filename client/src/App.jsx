@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -36,87 +37,91 @@ import { Masterlist } from './pages/Masterlist';
 import { Panelists } from './pages/Panelists';
 import { Notifications } from './pages/Notifications';
 import { AdvisersList } from './pages/AdvisersList';
+import { ResearchDocumentsPage } from './pages/ResearchDocumentsPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Routes>
-            {/* Public Auth Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            
-            {/* Public/Shared Routes */}
-            <Route path="/join/:inviteId" element={<JoinSection />} />
+          <ConfirmProvider>
+            <Routes>
+              {/* Public Auth Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Protected Main Workspace Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/onboarding" element={<Onboarding />} />
+              {/* Public/Shared Routes */}
+              <Route path="/join/:inviteId" element={<JoinSection />} />
 
-              <Route element={<Layout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/profile" element={<ProfileSettings />} />
-                <Route path="/profile-settings" element={<ProfileSettings />} />
-                <Route path="/settings" element={<ProfileSettings />} />
+              {/* Protected Main Workspace Routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/onboarding" element={<Onboarding />} />
 
-                {/* Student specific */}
-                <Route element={<ProtectedRoute allowedRoles={['student']} />}>
-                  <Route path="/my-group" element={<MyGroup />} />
-                  <Route path="/masterlist" element={<Masterlist />} />
-                  <Route path="/advisers" element={<AdvisersList />} />
-                </Route>
+                <Route element={<Layout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/profile" element={<ProfileSettings />} />
+                  <Route path="/profile-settings" element={<ProfileSettings />} />
+                  <Route path="/settings" element={<ProfileSettings />} />
 
-                {/* Title & Adviser Matching Routes */}
-                <Route path="/submit-title" element={<SubmitTitle />} />
-                <Route path="/adviser-matching" element={<AdviserMatching />} />
+                  {/* Student specific */}
+                  <Route element={<ProtectedRoute allowedRoles={['student']} />}>
+                    <Route path="/my-group" element={<MyGroup />} />
+                    <Route path="/masterlist" element={<Masterlist />} />
+                    <Route path="/advisers" element={<AdvisersList />} />
+                  </Route>
 
-                {/* Research Projects & Workspace */}
-                <Route path="/projects" element={<Projects />} />
-                <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
-                <Route path="/workspace" element={<StudentResearchWorkspace />} />
-                <Route path="/advisees" element={<AdviserAdvisees />} />
-                <Route path="/faculty/workspace/:id" element={<FacultyWorkspaceView />} />
-                <Route path="/panelists" element={<Panelists />} />
-                <Route path="/panelist/defendees" element={<PanelistDefendees />} />
+                  {/* Title & Adviser Matching Routes */}
+                  <Route path="/submit-title" element={<SubmitTitle />} />
+                  <Route path="/adviser-matching" element={<AdviserMatching />} />
 
-                {/* Real-time Documents Editor */}
-                <Route path="/documents" element={<Documents />} />
-                <Route path="/documents/:id" element={<DocumentEditorPage />} />
+                  {/* Research Projects & Workspace */}
+                  <Route path="/projects" element={<Projects />} />
+                  <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
+                  <Route path="/workspace" element={<StudentResearchWorkspace />} />
+                  <Route path="/advisees" element={<AdviserAdvisees />} />
+                  <Route path="/faculty/workspace/:id" element={<FacultyWorkspaceView />} />
+                  <Route path="/panelists" element={<Panelists />} />
+                  <Route path="/panelist/defendees" element={<PanelistDefendees />} />
 
-                {/* Reviews */}
-                <Route path="/reviews" element={<Reviews />} />
+                  {/* Real-time Documents Editor */}
+                  <Route path="/documents" element={<Documents />} />
+                  <Route path="/documents/:id" element={<DocumentEditorPage />} />
 
-                {/* Schedules */}
-                <Route path="/schedules" element={<Schedules />} />
+                  {/* Reviews */}
+                  <Route path="/reviews" element={<Reviews />} />
 
-                {/* Repository */}
-                <Route path="/repository" element={<Repository />} />
+                  {/* Schedules */}
+                  <Route path="/schedules" element={<Schedules />} />
 
-                {/* Student & Groups Management */}
-                <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator', 'adviser']} />}>
-                  <Route path="/students" element={<StudentDirectory />} />
-                  <Route path="/admin/students" element={<StudentDirectory />} />
-                  <Route path="/research-groups" element={<ResearchGroups />} />
-                  <Route path="/groups" element={<ResearchGroups />} />
-                  <Route path="/admin/groups" element={<ResearchGroups />} />
-                  <Route path="/admin/scheduling" element={<Scheduling />} />
-                </Route>
+                  {/* Repository */}
+                  <Route path="/repository" element={<Repository />} />
 
-                <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                  <Route path="/admin/users" element={<UserDirectory />} />
-                  <Route path="/admin/courses" element={<Courses />} />
-                  <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
+                  {/* Student & Groups Management */}
+                  <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator', 'adviser']} />}>
+                    <Route path="/students" element={<StudentDirectory />} />
+                    <Route path="/admin/students" element={<StudentDirectory />} />
+                    <Route path="/research-groups" element={<ResearchGroups />} />
+                    <Route path="/groups" element={<ResearchGroups />} />
+                    <Route path="/admin/groups" element={<ResearchGroups />} />
+                    <Route path="/admin/scheduling" element={<Scheduling />} />
+                    <Route path="/research-documents" element={<ResearchDocumentsPage />} />
+                  </Route>
+
+                  <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                    <Route path="/admin/users" element={<UserDirectory />} />
+                    <Route path="/admin/courses" element={<Courses />} />
+                    <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
+                  </Route>
                 </Route>
               </Route>
-            </Route>
 
-            {/* Fallback Redirect */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+              {/* Fallback Redirect */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </ConfirmProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

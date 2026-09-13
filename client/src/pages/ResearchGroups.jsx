@@ -3,8 +3,11 @@ import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { EmptyState } from "../components/ui/EmptyState";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
+import { useConfirm } from "../context/ConfirmContext";
+import { useAuth } from "../context/AuthContext";
 import { Modal } from "../components/ui/Modal";
 import { CourseFilterDropdown } from "../components/ui/CourseFilterDropdown";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
@@ -26,6 +29,9 @@ import { groupService } from "../services/group.service";
 import { titleProposalService } from "../services/titleProposal.service";
 
 export const ResearchGroups = () => {
+  const { userProfile, role } = useAuth();
+  const { confirm } = useConfirm();
+
   // --- Data State ---
   const [courses, setCourses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -375,7 +381,13 @@ export const ResearchGroups = () => {
 
   // --- Delete Handler ---
   const handleDeleteGroup = async (groupId) => {
-    if (window.confirm("Are you sure you want to delete this research group?")) {
+    const isConfirmed = await confirm({
+      title: "Delete Research Group",
+      message: "Are you sure you want to delete this research group?",
+      confirmText: "Delete",
+      variant: "danger"
+    });
+    if (isConfirmed) {
       try {
         await groupService.deleteGroup(groupId);
         showToast("Group deleted successfully!");

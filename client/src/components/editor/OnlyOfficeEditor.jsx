@@ -15,52 +15,49 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
 
     const fetchConfig = async () => {
       try {
-        // 1. Fetch the runtime server config (ONLYOFFICE URL) from backend.
-        //    This avoids baking the URL into the frontend build — no rebuild needed when tunnel changes!
         let serverUrl = import.meta.env.VITE_ONLYOFFICE_SERVER_URL || 'http://localhost:8080/';
-        try {
-          const configResponse = await api.get('/config');
-          if (configResponse.data?.onlyofficeServerUrl) {
-            serverUrl = configResponse.data.onlyofficeServerUrl;
-          }
-        } catch (configErr) {
+        const configUrl = `/onlyoffice/config/${documentId}${mode ? `?mode=${encodeURIComponent(mode)}` : ''}`;
+
+        // Fetch both configs in parallel to speed up editor loading
+        const [configResult, docConfigResult] = await Promise.allSettled([
+          api.get('/config'),
+          api.get(configUrl)
+        ]);
+
+        // Process runtime server config
+        if (configResult.status === 'fulfilled' && configResult.value.data?.onlyofficeServerUrl) {
+          serverUrl = configResult.value.data.onlyofficeServerUrl;
+        } else if (configResult.status === 'rejected') {
           console.warn('[OnlyOfficeEditor] Could not fetch runtime config, using fallback URL:', serverUrl);
         }
 
         if (isMounted) setDocumentServerUrl(serverUrl);
 
-        // 2. Fetch the ONLYOFFICE document config (JWT token, permissions, etc.)
-        let response;
-        const configUrl = `/onlyoffice/config/${documentId}${mode ? `?mode=${encodeURIComponent(mode)}` : ''}`;
-        try {
-          response = await api.get(configUrl);
-        } catch (err) {
-          // If document not found or not migrated, attempt to create/initialize it
-          if (err.response && (err.response.status === 404 || err.response.status === 400)) {
-            console.log('[OnlyOfficeEditor] Document not found, attempting to auto-create...');
-            await api.post('/onlyoffice/create', { documentId, title: 'Research Manuscript' });
-            response = await api.get(configUrl);
-          } else {
-            throw err;
+        // Process document config
+        if (docConfigResult.status === 'fulfilled') {
+          const data = docConfigResult.value.data;
+          if (data.success && isMounted) {
+            const finalConfig = {
+              ...data.config,
+              token: data.token
+            };
+            setConfig(finalConfig);
+          } else if (isMounted) {
+            setError(data.message || 'Failed to load editor configuration');
           }
-        }
-
-        const data = response.data;
-
-        if (data.success && isMounted) {
-          const finalConfig = {
-            ...data.config,
-            token: data.token
-          };
-          setConfig(finalConfig);
-        } else if (isMounted) {
-          setError(data.message || 'Failed to load editor configuration');
+        } else {
+          // Promise was rejected
+          if (isMounted) {
+            const err = docConfigResult.reason;
+            const errMsg = err?.response?.data?.message || 'Network error while loading editor configuration';
+            setError(errMsg);
+            console.error('[OnlyOfficeEditor] fetchConfig error:', err);
+          }
         }
       } catch (err) {
         if (isMounted) {
-          const errMsg = err.response?.data?.message || 'Network error while loading editor configuration';
-          setError(errMsg);
-          console.error('[OnlyOfficeEditor] fetchConfig error:', err);
+          setError('Unexpected error while initializing editor');
+          console.error('[OnlyOfficeEditor] Unexpected error:', err);
         }
       } finally {
         if (isMounted) {
@@ -134,7 +131,7 @@ export const OnlyOfficeEditor = ({ documentId, mode }) => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col relative rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div className="w-full h-full flex flex-col relative bg-white dark:bg-slate-900">
       <DocumentEditor
         id="onlyoffice-editor"
         documentServerUrl={documentServerUrl}

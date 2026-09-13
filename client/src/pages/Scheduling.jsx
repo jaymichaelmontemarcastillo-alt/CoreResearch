@@ -12,6 +12,8 @@ import { sectionService } from "../services/section.service";
 import { groupService } from "../services/group.service";
 import { titleProposalService } from "../services/titleProposal.service";
 import { scheduleService } from "../services/schedule.service";
+import { useAuth } from "../context/AuthContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { GenerateScheduleModal } from "../components/scheduling/GenerateScheduleModal";
 import EditScheduleModal from "../components/scheduling/EditScheduleModal";
 
@@ -26,6 +28,9 @@ const formatTime12Hour = (time) => {
 };
 
 export const Scheduling = () => {
+  const { userProfile } = useAuth();
+  const { confirm } = useConfirm();
+
   // --- Data State ---
   const [courses, setCourses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -197,7 +202,14 @@ export const Scheduling = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to clear the scheduled time for ${schedulesToClear.length} group(s)?\n(This will keep the assigned panelists but remove the date and time)`)) {
+    const isConfirmed = await confirm({
+      title: "Clear Selected Schedules",
+      message: `Are you sure you want to clear the scheduled time for ${schedulesToClear.length} group(s)?\n(This will keep the assigned panelists but remove the date and time)`,
+      confirmText: "Clear Schedules",
+      variant: "danger"
+    });
+
+    if (!isConfirmed) {
       return;
     }
 
@@ -404,7 +416,13 @@ export const Scheduling = () => {
                           </div>
                           <button
                             onClick={async () => {
-                              if (window.confirm("Are you sure you want to clear the scheduled time?")) {
+                              const isConfirmed = await confirm({
+                                title: "Clear Schedule",
+                                message: "Are you sure you want to clear the scheduled time?",
+                                confirmText: "Clear Schedule",
+                                variant: "danger"
+                              });
+                              if (isConfirmed) {
                                 // Optimistically clear locally first
                                 setSchedules(prev => prev.map(s => s.id === schedule.id ? { ...s, date: '', startTime: '', endTime: '' } : s));
                                 try {

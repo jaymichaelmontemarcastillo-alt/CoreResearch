@@ -218,6 +218,7 @@ export class NLPAdviserMatchingProvider {
 // ── Gemini Provider ───────────────────────────────────────────────────────────
 
 import { GoogleGenAI } from '@google/genai';
+import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 
 // Simple in-memory cache for adviser embeddings to save API calls
 const adviserEmbeddingCache = new Map();
@@ -236,30 +237,45 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// Helper for exact/partial text overlap
+// Helper for phrase-based overlap similarity
 function calculateOverlapScore(researchText, adviserItems) {
   if (!adviserItems || adviserItems.length === 0) return 0;
+  if (!researchText || researchText.trim() === '') return 0;
   
-  const researchTokens = researchText.toLowerCase().split(/\W+/).filter(t => t.length > 1);
-  if (researchTokens.length === 0) return 0;
+  const researchTextLower = researchText.toLowerCase();
   
-  let matchCount = 0;
-  const adviserTokens = new Set();
-  
+  // Normalize adviser items into cleaned multi-word phrases
+  const adviserPhrases = new Set();
   adviserItems.forEach(item => {
-    item.toLowerCase().split(/\W+/).filter(t => t.length > 1).forEach(t => adviserTokens.add(t));
+    if (typeof item === 'string' && item.trim()) {
+      const cleaned = item.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      if (cleaned.length > 2) adviserPhrases.add(cleaned);
+    }
   });
+
+  if (adviserPhrases.size === 0) return 0;
   
-  adviserTokens.forEach(token => {
-    if (researchTokens.includes(token)) {
-      matchCount++;
+  let matchScore = 0;
+  adviserPhrases.forEach(phrase => {
+    // Exact phrase match
+    if (researchTextLower.includes(phrase)) {
+      matchScore += 1.0;
+    } else {
+      // Partial match: if more than half the words >3 chars are found
+      const words = phrase.split(' ');
+      if (words.length > 1) {
+        const significantWords = words.filter(w => w.length > 3);
+        const matchedWords = significantWords.filter(w => researchTextLower.includes(w)).length;
+        if (significantWords.length > 0 && matchedWords / significantWords.length > 0.5) {
+          matchScore += 0.5;
+        }
+      }
     }
   });
   
-  // Normalize score between 0 and 100 based on matches
-  // Simple heuristic: 1 match = 30, 2 matches = 60, 3+ matches = 100
-  const score = Math.min((matchCount / 3) * 100, 100);
-  return score;
+  // Scale proportionally. Dynamic cap based on phrases.
+  const cap = Math.max(3, adviserPhrases.size * 0.25);
+  return Math.min((matchScore / cap) * 100, 100);
 }
 
 /**
@@ -270,21 +286,41 @@ function calculateOverlapScore(researchText, adviserItems) {
 export class GeminiAdviserMatchingProvider {
   constructor(options = {}) {
     this.name = 'gemini';
-    this.version = 'v2.0-gemini';
-    this.apiKey = process.env.GEMINI_API_KEY;
-    if (this.apiKey) {
-      this.ai = new GoogleGenAI({ apiKey: this.apiKey });
-    } else {
-      console.warn('[GeminiProvider] GEMINI_API_KEY is not set. Matching will fail.');
-    }
+    this.version = 'v2.2-gemini-multisignal';
+    this._ai = null; // Lazy — initialized on first use
     
-    // Configurable Scoring Weights
-    this.WEIGHTS = {
-      semantic: 0.50,
-      specialization: 0.25,
-      expertise: 0.15,
-      researchInterest: 0.10
+    // Configurable Scoring Constants
+    this.MATCHING_CONFIG = {
+      WEIGHTS: {
+        semantic: 0.40,    // Embedding cosine similarity (primary)
+        topic: 0.20,       // Topic phrase overlap (supporting)
+        concept: 0.15,     // Keyword/concept overlap (supporting)
+        methodology: 0.10, // Methodology overlap (supporting)
+        profile: 0.15      // Adviser profile compatibility (supporting)
+      },
+      SEMANTIC_BASELINE: 0.65,
+      // Multi-paper aggregation weights
+      PAPER_WEIGHTS: [0.70, 0.20, 0.10],  // Best, 2nd best, 3rd best
+      MAX_MATCHED_PAPERS: 3,
+      MIN_PAPER_RELEVANCE: 30,  // Minimum score to be considered "relevant"
     };
+  }
+
+  /** Lazy-init Gemini client so env vars are guaranteed to be loaded */
+  get ai() {
+    if (!this._ai) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn('[GeminiProvider] GEMINI_API_KEY is not set. Matching will fail.');
+        return null;
+      }
+      this._ai = new GoogleGenAI({ apiKey });
+    }
+    return this._ai;
+  }
+
+  get apiKey() {
+    return process.env.GEMINI_API_KEY;
   }
 
   async isHealthy() {
@@ -295,7 +331,7 @@ export class GeminiAdviserMatchingProvider {
   }
 
   async _getEmbedding(text) {
-    if (!text || text.trim() === '') return new Array(768).fill(0); // Dummy empty embedding
+    if (!text || text.trim() === '') return new Array(3072).fill(0); // Dummy empty embedding
     try {
       const response = await this.ai.models.embedContent({
         model: 'gemini-embedding-2',
@@ -314,84 +350,243 @@ export class GeminiAdviserMatchingProvider {
     }
     
     const startTime = Date.now();
-    const researchText = `${title} ${description || ''}`.trim();
+    const researchText = `${title}\n\n${description || ''}`.trim();
     
-    console.log(`[GeminiProvider] Generating semantic embedding for research: "${title.substring(0, 40)}..."`);
-    const studentEmbedding = await this._getEmbedding(researchText);
-    
-    console.log(`[GeminiProvider] Scoring ${advisers.length} advisers against semantic representation...`);
-    
-    const results = [];
-    
-    for (const adv of advisers) {
-      // 1. Generate/Retrieve Semantic Representation for Adviser
-      const adviserText = [
-        ...(adv.specialization || []),
-        ...(adv.expertise || []),
-        ...(adv.researchInterests || []),
-        ...(adv.keywords || [])
-      ].join(' ');
-      
-      let advEmbedding;
-      const cacheKey = `adv_emb_${adv.adviserId}_${adviserText.length}`;
-      
-      if (adviserEmbeddingCache.has(cacheKey)) {
-        advEmbedding = adviserEmbeddingCache.get(cacheKey);
-      } else {
-        advEmbedding = await this._getEmbedding(adviserText);
-        if (adviserText.trim() !== '') {
-          adviserEmbeddingCache.set(cacheKey, advEmbedding);
+    console.log(`[GeminiProvider] Analyzing student proposal: "${title.substring(0, 40)}..."`);
+
+    // 1. Analyze student proposal with same schema
+    const prompt = `
+Analyze the following student research proposal and extract structured metadata.
+Focus on identifying the research concepts, methodologies, and specific domain keywords.
+Do NOT extract generic academic terms.
+
+STUDENT PROPOSAL:
+---
+${researchText.substring(0, 5000)}
+---
+`;
+
+    const responseSchema = {
+      type: "OBJECT",
+      properties: {
+        abstract: { type: "STRING" },
+        keywords: { type: "ARRAY", items: { type: "STRING" } },
+        keyPhrases: { type: "ARRAY", items: { type: "STRING" } },
+        researchTopics: { type: "ARRAY", items: { type: "STRING" } },
+        researchConcepts: { type: "ARRAY", items: { type: "STRING" } },
+        methodologies: { type: "ARRAY", items: { type: "STRING" } },
+        researchDomain: { type: "STRING" },
+        researchProblem: { type: "STRING" }
+      },
+      required: ["abstract", "keywords", "researchTopics", "researchConcepts", "methodologies", "researchDomain", "researchProblem"]
+    };
+
+    let studentData = {
+      abstract: '', keywords: [], keyPhrases: [], researchTopics: [],
+      researchConcepts: [], methodologies: [], researchDomain: '', researchProblem: ''
+    };
+
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3.6-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: responseSchema
         }
-      }
-      
-      // 2. Calculate Sub-scores
-      // Semantic Score (Cosine Similarity scaled)
-      // Gemini embeddings typically range from ~0.65 (unrelated) to 1.0 (identical)
-      const cosineSim = cosineSimilarity(studentEmbedding, advEmbedding);
-      
-      const BASELINE = 0.65;
+      });
+      studentData = JSON.parse(response.text);
+    } catch (err) {
+      console.warn('[GeminiProvider] Failed to parse student proposal with Gemini:', err.message);
+      // Fallback: just use raw text for simple overlap if Gemini structured output fails
+    }
+
+    const studentRepresentation = [
+      title,
+      studentData.abstract || description || '',
+      ...(studentData.researchTopics || []),
+      ...(studentData.keywords || []),
+      ...(studentData.keyPhrases || []),
+      ...(studentData.researchConcepts || []),
+      ...(studentData.methodologies || []),
+      studentData.researchDomain || '',
+      studentData.researchProblem || ''
+    ].join(' ');
+
+    console.log(`[GeminiProvider] Generating semantic embedding for student proposal.`);
+    const studentEmbedding = await this._getEmbedding(studentRepresentation);
+    
+    // 2. Fetch all READY research documents for the eligible advisers
+    const eligibleAdviserIds = advisers.map(a => a.adviserId);
+    const researchDocs = await AdviserResearchDocument.find({
+      adviserId: { $in: eligibleAdviserIds },
+      processingStatus: 'READY'
+    }).lean();
+
+    console.log(`[GeminiProvider] Found ${researchDocs.length} processed research documents for eligible advisers.`);
+
+    const adviserDocScores = new Map();
+    const studentAllTerms = [
+      ...(studentData.keywords || []),
+      ...(studentData.researchTopics || []),
+      ...(studentData.researchConcepts || []),
+      ...(studentData.methodologies || [])
+    ];
+    // Fallback string if parse failed
+    const fallbackTerms = studentAllTerms.length > 0 ? studentAllTerms.join(' ') : researchText;
+
+    // 3. Score each document
+    for (const doc of researchDocs) {
+      if (!doc.embedding || doc.embedding.length === 0) continue;
+
+      // a. Semantic Score (40%)
+      const cosineSim = cosineSimilarity(studentEmbedding, doc.embedding);
+      const BASELINE = this.MATCHING_CONFIG.SEMANTIC_BASELINE;
       let rawSemanticScore = 0;
       if (cosineSim > BASELINE) {
         rawSemanticScore = ((cosineSim - BASELINE) / (1.0 - BASELINE)) * 100;
       }
+
+      // b. Topic Similarity (20%)
+      const topicScore = calculateOverlapScore(
+        studentData.researchTopics?.join(' ') || fallbackTerms, 
+        doc.researchTopics || doc.keywords || []
+      );
+
+      // c. Keyword/Concept Similarity (15%)
+      const conceptScore = calculateOverlapScore(
+        [...(studentData.keywords || []), ...(studentData.researchConcepts || [])].join(' ') || fallbackTerms, 
+        [...(doc.keywords || []), ...(doc.researchConcepts || [])]
+      );
+
+      // d. Methodology Similarity (10%)
+      const methodScore = calculateOverlapScore(
+        studentData.methodologies?.join(' ') || fallbackTerms, 
+        doc.methodologies || doc.methodologyTerms || []
+      );
       
-      // Keyword Overlap Scores
-      const specScore = calculateOverlapScore(researchText, adv.specialization);
-      const expScore = calculateOverlapScore(researchText, adv.expertise);
-      const intScore = calculateOverlapScore(researchText, adv.researchInterests);
+      const docBaseScore = 
+        (rawSemanticScore * this.MATCHING_CONFIG.WEIGHTS.semantic) +
+        (topicScore * this.MATCHING_CONFIG.WEIGHTS.topic) +
+        (conceptScore * this.MATCHING_CONFIG.WEIGHTS.concept) +
+        (methodScore * this.MATCHING_CONFIG.WEIGHTS.methodology);
+
+      // Out of 85 points so far. Remaining 15 points come from adviser profile.
+
+      const scoreEntry = {
+        docBaseScore, // Max 85
+        rawSemanticScore,
+        topicScore,
+        conceptScore,
+        methodScore,
+        documentId: doc.id,
+        documentTitle: doc.originalFilename || doc.title,
+        matchedKeywords: (doc.researchConcepts || doc.keywords || []).slice(0, 4)
+      };
+
+      if (!adviserDocScores.has(doc.adviserId)) {
+        adviserDocScores.set(doc.adviserId, []);
+      }
+      adviserDocScores.get(doc.adviserId).push(scoreEntry);
+    }
+
+    // 4. Aggregate by adviser
+    const results = [];
+    
+    for (const adv of advisers) {
+      let docScores = adviserDocScores.get(adv.adviserId) || [];
       
-      // 3. Final Weighted Score
-      const finalScore = 
-        (rawSemanticScore * this.WEIGHTS.semantic) +
-        (specScore * this.WEIGHTS.specialization) +
-        (expScore * this.WEIGHTS.expertise) +
-        (intScore * this.WEIGHTS.researchInterest);
-        
-      // 4. Generate Recommendation Reason
-      let explanation = 'Moderate compatibility based on general research domain.';
-      if (finalScore > 85) {
-        explanation = "Exceptional semantic match with adviser's core expertise and specialization.";
-      } else if (finalScore > 70) {
-        explanation = 'Strong match in specialization and research interests.';
-      } else if (finalScore > 50) {
-        explanation = 'Good compatibility with relevant expertise overlap.';
+      // Calculate Profile Field Compatibility (15%)
+      const advProfileTerms = [
+        ...(adv.specialization || []),
+        ...(adv.expertise || []),
+        ...(adv.researchInterests || [])
+      ];
+      const profileScore = calculateOverlapScore(fallbackTerms, advProfileTerms);
+      const profilePoints = profileScore * this.MATCHING_CONFIG.WEIGHTS.profile; // Max 15
+
+      // Filter out irrelevant papers
+      docScores = docScores.filter(d => d.docBaseScore > this.MATCHING_CONFIG.MIN_PAPER_RELEVANCE);
+      docScores.sort((a, b) => b.docBaseScore - a.docBaseScore);
+
+      if (docScores.length === 0) {
+        // Fallback: If no relevant documents, give a low score based on profile only
+        if (profileScore > 30) {
+           results.push({
+             adviserId: adv.adviserId,
+             score: Math.round(profilePoints), // Max 15
+             textSimilarity: 0,
+             topicMatch: 0,
+             conceptMatch: 0,
+             methodologyMatch: 0,
+             profileMatch: Math.round(profileScore),
+             matchedKeywords: (adv.specialization || []).slice(0, 4),
+             matchedPaperTitle: null,
+             matchedResearch: [],
+             explanation: 'Moderate compatibility based solely on general profile specialization (no relevant research documents uploaded).',
+             algorithmVersion: this.version
+           });
+        }
+        continue;
+      }
+
+      // Multi-paper aggregation (70/20/10)
+      let aggregatedDocBaseScore = 0;
+      let weightSum = 0;
+      const matchedResearch = [];
+
+      for (let i = 0; i < Math.min(docScores.length, this.MATCHING_CONFIG.MAX_MATCHED_PAPERS); i++) {
+        const doc = docScores[i];
+        const weight = this.MATCHING_CONFIG.PAPER_WEIGHTS[i];
+        aggregatedDocBaseScore += doc.docBaseScore * weight;
+        weightSum += weight;
+
+        // Convert docBaseScore out of 85 back to a rough 100-scale similarity for display
+        const displaySimilarity = Math.round((doc.docBaseScore / 85) * 100);
+        matchedResearch.push({
+          documentId: doc.documentId,
+          title: doc.documentTitle,
+          similarity: displaySimilarity,
+          relevance: displaySimilarity > 80 ? 'strong' : displaySimilarity > 60 ? 'moderate' : 'partial'
+        });
       }
       
-      const matchedKeywords = (adv.specialization || []).slice(0, 3);
+      // Normalize if they had fewer than 3 relevant papers
+      aggregatedDocBaseScore = aggregatedDocBaseScore / weightSum;
+
+      const bestDoc = docScores[0];
+      const finalScore = aggregatedDocBaseScore + profilePoints; // Max 100
+
+      // Explanation generation using paper citations
+      let explanation = 'Moderate compatibility based on general research domain.';
+      if (finalScore > 85) {
+        explanation = `Exceptional match: Adviser's paper '${bestDoc.documentTitle}' shows strong research similarity.`;
+      } else if (finalScore > 70) {
+        explanation = `Strong match: Adviser's research concepts in '${bestDoc.documentTitle}' align well with your proposal.`;
+      } else if (finalScore > 50) {
+        explanation = `Good compatibility: Overlapping topics found in '${bestDoc.documentTitle}'.`;
+      }
       
+      if (bestDoc.matchedKeywords && bestDoc.matchedKeywords.length > 0) {
+          explanation += ` Shared topics: ${bestDoc.matchedKeywords.slice(0, 2).join(', ')}.`;
+      }
+
       results.push({
         adviserId: adv.adviserId,
         score: Math.round(finalScore),
-        textSimilarity: Math.round(rawSemanticScore),
-        specializationMatch: Math.round(specScore),
-        expertiseMatch: Math.round(expScore),
-        researchInterestMatch: Math.round(intScore),
-        matchedKeywords,
+        textSimilarity: Math.round(bestDoc.rawSemanticScore),
+        topicMatch: Math.round(bestDoc.topicScore),
+        conceptMatch: Math.round(bestDoc.conceptScore),
+        methodologyMatch: Math.round(bestDoc.methodScore),
+        profileMatch: Math.round(profileScore),
+        matchedKeywords: bestDoc.matchedKeywords,
+        matchedPaperTitle: bestDoc.documentTitle,
+        matchedResearch,
         explanation,
         algorithmVersion: this.version
       });
     }
-    
+
     // 5. Rank
     results.sort((a, b) => b.score - a.score);
     

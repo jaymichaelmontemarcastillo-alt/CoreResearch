@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   BookOpen,
   UserCheck,
@@ -38,6 +39,7 @@ import { ResearchFeedbackSection } from '../components/research/ResearchFeedback
 
 export const StudentResearchWorkspace = () => {
   const { currentUser, userProfile, role } = useAuth();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -188,8 +190,13 @@ export const StudentResearchWorkspace = () => {
 
   const handleResetWorkspace = async () => {
     if (!workspace) return;
-    const confirm = window.confirm("WARNING: This will permanently delete your current workspace so you can restart the title submission process. Proceed?");
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: "Restart Workspace",
+      message: "WARNING: This will permanently delete your current workspace so you can restart the title submission process. Proceed?",
+      confirmText: "Restart Workspace",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
 
     try {
       // 1. Delete Workspace
@@ -237,7 +244,13 @@ export const StudentResearchWorkspace = () => {
   };
 
   const handleTaskDelete = async (taskId) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    const isConfirmed = await confirm({
+      title: "Delete Task",
+      message: "Are you sure you want to delete this task?",
+      confirmText: "Delete",
+      variant: "danger"
+    });
+    if (!isConfirmed) return;
     try {
       await researchTaskService.deleteTask(taskId);
       setToast('Task deleted successfully.');

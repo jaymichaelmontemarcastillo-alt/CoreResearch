@@ -291,6 +291,6 @@ export const createDocument = async (req, res) => {
     return res.status(201).json({ success: true, document });
   } catch (error) {
     console.error('[onlyofficeController] createDocument error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to create ONLYOFFICE document' });
+    return res.status(500).json({ success: false, message: 'Failed to create ONLYOFFICE document', error: error.message, stack: error.stack });
   }
 };

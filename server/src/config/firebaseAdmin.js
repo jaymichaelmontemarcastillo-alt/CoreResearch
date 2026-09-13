@@ -44,6 +44,7 @@ try {
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey: privateKey,
         }),
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
       });
       db = admin.firestore();
       auth = admin.auth();
@@ -52,6 +53,7 @@ try {
       const serviceAccount = JSON.parse(fs.readFileSync(foundServiceAccount, 'utf8'));
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
       });
       db = admin.firestore();
       auth = admin.auth();

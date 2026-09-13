@@ -20,11 +20,14 @@ import {
   HiKey,
   HiCheck,
   HiSparkles,
+  HiDocumentText,
+  HiDocumentPlus,
 } from "react-icons/hi2";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth } from "../services/firebase";
 import api from "../services/api";
 import { ImageCropModal } from "../components/ui/ImageCropModal";
+import { AdviserResearchTab } from "../components/adviser/AdviserResearchTab";
 
 const COLLEGES_DATA = {
   "College of Computer Studies": [
@@ -560,6 +563,7 @@ export const ProfileSettings = () => {
                 )}
               </button>
             )}
+
           </div>
 
           {/* Institutional Badge Card */}
@@ -1387,6 +1391,7 @@ export const ProfileSettings = () => {
               </div>
             </div>
           )}
+
         </div>
       </div>
 

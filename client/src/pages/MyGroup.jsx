@@ -1,6 +1,7 @@
 // src/pages/MyGroup.jsx
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -28,6 +29,7 @@ import { scheduleService } from "../services/schedule.service";
 
 export const MyGroup = () => {
   const { userProfile, role } = useAuth();
+  const { confirm } = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState(null);
@@ -224,9 +226,16 @@ export const MyGroup = () => {
   };
 
   const handleLeaveGroup = async () => {
-    if (!group || !window.confirm("Are you sure you want to leave this research group?")) {
-      return;
-    }
+    if (!group) return;
+    
+    const isConfirmed = await confirm({
+      title: "Leave Group",
+      message: "Are you sure you want to leave this research group?",
+      confirmText: "Leave Group",
+      variant: "danger"
+    });
+    
+    if (!isConfirmed) return;
 
     try {
       if (group.memberIds.length <= 1) {

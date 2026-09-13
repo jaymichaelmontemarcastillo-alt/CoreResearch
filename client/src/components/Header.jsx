@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../hooks/useNotifications";
+import { useConfirm } from "../context/ConfirmContext";
 import { Avatar } from "./ui/Avatar";
 import {
   HiBars3,
@@ -15,6 +16,7 @@ import {
 
 export const Header = ({ onOpenMobileMenu }) => {
   const { userProfile, currentUser, logout } = useAuth();
+  const { confirm } = useConfirm();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -67,8 +69,18 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   const handleLogout = async () => {
     setProfileDropdownOpen(false);
-    await logout();
-    navigate("/login");
+    
+    const isConfirmed = await confirm({
+      title: "Confirm Logout",
+      message: "Are you sure you want to log out of your account?",
+      confirmText: "Log Out",
+      variant: "danger",
+    });
+    
+    if (isConfirmed) {
+      await logout();
+      navigate("/login");
+    }
   };
 
   // Map route to clean real page title
@@ -117,7 +129,7 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   return (
     <header
-      className="sticky top-0 z-20 h-16 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-[#1c1d28]/60 px-6 sm:px-8 lg:px-12 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
+      className="sticky top-0 z-20 h-[76px] pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-12 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
     >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
       <div className="flex items-center gap-3 shrink-0">
