@@ -398,42 +398,42 @@ export const StudentResearchWorkspace = () => {
           </div>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-5">
           {/* Top Hero Card: Research Overview + Overall Progress Circle + Open Manuscript CTA */}
-          <Card className="p-6 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-sm">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <Card padding={false} className="p-4 sm:p-5 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Details (75%) */}
-              <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between space-y-4">
-                <div className="space-y-4">
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
                   {/* Category */}
-                  <div className="text-xs font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider">
-                    {workspace.department || 'Computer Studies'}
+                  <div className="text-[10px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider">
+                    {workspace.department || 'Department of Information Technology'}
                   </div>
 
                   {/* Title */}
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-3">
+                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={workspace.title}>
                     {workspace.title}
                   </h1>
                 </div>
 
                 {/* Metadata */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-6 pt-2">
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6 pt-1">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1">
+                    <span className="text-[9px] text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-0.5">
                       Research Group
                     </span>
-                    <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-sm">
-                      <Users className="w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                    <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-xs sm:text-sm">
+                      <Users className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
                       {workspace.groupName} <span className="text-gray-500 dark:text-[#9396a8] font-normal">({workspace.studentName})</span>
                     </span>
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1">
+                    <span className="text-[9px] text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-0.5">
                       Faculty Adviser
                     </span>
-                    <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-sm">
-                      <UserCheck className="w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                    <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-xs sm:text-sm">
+                      <UserCheck className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
                       {workspace.adviserName || 'Adviser Assignment in Progress'}
                     </span>
                   </div>
@@ -441,31 +441,31 @@ export const StudentResearchWorkspace = () => {
               </div>
 
               {/* Right: Progress Circle & Actions (25%) */}
-              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between items-end w-full">
+              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between items-center lg:items-end w-full">
                 {/* Dynamic Progress Circle */}
-                <div className="flex-1 flex flex-col items-center justify-center lg:items-end w-full lg:pr-8 py-2">
+                <div className="flex-1 flex flex-col items-center justify-center lg:items-end w-full py-1">
                   <ResearchProgressCircle
                     progress={overallProgress}
-                    size={100}
-                    strokeWidth={8}
+                    size={80}
+                    strokeWidth={7}
                     showDetails={false}
                   />
-                  <div className="text-center lg:text-right mt-2">
+                  <div className="text-center lg:text-right mt-1.5">
                     <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 block tracking-wide">
                       {currentFocusArea}
                     </span>
-                    <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
+                    <span className="text-[9px] uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
                       Current Focus Area
                     </span>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full mt-4 lg:mt-0">
+                <div className="flex items-center justify-end gap-2 w-full mt-3 lg:mt-0">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full sm:w-auto text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                    className="text-xs text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 transition-colors py-1 px-3 h-auto"
                     onClick={handleResetWorkspace}
                   >
                     Restart
@@ -474,11 +474,11 @@ export const StudentResearchWorkspace = () => {
                   <Button
                     variant="primary"
                     size="sm"
-                    className="w-full sm:w-auto shadow-sm"
+                    className="text-xs shadow-xs py-1 px-3.5 h-auto"
                     disabled={openingDoc}
                     onClick={handleOpenManuscript}
                   >
-                    <FileEdit className="w-4 h-4 mr-2" />
+                    <FileEdit className="w-3.5 h-3.5 mr-1.5" />
                     {openingDoc ? 'Opening...' : 'Open'}
                   </Button>
                 </div>
@@ -486,146 +486,151 @@ export const StudentResearchWorkspace = () => {
             </div>
           </Card>
 
-          {/* Milestones Tracker */}
-          <Card className="p-5 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433]">
-            <MilestonesTracker milestones={milestones} />
-          </Card>
+          {/* 2-Column Grid: Research Milestones (Left) & Manuscript Chapters (Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch">
+            {/* Left Card: Milestones Tracker */}
+            <Card padding={false} className="p-4 sm:p-5 flex flex-col justify-between bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
+              <MilestonesTracker milestones={milestones} orientation="vertical" />
+            </Card>
 
-          {/* Manuscript Sections Progress Table */}
-          <Card className="p-5 space-y-4 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433]">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">
-                  Manuscript Chapters (Chapters 1–5)
-                </h3>
-                <p className="text-xs text-gray-400 dark:text-[#6b6f84] mt-0.5">
-                  Track individual progress, submit for advisory review, and monitor approvals across all 5 chapters
-                </p>
+            {/* Right Card: Manuscript Sections Progress Table */}
+            <Card padding={false} className="p-4 sm:p-5 flex flex-col justify-between space-y-3 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">
+                    Manuscript Chapters
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-[#6b6f84] mt-0.5">
+                    Track individual progress &amp; approvals (1–5)
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="divide-y divide-gray-100 dark:divide-[#222433]">
-              {(dynamicSections || []).map((sec) => {
-                const isCompleted = sec.status === 'completed';
-                const isSubmitted = sec.status === 'submitted' || sec.status === 'under_review';
-                const isRevision = sec.status === 'revision_required';
-                const isInProgress = sec.status === 'in_progress';
-                const isNotStarted = sec.status === 'not_started' || sec.status === 'pending';
+              <div className="space-y-2 flex-1 flex flex-col justify-between">
+                {(dynamicSections || []).map((sec) => {
+                  const isCompleted = sec.status === 'completed';
+                  const isSubmitted = sec.status === 'submitted' || sec.status === 'under_review';
+                  const isRevision = sec.status === 'revision_required';
+                  const isInProgress = sec.status === 'in_progress';
+                  const isNotStarted = sec.status === 'not_started' || sec.status === 'pending';
 
-                return (
-                  <div
-                    key={sec.id}
-                    className="py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                          {sec.name}
-                        </span>
-                        
-                        <Badge
-                          variant={
-                            isCompleted
-                              ? 'emerald'
+                  return (
+                    <div
+                      key={sec.id}
+                      className="p-2.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1c1d28]/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-gray-200 dark:hover:border-[#2a2d3e] transition"
+                    >
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                            {sec.name}
+                          </span>
+                          
+                          <Badge
+                            variant={
+                              isCompleted
+                                ? 'emerald'
+                                : isSubmitted
+                                ? 'blue'
+                                : isRevision
+                                ? 'rose'
+                                : isInProgress
+                                ? 'amber'
+                                : 'gray'
+                            }
+                            size="sm"
+                            className="text-[9px] py-0 px-1.5"
+                          >
+                            {isCompleted
+                              ? 'Approved'
                               : isSubmitted
-                              ? 'blue'
+                              ? 'Submitted'
                               : isRevision
-                              ? 'rose'
+                              ? 'Revision'
                               : isInProgress
-                              ? 'amber'
-                              : 'gray'
-                          }
-                        >
-                          {isCompleted
-                            ? 'Approved'
-                            : isSubmitted
-                            ? 'Submitted (Under Review)'
-                            : isRevision
-                            ? 'Revision Required'
-                            : isInProgress
-                            ? 'In Progress'
-                            : 'Not Started'}
-                        </Badge>
+                              ? 'In Progress'
+                              : 'Not Started'}
+                          </Badge>
+                        </div>
+
+                        {/* Feedback comment if revision required */}
+                        {sec.feedbackComment && (
+                          <p className="text-[11px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-1.5 rounded border border-rose-200 dark:border-rose-900/50">
+                            <strong>Adviser Notes:</strong> {sec.feedbackComment}
+                          </p>
+                        )}
+
+                        <div className="w-full max-w-[140px] bg-gray-200/80 dark:bg-[#15161e] h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              isCompleted ? 'bg-emerald-500' : 'bg-blue-600'
+                            }`}
+                            style={{
+                              width: `${isCompleted ? 100 : sec.progress || 0}%`,
+                            }}
+                          />
+                        </div>
                       </div>
 
-                      {/* Feedback comment if revision required */}
-                      {sec.feedbackComment && (
-                        <p className="text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-2 rounded border border-rose-200 dark:border-rose-900/50">
-                          <strong>Adviser Notes:</strong> {sec.feedbackComment}
-                        </p>
-                      )}
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isStudent && (
+                          <>
+                            {isNotStarted && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/60 dark:hover:bg-blue-500/15 transition-all shadow-xs gap-1 py-1 px-2.5 h-auto"
+                                onClick={() => handleStartChapter(sec.id, sec.name)}
+                              >
+                                <Play className="w-3 h-3 fill-current" />
+                                Start Working
+                              </Button>
+                            )}
+                            {(isInProgress || isRevision) && (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                className="text-[11px] font-semibold shadow-xs gap-1 py-1 px-2.5 h-auto"
+                                onClick={() => handleSubmitChapter(sec.id, sec.name)}
+                              >
+                                <Send className="w-3 h-3" />
+                                Submit
+                              </Button>
+                            )}
+                            {isSubmitted && (
+                              <span className="text-[10px] text-blue-500 font-medium px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 flex items-center gap-1">
+                                <Clock className="w-3 h-3 animate-pulse" /> Awaiting Review
+                              </span>
+                            )}
+                            {isCompleted && (
+                              <span className="text-[10px] text-emerald-500 font-medium px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Approved
+                              </span>
+                            )}
+                          </>
+                        )}
 
-                      <div className="w-full max-w-xs bg-gray-100 dark:bg-[#1c1d28] h-1.5 rounded-full overflow-hidden border border-transparent dark:border-[#222433]">
-                        <div
-                          className={`h-full transition-all duration-500 ${
-                            isCompleted ? 'bg-emerald-500' : 'bg-blue-600'
-                          }`}
-                          style={{
-                            width: `${isCompleted ? 100 : sec.progress || 0}%`,
-                          }}
-                        />
+                        {/* Adviser / Coordinator override controls */}
+                        {(isAdviser || isCoordinator) && (
+                          <select
+                            className="text-[11px] p-1 rounded-md border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-700 dark:text-[#f3f4f8]"
+                            value={sec.status}
+                            onChange={(e) => handleSectionStatusChange(sec.id, e.target.value)}
+                          >
+                            <option value="not_started">Not Started</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="submitted">Submitted</option>
+                            <option value="revision_required">Revision Required</option>
+                            <option value="completed">Completed / Approved</option>
+                          </select>
+                        )}
                       </div>
                     </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isStudent && (
-                        <>
-                          {isNotStarted && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/60 dark:hover:bg-blue-500/15 transition-all shadow-xs gap-1.5"
-                              onClick={() => handleStartChapter(sec.id, sec.name)}
-                            >
-                              <Play className="w-3.5 h-3.5 fill-current" />
-                              Start Working
-                            </Button>
-                          )}
-                          {(isInProgress || isRevision) && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              className="text-xs font-semibold shadow-xs gap-1.5"
-                              onClick={() => handleSubmitChapter(sec.id, sec.name)}
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              Submit for Review
-                            </Button>
-                          )}
-                          {isSubmitted && (
-                            <span className="text-xs text-blue-500 font-medium px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 animate-pulse" /> Awaiting Adviser Review
-                            </span>
-                          )}
-                          {isCompleted && (
-                            <span className="text-xs text-emerald-500 font-medium px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Approved
-                            </span>
-                          )}
-                        </>
-                      )}
-
-                      {/* Adviser / Coordinator override controls */}
-                      {(isAdviser || isCoordinator) && (
-                        <select
-                          className="text-xs p-1.5 rounded-lg border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-700 dark:text-[#f3f4f8]"
-                          value={sec.status}
-                          onChange={(e) => handleSectionStatusChange(sec.id, e.target.value)}
-                        >
-                          <option value="not_started">Not Started</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="submitted">Submitted</option>
-                          <option value="revision_required">Revision Required</option>
-                          <option value="completed">Completed / Approved</option>
-                        </select>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
 
           {/* Grid Layout: Assigned Research Tasks (Left) & Advisory Feedback (Right) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -409,26 +409,26 @@ export const StudentDashboardView = () => {
   }, [revisions, tasks, groupDocuments, upcomingDeadlines, documentId, studentUid]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       {/* Top Banner: Academic & Research Group Context */}
-      <Card className="p-5 sm:p-6 border-blue-100/70 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/50 via-indigo-50/20 to-transparent dark:from-blue-950/20 dark:via-indigo-950/10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
+      <Card padding={false} className="p-4 sm:p-5 border-blue-100/70 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/50 via-indigo-50/20 to-transparent dark:from-blue-950/20 dark:via-indigo-950/10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+          <div className="space-y-1 min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-xs uppercase font-bold tracking-wider text-blue-700 dark:text-blue-400">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+              <span className="text-[11px] uppercase font-bold tracking-wider text-blue-700 dark:text-blue-400">
                 Active Research Cohort
               </span>
-              <Badge variant="blue" size="sm">
+              <Badge variant="blue" size="sm" className="text-[10px] py-0 px-1.5">
                 {userProfile?.enrollmentStatus || 'Active Student'}
               </Badge>
             </div>
 
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={workspace?.title}>
               {workspace?.title || (group?.name ? `${group.name} Research Cohort` : 'Undergraduate Research')}
             </h2>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-[#9396a8] pt-0.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600 dark:text-[#9396a8] pt-0.5">
               {programInfo.course && (
                 <span>
                   Program: <strong className="text-gray-800 dark:text-gray-200">{programInfo.course.name}</strong>
@@ -448,20 +448,20 @@ export const StudentDashboardView = () => {
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {documentId ? (
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() => navigate(`/documents/${documentId}`)}
-                className="shadow-sm"
+                className="shadow-xs text-xs"
               >
-                <HiDocumentText className="w-4 h-4 mr-1.5" /> Open Manuscript in ONLYOFFICE
+                <HiDocumentText className="w-3.5 h-3.5 mr-1" /> Open Manuscript in ONLYOFFICE
               </Button>
             ) : null}
             <Link to="/research/workspace">
-              <Button variant="outline" size="sm">
-                <HiOutlineBookOpen className="w-4 h-4 mr-1.5" /> Research Workspace
+              <Button variant="outline" size="sm" className="text-xs">
+                <HiOutlineBookOpen className="w-3.5 h-3.5 mr-1" /> Research Workspace
               </Button>
             </Link>
           </div>
@@ -469,7 +469,7 @@ export const StudentDashboardView = () => {
       </Card>
 
       {/* ====== ROW 1: UPCOMING DEADLINES & MANUSCRIPT REVISIONS ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
         {/* Module 1: Upcoming Deadlines */}
         <UpcomingDeadlinesCard
           deadlines={upcomingDeadlines}
@@ -485,29 +485,31 @@ export const StudentDashboardView = () => {
         />
       </div>
 
-      {/* ====== ROW 2: RECENT RESEARCH ACTIVITY (7-DAY BAR CHART) ====== */}
-      <ResearchActivityChart
-        dailyActivity={dailyActivity}
-        loading={loading}
-      />
-
-      {/* ====== ROW 3: GROUP ACTIVITY & RECENT ACTIVITY FEED ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        {/* Module 4: Group Activity */}
-        <GroupActivityCard
-          members={group?.members || []}
-          activityRecords={activityRecords}
-          currentUserId={studentUid}
+      {/* ====== ROW 2: RECENT RESEARCH ACTIVITY & RECENT ACTIVITY FEED ====== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch">
+        {/* Module 3: Recent Research Activity (7-Day Bar Chart) */}
+        <ResearchActivityChart
+          dailyActivity={dailyActivity}
           loading={loading}
         />
 
-        {/* Module 5: Recent Activity Feed */}
+        {/* Module 4: Recent Activity Feed */}
         <StudentRecentActivityFeed
           activities={recentActivities}
           currentUserId={studentUid}
           loading={loading}
         />
       </div>
+
+      {/* ====== ROW 3: GROUP ACTIVITY ====== */}
+      {group?.members && group.members.length > 0 && (
+        <GroupActivityCard
+          members={group.members}
+          activityRecords={activityRecords}
+          currentUserId={studentUid}
+          loading={loading}
+        />
+      )}
     </div>
   );
 };

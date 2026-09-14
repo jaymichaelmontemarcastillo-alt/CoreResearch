@@ -10,7 +10,7 @@ export const Card = ({
 }) => {
   return (
     <div
-      className={`bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/90 dark:border-[#222433] ${padding ? "p-5 sm:p-6" : ""} ${hover ? "transition-all duration-200 hover:border-gray-300 dark:hover:border-[#333649] cursor-pointer" : ""} ${className}`}
+      className={`bg-white dark:bg-[#15161e] rounded-xl border border-gray-200/90 dark:border-[#222433] ${padding ? "p-4 sm:p-5" : ""} ${hover ? "transition-all duration-200 hover:border-gray-300 dark:hover:border-[#333649] cursor-pointer" : ""} ${className}`}
       {...props}
     >
       {children}

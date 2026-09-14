@@ -47,17 +47,22 @@ export const MilestonesTracker = ({ milestones = [], orientation = 'horizontal' 
   // Vertical list layout for narrow sidebar columns
   if (orientation === 'vertical') {
     return (
-      <div className="space-y-3 min-w-0">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Research Milestones
-          </h3>
+      <div className="space-y-3 min-w-0 flex flex-col h-full">
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
+          <div>
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Research Milestones
+            </h3>
+            <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-[#6b6f84] mt-0.5">
+              Deliverable milestones across stages
+            </p>
+          </div>
           <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
             {completedCount} of {totalMilestones} Reached
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 flex-1 flex flex-col justify-between">
           {milestones.map((m, idx) => {
             const isCompleted = m.completed || m.status === 'completed';
             const isActive = m.active && !isCompleted;

@@ -162,25 +162,25 @@ export const Dashboard = () => {
   }, [role, userProfile?.uid, userProfile?.courseId, userProfile?.sectionId, currentUser?.uid]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       {toastMessage && (
         <Toast message={toastMessage} variant="success" onClose={() => setToastMessage("")} />
       )}
 
       {/* Page Header / Welcome Hero Section */}
-      <div className="px-6 py-8 sm:px-8 sm:py-9 lg:px-10 lg:py-10 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all shadow-sm">
-        <div className="space-y-1.5">
+      <div className="px-5 py-4 sm:px-6 sm:py-5 rounded-xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all shadow-xs">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
               {getGreeting()}, {displayName}
             </h1>
           </div>
           {role === 'faculty' && (
-            <div className="flex items-center gap-2 mt-2.5 bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-xl w-max border border-transparent dark:border-[#222433]">
+            <div className="flex items-center gap-2 mt-2 bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-lg w-max border border-transparent dark:border-[#222433]">
               <button
                 onClick={() => setFacultyMode('adviser')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${currentFacultyMode === 'adviser'
-                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200 dark:border-[#222433]'
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${currentFacultyMode === 'adviser'
+                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
                     : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
                   }`}
               >
@@ -188,8 +188,8 @@ export const Dashboard = () => {
               </button>
               <button
                 onClick={() => setFacultyMode('panelist')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${currentFacultyMode === 'panelist'
-                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-sm border border-gray-200 dark:border-[#222433]'
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${currentFacultyMode === 'panelist'
+                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
                     : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
                   }`}
               >
@@ -197,21 +197,21 @@ export const Dashboard = () => {
               </button>
             </div>
           )}
-          <p className="text-gray-500 dark:text-[#9396a8] text-sm sm:text-base max-w-2xl leading-relaxed mt-1">
+          <p className="text-gray-500 dark:text-[#9396a8] text-xs sm:text-sm max-w-2xl leading-relaxed">
             Active under <span className="font-semibold text-gray-800 dark:text-white">{userProfile?.department || "Computer Studies"}</span>. Proposals, manuscripts, defense rubrics, and archiving.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {effectiveRole === "student" && (
             <>
               <Link to="/research/workspace">
-                <Button variant="secondary" size="md">
+                <Button variant="secondary" size="sm">
                   Research Workspace
                 </Button>
               </Link>
               <Link to="/submit-title">
-                <Button variant="primary" size="md">
+                <Button variant="primary" size="sm">
                   Submit Title
                 </Button>
               </Link>
@@ -219,21 +219,21 @@ export const Dashboard = () => {
           )}
           {effectiveRole === "adviser" && (
             <Link to="/advisees">
-              <Button variant="primary" size="md">
+              <Button variant="primary" size="sm">
                 My Advisees
               </Button>
             </Link>
           )}
           {effectiveRole === "panelist" && (
             <Link to="/panelist/defendees">
-              <Button variant="primary" size="md">
+              <Button variant="primary" size="sm">
                 Panel Defendees
               </Button>
             </Link>
           )}
           {effectiveRole === "admin" && (
             <Link to="/admin/users">
-              <Button variant="primary" size="md">
+              <Button variant="primary" size="sm">
                 Manage Users
               </Button>
             </Link>
