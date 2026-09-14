@@ -282,3 +282,59 @@ export const matchAdvisers = async (req, res) => {
     });
   }
 };
+
+import { documentAnalysisService } from '../services/DocumentAnalysisService.js';
+
+/**
+ * POST /api/adviser-matching/extract-document
+ * 
+ * Receives a student's research document upload, dynamically parses it,
+ * extracts text, and uses NLP to determine the Title, Abstract, etc.
+ * 
+ * Does NOT store the document permanently. Used strictly for auto-filling
+ * the student research title submission form.
+ */
+export const extractDocument = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No document uploaded.' });
+    }
+
+    const { buffer, mimetype, size, originalname } = req.file;
+
+    if (size > 10 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'File size exceeds the 10MB limit.' });
+    }
+
+    console.log(`[AdviserMatching] Extracting document: ${originalname} (${mimetype})`);
+
+    // 1. Extract text
+    const extractedText = await documentAnalysisService.extractText(buffer, mimetype);
+    const textToProcess = extractedText.substring(0, 30000);
+
+    // 2. Run NLP Analysis
+    const nlpData = await documentAnalysisService.analyzeDocument(textToProcess);
+
+    // If title wasn't found by AI, fallback to filename without extension
+    if (!nlpData.title) {
+      nlpData.title = originalname.replace(/\.[^/.]+$/, '');
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        title: nlpData.title,
+        abstract: nlpData.abstract,
+        keywords: nlpData.keywords,
+        researchTopics: nlpData.researchTopics,
+        researchDomain: nlpData.researchDomain
+      }
+    });
+  } catch (error) {
+    console.error('[AdviserMatching] Document extraction error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to extract document content.'
+    });
+  }
+};

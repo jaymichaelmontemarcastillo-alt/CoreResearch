@@ -96,6 +96,26 @@ class AdviserMatchingService {
       throw new Error('Failed to generate adviser recommendations.');
     }
   }
+
+  async extractDocument(file: File): Promise<{ title: string; abstract: string; keywords: string[] }> {
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+
+      const response = await api.post('/adviser-matching/extract-document', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data?.message || 'Failed to extract document content.');
+      }
+      throw new Error('Unable to reach the service. Please check your connection and try again.');
+    }
+  }
 }
 
 export const adviserMatchingService = new AdviserMatchingService();

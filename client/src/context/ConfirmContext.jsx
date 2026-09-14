@@ -19,6 +19,7 @@ export const ConfirmProvider = ({ children }) => {
     confirmText: 'Confirm',
     cancelText: 'Cancel',
     variant: 'danger',
+    content: null,
   });
   
   const [resolveFn, setResolveFn] = useState(null);
@@ -32,6 +33,7 @@ export const ConfirmProvider = ({ children }) => {
         confirmText: options.confirmText || 'Confirm',
         cancelText: options.cancelText || 'Cancel',
         variant: options.variant || 'danger',
+        content: options.content || null,
       });
       setResolveFn(() => resolve);
     });
@@ -64,6 +66,7 @@ export const ConfirmProvider = ({ children }) => {
         confirmText={modalState.confirmText}
         cancelText={modalState.cancelText}
         variant={modalState.variant}
+        content={modalState.content}
       />
     </ConfirmContext.Provider>
   );

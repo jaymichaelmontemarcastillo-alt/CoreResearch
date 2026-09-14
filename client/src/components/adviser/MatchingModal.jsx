@@ -21,6 +21,7 @@ import adviserRequestService from '../../services/adviserRequest.service';
 import groupService from '../../services/group.service';
 import { courseService } from '../../services/course.service';
 import { sectionService } from '../../services/section.service';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const LOADING_MESSAGES = [
   'Analyzing your research title...',
@@ -40,12 +41,14 @@ export const MatchingModal = ({
   onSuccess,
 }) => {
   const navigate = useNavigate();
+  const { confirm } = useConfirm();
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [matches, setMatches] = useState([]);
   const [serviceError, setServiceError] = useState(null);
   const [submittingId, setSubmittingId] = useState(null);
   const [pendingRequest, setPendingRequest] = useState(null);
+  const [declinedRequest, setDeclinedRequest] = useState(null);
   const [toast, setToast] = useState('');
   const loadingIntervalRef = useRef(null);
 
@@ -64,7 +67,50 @@ export const MatchingModal = ({
         loadingIntervalRef.current = null;
       }
     };
-  }, [isOpen, loading, pendingRequest]);
+  }, [isOpen, loading, pendingRequest, declinedRequest]);
+
+  // Real-time listener for student requests
+  useEffect(() => {
+    let unsubscribe = null;
+    let isMounted = true;
+
+    const setupListener = async () => {
+      if (!isOpen || !currentUser) return;
+      
+      const group = await groupService.getGroupByStudentId(currentUser.uid);
+      unsubscribe = adviserRequestService.subscribeToStudentRequests(
+        currentUser.uid,
+        (requests) => {
+          if (!isMounted) return;
+          const active = requests.find((r) => r.status === 'pending');
+          const accepted = requests.find((r) => r.status === 'accepted');
+          const declined = requests.find((r) => r.status === 'declined');
+
+          if (accepted) {
+            onClose();
+            navigate('/research/workspace');
+          } else if (declined) {
+            setDeclinedRequest(declined);
+            setPendingRequest(null);
+          } else if (active) {
+            setPendingRequest(active);
+            setDeclinedRequest(null);
+          } else {
+            setPendingRequest(null);
+            setDeclinedRequest(null);
+          }
+        },
+        group?.id
+      );
+    };
+
+    setupListener();
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isOpen, currentUser, navigate, onClose]);
 
   // Execute matching when modal opens
   const runMatching = async () => {
@@ -72,27 +118,6 @@ export const MatchingModal = ({
     setLoading(true);
     setServiceError(null);
     try {
-      // Check if student already has a pending or accepted request
-      const group = await groupService.getGroupByStudentId(currentUser.uid);
-      const requests = await adviserRequestService.getRequestsForStudentOrGroup(
-        currentUser.uid,
-        group?.id
-      );
-      const active = requests.find((r) => r.status === 'pending');
-      const accepted = requests.find((r) => r.status === 'accepted');
-
-      if (accepted) {
-        onClose();
-        navigate('/research/workspace');
-        return;
-      }
-
-      if (active) {
-        setPendingRequest(active);
-        setLoading(false);
-        return;
-      }
-
       const recommendations = await adviserMatchingService.getRecommendations(
         title,
         description || ''
@@ -111,16 +136,67 @@ export const MatchingModal = ({
       runMatching();
     } else {
       setMatches([]);
-      setPendingRequest(null);
-      setServiceError(null);
     }
   }, [isOpen, title, description]);
 
   const handleSelectAdviser = async (adviser) => {
-    const confirm = window.confirm(
-      `Are you sure you want to select ${adviser.adviserName} as your preferred adviser?`
-    );
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: 'Select Adviser',
+      message: `Are you sure you want to select this adviser as your preferred faculty mentor?`,
+      content: (
+        <div className="p-4 rounded-xl border border-gray-200 dark:border-[#222433] bg-gray-50 dark:bg-slate-800/50 flex flex-col items-center gap-3 mt-2">
+          {/* Profile Picture */}
+          <div className="relative shrink-0">
+            {adviser.profile_image ? (
+              <img
+                src={adviser.profile_image}
+                alt={adviser.adviserName}
+                className="w-16 h-16 rounded-full object-cover border-2 border-white dark:border-[#15161e] shadow-sm"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-lg flex items-center justify-center shadow-sm">
+                {adviser.adviserName
+                  ?.split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || 'AD'}
+              </div>
+            )}
+            <Badge variant="primary" size="sm" className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap shadow-sm border border-white dark:border-[#15161e]">
+              {adviser.compatibilityScore || adviser.score || 0}% Match
+            </Badge>
+          </div>
+
+          <div className="text-center space-y-1 mt-2">
+            <h4 className="text-base font-bold text-gray-900 dark:text-white">
+              {adviser.adviserName}
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {adviser.department || 'Faculty Adviser'}
+            </p>
+          </div>
+
+          {/* Matched Keywords */}
+          {adviser.matchedKeywords && adviser.matchedKeywords.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-1.5 pt-2">
+              {adviser.matchedKeywords.slice(0, 5).map((kw, ki) => (
+                <span
+                  key={ki}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-blue-100/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40"
+                >
+                  <HiTag className="w-3 h-3" />
+                  {kw}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      ),
+      confirmText: 'Select Adviser',
+      variant: 'primary'
+    });
+    if (!isConfirmed) return;
 
     setSubmittingId(adviser.adviserId);
     try {
@@ -173,10 +249,13 @@ export const MatchingModal = ({
 
   const handleCancelRequest = async () => {
     if (!pendingRequest) return;
-    const confirm = window.confirm(
-      'Are you sure you want to cancel this request and select another adviser?'
-    );
-    if (!confirm) return;
+    const isConfirmed = await confirm({
+      title: 'Cancel Request',
+      message: 'Are you sure you want to cancel this request and select another adviser?',
+      confirmText: 'Cancel Request',
+      variant: 'danger'
+    });
+    if (!isConfirmed) return;
 
     setLoading(true);
     try {
@@ -195,8 +274,8 @@ export const MatchingModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Faculty Adviser Matching"
-      icon={HiSparkles}
-      maxWidth="max-w-3xl"
+      maxWidth="max-w-4xl"
+      noHeaderBorder={true}
     >
       <div className="space-y-4">
         {toast && (
@@ -209,16 +288,17 @@ export const MatchingModal = ({
 
         {/* Loading Animation */}
         {loading && (
-          <div className="py-16 flex flex-col items-center justify-center gap-5 text-center">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full border-4 border-blue-200 dark:border-blue-900/40 border-t-blue-600 dark:border-t-blue-400 animate-spin" />
-              <HiSparkles className="w-6 h-6 text-blue-600 dark:text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          <div className="py-24 flex flex-col items-center justify-center gap-6 text-center h-[60vh]">
+            <div className="relative flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full border-2 border-purple-100 dark:border-purple-900/20 border-t-purple-500 dark:border-t-purple-400 animate-spin" />
+              <div className="absolute inset-0 bg-purple-500/10 dark:bg-purple-400/10 rounded-full animate-pulse" />
+              <HiSparkles className="w-7 h-7 text-purple-500 dark:text-purple-400 absolute" />
             </div>
-            <div>
-              <p className="text-base font-semibold text-gray-800 dark:text-gray-200 animate-pulse">
+            <div className="space-y-2">
+              <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 animate-pulse">
                 {loadingMessage}
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Comparing research profile keywords with faculty expertise
               </p>
             </div>
@@ -298,8 +378,42 @@ export const MatchingModal = ({
           </div>
         )}
 
+        {/* Declined Request State */}
+        {!loading && !serviceError && declinedRequest && (
+          <div className="p-6 text-center space-y-5 rounded-2xl bg-red-50/70 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 flex items-center justify-center mx-auto">
+              <HiExclamationCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Adviser Request Declined
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-md mx-auto">
+                <strong className="text-gray-900 dark:text-white">
+                  {declinedRequest.adviserName}
+                </strong>{' '}
+                has declined your request. You may now pick another adviser.
+              </p>
+            </div>
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={async () => {
+                  setLoading(true);
+                  await adviserRequestService.deleteRequest(declinedRequest.id);
+                  setDeclinedRequest(null);
+                  await runMatching();
+                }}
+              >
+                Find Another Adviser
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Results List */}
-        {!loading && !serviceError && !pendingRequest && (
+        {!loading && !serviceError && !pendingRequest && !declinedRequest && (
           <div className="space-y-4">
             <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
               <HiSparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />

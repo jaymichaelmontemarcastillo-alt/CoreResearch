@@ -7,11 +7,18 @@
  */
 
 import express from 'express';
-import { matchAdvisers } from '../controllers/adviserMatchingController.js';
+import multer from 'multer';
+import { matchAdvisers, extractDocument } from '../controllers/adviserMatchingController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 import adviserMatchingService from '../services/adviserMatchingService.js';
 
 const router = express.Router();
+
+// Memory storage for temporary document extraction
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Extract metadata from a student's uploaded document
+router.post('/extract-document', verifyToken, requireRole(['student']), upload.single('document'), extractDocument);
 
 // Run adviser matching — requires authenticated student
 router.post('/match', verifyToken, requireRole(['student']), matchAdvisers);

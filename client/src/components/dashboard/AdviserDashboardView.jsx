@@ -504,7 +504,7 @@ export const AdviserDashboardView = () => {
           {/* 2. ACTION REQUIRED SECTION */}
           {/* -------------------------------------------------- */}
           <Card className="p-5 sm:p-6 border-l-4 border-l-amber-500 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
+            <div className="flex items-center justify-between pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                   <HiSparkles className="w-5 h-5" />
@@ -601,7 +601,7 @@ export const AdviserDashboardView = () => {
                           size="sm"
                           disabled={actionLoading === req.id}
                           onClick={() => handleDeclineRequest(req.id)}
-                          className="w-full sm:w-28 text-xs font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400"
+                          className="w-full sm:w-28 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white border-transparent"
                         >
                           Decline
                         </Button>
@@ -722,7 +722,7 @@ export const AdviserDashboardView = () => {
           {/* 3. RESEARCH PROGRESS OVERVIEW */}
           {/* -------------------------------------------------- */}
           <Card className="p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
+            <div className="flex items-center justify-between pb-3">
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <HiClipboardDocumentList className="w-5 h-5 text-blue-600 dark:text-blue-400" />

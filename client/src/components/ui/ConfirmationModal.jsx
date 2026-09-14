@@ -12,6 +12,7 @@ export const ConfirmationModal = ({
   confirmText = "Confirm",
   cancelText = "Cancel",
   variant = "danger", // 'danger', 'warning', 'info', 'success', 'primary'
+  content = null,
 }) => {
   const getIcon = () => {
     switch (variant) {
@@ -68,9 +69,16 @@ export const ConfirmationModal = ({
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 whitespace-pre-line">
           {title}
         </h3>
-        <p className="text-sm text-gray-500 dark:text-[#9396a8] mb-6 whitespace-pre-line">
-          {message}
-        </p>
+        {message && (
+          <p className="text-sm text-gray-500 dark:text-[#9396a8] mb-6 whitespace-pre-line">
+            {message}
+          </p>
+        )}
+        {content && (
+          <div className="w-full mb-6 text-left">
+            {content}
+          </div>
+        )}
         <div className="flex items-center justify-center gap-3 w-full">
           <Button variant="outline" onClick={onClose} className="w-full">
             {cancelText}
