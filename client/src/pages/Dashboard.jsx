@@ -40,6 +40,7 @@ import { userService } from "../services/user.service";
 import { AdminAnalyticsSection } from "../components/admin/analytics/AdminAnalyticsSection";
 import { systemActivityService } from "../services/systemActivity.service";
 import { AdviserDashboardView } from "../components/dashboard/AdviserDashboardView";
+import { StudentDashboardView } from "../components/dashboard/StudentDashboardView";
 
 /* Shared helper — converts a date string/object to a relative time string */
 const formatRelativeTime = (dateStr) => {
@@ -243,10 +244,11 @@ export const Dashboard = () => {
       {/* Role-Specific Dashboard Content */}
       {effectiveRole === "adviser" ? (
         <AdviserDashboardView />
+      ) : effectiveRole === "student" || (!effectiveRole && role !== 'admin' && role !== 'faculty') ? (
+        <StudentDashboardView />
       ) : (
         <>
           {/* Metric Cards Row */}
-          {effectiveRole === "student" && <StudentDashboardMetrics research={studentResearch} userProfile={userProfile} />}
           {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
           {effectiveRole === "admin" && <AdminAnalyticsSection />}
 
@@ -541,40 +543,7 @@ export const Dashboard = () => {
 );
 };
 
-/* Student Metrics - REMOVED Proposal Status ONLY */
-const StudentDashboardMetrics = ({ research, userProfile }) => {
-  const manuscriptProgress = research?.workspace?.overallProgress
-    ? `${research.workspace.overallProgress}%`
-    : (research?.documents?.length || 0) > 0
-      ? `${research.documents.length} Drafts`
-      : '0%';
 
-  const adviserStatus = research?.workspace?.adviserName || 'In Matching';
-  const departmentStatus = userProfile?.department || 'Computer Studies';
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-      <StatCard
-        label="Manuscript Progress"
-        value={manuscriptProgress}
-        trend="Overall Completion"
-        trendType="neutral"
-      />
-      <StatCard
-        label="Faculty Adviser"
-        value={adviserStatus}
-        trend="Assigned Mentor"
-        trendType={research?.workspace?.adviserName ? 'positive' : 'neutral'}
-      />
-      <StatCard
-        label="Academic Unit"
-        value={departmentStatus}
-        trend="Active Term"
-        trendType="positive"
-      />
-    </div>
-  );
-};
 
 /* Adviser Metrics */
 const AdviserDashboardMetrics = () => {

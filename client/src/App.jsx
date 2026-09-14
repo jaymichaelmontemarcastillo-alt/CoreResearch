@@ -38,6 +38,7 @@ import { Panelists } from './pages/Panelists';
 import { Notifications } from './pages/Notifications';
 import { AdvisersList } from './pages/AdvisersList';
 import { ResearchDocumentsPage } from './pages/ResearchDocumentsPage';
+import { AdminMasterCalendar } from './pages/AdminMasterCalendar';
 
 export default function App() {
   return (
@@ -93,8 +94,9 @@ export default function App() {
                   {/* Reviews */}
                   <Route path="/reviews" element={<Reviews />} />
 
-                  {/* Schedules */}
+                  {/* Schedules & Master Calendar */}
                   <Route path="/schedules" element={<Schedules />} />
+                  <Route path="/calendar" element={<AdminMasterCalendar />} />
 
                   {/* Repository */}
                   <Route path="/repository" element={<Repository />} />
@@ -114,6 +116,8 @@ export default function App() {
                     <Route path="/admin/users" element={<UserDirectory />} />
                     <Route path="/admin/courses" element={<Courses />} />
                     <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
+                    <Route path="/admin/calendar" element={<AdminMasterCalendar />} />
+                    <Route path="/admin/master-calendar" element={<AdminMasterCalendar />} />
                   </Route>
                 </Route>
               </Route>

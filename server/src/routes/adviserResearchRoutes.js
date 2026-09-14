@@ -1,9 +1,20 @@
 import express from 'express';
 import multer from 'multer';
-import { uploadDocument, getMyDocuments, deleteDocument, reprocessDocument } from '../controllers/adviserResearchController.js';
+import { 
+  uploadDocument, 
+  getMyDocuments, 
+  getAllDocuments,
+  getAdviserDocuments,
+  deleteDocument, 
+  reprocessDocument 
+} from '../controllers/adviserResearchController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Read routes for published research works (available for directory & repository)
+router.get('/all', getAllDocuments);
+router.get('/adviser/:adviserId', getAdviserDocuments);
 
 // Configure multer for memory storage
 const upload = multer({
@@ -25,7 +36,7 @@ const upload = multer({
   }
 });
 
-// All routes require authentication
+// Protected routes (adviser management)
 router.use(verifyToken);
 
 router.post('/upload', upload.single('file'), uploadDocument);

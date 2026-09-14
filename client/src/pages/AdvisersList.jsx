@@ -57,17 +57,89 @@ export const AdvisersList = () => {
 
         setPublications(repoPubs);
 
+        // 3. Fetch uploaded & indexed adviser research documents
+        let adviserDocs = [];
+        try {
+          const advRes = await api.get('/adviser-research/all');
+          if (advRes.data?.data) {
+            adviserDocs = advRes.data.data;
+          }
+        } catch (e) {
+          console.warn('[AdvisersList] Could not fetch adviser research docs:', e);
+        }
+
         // Map publications to advisers if they match adviserName or adviserId or user.publishedWorks
         const enriched = adviserUsers.map((adv) => {
           const nameMatch = adv.fullName || `${adv.first_name} ${adv.last_name}`.trim();
+
+          // Map documents uploaded by this adviser in /research-documents
+          const advUploadedDocs = adviserDocs
+            .filter((doc) => {
+              const matchesId = doc.adviserId && (doc.adviserId === adv.uid || doc.adviserId === adv.id);
+              const matchesEmail = doc.adviserEmail && adv.email && doc.adviserEmail.toLowerCase() === adv.email.toLowerCase();
+              const matchesName = doc.adviserName && nameMatch && doc.adviserName.toLowerCase().includes(nameMatch.toLowerCase());
+              return matchesId || matchesEmail || matchesName;
+            })
+            .map((doc) => {
+              const docTitle = doc.title || doc.originalFilename?.replace(/\.[^/.]+$/, '') || 'Research Publication';
+              const highlights = [];
+              if (doc.researchProblem) {
+                highlights.push({ label: 'Research Problem', text: doc.researchProblem });
+              }
+              if (doc.methodologies && doc.methodologies.length > 0) {
+                highlights.push({ 
+                  label: 'Methodology & Framework', 
+                  text: Array.isArray(doc.methodologies) ? doc.methodologies.join(', ') : String(doc.methodologies) 
+                });
+              }
+              if (doc.researchConcepts && doc.researchConcepts.length > 0) {
+                highlights.push({ 
+                  label: 'Core Concepts', 
+                  text: Array.isArray(doc.researchConcepts) ? doc.researchConcepts.join(', ') : String(doc.researchConcepts) 
+                });
+              }
+              if (doc.researchDomain) {
+                highlights.push({ label: 'Research Domain', text: doc.researchDomain });
+              }
+
+              const allKeywords = Array.from(new Set([
+                ...(Array.isArray(doc.keywords) ? doc.keywords : (doc.keywords ? String(doc.keywords).split(' ') : [])),
+                ...(Array.isArray(doc.researchConcepts) ? doc.researchConcepts : []),
+                ...(Array.isArray(doc.researchTopics) ? doc.researchTopics : []),
+                ...(Array.isArray(doc.methodologies) ? doc.methodologies : [])
+              ])).filter(Boolean);
+
+              const pubYear = doc.created_at ? new Date(doc.created_at).getFullYear() : new Date().getFullYear();
+
+              return {
+                id: doc.id || doc._id,
+                title: docTitle,
+                abstract: doc.abstract || 'No abstract preview available.',
+                abstractHighlights: highlights.length > 0 ? highlights : undefined,
+                authors: [nameMatch || 'Faculty Author'],
+                adviserName: nameMatch,
+                adviserId: doc.adviserId || adv.uid,
+                department: adv.department || 'Computer Studies',
+                college: adv.college || '',
+                publicationYear: pubYear,
+                keywords: allKeywords,
+                fileUrl: doc.fileUrl,
+                pdfUrl: doc.fileUrl,
+                originalFilename: doc.originalFilename,
+                isUploadedResearch: true,
+                processingStatus: doc.processingStatus,
+              };
+            });
+
           const advPubs = [
+            ...advUploadedDocs,
             ...(adv.publishedWorks || []),
             ...repoPubs.filter(
               (p) =>
                 (p.adviserName &&
                   nameMatch &&
                   p.adviserName.toLowerCase().includes(nameMatch.toLowerCase())) ||
-                (p.adviserId && p.adviserId === adv.uid) ||
+                (p.adviserId && (p.adviserId === adv.uid || p.adviserId === adv.id)) ||
                 (Array.isArray(p.authors) &&
                   p.authors.some(
                     (a) => nameMatch && a.toLowerCase().includes(nameMatch.toLowerCase())
@@ -79,20 +151,22 @@ export const AdvisersList = () => {
           const uniquePubs = [];
           const seen = new Set();
           advPubs.forEach((p) => {
-            const key = p.id || p.title;
+            const key = p.id || p.title?.toLowerCase()?.trim();
             if (!seen.has(key)) {
               seen.add(key);
               uniquePubs.push(p);
             }
           });
 
-          // Compile all expertise tags
+          // Compile all expertise tags (combining profile specializations + concepts from published works)
+          const docKeywords = advUploadedDocs.flatMap((d) => d.keywords || []);
           const allExpertise = Array.from(
             new Set([
               ...(adv.selectedExpertise || []),
               ...(adv.expertise || []),
               ...(adv.specialization || []),
               ...(adv.researchInterests || []),
+              ...docKeywords,
             ])
           ).filter(Boolean);
 
@@ -403,6 +477,11 @@ export const AdvisersList = () => {
                           <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                             {Array.isArray(pub.authors) ? pub.authors.join(', ') : pub.authors}
                           </span>
+                          {pub.isUploadedResearch && (
+                            <Badge variant="blue" size="sm" className="text-[10px] py-0 px-1.5 ml-1 font-semibold">
+                              Verified Paper
+                            </Badge>
+                          )}
                         </div>
                         <h5 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
                           {pub.title}
@@ -410,6 +489,23 @@ export const AdvisersList = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                           {pub.abstract}
                         </p>
+                        {pub.keywords && pub.keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {pub.keywords.slice(0, 3).map((kw, ki) => (
+                              <span
+                                key={ki}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-900/30"
+                              >
+                                #{kw}
+                              </span>
+                            ))}
+                            {pub.keywords.length > 3 && (
+                              <span className="text-[10px] text-gray-400 self-center">
+                                +{pub.keywords.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <Button

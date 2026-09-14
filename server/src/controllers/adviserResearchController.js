@@ -56,6 +56,55 @@ export const getMyDocuments = async (req, res) => {
 };
 
 /**
+ * Get all published/uploaded research documents (for repository & adviser profile listings)
+ */
+export const getAllDocuments = async (req, res) => {
+  try {
+    const { adviserId } = req.query;
+    const filter = {};
+    if (adviserId) {
+      filter.adviserId = adviserId;
+    }
+
+    const docs = await AdviserResearchDocument.find(filter)
+      .select('-extractedText -embedding')
+      .sort({ created_at: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: docs.length,
+      data: docs
+    });
+  } catch (error) {
+    console.error('[AdviserResearchController] getAllDocuments error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get research documents for a specific adviser
+ */
+export const getAdviserDocuments = async (req, res) => {
+  try {
+    const { adviserId } = req.params;
+    const docs = await AdviserResearchDocument.find({ adviserId })
+      .select('-extractedText -embedding')
+      .sort({ created_at: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: docs.length,
+      data: docs
+    });
+  } catch (error) {
+    console.error('[AdviserResearchController] getAdviserDocuments error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * Delete a research document
  */
 export const deleteDocument = async (req, res) => {

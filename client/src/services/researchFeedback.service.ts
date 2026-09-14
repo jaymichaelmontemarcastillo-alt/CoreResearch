@@ -116,6 +116,19 @@ export const researchFeedbackService = {
     const docRef = doc(db, COLLECTION_NAME, feedbackId);
     await deleteDoc(docRef);
   },
+
+  /**
+   * Fetch all feedback entries across all workspaces (for Admin Master Calendar)
+   */
+  async getAllFeedback(): Promise<ResearchFeedback[]> {
+    try {
+      const snap = await getDocs(collection(db, COLLECTION_NAME));
+      return snap.docs.map((d) => d.data() as ResearchFeedback);
+    } catch (err) {
+      console.warn('[researchFeedbackService] getAllFeedback error:', err);
+      return [];
+    }
+  },
 };
 
 export default researchFeedbackService;

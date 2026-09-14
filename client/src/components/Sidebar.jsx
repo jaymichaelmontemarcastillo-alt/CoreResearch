@@ -203,6 +203,12 @@ export const Sidebar = ({
       category: "ACADEMIC",
       items: [
         {
+          label: "Calendar",
+          path: "/calendar",
+          icon: HiCalendarDays,
+          roles: ["student", "adviser", "panelist", "faculty"],
+        },
+        {
           label: "Schedule",
           path: "/schedules",
           icon: HiCalendarDays,
@@ -238,6 +244,12 @@ export const Sidebar = ({
           roles: ["admin", "research_coordinator"],
         },
         {
+          label: "Master Calendar",
+          path: "/admin/calendar",
+          icon: HiCalendarDays,
+          roles: ["admin"],
+        },
+        {
           label: "Scheduling",
           path: "/admin/scheduling",
           icon: HiCalendarDays,
@@ -258,6 +270,8 @@ export const Sidebar = ({
     if (path === "/proposals") return currentPath.startsWith("/proposals");
     if (path === "/admin/users") return currentPath.startsWith("/admin/users");
     if (path === "/admin/courses") return currentPath.startsWith("/admin/courses");
+    if (path === "/admin/calendar") return currentPath.startsWith("/admin/calendar") || currentPath.startsWith("/admin/master-calendar");
+    if (path === "/calendar") return currentPath === "/calendar";
     return currentPath === path;
   };
 

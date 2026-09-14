@@ -72,6 +72,8 @@ export const PublicationDetailModal = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const documentUrl = publication.pdfUrl || publication.fileUrl;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -237,12 +239,12 @@ export const PublicationDetailModal = ({
                   <p key={idx}>{paragraph}</p>
                 ))}
               </div>
-            ) : publication.pdfUrl ? (
+            ) : documentUrl ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-300">
                   <span>Interactive Document Reader for <strong>{publication.title}</strong></span>
                   <a
-                    href={publication.pdfUrl}
+                    href={documentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline"
@@ -253,7 +255,7 @@ export const PublicationDetailModal = ({
 
                 <div className="w-full h-[55vh] rounded-xl overflow-hidden border border-gray-200 dark:border-[#222433] bg-gray-100 dark:bg-[#0e0f15]">
                   <iframe
-                    src={publication.pdfUrl}
+                    src={documentUrl}
                     title={publication.title}
                     className="w-full h-full"
                   />
@@ -296,8 +298,8 @@ export const PublicationDetailModal = ({
               )}
             </Button>
 
-            {publication.pdfUrl && (
-              <a href={publication.pdfUrl} target="_blank" rel="noopener noreferrer">
+            {documentUrl && (
+              <a href={documentUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="primary" size="sm">
                   <HiArrowDownTray className="w-4 h-4 mr-1.5" /> Download PDF
                 </Button>

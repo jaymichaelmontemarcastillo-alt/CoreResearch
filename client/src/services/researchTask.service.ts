@@ -177,6 +177,19 @@ export const researchTaskService = {
     const docRef = doc(db, COLLECTION_NAME, taskId);
     await deleteDoc(docRef);
   },
+
+  /**
+   * Fetch all tasks across all workspaces (for Admin Master Calendar)
+   */
+  async getAllTasks(): Promise<ResearchTask[]> {
+    try {
+      const snap = await getDocs(collection(db, COLLECTION_NAME));
+      return snap.docs.map((d) => d.data() as ResearchTask);
+    } catch (err) {
+      console.warn('[researchTaskService] getAllTasks error:', err);
+      return [];
+    }
+  },
 };
 
 export default researchTaskService;
