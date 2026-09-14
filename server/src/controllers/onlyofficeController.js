@@ -102,7 +102,7 @@ export const generateConfig = async (req, res) => {
           id: user.uid,
           name: user.fullName
         },
-        mode: isAdviserOrPanelist ? 'view' : 'edit',
+        mode: 'edit',
         customization: {
           compactHeader: false,
           toolbarNoTabs: false,
