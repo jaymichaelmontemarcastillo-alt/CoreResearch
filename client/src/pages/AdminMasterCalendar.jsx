@@ -343,47 +343,24 @@ export const MasterCalendar = () => {
       {/* ========================================================= */}
       {/* 1. PAGE HEADER                                           */}
       {/* ========================================================= */}
-      <div className="px-6 py-6 sm:px-8 sm:py-7 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
-              <HiCalendarDays className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                  {pageTitle}
-                </h1>
-                {effectiveRole === "student" && groupInfo && (
-                  <Badge variant="blue" size="sm" className="hidden sm:inline-flex">
-                    {groupInfo.name}
-                  </Badge>
-                )}
-                {effectiveRole === "panelist" && (
-                  <Badge variant="purple" size="sm" className="hidden sm:inline-flex">
-                    Panelist View
-                  </Badge>
-                )}
-              </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-[#9396a8] mt-0.5">
-                {pageSubtitle}
-              </p>
-            </div>
-          </div>
+      <div className="px-6 py-4 sm:px-8 sm:py-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+        {/* Left Side: Context Badges */}
+        <div className="flex items-center gap-2">
+          {effectiveRole === "student" && groupInfo && (
+            <Badge variant="blue" size="sm">
+              {groupInfo.name}
+            </Badge>
+          )}
+          {effectiveRole === "panelist" && (
+            <Badge variant="purple" size="sm">
+              Panelist View
+            </Badge>
+          )}
         </div>
 
-        {/* Right Header Actions based on role */}
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadEvents(true)}
-            disabled={loading || refreshing}
-            className="text-xs font-semibold"
-          >
-            <HiArrowPath className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+        {/* Right Side: Actions based on role */}
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap justify-end">
+
 
           {effectiveRole === "admin" && (
             <Link to="/admin/scheduling">

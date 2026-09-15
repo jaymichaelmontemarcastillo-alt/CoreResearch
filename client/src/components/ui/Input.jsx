@@ -13,6 +13,9 @@ export const Input = ({
   const inputId =
     id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
+  const isSearch = props.type === "search" || (props.placeholder && props.placeholder.toLowerCase().includes("search"));
+  const roundedClass = isSearch ? "rounded-full" : "rounded-lg";
+
   return (
     <div className="w-full space-y-1.5">
       {label && (
@@ -33,7 +36,7 @@ export const Input = ({
           id={inputId}
           className={`w-full bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] 
                      focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500
-                     transition-all duration-200 rounded-lg text-sm py-2.5 px-3.5 ${Icon ? "pl-10" : ""} ${
+                     transition-all duration-200 ${roundedClass} text-sm py-2.5 px-3.5 ${Icon ? "pl-10" : ""} ${
                        error
                          ? "border-red-300 dark:border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
                          : ""

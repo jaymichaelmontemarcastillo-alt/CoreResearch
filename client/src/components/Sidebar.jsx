@@ -114,7 +114,7 @@ export const Sidebar = ({
           label: "Research Documents",
           path: "/research-documents",
           icon: HiDocumentText,
-          roles: ["adviser", "research_coordinator", "faculty"],
+          roles: ["adviser", "research_coordinator", "faculty", "admin"],
         },
         ...(effectiveRole === "student"
           ? [
@@ -212,7 +212,7 @@ export const Sidebar = ({
           label: "Schedule",
           path: "/schedules",
           icon: HiCalendarDays,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
+          roles: ["student", "adviser", "panelist", "faculty"],
         },
         {
           label: "Notifications",
@@ -244,21 +244,9 @@ export const Sidebar = ({
           roles: ["admin", "research_coordinator"],
         },
         {
-          label: "Master Calendar",
-          path: "/admin/calendar",
-          icon: HiCalendarDays,
-          roles: ["admin"],
-        },
-        {
           label: "Scheduling",
           path: "/admin/scheduling",
           icon: HiCalendarDays,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
-          label: "Adviser Matching",
-          path: "/adviser-matching",
-          icon: HiUsers,
           roles: ["admin", "research_coordinator"],
         },
       ],
@@ -320,12 +308,6 @@ export const Sidebar = ({
 
           return (
             <div key={sec.category} className="space-y-1">
-              {expanded && (
-                <div className="px-3 text-[10px] font-semibold text-gray-400 dark:text-[#72768f] uppercase tracking-wider whitespace-nowrap py-1">
-                  {sec.category}
-                </div>
-              )}
-
               <div className="space-y-1">
                 {visibleItems.map((item) => {
                   const Icon = item.icon;

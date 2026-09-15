@@ -350,23 +350,10 @@ export const StudentDirectory = () => {
 
   return (
     <div className="space-y-6 font-inter">
-      {/* Page Header (Preserved existing manual assign action) */}
       <PageHeader
         icon={HiAcademicCap}
         title="Students"
         description="Manage student directory and generate enrollment links."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAssignForm(!showAssignForm)}
-              disabled={!selectedCourse || !selectedSection}
-            >
-              <HiCheckCircle className="w-3.5 h-3.5 mr-1.5" /> Manual Assign
-            </Button>
-          </div>
-        }
       />
 
       {toastMessage && (
@@ -517,8 +504,18 @@ export const StudentDirectory = () => {
           )}
         </div>
 
-        {/* Generate Invite Link Button (Far Right) */}
-        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0">
+        {/* Generate Invite Link & Manual Assign Buttons (Far Right) */}
+        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex flex-col md:flex-row gap-2">
+          <Button
+            variant="outline"
+            size="md"
+            className="w-full md:w-auto h-10 shadow-sm"
+            onClick={() => setShowAssignForm(!showAssignForm)}
+            disabled={!selectedCourse || !selectedSection}
+          >
+            <HiCheckCircle className="w-4 h-4 mr-2" />
+            Manual Assign
+          </Button>
           <Button
             variant="primary"
             size="md"

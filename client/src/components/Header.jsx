@@ -90,18 +90,27 @@ export const Header = ({ onOpenMobileMenu }) => {
     if (path === "/notifications") return "Notifications";
     if (path === "/masterlist") return "Section Masterlist";
     if (path === "/my-group") return "My Research Group";
-    if (path === "/panelists") return "Panelist Defense Schedules";
-    if (path === "/advisees") return "My Advisees";
-    if (path === "/profile" || path === "/profile-settings" || path === "/settings") return "Account Settings";
-    if (path.startsWith("/proposals")) return "Title Proposals";
-    if (path.startsWith("/documents")) return "Documents";
+    if (path === "/advisers") return "Adviser Directory";
+    if (path === "/submit-title") return "Submit Title";
+    if (path === "/adviser-matching") return "Adviser Matching";
     if (path.startsWith("/projects")) return "Research Projects";
-    if (path.startsWith("/schedules")) return "Defense Schedules";
-    if (path.startsWith("/admin/scheduling")) return "Defense Scheduling";
+    if (path.startsWith("/research/workspace") || path.startsWith("/workspace")) return "Research Workspace";
+    if (path === "/advisees") return "My Advisees";
+    if (path.startsWith("/faculty/workspace/")) return "Faculty Workspace";
+    if (path === "/panelists") return "Defense Schedules";
+    if (path === "/panelist/defendees") return "Panel Defendees";
+    if (path.startsWith("/documents")) return "Documents";
     if (path.startsWith("/reviews")) return "Reviews & Annotations";
-    if (path.startsWith("/grading")) return "Digital Rubric & Grading";
-    if (path.startsWith("/repository")) return "Research Repository";
+    if (path.startsWith("/schedules")) return "Defense Schedules";
+    if (path.startsWith("/calendar") || path.startsWith("/admin/calendar") || path.startsWith("/admin/master-calendar")) return "Master Calendar";
+    if (path === "/repository") return "Research Repository";
+    if (path === "/profile" || path === "/profile-settings" || path === "/settings") return "Account Settings";
+    if (path.startsWith("/admin/scheduling")) return "Defense Scheduling";
+    if (path.startsWith("/students") || path.startsWith("/admin/students")) return "Student Directory";
+    if (path.startsWith("/research-groups") || path.startsWith("/groups") || path.startsWith("/admin/groups")) return "Research Groups";
     if (path.startsWith("/admin/users")) return "User Directory";
+    if (path.startsWith("/admin/courses")) return "Courses & Sections";
+    if (path === "/research-documents") return "Research Documents";
     if (path === "/onboarding") return "Profile Setup";
     return "Dashboard";
   };
@@ -129,7 +138,7 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   return (
     <header
-      className="sticky top-0 z-20 h-[76px] pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-12 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
+      className="sticky top-0 z-20 h-[76px] pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
     >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
       <div className="flex items-center gap-3 shrink-0">
@@ -141,7 +150,7 @@ export const Header = ({ onOpenMobileMenu }) => {
           <HiBars3 className="w-6 h-6" />
         </button>
 
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+        <h1 className="text-2xl sm:text-[26px] font-medium text-gray-900 dark:text-white tracking-tight">
           {getPageTitle()}
         </h1>
       </div>

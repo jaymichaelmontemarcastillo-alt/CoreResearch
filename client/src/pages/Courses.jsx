@@ -123,9 +123,6 @@ export const Courses = () => {
         description="Manage the academic hierarchy and degree programs offered."
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={fetchCourses} isLoading={loading}>
-              <HiArrowPath className="w-3.5 h-3.5 mr-1.5" /> Refresh
-            </Button>
             <Button variant="primary" size="sm" onClick={() => setIsAdding(!isAdding)}>
               <HiPlus className="w-3.5 h-3.5 mr-1.5" /> Add Course
             </Button>

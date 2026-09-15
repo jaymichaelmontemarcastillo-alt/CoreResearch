@@ -76,7 +76,6 @@ export default function App() {
 
                   {/* Title & Adviser Matching Routes */}
                   <Route path="/submit-title" element={<SubmitTitle />} />
-                  <Route path="/adviser-matching" element={<AdviserMatching />} />
 
                   {/* Research Projects & Workspace */}
                   <Route path="/projects" element={<Projects />} />
@@ -116,8 +115,6 @@ export default function App() {
                     <Route path="/admin/users" element={<UserDirectory />} />
                     <Route path="/admin/courses" element={<Courses />} />
                     <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
-                    <Route path="/admin/calendar" element={<AdminMasterCalendar />} />
-                    <Route path="/admin/master-calendar" element={<AdminMasterCalendar />} />
                   </Route>
                 </Route>
               </Route>

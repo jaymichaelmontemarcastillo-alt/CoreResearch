@@ -6,7 +6,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
 import { CourseFilterDropdown } from "../components/ui/CourseFilterDropdown";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
-import { HiCalendarDays, HiMagnifyingGlass, HiFunnel, HiPlus, HiPencil, HiTrash } from "react-icons/hi2";
+import { HiCalendarDays, HiMagnifyingGlass, HiFunnel, HiPlus, HiPencilSquare, HiTrash } from "react-icons/hi2";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { groupService } from "../services/group.service";
@@ -66,21 +66,21 @@ export const Scheduling = () => {
     }
   }, [selectedCourse]);
 
-  useEffect(() => {
-    if (selectedCourse && selectedSection) {
-      fetchGroupsAndSchedules();
-    } else {
-      setGroups([]);
-      setProposals([]);
-      setSchedules([]);
-    }
-  }, [selectedSection, selectedCourse]);
-
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const coursesData = await courseService.getAllCourses();
+      const [coursesData, groupsData, proposalsData, schedulesData] = await Promise.all([
+        courseService.getAllCourses(),
+        groupService.getAllGroups(),
+        titleProposalService.getAllProposals(),
+        scheduleService.getAllSchedules()
+      ]);
+      
       setCourses(coursesData);
+      setGroups(groupsData);
+      setProposals(proposalsData);
+      setSchedules(schedulesData);
+      
       const sectionMap = {};
       await Promise.all(
         coursesData.map(async (course) => {
@@ -101,37 +101,30 @@ export const Scheduling = () => {
     }
   };
 
+  const refreshData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const [groupsData, proposalsData, schedulesData] = await Promise.all([
+        groupService.getAllGroups(),
+        titleProposalService.getAllProposals(),
+        scheduleService.getAllSchedules()
+      ]);
+      setGroups(groupsData);
+      setProposals(proposalsData);
+      setSchedules(schedulesData);
+    } catch (error) {
+      console.error("Failed to load data", error);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
+
   const fetchSectionsForCourse = async (courseId) => {
     try {
       const sectionsData = await sectionService.getSectionsByCourseId(courseId);
       setSections(sectionsData);
     } catch (error) {
       console.error("Failed to load sections:", error);
-    }
-  };
-
-  const fetchGroupsAndSchedules = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    try {
-      const sectionGroups = await groupService.getGroupsBySection(selectedSection);
-      
-      const groupIds = sectionGroups.map(g => g.id);
-      let sectionProposals = [];
-      if (groupIds.length > 0) {
-        sectionProposals = await titleProposalService.getProposalsByGroupIds(groupIds);
-      }
-      
-      // Fetch schedules
-      const allSchedules = await scheduleService.getAllSchedules();
-      
-      setGroups(sectionGroups);
-      setProposals(sectionProposals);
-      setSchedules(allSchedules);
-    } catch (error) {
-      console.error("Failed to load data", error);
-      showToast("Failed to load data.", "error");
-    } finally {
-      if (showLoading) setLoading(false);
     }
   };
 
@@ -152,17 +145,7 @@ export const Scheduling = () => {
     (!hasSpecializations && selectedCourse) || 
     (hasSpecializations && selectedSpecialization && specHasSections);
 
-  const filteredGroups = groups.filter((g) => {
-    const q = searchQuery.toLowerCase();
-    if (!q) return true;
-    
-    const matchName = (g.name || "").toLowerCase().includes(q);
-    const matchMember = (g.members || []).some(m => (m?.fullName || "").toLowerCase().includes(q));
-    const proposal = proposals.find(p => p.groupId === g.id);
-    const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
-    
-    return matchName || matchMember || matchTitle;
-  });
+
 
   const showToast = (msg, variant = "success") => {
     setToastMessage(msg);
@@ -220,23 +203,23 @@ export const Scheduling = () => {
     try {
       await Promise.all(scheduleIdsToClear.map(id => scheduleService.updateSchedule(id, { date: '', startTime: '', endTime: '' })));
       showToast(`Cleared times for ${scheduleIdsToClear.length} group(s).`, "success");
-      fetchGroupsAndSchedules(false);
+      refreshData(false);
     } catch (error) {
       console.error("Bulk clear error:", error);
       showToast("Failed to clear some times.", "error");
-      fetchGroupsAndSchedules(false); // revert on error
+      refreshData(false); // revert on error
     }
   };
 
   const tableColumns = [
-    { label: "Time", className: "min-w-[120px]" },
+    { label: "Time", className: "w-[110px]" },
     { label: "Name of Students", className: "min-w-[150px]" },
     { label: "Title", className: "min-w-[200px]" },
     { label: "Adviser", className: "min-w-[150px]" },
     { label: "Subject Specialist", className: "min-w-[150px]" },
     { label: "Stat", className: "min-w-[120px]" },
     { label: "Technical", className: "min-w-[150px]" },
-    { label: "Actions", className: "min-w-[100px] text-center" },
+    { label: "Actions", className: "w-[80px] text-center" },
   ];
 
   return (
@@ -330,7 +313,8 @@ export const Scheduling = () => {
         </div>
 
         <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex gap-2">
-          {filteredGroups.some(g => {
+          {/* The Clear All Times button logic needs a specific section scope to be safe, so we only show it if a specific section is selected. */}
+          {selectedCourse && selectedSection && groups.filter(g => g.sectionId === selectedSection).some(g => {
             const s = getScheduleForGroup(g.id);
             return s && (s.startTime || s.date);
           }) && (
@@ -349,7 +333,7 @@ export const Scheduling = () => {
             size="md"
             className="w-full md:w-auto h-10 shadow-sm"
             onClick={() => setIsScheduleModalOpen(true)}
-            disabled={!selectedCourse || !selectedSection || filteredGroups.length === 0}
+            disabled={!selectedCourse || !selectedSection}
           >
             <HiPlus className="w-4 h-4 mr-2" />
             Create Schedule
@@ -357,175 +341,198 @@ export const Scheduling = () => {
         </div>
       </div>
 
-      {selectedCourse && selectedSection && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-[#15161e] p-6 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
-                {courseObj?.name || "PROGRAM NOT SELECTED"}
-              </h2>
-              {specializations.find(s => s.id === selectedSpecialization)?.name && (
-                <p className="text-sm font-medium text-gray-500 dark:text-[#9396a8] mt-1">
-                  Specialized in <span className="text-gray-700 dark:text-[#f3f4f8] font-semibold">{specializations.find(s => s.id === selectedSpecialization)?.name}</span>
-                </p>
-              )}
-            </div>
-            <div className="text-left md:text-right">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                Section {sections.find(s => s.id === selectedSection)?.name || ""}
-              </h3>
-            </div>
-          </div>
-          
-          <DataTable columns={tableColumns} className="shadow-sm">
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-gray-400">
-                  <div className="flex flex-col items-center justify-center space-y-3">
-                    <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-                    <span className="text-sm">Loading groups...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : filteredGroups.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-16 text-center text-gray-400">
-                  <span className="text-sm">No groups found for this section.</span>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredGroups.map((group) => {
-                const proposal = getProposalForGroup(group.id);
-                const schedule = getScheduleForGroup(group.id);
-                const activePanelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (group.panelists || []);
-                const activeAdviserName = schedule?.adviserName || group.adviserName;
-                
-                return (
-                  <TableRow key={group.id}>
-                    {/* Time */}
-                    <TableCell>
-                      {schedule && (schedule.startTime || schedule.date) ? (
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex flex-col space-y-0.5">
-                            <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                              {formatTime12Hour(schedule.startTime)} {schedule.endTime ? `- ${formatTime12Hour(schedule.endTime)}` : ''}
-                            </span>
-                            <span className="text-[10px] text-gray-500 font-medium">
-                              {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                            </span>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              const isConfirmed = await confirm({
-                                title: "Clear Schedule",
-                                message: "Are you sure you want to clear the scheduled time?",
-                                confirmText: "Clear Schedule",
-                                variant: "danger"
-                              });
-                              if (isConfirmed) {
-                                // Optimistically clear locally first
-                                setSchedules(prev => prev.map(s => s.id === schedule.id ? { ...s, date: '', startTime: '', endTime: '' } : s));
-                                try {
-                                  await scheduleService.updateSchedule(schedule.id, { date: '', startTime: '', endTime: '' });
-                                  showToast("Time cleared.", "success");
-                                  fetchGroupsAndSchedules(false);
-                                } catch (e) {
-                                  showToast("Failed to clear time.", "error");
-                                  // Revert optimistic update by refetching
-                                  fetchGroupsAndSchedules(false);
-                                }
-                              }
-                            }}
-                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors tooltip-trigger"
-                            title="Clear Time"
-                          >
-                            <HiTrash className="w-3.5 h-3.5" />
-                          </button>
+      {loading ? (
+        <div className="py-12 text-center text-gray-400 flex flex-col items-center justify-center space-y-3">
+          <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+          <span className="text-sm">Loading data...</span>
+        </div>
+      ) : (
+        <div className="mt-6 space-y-10">
+          {courses
+            .filter((c) => (selectedCourse ? c.id === selectedCourse : true))
+            .map((course) => {
+              const courseSections = allSectionsByCourse[course.id] || [];
+              const displaySections = courseSections.filter((s) => {
+                if (selectedSpecialization) return s.specializationId === selectedSpecialization;
+                if (selectedSection) return s.id === selectedSection;
+                return true;
+              });
+
+              if (displaySections.length === 0) return null;
+
+              return (
+                <div key={course.id} className="space-y-8">
+                  {displaySections.map((section) => {
+                    const sectionGroups = groups.filter((g) => g.sectionId === section.id);
+                    const filteredSectionGroups = sectionGroups.filter((g) => {
+                      const q = searchQuery.toLowerCase();
+                      if (!q) return true;
+                      const matchName = (g.name || "").toLowerCase().includes(q);
+                      const matchMember = (g.members || []).some((m) =>
+                        (m?.fullName || "").toLowerCase().includes(q)
+                      );
+                      const proposal = getProposalForGroup(g.id);
+                      const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
+                      return matchName || matchMember || matchTitle;
+                    });
+
+                    return (
+                      <div key={section.id} className="bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-card overflow-hidden">
+                        <div className="p-5 border-b border-gray-200 dark:border-[#222433] flex items-center justify-between gap-4">
+                          <h2 className="text-xl font-medium text-gray-900 dark:text-white leading-tight">
+                            {course.name}
+                          </h2>
+                          <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-widest text-right shrink-0">
+                            Section <span className="text-gray-900 dark:text-white">{section.name}</span>
+                          </h3>
                         </div>
-                      ) : (
-                        <span className="text-gray-400 italic text-sm">Not set</span>
-                      )}
-                    </TableCell>
 
-                    {/* Students */}
-                    <TableCell>
-                      <div className="flex flex-col gap-1.5">
-                        {(group.members || []).map(member => (
-                          <div key={member.uid || member.id} className="flex items-center gap-2">
-                            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                              {member.fullName || "Student"}
-                            </span>
-                          </div>
-                        ))}
+                        <DataTable columns={tableColumns} className="!border-0 !shadow-none !rounded-none">
+                          {filteredSectionGroups.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={8} className="py-16 text-center text-gray-400">
+                                <span className="text-sm">No groups found for this section.</span>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredSectionGroups.map((group) => {
+                              const proposal = getProposalForGroup(group.id);
+                              const schedule = getScheduleForGroup(group.id);
+                              const activePanelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (group.panelists || []);
+                              const activeAdviserName = schedule?.adviserName || group.adviserName;
+                              
+                              return (
+                                <TableRow key={group.id}>
+                                  {/* Time */}
+                                  <TableCell>
+                                    {schedule && (schedule.startTime || schedule.date) ? (
+                                      <div className="flex flex-col space-y-0.5">
+                                        <span className="font-bold text-[12px] text-gray-900 dark:text-white whitespace-nowrap">
+                                          {formatTime12Hour(schedule.startTime)} {schedule.endTime ? `- ${formatTime12Hour(schedule.endTime)}` : ''}
+                                        </span>
+                                        <span className="text-[10px] text-gray-500 font-medium">
+                                          {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400 italic text-sm">Not set</span>
+                                    )}
+                                  </TableCell>
+
+                                  {/* Students */}
+                                  <TableCell>
+                                    <div className="flex flex-col gap-1.5">
+                                      {(group.members || []).map(member => (
+                                        <div key={member.uid || member.id} className="flex items-center gap-2">
+                                          <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                            {member.fullName || "Student"}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TableCell>
+
+                                  {/* Title */}
+                                  <TableCell>
+                                    {proposal ? (
+                                      <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
+                                        {proposal.title}
+                                      </div>
+                                    ) : (
+                                      <span className="text-sm text-gray-400 italic">No approved title yet</span>
+                                    )}
+                                  </TableCell>
+
+                                  {/* Adviser */}
+                                  <TableCell>
+                                    <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                      {activeAdviserName || <span className="text-gray-400 italic">Not Assigned</span>}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* Subject Specialist */}
+                                  <TableCell>
+                                    <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                      {activePanelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.name || 
+                                       activePanelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.fullName || 
+                                       <span className="text-gray-400 italic">Not Assigned</span>}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* Stat */}
+                                  <TableCell>
+                                    <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                      {activePanelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.name || 
+                                       activePanelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.fullName || 
+                                       <span className="text-gray-400 italic">Not Assigned</span>}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* Technical */}
+                                  <TableCell>
+                                    <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                      {activePanelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.name || 
+                                       activePanelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.fullName || 
+                                       <span className="text-gray-400 italic">Not Assigned</span>}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* Actions */}
+                                  <TableCell className="align-middle">
+                                    <div className="flex items-center justify-center gap-3 h-full">
+                                      <button 
+                                        className="text-primary hover:text-blue-600 transition-colors" 
+                                        title="Edit Schedule" 
+                                        onClick={() => {
+                                          setEditingGroup(group);
+                                          setEditingSchedule(schedule || null);
+                                        }}
+                                      >
+                                        <HiPencilSquare className="w-4 h-4" />
+                                      </button>
+                                      
+                                      {schedule && (schedule.startTime || schedule.date) && (
+                                        <button
+                                          onClick={async () => {
+                                            const isConfirmed = await confirm({
+                                              title: "Clear Schedule",
+                                              message: "Are you sure you want to clear the scheduled time?",
+                                              confirmText: "Clear Schedule",
+                                              variant: "danger"
+                                            });
+                                            if (isConfirmed) {
+                                              // Optimistically clear locally first
+                                              setSchedules(prev => prev.map(s => s.id === schedule.id ? { ...s, date: '', startTime: '', endTime: '' } : s));
+                                              try {
+                                                await scheduleService.updateSchedule(schedule.id, { date: '', startTime: '', endTime: '' });
+                                                showToast("Time cleared.", "success");
+                                                refreshData(false);
+                                              } catch (e) {
+                                                showToast("Failed to clear time.", "error");
+                                                // Revert optimistic update by refetching
+                                                refreshData(false);
+                                              }
+                                            }
+                                          }}
+                                          className="text-red-500 hover:text-red-600 transition-colors"
+                                          title="Clear Time"
+                                        >
+                                          <HiTrash className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </DataTable>
                       </div>
-                    </TableCell>
-
-                    {/* Title */}
-                    <TableCell>
-                      {proposal ? (
-                        <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
-                          {proposal.title}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400 italic">No approved title yet</span>
-                      )}
-                    </TableCell>
-
-                    {/* Adviser */}
-                    <TableCell>
-                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {activeAdviserName || <span className="text-gray-400 italic">Not Assigned</span>}
-                      </span>
-                    </TableCell>
-
-                    {/* Subject Specialist */}
-                    <TableCell>
-                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {activePanelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.name || 
-                         activePanelists.find(p => (p.role || '').toLowerCase().includes('subject'))?.fullName || 
-                         <span className="text-gray-400 italic">Not Assigned</span>}
-                      </span>
-                    </TableCell>
-
-                    {/* Stat */}
-                    <TableCell>
-                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {activePanelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.name || 
-                         activePanelists.find(p => (p.role || '').toLowerCase().includes('stat'))?.fullName || 
-                         <span className="text-gray-400 italic">Not Assigned</span>}
-                      </span>
-                    </TableCell>
-
-                    {/* Technical */}
-                    <TableCell>
-                      <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                        {activePanelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.name || 
-                         activePanelists.find(p => (p.role || '').toLowerCase().includes('tech'))?.fullName || 
-                         <span className="text-gray-400 italic">Not Assigned</span>}
-                      </span>
-                    </TableCell>
-
-                    {/* Actions */}
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 px-3"
-                          onClick={() => {
-                            setEditingGroup(group);
-                            setEditingSchedule(schedule || null);
-                          }}
-                        >
-                          <HiPencil className="w-3.5 h-3.5 mr-1" /> Edit
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </DataTable>
+                    );
+                  })}
+                </div>
+              );
+            })}
         </div>
       )}
 
@@ -533,7 +540,9 @@ export const Scheduling = () => {
         <GenerateScheduleModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
-          groups={filteredGroups.map(g => {
+          groups={groups
+            .filter((g) => g.sectionId === selectedSection)
+            .map(g => {
             const schedule = getScheduleForGroup(g.id);
             const panelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (g.panelists || []);
             return {
@@ -548,7 +557,7 @@ export const Scheduling = () => {
           onSchedulesCreated={() => {
             setIsScheduleModalOpen(false);
             showToast("Schedules created successfully!");
-            fetchGroupsAndSchedules(); // Refresh
+            refreshData(); // Refresh
           }}
         />
       )}
@@ -569,7 +578,7 @@ export const Scheduling = () => {
             setEditingGroup(null);
             setEditingSchedule(null);
             showToast("Schedule updated successfully!");
-            fetchGroupsAndSchedules(false);
+            refreshData(false);
           }}
         />
       )}

@@ -302,7 +302,7 @@ export const ProfileSettings = () => {
         }
       }
 
-      if (userProfile?.role === "adviser") {
+      if (["adviser", "admin", "research_coordinator", "faculty"].includes(userProfile?.role)) {
         updatedFields.selectedExpertise = selectedExpertise;
       }
 
@@ -462,16 +462,6 @@ export const ProfileSettings = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
-      {/* Page Title Header */}
-      <div>
-        <h1 className="text-2xl font-medium text-gray-900 dark:text-white tracking-tight">
-          Account settings
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Manage your personal profile, credentials, and institutional preferences.
-        </p>
-      </div>
-
       {/* Main Settings Layout Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar Tabs */}
@@ -545,8 +535,7 @@ export const ProfileSettings = () => {
               )}
             </button>
 
-            {/* Tab: Expertise (Adviser Only) */}
-            {userProfile?.role === "adviser" && (
+            {["adviser", "admin", "research_coordinator", "faculty"].includes(userProfile?.role) && (
               <button
                 onClick={() => handleTabChange("expertise")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "expertise"
@@ -1239,8 +1228,7 @@ export const ProfileSettings = () => {
             </div>
           )}
 
-          {/* TAB 5: EXPERTISE (Adviser Only) */}
-          {activeTab === "expertise" && userProfile?.role === "adviser" && (
+          {activeTab === "expertise" && ["adviser", "admin", "research_coordinator", "faculty"].includes(userProfile?.role) && (
             <div className="space-y-8 animate-fade-in">
               {/* Feedback Alert */}
               {profileFeedback && (

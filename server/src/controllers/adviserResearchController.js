@@ -12,9 +12,9 @@ export const uploadDocument = async (req, res) => {
 
     const adviserId = req.user.uid;
     
-    // Only advisers can upload to this endpoint
-    if (req.user.role !== 'adviser') {
-      return res.status(403).json({ success: false, message: 'Only advisers can upload research documents' });
+    // Only faculty-level roles can upload to this endpoint
+    if (!['adviser', 'admin', 'research_coordinator', 'faculty'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Only faculty members can upload research documents' });
     }
 
     const doc = await adviserResearchProcessingService.importResearchDocument({
