@@ -16,6 +16,7 @@ import {
   ResearchTask,
   CreateTaskInput,
   TaskStatus,
+  TaskRevisionEntry,
 } from '../types/researchWorkspace.types';
 
 const COLLECTION_NAME = 'research_tasks';
@@ -39,6 +40,7 @@ export const researchTaskService = {
       workspaceId: input.workspaceId,
       proposalId: input.proposalId,
       projectId: input.projectId,
+      documentId: input.documentId,
       studentId: input.studentId,
       studentName: input.studentName,
       adviserId: input.adviserId,
@@ -46,9 +48,13 @@ export const researchTaskService = {
       sectionId: input.sectionId,
       title: input.title.trim(),
       description: input.description.trim(),
+      type: input.type || 'general',
+      source: input.source || 'manual',
+      anchor: input.anchor,
       priority: input.priority || 'medium',
       status: 'todo',
       dueDate: input.dueDate,
+      revisionHistory: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -136,10 +142,28 @@ export const researchTaskService = {
   async updateTaskStatus(
     taskId: string,
     status: TaskStatus,
-    submissionNote?: string
+    submissionNote?: string,
+    submitterName?: string
   ): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, taskId);
     const now = new Date().toISOString();
+
+    // Build revision history entry for submissions
+    const historyEntry: TaskRevisionEntry | null =
+      status === 'submitted'
+        ? {
+            action: 'submitted',
+            by: '', // caller should set this from auth context
+            timestamp: now,
+            ...(submitterName ? { byName: submitterName } : {}),
+            ...(submissionNote ? { comment: submissionNote } : {}),
+          }
+        : null;
+
+    const existingSnap = await getDoc(docRef);
+    const existingHistory: TaskRevisionEntry[] = existingSnap.exists()
+      ? (existingSnap.data() as ResearchTask).revisionHistory || []
+      : [];
 
     const updates: Partial<ResearchTask> = {
       status,
@@ -147,6 +171,9 @@ export const researchTaskService = {
       ...(submissionNote !== undefined ? { submissionNote } : {}),
       ...(status === 'submitted' ? { submittedAt: now } : {}),
       ...(status === 'completed' ? { completedAt: now } : {}),
+      ...(historyEntry
+        ? { revisionHistory: [...existingHistory, historyEntry] }
+        : {}),
     };
 
     await updateDoc(docRef, stripUndefined(updates));
@@ -158,15 +185,32 @@ export const researchTaskService = {
   async reviewTask(
     taskId: string,
     decision: 'completed' | 'revision_required',
-    feedback?: string
+    feedback?: string,
+    reviewerName?: string
   ): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, taskId);
     const now = new Date().toISOString();
 
+    const existingSnap = await getDoc(docRef);
+    const existingHistory: TaskRevisionEntry[] = existingSnap.exists()
+      ? (existingSnap.data() as ResearchTask).revisionHistory || []
+      : [];
+
+    const historyEntry: TaskRevisionEntry = {
+      action: decision === 'completed' ? 'approved' : 'revision_requested',
+      by: '',
+      timestamp: now,
+      ...(reviewerName ? { byName: reviewerName } : {}),
+      ...(feedback ? { comment: feedback } : {}),
+    };
+
     await updateDoc(docRef, stripUndefined({
       status: decision,
       updatedAt: now,
+      reviewedAt: now,
       ...(decision === 'completed' ? { completedAt: now } : {}),
+      ...(feedback ? { adviserFeedback: feedback } : {}),
+      revisionHistory: [...existingHistory, historyEntry],
     }));
   },
 

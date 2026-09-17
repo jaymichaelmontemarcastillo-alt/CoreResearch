@@ -145,6 +145,25 @@ export const FacultyWorkspaceView = () => {
     }
   };
 
+  const handleTaskReview = async (taskId, decision) => {
+    try {
+      await researchTaskService.reviewTask(taskId, decision);
+      setToast(decision === 'completed' ? 'Task marked as completed.' : 'Task sent back for revision.');
+    } catch (err) {
+      setToast('Failed to review task: ' + err.message);
+    }
+  };
+
+  const handleTaskDelete = async (taskId) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    try {
+      await researchTaskService.deleteTask(taskId);
+      setToast('Task deleted successfully.');
+    } catch (err) {
+      setToast('Failed to delete task: ' + err.message);
+    }
+  };
+
   const handleTaskCreated = async (taskInput) => {
     try {
       await researchTaskService.createTask(taskInput);
@@ -152,6 +171,23 @@ export const FacultyWorkspaceView = () => {
       setIsTaskModalOpen(false);
     } catch (err) {
       setToast('Failed to assign task: ' + err.message);
+    }
+  };
+
+  const handleOpenTaskInEditor = async (task) => {
+    if (!workspace) return;
+    try {
+      const { documentId, editorUrl } = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+        workspace,
+        { uid: currentUser.uid, fullName: currentUser.displayName, role: effectiveRole }
+      );
+      if (workspace.documentId !== documentId) {
+        await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
+      }
+      const targetUrl = `${editorUrl}?workspaceId=${workspace.id}&focusTaskId=${task.id}`;
+      navigate(targetUrl, { state: { from: location.pathname + location.search } });
+    } catch (err) {
+      setToast('Failed to open editor: ' + err.message);
     }
   };
 
@@ -532,8 +568,11 @@ export const FacultyWorkspaceView = () => {
                   <TaskCard
                     key={task.id}
                     task={task}
-                    role={effectiveRole} // Pass effectiveRole so TaskCard displays correctly for Adviser
+                    isAdviser={isAdviser}
                     onStatusChange={(newStatus) => handleTaskStatusChange(task.id, newStatus)}
+                    onReview={handleTaskReview}
+                    onDelete={handleTaskDelete}
+                    onOpenInEditor={handleOpenTaskInEditor}
                   />
                 ))
               )}

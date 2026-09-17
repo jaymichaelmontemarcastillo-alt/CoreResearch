@@ -37,6 +37,7 @@ export const TaskCard = ({
   onStatusChange,
   onReview,
   onDelete,
+  onOpenInEditor,
 }) => {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submissionNote, setSubmissionNote] = useState('');
@@ -76,6 +77,11 @@ export const TaskCard = ({
               Overdue
             </span>
           )}
+          {task.type === 'anchored' && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-transparent dark:border-indigo-500/20">
+              📌 Anchored
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-[#9396a8]">
@@ -95,6 +101,36 @@ export const TaskCard = ({
           </p>
         )}
       </div>
+
+      {/* Anchored Text Context */}
+      {task.type === 'anchored' && task.anchor?.selectedText && (
+        <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-xs">
+          <span className="font-semibold text-indigo-700 dark:text-indigo-300 block mb-0.5">
+            📌 Linked Manuscript Text:
+          </span>
+          <p className="text-indigo-600 dark:text-indigo-200 italic line-clamp-2">
+            "{task.anchor.selectedText}"
+          </p>
+          {onOpenInEditor && (
+            <button
+              onClick={() => onOpenInEditor(task)}
+              className="mt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              Open in Editor →
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* General Task: Open in Editor Button */}
+      {task.type === 'general' && onOpenInEditor && (
+        <button
+          onClick={() => onOpenInEditor(task)}
+          className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+        >
+          Open Manuscript Editor →
+        </button>
+      )}
 
       {/* Student Submission Note (if any) */}
       {task.submissionNote && (

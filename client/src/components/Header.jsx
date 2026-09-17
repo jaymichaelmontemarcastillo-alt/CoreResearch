@@ -99,7 +99,8 @@ export const Header = ({ onOpenMobileMenu }) => {
     if (path.startsWith("/faculty/workspace/")) return "Faculty Workspace";
     if (path === "/panelists") return "Defense Schedules";
     if (path === "/panelist/defendees") return "Panel Defendees";
-    if (path.startsWith("/documents")) return "Documents";
+    if (path === "/documents") return "Documents";
+    if (path.startsWith("/documents/")) return "Document Editor";
     if (path.startsWith("/reviews")) return "Reviews & Annotations";
     if (path.startsWith("/schedules")) return "Defense Schedules";
     if (path.startsWith("/calendar") || path.startsWith("/admin/calendar") || path.startsWith("/admin/master-calendar")) return "Master Calendar";
@@ -138,7 +139,7 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   return (
     <header
-      className="sticky top-0 z-20 h-[76px] pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
+      className="sticky top-0 z-50 h-[76px] pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
     >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
       <div className="flex items-center gap-3 shrink-0">

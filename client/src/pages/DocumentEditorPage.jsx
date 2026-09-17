@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { OnlyOfficeEditor } from '../components/editor/OnlyOfficeEditor';
+import { EditorTaskSidebar } from '../components/editor/EditorTaskSidebar';
 import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
+import { Textarea } from '../components/ui/Textarea';
 import { 
   HiChevronLeft, 
   HiChevronRight, 
@@ -17,6 +20,9 @@ import { documentStore } from '../services/documentStore';
 import documentImportService from './Documents/services/documentImportService';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchFeedbackService from '../services/researchFeedback.service';
+import researchTaskService from '../services/researchTask.service';
+import notificationService from '../services/notification.service';
+import { navigateToContentControl, navigateToText, navigateToComment } from '../services/editorConnector';
 
 export const DocumentEditorPage = () => {
   const { id: documentId } = useParams();
@@ -169,8 +175,16 @@ export const DocumentEditorPage = () => {
     const [activeChapterId, setActiveChapterId] = useState(urlChapterId || '');
     const [approving, setApproving] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
+    const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+    const [revisionInstructions, setRevisionInstructions] = useState('');
+    const [revisionTargetWasApproved, setRevisionTargetWasApproved] = useState(false);
+    const [revisionTargetChapterName, setRevisionTargetChapterName] = useState('');
     const [feedbackList, setFeedbackList] = useState([]);
     const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+    const [tasks, setTasks] = useState([]);
+    const [isTaskSidebarOpen, setIsTaskSidebarOpen] = useState(false);
+    const isStudent = userProfile?.role === 'student';
+    const focusTaskId = searchParams.get('focusTaskId');
 
     // Subscribe to workspace & feedback if workspaceId is present or document is linked
     useEffect(() => {
@@ -216,6 +230,129 @@ export const DocumentEditorPage = () => {
       };
     }, [urlWorkspaceId, documentId, urlChapterId]);
 
+    // Subscribe to workspace tasks in real-time
+    useEffect(() => {
+      if (!workspace?.id) return;
+      const unsubscribeTasks = researchTaskService.subscribeWorkspaceTasks(
+        workspace.id,
+        (updatedTasks) => setTasks(updatedTasks)
+      );
+      return () => unsubscribeTasks();
+    }, [workspace?.id]);
+
+    // Auto-open sidebar and focus task if focusTaskId is in URL
+    useEffect(() => {
+      if (focusTaskId && tasks.length > 0) {
+        setIsTaskSidebarOpen(true);
+        // Auto-navigate to the anchored text after a short delay for editor init
+        const targetTask = tasks.find((t) => t.id === focusTaskId);
+        if (targetTask) {
+          const timer = setTimeout(() => {
+            if (targetTask.anchor?.commentId) {
+              navigateToComment(targetTask.anchor.commentId);
+            } else if (targetTask.anchor?.contentControlId) {
+              navigateToContentControl(targetTask.anchor.contentControlId).then((ok) => {
+                if (!ok && targetTask.anchor?.selectedText) {
+                  navigateToText(targetTask.anchor.selectedText);
+                }
+              });
+            }
+          }, 2000); // Wait for ONLYOFFICE to fully load
+          return () => clearTimeout(timer);
+        }
+      }
+    }, [focusTaskId, tasks]);
+
+    const handleEditorTaskCreate = async (taskData) => {
+      if (!workspace) return;
+      try {
+        await researchTaskService.createTask({
+          ...taskData,
+          workspaceId: workspace.id,
+          proposalId: workspace.proposalId,
+          projectId: workspace.projectId,
+          documentId: workspace.documentId,
+          studentId: workspace.studentId,
+          studentName: workspace.studentName,
+          adviserId: workspace.adviserId || userProfile?.uid,
+          adviserName: workspace.adviserName || userProfile?.fullName,
+        });
+        setToastMessage('Task created successfully');
+      } catch (err) {
+        console.error('Failed to create task:', err);
+        alert('Failed to create task');
+      }
+    };
+
+    const handleEditorTaskStatusChange = async (taskId, status, note) => {
+      try {
+        await researchTaskService.updateTaskStatus(
+          taskId, status, note,
+          currentUser?.displayName || userProfile?.fullName
+        );
+
+        if (status === 'submitted' && workspace) {
+          // Notify adviser
+          try {
+            await notificationService.createNotification({
+              userId: workspace.adviserId,
+              title: 'Task Submitted for Review',
+              message: `${workspace.studentName || 'A student'} submitted a task for your review.`,
+              type: 'task',
+              linkUrl: `/faculty/workspace/${workspace.id}`,
+            });
+          } catch (notifErr) {
+            console.warn('[DocumentEditorPage] Notification send failed:', notifErr);
+          }
+        }
+      } catch (err) {
+        throw err;
+      }
+    };
+
+    const handleEditorTaskReview = async (taskId, decision, feedback) => {
+      try {
+        await researchTaskService.reviewTask(
+          taskId, decision, feedback,
+          currentUser?.displayName || userProfile?.fullName
+        );
+        setToastMessage(decision === 'completed' ? 'Task approved!' : 'Revision requested.');
+        setTimeout(() => setToastMessage(''), 4000);
+
+        // Notify student
+        if (workspace) {
+          try {
+            await notificationService.createNotification({
+              userId: workspace.studentId,
+              title: decision === 'completed' ? 'Task Approved' : 'Task Revision Required',
+              message: decision === 'completed'
+                ? `Your adviser approved your task submission.`
+                : `Your adviser requested revisions: "${feedback?.slice(0, 80) || 'See task details'}"`,
+              type: 'task',
+              linkUrl: `/research/workspace`,
+            });
+          } catch (notifErr) {
+            console.warn('[DocumentEditorPage] Notification send failed:', notifErr);
+          }
+        }
+      } catch (err) {
+        throw err;
+      }
+    };
+
+    const handleNavigateToAnchor = async (task) => {
+      if (task.anchor?.commentId) {
+        await navigateToComment(task.anchor.commentId);
+      } else if (task.anchor?.contentControlId) {
+        const ok = await navigateToContentControl(task.anchor.contentControlId);
+        if (!ok && task.anchor?.selectedText) {
+          await navigateToText(task.anchor.selectedText);
+        }
+      } else if (task.anchor?.selectedText) {
+        await navigateToText(task.anchor.selectedText);
+      }
+    };
+
     const handleApproveChapterInEditor = async () => {
       if (!workspace || !activeChapterId) return;
       const targetSection = (workspace.sections || []).find((s) => s.id === activeChapterId);
@@ -243,23 +380,26 @@ export const DocumentEditorPage = () => {
       }
     };
 
-    const handleRequestRevisionInEditor = async () => {
+    const handleRequestRevisionInEditor = () => {
       if (!workspace || !activeChapterId) return;
       const targetSection = (workspace.sections || []).find((s) => s.id === activeChapterId);
       const chapterTitle = targetSection?.name || 'this chapter';
       const wasApproved = targetSection?.status === 'completed';
 
-      const promptMsg = wasApproved
-        ? `Flag ${chapterTitle} for revision?\n\nThis will revert its "Approved" status, deduct research progress, and notify advisees to address the remarks.\n\nEnter revision instructions or panel defense notes:`
-        : `Enter revision instructions for ${chapterTitle} (or leave as is to refer advisees to in-editor comments):`;
-
+      setRevisionTargetChapterName(chapterTitle);
+      setRevisionTargetWasApproved(wasApproved);
+      
       const defaultComment = wasApproved
         ? 'Defense revisions required: Please address the comments and corrections in the manuscript editor and resubmit.'
         : 'Revisions and comments have been added directly in the document editor. Please address and re-submit.';
+        
+      setRevisionInstructions(defaultComment);
+      setIsRevisionModalOpen(true);
+    };
 
-      const comment = window.prompt(promptMsg, defaultComment);
-      if (comment === null) return;
-
+    const confirmRevisionRequest = async () => {
+      if (!workspace || !activeChapterId) return;
+      
       const reviewerRole = userProfile?.role === 'panelist' || isPanelistMode ? 'Defense Panelist' : 'Faculty Adviser';
       const reviewerName = currentUser?.displayName || userProfile?.fullName || reviewerRole;
 
@@ -267,19 +407,21 @@ export const DocumentEditorPage = () => {
         await researchWorkspaceService.requestRevisionChapter(
           workspace.id,
           activeChapterId,
-          comment.trim() || defaultComment,
+          revisionInstructions.trim(),
           currentUser?.uid,
           reviewerName,
           isPanelist ? 'panelist' : 'adviser'
         );
         setToastMessage(
-          wasApproved
-            ? `${chapterTitle} reverted to Revision Required. Progress updated.`
-            : `Revision requested for ${chapterTitle}. Advisees notified.`
+          revisionTargetWasApproved
+            ? `${revisionTargetChapterName} reverted to Revision Required. Progress updated.`
+            : `Revision requested for ${revisionTargetChapterName}. Advisees notified.`
         );
         setTimeout(() => setToastMessage(''), 4500);
       } catch (err) {
         alert('Failed to request revision: ' + err.message);
+      } finally {
+        setIsRevisionModalOpen(false);
       }
     };
 
@@ -385,6 +527,21 @@ export const DocumentEditorPage = () => {
               >
                 {isHeightMaximized ? <HiChevronDown className="w-4 h-4" /> : <HiChevronUp className="w-4 h-4" />}
               </Button>
+
+              {/* Tasks Sidebar Toggle */}
+              {workspace && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsTaskSidebarOpen(!isTaskSidebarOpen)}
+                  className={`p-2 rounded-lg shadow-xs transition-colors ${isTaskSidebarOpen ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'}`}
+                  title={isTaskSidebarOpen ? 'Hide Tasks Panel' : 'Open Tasks Panel'}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                </Button>
+              )}
 
               <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1"></div>
 
@@ -594,6 +751,49 @@ export const DocumentEditorPage = () => {
           </div>
         )}
 
+        {/* Flag for Revision Modal */}
+        <Modal
+          isOpen={isRevisionModalOpen}
+          onClose={() => setIsRevisionModalOpen(false)}
+          title={revisionTargetWasApproved ? `Flag ${revisionTargetChapterName} for revision?` : `Revision instructions for ${revisionTargetChapterName}`}
+          noHeaderBorder={true}
+        >
+          <div className="space-y-4">
+            {revisionTargetWasApproved && (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                This will revert its "Approved" status, deduct research progress, and notify advisees to address the remarks.
+              </p>
+            )}
+            {!revisionTargetWasApproved && (
+               <p className="text-sm text-gray-600 dark:text-gray-300">
+                 (or leave as is to refer advisees to in-editor comments)
+               </p>
+            )}
+            <Textarea
+              label="Enter revision instructions or panel defense notes:"
+              value={revisionInstructions}
+              onChange={(e) => setRevisionInstructions(e.target.value)}
+              rows={4}
+              placeholder="Type your revision instructions here..."
+            />
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsRevisionModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={confirmRevisionRequest}
+                className="bg-blue-600 hover:bg-blue-700 text-white border-none"
+              >
+                OK
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
         {/* Chapter Comments & Revisions Modal */}
         {isCommentsOpen && workspace && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
@@ -741,8 +941,31 @@ export const DocumentEditorPage = () => {
         {/* Main Document Workspace */}
         <div className="flex-1 flex overflow-hidden relative">
           <div className="flex-1 w-full h-full p-0">
-            <OnlyOfficeEditor documentId={documentId} mode={isPanelistMode ? 'panelist' : 'edit'} />
+            <OnlyOfficeEditor 
+              documentId={documentId} 
+              mode={isPanelistMode ? 'panelist' : 'edit'}
+              workspace={workspace}
+              tasks={tasks}
+            />
           </div>
+
+          {/* Editor Task Sidebar */}
+          {workspace && (
+            <EditorTaskSidebar
+              isOpen={isTaskSidebarOpen}
+              onClose={() => setIsTaskSidebarOpen(false)}
+              workspace={workspace}
+              tasks={tasks}
+              currentUser={currentUser}
+              userProfile={userProfile}
+              isAdviser={isAdviser}
+              isStudent={isStudent}
+              onTaskStatusChange={handleEditorTaskStatusChange}
+              onTaskReview={handleEditorTaskReview}
+              onNavigateToAnchor={handleNavigateToAnchor}
+              onCreateTask={handleEditorTaskCreate}
+            />
+          )}
         </div>
       </div>
     );

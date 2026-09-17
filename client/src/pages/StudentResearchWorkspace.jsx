@@ -268,6 +268,30 @@ export const StudentResearchWorkspace = () => {
     }
   };
 
+  // Open task in editor — navigate with focusTaskId
+  const handleOpenTaskInEditor = async (task) => {
+    if (!workspace) return;
+    setOpeningDoc(true);
+    try {
+      const { documentId, editorUrl } =
+        await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+          workspace,
+          userProfile
+        );
+
+      if (workspace.documentId !== documentId) {
+        await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
+      }
+
+      const targetUrl = `${editorUrl}?workspaceId=${workspace.id}&focusTaskId=${task.id}`;
+      navigate(targetUrl, { state: { from: location.pathname + location.search } });
+    } catch (err) {
+      console.error('Failed to open editor for task:', err);
+      setToast('Failed to open editor: ' + err.message);
+      setOpeningDoc(false);
+    }
+  };
+
   // 4. Feedback Handlers
   const handleAddFeedback = async (feedbackInput) => {
     try {
@@ -705,6 +729,7 @@ export const StudentResearchWorkspace = () => {
                       onStatusChange={handleTaskStatusChange}
                       onReview={handleTaskReview}
                       onDelete={handleTaskDelete}
+                      onOpenInEditor={handleOpenTaskInEditor}
                     />
                   ))}
                 </div>

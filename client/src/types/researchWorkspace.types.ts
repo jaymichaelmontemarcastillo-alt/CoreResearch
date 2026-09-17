@@ -34,6 +34,23 @@ export type TaskStatus =
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
+export type TaskType = 'anchored' | 'general';
+
+export interface TaskAnchor {
+  selectedText: string;
+  contentControlId?: string; // ONLYOFFICE Content Control ID for navigation
+  commentId?: string; // ONLYOFFICE native comment ID
+  chapterId?: string;
+}
+
+export interface TaskRevisionEntry {
+  action: 'submitted' | 'approved' | 'revision_requested';
+  by: string;
+  byName?: string;
+  comment?: string;
+  timestamp: string;
+}
+
 export type FeedbackStatus = 'open' | 'addressed' | 'resolved';
 
 export interface ManuscriptSection {
@@ -75,6 +92,7 @@ export interface ResearchTask {
   workspaceId: string;
   proposalId?: string;
   projectId?: string;
+  documentId?: string;
   studentId: string;
   studentName?: string;
   adviserId: string;
@@ -82,12 +100,18 @@ export interface ResearchTask {
   sectionId?: string;
   title: string;
   description: string;
+  type: TaskType;
+  source?: 'native_comment' | 'manual';
+  anchor?: TaskAnchor;
   status: TaskStatus;
   priority: TaskPriority;
   dueDate: string;
   submissionNote?: string;
+  adviserFeedback?: string;
+  revisionHistory?: TaskRevisionEntry[];
   submittedAt?: string;
   completedAt?: string;
+  reviewedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -96,6 +120,7 @@ export interface CreateTaskInput {
   workspaceId: string;
   proposalId?: string;
   projectId?: string;
+  documentId?: string;
   studentId: string;
   studentName?: string;
   adviserId: string;
@@ -103,6 +128,9 @@ export interface CreateTaskInput {
   sectionId?: string;
   title: string;
   description: string;
+  type: TaskType;
+  source?: 'native_comment' | 'manual';
+  anchor?: TaskAnchor;
   priority: TaskPriority;
   dueDate: string;
 }

@@ -1,14 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DocumentEditor } from '@onlyoffice/document-editor-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
-export const OnlyOfficeEditor = ({ documentId, mode }) => {
+export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
   const [config, setConfig] = useState(null);
   const [documentServerUrl, setDocumentServerUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { userProfile } = useAuth();
+
+  const workspaceRef = useRef(workspace);
+  const tasksRef = useRef(tasks);
+
+  useEffect(() => {
+    workspaceRef.current = workspace;
+  }, [workspace]);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   useEffect(() => {
     let isMounted = true;
