@@ -5,8 +5,25 @@ import { Header } from "./Header";
 
 export const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    try {
+      const saved = localStorage.getItem('core_research_sidebar_expanded');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   const location = useLocation();
+
+  const handleToggleSidebar = () => {
+    setSidebarExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('core_research_sidebar_expanded', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Check if we are on the document editor page (which needs full width)
   const isDocumentEditor = location.pathname.startsWith('/documents/') && location.pathname.length > 11;
@@ -18,7 +35,7 @@ export const Layout = () => {
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
         isExpanded={sidebarExpanded}
-        onToggle={() => setSidebarExpanded(!sidebarExpanded)}
+        onToggle={handleToggleSidebar}
       />
 
       {/* Main Viewport Column (Header + Page Body) — dynamically shrinks/shifts in real time */}
@@ -29,7 +46,7 @@ export const Layout = () => {
 
         <main
           className={`flex-1 transition-all duration-150 ease-in-out ${
-            isDocumentEditor ? "p-0" : "px-6 py-6 sm:px-8 sm:py-7 lg:px-8 lg:py-8"
+            isDocumentEditor ? "p-0" : "px-6 pt-2 pb-6 sm:px-8 sm:pt-3 sm:pb-7 lg:px-8 lg:pt-3 lg:pb-8"
           }`}
         >
           <div className={isDocumentEditor ? "w-full h-full" : "w-full"}>

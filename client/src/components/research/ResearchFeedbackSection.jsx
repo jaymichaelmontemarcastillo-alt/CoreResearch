@@ -4,14 +4,11 @@ import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import {
-  MessageSquare,
-  Send,
-  CheckCircle2,
-  AlertCircle,
-  User,
-  Shield,
-  Clock,
-} from 'lucide-react';
+  HiChatBubbleLeftRight,
+  HiShieldCheck,
+  HiPaperAirplane,
+  HiCheckCircle,
+} from 'react-icons/hi2';
 
 export const ResearchFeedbackSection = ({
   feedbackList = [],
@@ -55,7 +52,7 @@ export const ResearchFeedbackSection = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-primary" />
+          <HiChatBubbleLeftRight className="w-4 h-4 text-primary" />
           Research Advisory Feedback
         </h3>
         <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -69,7 +66,7 @@ export const ResearchFeedbackSection = ({
           <form onSubmit={handleCreateFeedback} className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-xs font-bold text-gray-700 dark:text-[#9396a8] flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-blue-500" /> Provide Research Guidance / Feedback
+                <HiShieldCheck className="w-3.5 h-3.5 text-blue-500" /> Provide Research Guidance / Feedback
               </span>
 
               <select
@@ -101,7 +98,7 @@ export const ResearchFeedbackSection = ({
                 type="submit"
                 disabled={isSubmitting || !comment.trim()}
               >
-                <Send className="w-3.5 h-3.5 mr-1.5" />
+                <HiPaperAirplane className="w-3.5 h-3.5 mr-1.5" />
                 {isSubmitting ? 'Posting...' : 'Post Advisory Feedback'}
               </Button>
             </div>
@@ -190,7 +187,7 @@ export const ResearchFeedbackSection = ({
                         variant="outline"
                         onClick={() => onUpdateStatus?.(fb.id, 'addressed')}
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Mark as Addressed
+                        <HiCheckCircle className="w-3.5 h-3.5 mr-1" /> Mark as Addressed
                       </Button>
                     )}
 
@@ -203,7 +200,7 @@ export const ResearchFeedbackSection = ({
                             variant="success"
                             onClick={() => onUpdateStatus?.(fb.id, 'resolved')}
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Resolve
+                            <HiCheckCircle className="w-3.5 h-3.5 mr-1" /> Resolve
                           </Button>
                         ) : (
                           <Button

@@ -264,39 +264,61 @@ export const Sidebar = ({
   };
 
   const renderContent = (expanded) => (
-    <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden`}>
+    <div className="relative flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none">
       {/* HEADER SECTION */}
-      <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 ${
-        expanded ? "px-3.5 justify-between" : "px-2 justify-center"
-      }`}>
-        <Link
-          to="/dashboard"
-          className={`flex items-center overflow-hidden ${
-            expanded ? "gap-3 opacity-100" : "hidden"
-          }`}
-          title="CoreResearch Dashboard"
-        >
-          <img
-            src={logoImg}
-            alt="CoreResearch Logo"
-            className="w-8 h-8 object-contain shrink-0 drop-shadow-sm"
-          />
-          <span className="text-base tracking-tight whitespace-nowrap overflow-hidden">
-            <span className="font-bold text-gray-900 dark:text-white">Core</span>
-            <span className="font-bold text-gray-700 dark:text-gray-300">Research</span>
-          </span>
-        </Link>
+      {expanded ? (
+        <div className="relative flex items-center justify-between shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-3.5 pr-6">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-2.5 min-w-0 overflow-hidden group"
+            title="CoreResearch Dashboard"
+          >
+            <img
+              src={logoImg}
+              alt="CoreResearch Logo"
+              className="w-8 h-8 object-contain shrink-0 drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
+            />
+            <span className="font-brand font-extrabold text-[14px] tracking-wide uppercase whitespace-nowrap overflow-hidden flex items-center">
+              <span className="text-gray-900 dark:text-white">Core</span>
+              <span className="text-gray-700 dark:text-gray-300">Research</span>
+            </span>
+          </Link>
 
-        <button
-          onClick={toggleSidebar}
-          className={`flex items-center justify-center shrink-0 text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white transition-colors duration-150 ${
-            expanded ? "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1f212d]" : "h-10 w-10 mx-auto rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1c26]"
-          }`}
-          title={expanded ? "Collapse Sidebar" : "Expand Sidebar"}
-        >
-          <HiChevronLeft className={`w-5 h-5 transition-transform duration-150 ${expanded ? "" : "rotate-180"}`} />
-        </button>
-      </div>
+          {/* Floating Toggle Button on top-right edge */}
+          <button
+            onClick={toggleSidebar}
+            className="absolute -right-3.5 top-4.5 z-40 flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-md hover:shadow-lg hover:bg-gray-50 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer"
+            title="Collapse Sidebar"
+            aria-label="Collapse Sidebar"
+          >
+            <HiChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="relative flex items-center justify-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-2">
+          <Link
+            to="/dashboard"
+            className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-colors group"
+            title="CoreResearch Dashboard"
+          >
+            <img
+              src={logoImg}
+              alt="CoreResearch Logo"
+              className="w-8 h-8 object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
+            />
+          </Link>
+
+          {/* Floating Toggle Button on top-right edge */}
+          <button
+            onClick={toggleSidebar}
+            className="absolute -right-3.5 top-4.5 z-40 flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-md hover:shadow-lg hover:bg-gray-50 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer"
+            title="Expand Sidebar"
+            aria-label="Expand Sidebar"
+          >
+            <HiChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* CATEGORIZED NAVIGATION */}
       <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar py-3 space-y-4 ${expanded ? "px-3" : "px-2"}`}>
@@ -425,8 +447,8 @@ export const Sidebar = ({
     <>
       {/* Desktop Container-like Sidebar in Flexbox flow that actively pushes content */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen p-3 z-30 select-none whitespace-nowrap overflow-x-hidden ${
-          isExpanded ? "w-[260px]" : "w-[80px]"
+        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen p-3 z-30 select-none whitespace-nowrap ${
+          isExpanded ? "w-[275px]" : "w-[80px]"
         }`}
       >
         {renderContent(isExpanded)}
@@ -439,7 +461,7 @@ export const Sidebar = ({
             className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={onCloseMobile}
           />
-          <div className="relative w-64 h-full z-50 animate-slide-in">
+          <div className="relative w-[275px] h-full z-50 animate-slide-in">
             {renderContent(true)}
           </div>
         </div>

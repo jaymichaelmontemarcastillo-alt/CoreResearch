@@ -74,18 +74,13 @@ export const StudentRecentActivityFeed = ({
     <Card padding={false} className="p-4 sm:p-5 flex flex-col h-full border border-gray-200/90 dark:border-[#222433] bg-white dark:bg-[#15161e] shadow-xs">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-            <HiClock className="w-3.5 h-3.5" />
-          </div>
-          <div>
-            <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-              Recent Activity
-            </h3>
-            <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
-              Live Research &amp; Group Timeline
-            </p>
-          </div>
+        <div>
+          <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
+            Recent Activity
+          </h3>
+          <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
+            Live Research &amp; Group Timeline
+          </p>
         </div>
 
         <span className="text-[11px] font-semibold text-gray-400">

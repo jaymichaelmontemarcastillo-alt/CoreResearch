@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { X, PlusCircle, AlertCircle } from 'lucide-react';
+import { HiXMark, HiPlusCircle, HiExclamationCircle } from 'react-icons/hi2';
 
 export const TaskManagementModal = ({
   isOpen,
@@ -83,13 +83,13 @@ export const TaskManagementModal = ({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
-            <X className="w-5 h-5" />
+            <HiXMark className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
           <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 text-xs text-rose-600 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <HiExclamationCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -175,7 +175,7 @@ export const TaskManagementModal = ({
               Cancel
             </Button>
             <Button variant="primary" size="sm" type="submit" disabled={isSubmitting}>
-              <PlusCircle className="w-4 h-4 mr-1.5" />
+              <HiPlusCircle className="w-4 h-4 mr-1.5" />
               {isSubmitting ? 'Creating...' : 'Assign Task'}
             </Button>
           </div>

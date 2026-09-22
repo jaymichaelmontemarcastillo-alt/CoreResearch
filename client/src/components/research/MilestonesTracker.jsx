@@ -1,6 +1,5 @@
-// src/components/research/MilestonesTracker.jsx
 import React from 'react';
-import { CheckCircle2, Circle, Clock, AlertCircle, FileCheck } from 'lucide-react';
+import { HiCheckCircle, HiMinusCircle, HiClock, HiExclamationCircle, HiDocumentCheck } from 'react-icons/hi2';
 
 export const MilestonesTracker = ({ milestones = [], orientation = 'horizontal' }) => {
   if (!milestones || milestones.length === 0) return null;
@@ -86,15 +85,15 @@ export const MilestonesTracker = ({ milestones = [], orientation = 'horizontal' 
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   {isCompleted ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <HiCheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   ) : isSubmitted ? (
-                    <FileCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <HiDocumentCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                   ) : isRevision ? (
-                    <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <HiExclamationCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                   ) : isActive ? (
-                    <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
+                    <HiClock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
                   ) : (
-                    <Circle className="w-4 h-4 text-gray-300 dark:text-[#4c5064] shrink-0" />
+                    <HiMinusCircle className="w-4 h-4 text-gray-300 dark:text-[#4c5064] shrink-0" />
                   )}
 
                   <div className="min-w-0 flex-1">
@@ -156,15 +155,15 @@ export const MilestonesTracker = ({ milestones = [], orientation = 'horizontal' 
                 <div className="flex items-center justify-between gap-1 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <HiCheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     ) : isSubmitted ? (
-                      <FileCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <HiDocumentCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                     ) : isRevision ? (
-                      <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <HiExclamationCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                     ) : isActive ? (
-                      <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
+                      <HiClock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
                     ) : (
-                      <Circle className="w-4 h-4 text-gray-300 dark:text-[#4c5064] shrink-0" />
+                      <HiMinusCircle className="w-4 h-4 text-gray-300 dark:text-[#4c5064] shrink-0" />
                     )}
                     <span className="text-[11px] font-bold text-gray-900 dark:text-white truncate">
                       Chapter {m.order || idx + 1}

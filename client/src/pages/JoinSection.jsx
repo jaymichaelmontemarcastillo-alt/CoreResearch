@@ -125,9 +125,9 @@ export const JoinSection = () => {
             alt="CoreResearch Logo"
             className="w-10 h-10 object-contain"
           />
-          <span className="text-2xl tracking-tight">
-            <span className="font-normal text-gray-900 dark:text-white">Core</span>
-            <span className="font-semibold text-blue-600 dark:text-blue-400">Research</span>
+          <span className="font-brand text-2xl font-bold tracking-wider uppercase">
+            <span className="text-gray-900 dark:text-white">Core</span>
+            <span className="text-blue-600 dark:text-blue-400">Research</span>
           </span>
         </div>
 

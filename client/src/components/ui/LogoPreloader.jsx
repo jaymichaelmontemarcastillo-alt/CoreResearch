@@ -52,7 +52,7 @@ export const LogoPreloader = ({
       </div>
 
       {/* Brand Title */}
-      <div className="flex items-center gap-1.5 text-lg font-bold tracking-tight mb-2">
+      <div className="font-brand flex items-center gap-1.5 text-lg font-bold tracking-wider uppercase mb-2">
         <span className="text-gray-900 dark:text-white">Core</span>
         <span className="text-blue-600 dark:text-blue-500">Research</span>
       </div>

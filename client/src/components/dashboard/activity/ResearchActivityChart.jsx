@@ -23,18 +23,13 @@ export const ResearchActivityChart = ({
     <Card padding={false} className="p-4 sm:p-5 flex flex-col justify-between h-full border border-gray-200/90 dark:border-[#222433] bg-white dark:bg-[#15161e] shadow-xs space-y-3">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-[#222433] pb-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-            <HiChartBar className="w-3.5 h-3.5" />
-          </div>
-          <div>
-            <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-              Recent Research Activity
-            </h3>
-            <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
-              Daily Manuscript Edits, Task Completions &amp; Revisions (Last 7 Days)
-            </p>
-          </div>
+        <div>
+          <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
+            Recent Research Activity
+          </h3>
+          <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
+            Daily Manuscript Edits, Task Completions &amp; Revisions (Last 7 Days)
+          </p>
         </div>
 
         {total7DayActions > 0 && (

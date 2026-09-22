@@ -206,7 +206,7 @@ export const AuthLayout = ({
                 alt="CoreResearch Logo"
                 className="w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.6)] transition-transform duration-300 group-hover:scale-105"
               />
-              <span className="text-2xl sm:text-3xl font-medium tracking-tight text-white flex items-center">
+              <span className="font-brand text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white flex items-center">
                 <span>Core</span>
                 <span className="text-blue-500">Research</span>
               </span>
@@ -290,7 +290,7 @@ export const AuthLayout = ({
 
             {/* Card Bottom Footer */}
             <div className="pt-4 text-center text-[11px] text-gray-400 dark:text-[#6b6f84] shrink-0">
-              © 2026 CoreResearch
+              © 2026 <span className="font-brand font-semibold uppercase tracking-wider">CoreResearch</span>
             </div>
           </div>
         </div>

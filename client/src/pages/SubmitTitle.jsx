@@ -6,7 +6,6 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
-import { BookOpen, CheckCircle2, UploadCloud, FileText, Loader2, Check, X, AlertCircle } from 'lucide-react';
 import groupService from '../services/group.service';
 import adviserRequestService from '../services/adviserRequest.service';
 import researchWorkspaceService from '../services/researchWorkspace.service';

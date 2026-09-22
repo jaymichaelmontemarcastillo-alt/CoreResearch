@@ -69,18 +69,13 @@ export const GroupActivityCard = ({
       {/* Header with Title & Filter Buttons */}
       <div className="space-y-2 border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <HiUsers className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-                Group Activity
-              </h3>
-              <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
-                Recent Measurable Actions by Member
-              </p>
-            </div>
+          <div>
+            <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
+              Group Activity
+            </h3>
+            <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
+              Recent Measurable Actions by Member
+            </p>
           </div>
 
           <Badge variant="gray" size="sm" className="text-[10px] py-0 px-1.5">

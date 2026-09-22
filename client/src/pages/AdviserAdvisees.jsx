@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button';
 import { StatCard } from '../components/ui/StatCard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
-import { Users, BookOpen, CheckCircle2, Search, ArrowRight, Folder, Clock, TrendingUp, Calendar } from 'lucide-react';
+import { HiUsers, HiCheckCircle, HiMagnifyingGlass, HiArrowRight, HiFolder, HiClock, HiArrowTrendingUp, HiCalendar } from 'react-icons/hi2';
 import { facultyService } from '../services/faculty.service';
 import { courseService } from '../services/course.service';
 import { sectionService } from '../services/section.service';
@@ -132,21 +132,21 @@ export const AdviserAdvisees = () => {
       {toast && <Toast message={toast} variant="error" onClose={() => setToast('')} />}
 
       <PageHeader
-        icon={Users}
+        icon={HiUsers}
         title="My Advisees"
         description="Monitor research progress, review milestone drafts, and guide your assigned advisee research groups."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
-          icon={Users}
+          icon={HiUsers}
           title="Total Advisee Groups"
           value={groups.length}
           description="Assigned research groups"
           trend="neutral"
         />
         <StatCard
-          icon={TrendingUp}
+          icon={HiArrowTrendingUp}
           title="Average Progress"
           value={`${avgProgress}%`}
           description="Across all advised groups"
@@ -154,7 +154,7 @@ export const AdviserAdvisees = () => {
           valueColor="text-blue-600 dark:text-blue-400"
         />
         <StatCard
-          icon={CheckCircle2}
+          icon={HiCheckCircle}
           title="Active Workspaces"
           value={groups.length}
           description="Groups with active workspaces"
@@ -165,11 +165,11 @@ export const AdviserAdvisees = () => {
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <Folder className="w-5 h-5 text-blue-600" />
+            <HiFolder className="w-5 h-5 text-blue-600" />
             Advisee Research Groups
           </h3>
           <div className="relative max-w-xs w-full">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <HiMagnifyingGlass className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search groups by name, title, or program..."
@@ -186,7 +186,7 @@ export const AdviserAdvisees = () => {
           <div className="py-16 text-center text-gray-500">
             {groups.length === 0 ? (
               <div className="space-y-2">
-                <Users className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
+                <HiUsers className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-2" />
                 <h4 className="text-base font-bold text-gray-800 dark:text-gray-200">
                   No Assigned Advisees
                 </h4>
@@ -281,11 +281,11 @@ export const AdviserAdvisees = () => {
                         {sch ? (
                           <div className="space-y-0.5">
                             <div className="text-xs font-semibold text-gray-900 dark:text-white flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <HiCalendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                               {sch.date}
                             </div>
                             <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-gray-400 shrink-0" />
+                              <HiClock className="w-3 h-3 text-gray-400 shrink-0" />
                               {sch.startTime} – {sch.endTime}
                             </div>
                             <div className="text-[11px] text-gray-400 truncate max-w-[150px]">
@@ -304,7 +304,7 @@ export const AdviserAdvisees = () => {
                           variant="secondary"
                           onClick={() => navigate(`/faculty/workspace/${group.id}`)}
                         >
-                          Workspace <ArrowRight className="w-3 h-3 ml-1" />
+                          Workspace <HiArrowRight className="w-3 h-3 ml-1" />
                         </Button>
                       </td>
                     </tr>

@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button';
 import { StatCard } from '../components/ui/StatCard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
-import { Users, CalendarDays, CheckCircle2, Search, ArrowRight, Folder } from 'lucide-react';
+import { HiUsers, HiCalendarDays, HiCheckCircle, HiMagnifyingGlass, HiArrowRight, HiFolder } from 'react-icons/hi2';
 import { facultyService } from '../services/faculty.service';
 import { courseService } from '../services/course.service';
 import { sectionService } from '../services/section.service';
@@ -72,21 +72,21 @@ export const PanelistDefendees = () => {
       {toast && <Toast message={toast} variant="error" onClose={() => setToast('')} />}
 
       <PageHeader
-        icon={Users}
+        icon={HiUsers}
         title="My Panel Assignments"
         description="View your assigned defendees, evaluate defense readiness, and check upcoming defense schedules."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
-          icon={Users}
+          icon={HiUsers}
           title="Total Defendees"
           value={groups.length}
           description="Groups assigned to your panel"
           trend="neutral"
         />
         <StatCard
-          icon={CalendarDays}
+          icon={HiCalendarDays}
           title="Upcoming Defenses"
           value={defenses.length}
           description="Scheduled defenses pending your attendance"
@@ -94,7 +94,7 @@ export const PanelistDefendees = () => {
           valueColor="text-purple-600 dark:text-purple-400"
         />
         <StatCard
-          icon={CheckCircle2}
+          icon={HiCheckCircle}
           title="Evaluations Done"
           value="0"
           description="Completed panel rubrics"
@@ -109,7 +109,7 @@ export const PanelistDefendees = () => {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                <CalendarDays className="w-5 h-5 text-purple-600" /> 
+                <HiCalendarDays className="w-5 h-5 text-purple-600" /> 
                 Upcoming Defenses
               </h3>
             </div>
@@ -118,7 +118,7 @@ export const PanelistDefendees = () => {
               <div className="py-8 text-center text-gray-400">Loading schedules...</div>
             ) : defenses.length === 0 ? (
               <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <HiCheckCircle className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
                 <p className="text-sm font-medium text-gray-500">No upcoming defenses.</p>
               </div>
             ) : (
@@ -148,11 +148,11 @@ export const PanelistDefendees = () => {
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                <Folder className="w-5 h-5 text-amber-600" />
+                <HiFolder className="w-5 h-5 text-amber-600" />
                 Assigned Defendee Groups
               </h3>
               <div className="relative max-w-xs w-full">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <HiMagnifyingGlass className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search groups..."
@@ -197,7 +197,7 @@ export const PanelistDefendees = () => {
                             variant="secondary"
                             onClick={() => navigate(`/faculty/workspace/${group.id}`)}
                           >
-                            Workspace <ArrowRight className="w-3 h-3 ml-1" />
+                            Workspace <HiArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                         </td>
                       </tr>

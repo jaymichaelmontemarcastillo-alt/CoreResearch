@@ -8,15 +8,15 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
 import {
-  BookOpen,
-  Users,
-  CheckCircle2,
-  FileEdit,
-  ArrowLeft,
-  Calendar,
-  AlertCircle,
-  PlusCircle
-} from 'lucide-react';
+  HiBookOpen,
+  HiUsers,
+  HiCheckCircle,
+  HiPencilSquare,
+  HiArrowLeft,
+  HiCalendar,
+  HiExclamationCircle,
+  HiPlusCircle
+} from 'react-icons/hi2';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
 import researchFeedbackService from '../services/researchFeedback.service';
@@ -204,7 +204,7 @@ export const FacultyWorkspaceView = () => {
   if (!workspace) {
     return (
       <div className="py-20 text-center text-gray-500">
-        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+        <HiExclamationCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
         <h2 className="text-lg font-medium text-gray-900">Workspace Not Found</h2>
         <Button onClick={() => navigate(-1)} className="mt-4" variant="outline">Go Back</Button>
       </div>
@@ -284,7 +284,7 @@ export const FacultyWorkspaceView = () => {
         onClick={() => navigate(-1)}
         className="flex items-center text-sm font-semibold text-gray-500 hover:text-gray-700"
       >
-        <ArrowLeft className="w-4 h-4 mr-1" />
+        <HiArrowLeft className="w-4 h-4 mr-1" />
         Back to Dashboard
       </button>
 
@@ -296,7 +296,7 @@ export const FacultyWorkspaceView = () => {
               {workspace.status?.replace(/_/g, ' ')}
             </Badge>
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
+              <HiCalendar className="w-3.5 h-3.5" />
               {new Date(workspace.createdAt).toLocaleDateString()}
             </span>
           </div>
@@ -307,7 +307,7 @@ export const FacultyWorkspaceView = () => {
 
           <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-gray-400" />
+              <HiUsers className="w-4 h-4 text-gray-400" />
               <span>Group: <strong className="text-gray-800 dark:text-gray-200">{workspace.groupName}</strong></span>
             </div>
           </div>
@@ -323,7 +323,7 @@ export const FacultyWorkspaceView = () => {
             className="w-full md:w-auto text-base py-3 px-6 shadow-md"
           >
             {openingDoc ? 'Opening...' : 'Open Manuscript for Review'}
-            <FileEdit className="w-5 h-5 ml-2" />
+            <HiPencilSquare className="w-5 h-5 ml-2" />
           </Button>
           <p className="text-[10px] text-gray-400 mt-2 text-center md:text-right">
             Read-only mode. Use comments for feedback.
@@ -365,7 +365,7 @@ export const FacultyWorkspaceView = () => {
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <HiBookOpen className="w-4 h-4 text-blue-600" />
                   Manuscript Chapters Review (Chapters 1–5)
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -458,7 +458,7 @@ export const FacultyWorkspaceView = () => {
                         ) : isCompleted ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+                              <HiCheckCircle className="w-3.5 h-3.5" /> Approved
                             </span>
                             <Button
                               size="sm"
@@ -467,7 +467,7 @@ export const FacultyWorkspaceView = () => {
                               className="text-xs py-1 px-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                               title="Open in document editor"
                             >
-                              <FileEdit className="w-3.5 h-3.5 mr-1" /> View
+                              <HiPencilSquare className="w-3.5 h-3.5 mr-1" /> View
                             </Button>
                             <Button
                               size="sm"
@@ -490,7 +490,7 @@ export const FacultyWorkspaceView = () => {
                               onClick={() => handleOpenManuscript(sec.id)}
                               className="text-xs py-1 px-2.5 text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/20"
                             >
-                              <FileEdit className="w-3.5 h-3.5 mr-1" /> View Chapter
+                              <HiPencilSquare className="w-3.5 h-3.5 mr-1" /> View Chapter
                             </Button>
                           </div>
                         ) : (
@@ -505,7 +505,7 @@ export const FacultyWorkspaceView = () => {
                               className="text-xs py-1 px-2 text-gray-400 hover:text-blue-500"
                               title="View draft"
                             >
-                              <FileEdit className="w-3.5 h-3.5 mr-1" /> View
+                              <HiPencilSquare className="w-3.5 h-3.5 mr-1" /> View
                             </Button>
                           </div>
                         )}
@@ -550,7 +550,7 @@ export const FacultyWorkspaceView = () => {
                   onClick={() => setIsTaskModalOpen(true)}
                   className="ml-2"
                 >
-                  <PlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
+                  <HiPlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
                 </Button>
               )}
             </div>
@@ -558,7 +558,7 @@ export const FacultyWorkspaceView = () => {
             <div className="space-y-3">
               {filteredTasks.length === 0 ? (
                 <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                  <HiCheckCircle className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
                   <p className="text-sm font-medium text-gray-500">
                     {taskFilter === 'completed' ? 'No completed tasks yet.' : 'All pending tasks have been completed!'}
                   </p>

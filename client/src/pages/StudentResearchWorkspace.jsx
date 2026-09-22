@@ -9,20 +9,17 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
 import { useConfirm } from '../context/ConfirmContext';
 import {
-  BookOpen,
-  UserCheck,
-  Users,
-  CheckCircle2,
-  Clock,
-  FileEdit,
-  ExternalLink,
-  PlusCircle,
-  Calendar,
-  AlertCircle,
-  Lock,
-  Play,
-  Send,
-} from 'lucide-react';
+  HiBookOpen,
+  HiUserCircle,
+  HiUsers,
+  HiCheckCircle,
+  HiClock,
+  HiPencilSquare,
+  HiPlusCircle,
+  HiExclamationCircle,
+  HiPlay,
+  HiPaperAirplane,
+} from 'react-icons/hi2';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
 import researchFeedbackService from '../services/researchFeedback.service';
@@ -373,7 +370,7 @@ export const StudentResearchWorkspace = () => {
       )}
 
       <PageHeader
-        icon={BookOpen}
+        icon={HiBookOpen}
         title="Research Manuscript & Progress Workspace"
         description="Comprehensive research management workspace connecting title proposal, adviser guidance, manuscript progress, tasks, and reviews."
       />
@@ -385,7 +382,7 @@ export const StudentResearchWorkspace = () => {
       ) : !workspace ? (
         <Card className="p-8 text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-6 h-6" />
+            <HiExclamationCircle className="w-6 h-6" />
           </div>
           <h3 className="text-base font-medium text-gray-900 dark:text-white">
             No Active Research Workspace Found
@@ -416,7 +413,7 @@ export const StudentResearchWorkspace = () => {
                 }
               }}
             >
-              <FileEdit className="w-4 h-4 mr-1.5" />
+              <HiPencilSquare className="w-4 h-4 mr-1.5" />
               Open Manuscript Editor
             </Button>
           </div>
@@ -447,7 +444,7 @@ export const StudentResearchWorkspace = () => {
                       Research Group
                     </span>
                     <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-xs sm:text-sm">
-                      <Users className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
+                      <HiUsers className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
                       {workspace.groupName} <span className="text-gray-500 dark:text-[#9396a8] font-normal">({workspace.studentName})</span>
                     </span>
                   </div>
@@ -457,7 +454,7 @@ export const StudentResearchWorkspace = () => {
                       Faculty Adviser
                     </span>
                     <span className="font-medium text-gray-900 dark:text-[#f3f4f8] flex items-center gap-1.5 text-xs sm:text-sm">
-                      <UserCheck className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
+                      <HiUserCircle className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
                       {workspace.adviserName || 'Adviser Assignment in Progress'}
                     </span>
                   </div>
@@ -502,7 +499,7 @@ export const StudentResearchWorkspace = () => {
                     disabled={openingDoc}
                     onClick={handleOpenManuscript}
                   >
-                    <FileEdit className="w-3.5 h-3.5 mr-1.5" />
+                    <HiPencilSquare className="w-3.5 h-3.5 mr-1.5" />
                     {openingDoc ? 'Opening...' : 'Open'}
                   </Button>
                 </div>
@@ -606,7 +603,7 @@ export const StudentResearchWorkspace = () => {
                                 className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/60 dark:hover:bg-blue-500/15 transition-all shadow-xs gap-1 py-1 px-2.5 h-auto"
                                 onClick={() => handleStartChapter(sec.id, sec.name)}
                               >
-                                <Play className="w-3 h-3 fill-current" />
+                                <HiPlay className="w-3 h-3 fill-current" />
                                 Start Working
                               </Button>
                             )}
@@ -617,18 +614,18 @@ export const StudentResearchWorkspace = () => {
                                 className="text-[11px] font-semibold shadow-xs gap-1 py-1 px-2.5 h-auto"
                                 onClick={() => handleSubmitChapter(sec.id, sec.name)}
                               >
-                                <Send className="w-3 h-3" />
+                                <HiPaperAirplane className="w-3 h-3" />
                                 Submit
                               </Button>
                             )}
                             {isSubmitted && (
                               <span className="text-[10px] text-blue-500 font-medium px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 flex items-center gap-1">
-                                <Clock className="w-3 h-3 animate-pulse" /> Awaiting Review
+                                <HiClock className="w-3 h-3 animate-pulse" /> Awaiting Review
                               </span>
                             )}
                             {isCompleted && (
                               <span className="text-[10px] text-emerald-500 font-medium px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Approved
+                                <HiCheckCircle className="w-3 h-3" /> Approved
                               </span>
                             )}
                           </>
@@ -663,7 +660,7 @@ export const StudentResearchWorkspace = () => {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    <HiCheckCircle className="w-4 h-4 text-blue-500" />
                     Research Tasks ({tasks.length})
                   </h3>
                 </div>
@@ -708,7 +705,7 @@ export const StudentResearchWorkspace = () => {
                       variant="primary"
                       onClick={() => setIsTaskModalOpen(true)}
                     >
-                      <PlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
+                      <HiPlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
                     </Button>
                   )}
                 </div>

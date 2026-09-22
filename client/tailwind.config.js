@@ -84,7 +84,9 @@ export default {
         info: '#06b6d4',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Poppins', 'system-ui', '-apple-system', 'sans-serif'],
+        brand: ['Montserrat', 'Futura', 'League Spartan', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        geometric: ['Montserrat', 'Futura', 'League Spartan', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         'xl': '12px',

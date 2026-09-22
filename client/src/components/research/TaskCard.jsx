@@ -4,16 +4,13 @@ import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import {
-  Clock,
-  Calendar,
-  CheckCircle2,
-  AlertTriangle,
-  Play,
-  Send,
-  Trash2,
-  FileText,
-  User,
-} from 'lucide-react';
+  HiCalendar,
+  HiCheckCircle,
+  HiExclamationTriangle,
+  HiPlay,
+  HiPaperAirplane,
+  HiTrash,
+} from 'react-icons/hi2';
 
 const PRIORITY_STYLES = {
   low: { label: 'Low Priority', variant: 'gray' },
@@ -85,7 +82,7 @@ export const TaskCard = ({
         </div>
 
         <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-[#9396a8]">
-          <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
+          <HiCalendar className="w-3.5 h-3.5 text-gray-400 dark:text-[#6b6f84]" />
           <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No date'}</span>
         </div>
       </div>
@@ -160,7 +157,7 @@ export const TaskCard = ({
                   variant="outline"
                   onClick={() => onStatusChange?.(task.id, 'in_progress')}
                 >
-                  <Play className="w-3.5 h-3.5 mr-1" /> Start Task
+                  <HiPlay className="w-3.5 h-3.5 mr-1" /> Start Task
                 </Button>
               )}
 
@@ -170,7 +167,7 @@ export const TaskCard = ({
                   variant="primary"
                   onClick={() => setShowSubmitModal(true)}
                 >
-                  <Send className="w-3.5 h-3.5 mr-1" /> Submit Work
+                  <HiPaperAirplane className="w-3.5 h-3.5 mr-1" /> Submit Work
                 </Button>
               )}
             </>
@@ -186,14 +183,14 @@ export const TaskCard = ({
                     variant="success"
                     onClick={() => onReview?.(task.id, 'completed')}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve &amp; Complete
+                    <HiCheckCircle className="w-3.5 h-3.5 mr-1" /> Approve &amp; Complete
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => onReview?.(task.id, 'revision_required')}
                   >
-                    <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Request Revision
+                    <HiExclamationTriangle className="w-3.5 h-3.5 mr-1" /> Request Revision
                   </Button>
                 </>
               )}
@@ -204,7 +201,7 @@ export const TaskCard = ({
                 className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                 onClick={() => onDelete?.(task.id)}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <HiTrash className="w-3.5 h-3.5" />
               </Button>
             </>
           )}

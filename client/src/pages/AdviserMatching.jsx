@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
-import { Users, CheckCircle2, ChevronRight, AlertCircle, Clock, XCircle, Sparkles, Tag } from 'lucide-react';
+import { HiUsers, HiChevronRight, HiExclamationCircle, HiClock, HiXCircle, HiSparkles, HiTag } from 'react-icons/hi2';
 import groupService from '../services/group.service';
 import adviserRequestService from '../services/adviserRequest.service';
 import adviserMatchingService from '../services/adviserMatching.service';
@@ -243,7 +243,7 @@ export const AdviserMatching = () => {
       <div className="py-20 flex flex-col items-center gap-6">
         <div className="relative">
           <div className="w-16 h-16 rounded-full border-4 border-blue-200 dark:border-blue-800 border-t-blue-600 dark:border-t-blue-400 animate-spin" />
-          <Sparkles className="w-6 h-6 text-blue-600 dark:text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+          <HiSparkles className="w-6 h-6 text-blue-600 dark:text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
         </div>
         <div className="text-center">
           <p className="text-gray-700 dark:text-gray-200 font-medium text-lg animate-pulse">
@@ -262,7 +262,7 @@ export const AdviserMatching = () => {
     return (
       <div className="max-w-2xl mx-auto space-y-6 mt-8">
         <Card className="p-8 text-center border-t-4 border-t-red-500">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <HiXCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-2">
             Matching Service Unavailable
           </h2>
@@ -287,7 +287,7 @@ export const AdviserMatching = () => {
     return (
       <div className="max-w-2xl mx-auto space-y-6 mt-8">
         <Card className="p-8 text-center border-t-4 border-t-amber-500">
-          <Clock className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+          <HiClock className="w-16 h-16 text-amber-500 mx-auto mb-4" />
           <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-2">Waiting for Adviser Acceptance</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
             Your request has been sent to <strong>{pendingRequest.adviserName}</strong>. 
@@ -328,13 +328,13 @@ export const AdviserMatching = () => {
       {toast && <Toast message={toast} variant={toast.includes('success') ? 'success' : 'error'} onClose={() => setToast('')} />}
 
       <PageHeader
-        icon={Users}
+        icon={HiUsers}
         title="Top Recommended Advisers"
         description="Based on your research title and description, here are the most compatible faculty members."
       />
 
       <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl flex items-start gap-4 mb-6">
-        <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+        <HiExclamationCircle className="w-6 h-6 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
         <div>
           <h4 className="text-sm font-bold text-blue-900 dark:text-blue-200">Matching Results</h4>
           <p className="text-xs text-blue-800 dark:text-blue-300 mt-1">
@@ -345,7 +345,7 @@ export const AdviserMatching = () => {
 
       {matches.length === 0 && (
         <Card className="p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <HiExclamationCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Suitable Matches Found</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-4">
             No adviser matches were found for your research title. This may happen if no advisers have matching specializations.
@@ -413,7 +413,7 @@ export const AdviserMatching = () => {
                         key={ki}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
                       >
-                        <Tag className="w-2.5 h-2.5" />
+                        <HiTag className="w-2.5 h-2.5" />
                         {kw}
                       </span>
                     ))}
@@ -475,7 +475,7 @@ export const AdviserMatching = () => {
                 onClick={() => handleSelectAdviser(adviser)}
               >
                 {submittingId === adviser.adviserId ? 'Sending...' : 'Select Adviser'}
-                <ChevronRight className="w-4 h-4 ml-1" />
+                <HiChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
 
