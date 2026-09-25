@@ -55,6 +55,9 @@ export const researchTaskService = {
       status: 'todo',
       dueDate: input.dueDate,
       revisionHistory: [],
+      createdBy: input.createdBy,
+      createdByName: input.createdByName,
+      createdByRole: input.createdByRole,
       createdAt: now,
       updatedAt: now,
     };

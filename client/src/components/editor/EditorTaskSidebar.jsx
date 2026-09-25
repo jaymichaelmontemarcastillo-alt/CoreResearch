@@ -1,5 +1,6 @@
 // src/components/editor/EditorTaskSidebar.jsx
 import React, { useState, useEffect } from 'react';
+import { getSelectedText, addContentControlAtSelection } from '../../services/editorConnector';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import {
@@ -42,10 +43,15 @@ export const EditorTaskSidebar = ({
   userProfile,
   isAdviser = false,
   isStudent = false,
+  isPanelist = false,
+  activeChapterId,
+  setActiveChapterId,
   onTaskStatusChange,
   onTaskReview,
   onNavigateToAnchor,
   onCreateTask,
+  onGradeProposal,
+  defenseType,
 }) => {
   const [filter, setFilter] = useState('active'); // 'active' | 'completed' | 'all'
   const [expandedTaskId, setExpandedTaskId] = useState(null);
@@ -70,6 +76,48 @@ export const EditorTaskSidebar = ({
   const [reviewingTaskId, setReviewingTaskId] = useState(null);
   const [revisionFeedback, setRevisionFeedback] = useState('');
   const [showRevisionForm, setShowRevisionForm] = useState(null);
+
+  // Panelist Review
+  const [panelistFeedback, setPanelistFeedback] = useState('');
+  const [isSubmittingPanelist, setIsSubmittingPanelist] = useState(false);
+  const [panelistTab, setPanelistTab] = useState('chapters'); // 'chapters' | 'comments'
+
+  // Student specific view
+  const [studentTab, setStudentTab] = useState('tasks'); // 'tasks' | 'panel_comments'
+  const [selectedPanelistId, setSelectedPanelistId] = useState(null);
+
+  const handlePanelistSubmit = async () => {
+    if (!panelistFeedback.trim()) return;
+    setIsSubmittingPanelist(true);
+    try {
+      const selectedText = await getSelectedText();
+      let controlId = null;
+      if (selectedText) {
+        const tag = `comment_${Date.now()}`;
+        controlId = await addContentControlAtSelection(tag);
+      }
+      
+      const currSec = (workspace?.sections || []).find(s => s.id === activeChapterId);
+      const chapterName = currSec ? currSec.name : 'Selected text';
+
+      await onCreateTask({
+        title: `Revision Required - ${chapterName}`,
+        description: panelistFeedback,
+        priority: 'high',
+        type: 'anchored',
+        status: 'revision_required',
+        anchor: {
+          selectedText: selectedText || '',
+          contentControlId: controlId,
+        }
+      });
+      setPanelistFeedback('');
+    } catch (err) {
+      setError('Failed to submit revision: ' + err.message);
+    } finally {
+      setIsSubmittingPanelist(false);
+    }
+  };
 
   // Creation actions
   const handleStartCreateTask = () => {
@@ -146,6 +194,12 @@ export const EditorTaskSidebar = ({
 
   // Filter tasks
   const filteredTasks = tasks.filter((t) => {
+    // If the user is a panelist, they should only see their own comments
+    if (isPanelist && t.createdBy !== currentUser?.uid) return false;
+
+    // For students and advisers in the main 'tasks' tab, hide panelist comments
+    if (!isPanelist && studentTab === 'tasks' && (t.createdByRole === 'panelist' || (!t.createdByRole && t.title.startsWith('Revision Required -')))) return false;
+
     const isDone = t.status === 'completed';
     if (filter === 'active') return !isDone;
     if (filter === 'completed') return isDone;
@@ -154,6 +208,142 @@ export const EditorTaskSidebar = ({
 
   if (!isOpen) return null;
 
+  if (isPanelist) {
+    return (
+      <div className="w-[340px] min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-30 shadow-xl">
+        <div className="px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-[#12131b] shrink-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Panelist Review</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1c1d28]">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* TABS */}
+        <div className="flex border-b border-gray-200 dark:border-[#1c1d28] bg-gray-50 dark:bg-[#12131b] px-2 shrink-0">
+          <button 
+            className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${panelistTab === 'chapters' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent'}`}
+            onClick={() => setPanelistTab('chapters')}
+          >
+            Chapters
+          </button>
+          <button 
+            className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${panelistTab === 'comments' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent'}`}
+            onClick={() => setPanelistTab('comments')}
+          >
+            Comments
+          </button>
+        </div>
+
+        {error && (
+          <div className="mx-3 mt-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 text-[11px] text-rose-600 dark:text-rose-400 flex items-start gap-2 shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>{error}</span>
+            <button onClick={() => setError('')} className="ml-auto text-rose-400 hover:text-rose-600">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {panelistTab === 'chapters' ? (
+            <div className="flex-1 p-4 flex flex-col">
+              <div className="mb-6">
+                <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">Select Chapter</h4>
+                <select
+                  value={activeChapterId}
+                  onChange={(e) => setActiveChapterId && setActiveChapterId(e.target.value)}
+                  className="w-full bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-500 outline-none appearance-none"
+                >
+                  {(workspace?.sections || []).map((sec, idx) => (
+                    <option key={sec.id} value={sec.id}>
+                      Chapter {idx + 1}: {sec.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-auto pt-4 space-y-3">
+                {/* Grade Proposal Defense Button — only for proposal_defense type */}
+                {defenseType === 'proposal_defense' && onGradeProposal && (
+                  <div className="mb-2">
+                    <button
+                      onClick={onGradeProposal}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4" />
+                      </svg>
+                      Grade Proposal Defense
+                    </button>
+                    <p className="text-[10px] text-center text-gray-400 dark:text-gray-500 mt-1.5">Open the LSPU Proposal Defense rubric</p>
+                  </div>
+                )}
+
+                <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">Flag for Revision</h4>
+                <textarea
+                  className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#0e0f15] text-gray-900 dark:text-white focus:ring-1 focus:ring-rose-500 focus:outline-none min-h-[120px] mb-3 resize-none placeholder:text-gray-400 shadow-sm"
+                  placeholder="Describe what needs to be revised or corrected..."
+                  value={panelistFeedback}
+                  onChange={(e) => setPanelistFeedback(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full text-[11px] py-2 font-bold text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30 hover:bg-rose-50 dark:hover:bg-rose-500/10 shadow-sm"
+                  onClick={handlePanelistSubmit}
+                  disabled={isSubmittingPanelist}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
+                  {isSubmittingPanelist ? 'Submitting...' : 'Flag for Revision'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">Comments</h4>
+                {filteredTasks.length === 0 ? (
+                  <p className="text-[11px] text-gray-400 text-center py-4">No review comments yet.</p>
+                ) : (
+                  filteredTasks.map(task => (
+                    <div key={task.id} className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm">
+                      <div className="flex items-center gap-1.5 mb-2 text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Revision Required
+                      </div>
+                      <p className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-line mb-3">
+                        {task.description || task.title}
+                      </p>
+                      
+                      {task.anchor?.selectedText && (
+                        <div className="bg-gray-50 dark:bg-[#0e0f15] p-2 rounded border border-gray-100 dark:border-[#222433] text-[11px] mb-2">
+                          <p className="text-gray-600 dark:text-[#9396a8] italic line-clamp-3">"{task.anchor.selectedText}"</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-[#1c1d28]">
+                        <span className="text-[10px] text-gray-500">{task.title.replace('Revision Required - ', '') || 'Selected text'}</span>
+                        {(task.anchor?.contentControlId || task.anchor?.selectedText) && (
+                          <button 
+                            onClick={() => onNavigateToAnchor?.(task)}
+                            className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Target className="w-3 h-3" /> Go to text
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-[340px] min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-30 shadow-xl">
       {/* Header */}
@@ -161,11 +351,13 @@ export const EditorTaskSidebar = ({
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-blue-500" />
           <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-            Manuscript Tasks
+            {!isPanelist && studentTab === 'panel_comments' ? 'Panelist Reviews' : 'Manuscript Tasks'}
           </h3>
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
-            {tasks.length}
-          </span>
+          {(isPanelist || studentTab === 'tasks') && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
+              {filteredTasks.length}
+            </span>
+          )}
         </div>
         <button
           onClick={onClose}
@@ -174,6 +366,24 @@ export const EditorTaskSidebar = ({
           <X className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Tabs for Student and Adviser */}
+      {!isPanelist && (
+        <div className="flex border-b border-gray-200 dark:border-[#1c1d28] bg-gray-50 dark:bg-[#12131b] px-2 shrink-0">
+          <button 
+            className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${studentTab === 'tasks' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent'}`}
+            onClick={() => setStudentTab('tasks')}
+          >
+            Adviser Tasks
+          </button>
+          <button 
+            className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${studentTab === 'panel_comments' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent'}`}
+            onClick={() => { setStudentTab('panel_comments'); setSelectedPanelistId(null); }}
+          >
+            Panelist Comments
+          </button>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -264,6 +474,98 @@ export const EditorTaskSidebar = ({
               </Button>
             </div>
           </form>
+        </div>
+      ) : !isPanelist && studentTab === 'panel_comments' ? (
+        <div className="flex-1 overflow-y-auto flex flex-col p-4 bg-gray-50/50 dark:bg-[#0e0f15]">
+          {(() => {
+            const panelistComments = tasks.filter(t => t.createdByRole === 'panelist' || (!t.createdByRole && t.title.startsWith('Revision Required -')));
+            const panelistsMap = {};
+            panelistComments.forEach(t => {
+              const id = t.createdBy || t.createdByName || 'unknown';
+              if (!panelistsMap[id]) {
+                panelistsMap[id] = { 
+                  id, 
+                  name: t.createdByName || 'Unknown Panelist', 
+                  role: (t.createdByRole === 'panelist' || !t.createdByRole) ? 'Panelist' : t.createdByRole,
+                  tasks: [] 
+                };
+              } else if (!panelistsMap[id].name || panelistsMap[id].name === 'Unknown Panelist') {
+                if (t.createdByName) panelistsMap[id].name = t.createdByName;
+                if (t.createdByRole) panelistsMap[id].role = t.createdByRole;
+              }
+              panelistsMap[id].tasks.push(t);
+            });
+            const panelistsList = Object.values(panelistsMap);
+
+            if (panelistsList.length === 0) {
+              return <p className="text-[11px] text-gray-400 text-center py-4">No panelist comments yet.</p>;
+            }
+
+            if (!selectedPanelistId) {
+              return (
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Select Panelist</h4>
+                  {panelistsList.map(panelist => (
+                    <button
+                      key={panelist.id}
+                      onClick={() => setSelectedPanelistId(panelist.id)}
+                      className="w-full text-left p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-semibold text-xs text-gray-900 dark:text-white capitalize">{panelist.name}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5 capitalize">{panelist.role} • {panelist.tasks.length} comments</div>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-gray-400 -rotate-90" />
+                    </button>
+                  ))}
+                </div>
+              );
+            }
+
+            const selectedPanelist = panelistsList.find(p => p.id === selectedPanelistId);
+            return (
+              <div className="flex flex-col space-y-3">
+                <button
+                  onClick={() => setSelectedPanelistId(null)}
+                  className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center mb-2"
+                >
+                  <ChevronDown className="w-3 h-3 rotate-90 mr-1" /> Back to Panelists
+                </button>
+                <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                  Comments by {selectedPanelist?.name}
+                </h4>
+                {selectedPanelist?.tasks.map(task => (
+                  <div key={task.id} className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm">
+                    <div className="flex items-center gap-1.5 mb-2 text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Revision Required
+                    </div>
+                    <p className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-line mb-3">
+                      {task.description || task.title}
+                    </p>
+                    
+                    {task.anchor?.selectedText && (
+                      <div className="bg-gray-50 dark:bg-[#0e0f15] p-2 rounded border border-gray-100 dark:border-[#222433] text-[11px] mb-2">
+                        <p className="text-gray-600 dark:text-[#9396a8] italic line-clamp-3">"{task.anchor.selectedText}"</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-[#1c1d28]">
+                      <span className="text-[10px] text-gray-500">{task.title.replace('Revision Required - ', '') || 'Selected text'}</span>
+                      {(task.anchor?.contentControlId || task.anchor?.selectedText) && (
+                        <button 
+                          onClick={() => onNavigateToAnchor?.(task)}
+                          className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <Target className="w-3 h-3" /> Go to text
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       ) : (
         <>

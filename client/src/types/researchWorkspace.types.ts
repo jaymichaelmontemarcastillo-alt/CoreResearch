@@ -112,6 +112,9 @@ export interface ResearchTask {
   submittedAt?: string;
   completedAt?: string;
   reviewedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -133,6 +136,9 @@ export interface CreateTaskInput {
   anchor?: TaskAnchor;
   priority: TaskPriority;
   dueDate: string;
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
 }
 
 export interface ResearchFeedback {

@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { OnlyOfficeEditor } from '../components/editor/OnlyOfficeEditor';
 import { EditorTaskSidebar } from '../components/editor/EditorTaskSidebar';
+import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Textarea';
@@ -22,6 +23,7 @@ import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchFeedbackService from '../services/researchFeedback.service';
 import researchTaskService from '../services/researchTask.service';
 import notificationService from '../services/notification.service';
+import gradingService from '../services/grading.service';
 import { navigateToContentControl, navigateToText, navigateToComment } from '../services/editorConnector';
 
 export const DocumentEditorPage = () => {
@@ -170,6 +172,9 @@ export const DocumentEditorPage = () => {
     const isPanelistMode = isPanelist;
     const urlWorkspaceId = searchParams.get('workspaceId');
     const urlChapterId = searchParams.get('chapterId');
+    // Defense metadata passed via URL (set when navigating from Panelist view)
+    const urlDefenseType = searchParams.get('defenseType') || null; // 'proposal_defense' | 'final_defense'
+    const urlDefenseId = searchParams.get('defenseId') || null;
 
     const [workspace, setWorkspace] = useState(null);
     const [activeChapterId, setActiveChapterId] = useState(urlChapterId || '');
@@ -185,6 +190,33 @@ export const DocumentEditorPage = () => {
     const [isTaskSidebarOpen, setIsTaskSidebarOpen] = useState(false);
     const isStudent = userProfile?.role === 'student';
     const focusTaskId = searchParams.get('focusTaskId');
+
+    // Proposal Grading Modal state
+    const [isGradingModalOpen, setIsGradingModalOpen] = useState(false);
+    const [existingProposalEval, setExistingProposalEval] = useState(null);
+    const [gradingLoading, setGradingLoading] = useState(false);
+
+    // Load existing proposal evaluation for this panelist (if any) when modal is about to open
+    useEffect(() => {
+      if (!isPanelistMode || !urlDefenseId || !currentUser?.uid) return;
+      if (urlDefenseType !== 'proposal_defense') return;
+
+      let mounted = true;
+      const loadExistingEval = async () => {
+        try {
+          const existing = await gradingService.getProposalEvaluationByPanelist(
+            urlDefenseId,
+            currentUser.uid
+          );
+          if (mounted) setExistingProposalEval(existing);
+        } catch (err) {
+          console.warn('[DocumentEditorPage] Failed to load existing proposal eval:', err);
+        }
+      };
+
+      loadExistingEval();
+      return () => { mounted = false; };
+    }, [urlDefenseId, urlDefenseType, currentUser?.uid, isPanelistMode]);
 
     // Subscribe to workspace & feedback if workspaceId is present or document is linked
     useEffect(() => {
@@ -263,6 +295,25 @@ export const DocumentEditorPage = () => {
       }
     }, [focusTaskId, tasks]);
 
+    const handleGradeProposalSubmit = async (input) => {
+      try {
+        await gradingService.submitProposalEvaluation(input);
+        setToastMessage('Proposal evaluation submitted!');
+        setTimeout(() => setToastMessage(''), 5000);
+        // Refresh existing eval so modal shows updated scores if reopened
+        if (urlDefenseId && currentUser?.uid) {
+          const updated = await gradingService.getProposalEvaluationByPanelist(
+            urlDefenseId,
+            currentUser.uid
+          );
+          setExistingProposalEval(updated);
+        }
+      } catch (err) {
+        console.error('[DocumentEditorPage] Failed to submit proposal evaluation:', err);
+        throw err; // re-throw so modal can show the error
+      }
+    };
+
     const handleEditorTaskCreate = async (taskData) => {
       if (!workspace) return;
       try {
@@ -276,6 +327,9 @@ export const DocumentEditorPage = () => {
           studentName: workspace.studentName,
           adviserId: workspace.adviserId || userProfile?.uid,
           adviserName: workspace.adviserName || userProfile?.fullName,
+          createdBy: currentUser?.uid || userProfile?.uid,
+          createdByName: userProfile?.fullName || (userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : null) || currentUser?.displayName || userProfile?.email || 'Unknown User',
+          createdByRole: isPanelistMode ? 'panelist' : (userProfile?.role || 'user'),
         });
         setToastMessage('Task created successfully');
       } catch (err) {
@@ -564,21 +618,10 @@ export const DocumentEditorPage = () => {
             </div>
           </div>
 
-        {/* Panelist Review Mode Banner */}
-        {isPanelistMode && (
-          <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between z-10 shrink-0">
-            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs sm:text-sm font-medium">
-              <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
-              <span><strong>Panelist Review Mode:</strong> You have view and comment privileges only. Direct editing of the manuscript is restricted.</span>
-            </div>
-            <span className="text-[11px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-amber-200/60 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200">
-              Comment Only
-            </span>
-          </div>
-        )}
+        {/* Panelist Review Mode Banner Removed */}
 
-        {/* Faculty / Adviser / Panelist Chapter Review & Revision Banner */}
-        {workspace && (userProfile?.role === 'adviser' || userProfile?.role === 'panelist' || userProfile?.role === 'faculty' || userProfile?.role === 'research_coordinator' || isPanelistMode) && (
+        {/* Faculty / Adviser Chapter Review & Revision Banner */}
+        {workspace && !isPanelistMode && (userProfile?.role === 'adviser' || userProfile?.role === 'faculty' || userProfile?.role === 'research_coordinator') && (
           <div className="bg-gradient-to-r from-blue-900/40 via-indigo-950/40 to-slate-900 border-b border-blue-500/30 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-10 shrink-0 shadow-sm">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
@@ -590,7 +633,7 @@ export const DocumentEditorPage = () => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-white tracking-wide">
-                    {isPanelist ? 'Panelist Defense Review:' : 'Faculty Review:'}
+                    Faculty Review:
                   </span>
                   
                   {/* Chapter Selector Dropdown */}
@@ -631,9 +674,7 @@ export const DocumentEditorPage = () => {
                 </div>
 
                 <p className="text-[11px] text-blue-200/80 hidden sm:block mt-0.5">
-                  {isPanelist
-                    ? 'Highlight text to add review comments. When students resolve your comments, open Comments & Revisions to approve that part.'
-                    : 'Highlight manuscript text to add comments for revisions. When satisfied, click Approve Chapter below.'}
+                  Highlight manuscript text to add comments for revisions. When satisfied, click Approve Chapter below.
                 </p>
               </div>
             </div>
@@ -960,13 +1001,48 @@ export const DocumentEditorPage = () => {
               userProfile={userProfile}
               isAdviser={isAdviser}
               isStudent={isStudent}
+              isPanelist={isPanelistMode}
+              activeChapterId={activeChapterId}
+              setActiveChapterId={setActiveChapterId}
               onTaskStatusChange={handleEditorTaskStatusChange}
               onTaskReview={handleEditorTaskReview}
               onNavigateToAnchor={handleNavigateToAnchor}
               onCreateTask={handleEditorTaskCreate}
+              defenseType={urlDefenseType}
+              onGradeProposal={isPanelistMode && urlDefenseType === 'proposal_defense' ? () => setIsGradingModalOpen(true) : undefined}
             />
           )}
         </div>
+
+        {/* Proposal Defense Grading Modal */}
+        <ProposalGradingModal
+          isOpen={isGradingModalOpen}
+          onClose={() => setIsGradingModalOpen(false)}
+          onSubmit={handleGradeProposalSubmit}
+          defenseType={urlDefenseType}
+          defenseId={urlDefenseId}
+          panelistId={currentUser?.uid}
+          panelistName={
+            userProfile?.fullName ||
+            (userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : null) ||
+            currentUser?.displayName ||
+            'Panelist'
+          }
+          groupDetails={{
+            adviser: location.state?.adviserName || workspace?.adviserName || '',
+            expert: location.state?.panelistRole || workspace?.specialization || '',
+            title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || '',
+            date: new URLSearchParams(location.search).get('defenseDate') || '',
+            time: new URLSearchParams(location.search).get('defenseTime') || '',
+            groupNo: workspace?.groupNo || workspace?.groupId || '',
+            proponents: location.state?.groupMembers?.length
+              ? location.state.groupMembers
+              : workspace?.members?.map(m => m.name || m.fullName || m.email) || [],
+            workspaceId: workspace?.id,
+            projectId: workspace?.projectId,
+          }}
+          existingEval={existingProposalEval}
+        />
       </div>
     );
 };
