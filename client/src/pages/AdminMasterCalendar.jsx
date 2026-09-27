@@ -750,27 +750,27 @@ export const MasterCalendar = () => {
                   return (
                     <div
                       key={ev.id}
-                      className="p-4 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1c1d28] space-y-2.5 hover:border-blue-200 dark:hover:border-blue-900/40 transition group"
+                      className="p-3 sm:p-4 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1c1d28] space-y-2 sm:space-y-2.5 hover:border-blue-200 dark:hover:border-blue-900/40 transition group"
                     >
                       {/* Event Header: Time & Badges */}
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-mono font-bold text-gray-700 dark:text-gray-300">
+                          <span className="text-[10px] sm:text-xs font-mono font-bold text-gray-700 dark:text-gray-300">
                             {ev.time || "All Day"} {ev.endTime ? `- ${ev.endTime}` : ""}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge variant={meta.badgeVariant} size="sm">
+                        <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                          <Badge variant={meta.badgeVariant} size="sm" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
                             {meta.label}
                           </Badge>
 
                           {ev.isOverdue ? (
-                            <Badge variant="rose" size="sm" className="font-extrabold animate-pulse">
+                            <Badge variant="rose" size="sm" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5 font-extrabold animate-pulse">
                               OVERDUE
                             </Badge>
                           ) : (
-                            <Badge variant="gray" size="sm">
+                            <Badge variant="gray" size="sm" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
                               {ev.statusLabel}
                             </Badge>
                           )}
@@ -779,37 +779,37 @@ export const MasterCalendar = () => {
 
                       {/* Event Title & Group Info */}
                       <div>
-                        <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
+                        <h4 className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white leading-snug">
                           {ev.title}
                         </h4>
                         {ev.groupName && (
-                          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-[#9396a8] mt-1 font-medium">
-                            <HiUsers className="w-3.5 h-3.5 text-gray-400" />
-                            <span>{ev.groupName}</span>
+                          <div className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 dark:text-[#9396a8] mt-0.5 sm:mt-1 font-medium">
+                            <HiUsers className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 shrink-0" />
+                            <span className="truncate">{ev.groupName}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Panelist Role Highlight (if applicable) */}
                       {ev.panelistRole && (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2.5 py-1 rounded-lg border border-purple-200/60 dark:border-purple-800/40 w-max">
-                          <HiAcademicCap className="w-4 h-4" />
-                          <span>Your Role: {ev.panelistRole}</span>
+                        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg border border-purple-200/60 dark:border-purple-800/40 w-max">
+                          <HiAcademicCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span>Role: {ev.panelistRole}</span>
                         </div>
                       )}
 
                       {/* Details Breakdown */}
-                      <div className="pt-2 border-t border-gray-200/50 dark:border-[#262838] text-xs space-y-1 text-gray-600 dark:text-[#9396a8]">
+                      <div className="pt-2 border-t border-gray-200/50 dark:border-[#262838] text-[11px] sm:text-xs space-y-1 text-gray-600 dark:text-[#9396a8]">
                         {ev.researchTitle && (
-                          <p>
-                            <span className="font-medium text-gray-400">Research Title:</span>{" "}
+                          <p className="line-clamp-2">
+                            <span className="font-medium text-gray-400">Research:</span>{" "}
                             <span className="text-gray-800 dark:text-gray-200 font-semibold">{ev.researchTitle}</span>
                           </p>
                         )}
 
                         {ev.chapter && (
-                          <p>
-                            <span className="font-medium text-gray-400">Chapter / Section:</span>{" "}
+                          <p className="truncate">
+                            <span className="font-medium text-gray-400">Chapter:</span>{" "}
                             <span className="text-gray-800 dark:text-gray-200 font-medium">{ev.chapter}</span>
                           </p>
                         )}
@@ -822,15 +822,15 @@ export const MasterCalendar = () => {
                         )}
 
                         {ev.assignedBy && (
-                          <p>
-                            <span className="font-medium text-gray-400">Assigned By:</span>{" "}
+                          <p className="truncate">
+                            <span className="font-medium text-gray-400">By:</span>{" "}
                             <span className="text-gray-800 dark:text-gray-200 font-medium">{ev.assignedBy}</span>
                           </p>
                         )}
 
                         {ev.venue && (
-                          <p className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
-                            <HiMapPin className="w-3.5 h-3.5" />
+                          <p className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium truncate">
+                            <HiMapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                             <span>{ev.venue}</span>
                           </p>
                         )}
@@ -841,9 +841,9 @@ export const MasterCalendar = () => {
                         <div className="pt-2 flex justify-end">
                           <Link
                             to={ev.link}
-                            className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                            className="text-[11px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
                           >
-                            Open Record in Module <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
+                            Open Module <HiArrowTopRightOnSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           </Link>
                         </div>
                       )}

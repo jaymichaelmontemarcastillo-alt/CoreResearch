@@ -59,10 +59,10 @@ export const Header = ({ onOpenMobileMenu }) => {
     
     // Simple navigation rules based on notification title/type
     if (notif.title.toLowerCase().includes('adviser request')) {
-      if (userProfile?.role === 'adviser') {
-        navigate('/dashboard');
+      if (userProfile?.role === 'adviser' || userProfile?.role === 'faculty') {
+        navigate('/adviser-requests');
       } else {
-        navigate('/research-workspace');
+        navigate('/research/workspace');
       }
     }
   };
@@ -112,6 +112,7 @@ export const Header = ({ onOpenMobileMenu }) => {
     if (path.startsWith("/admin/users")) return "User Directory";
     if (path.startsWith("/admin/courses")) return "Courses & Sections";
     if (path === "/research-documents") return "Research Documents";
+    if (path === "/adviser-requests") return "Adviser Requests";
     if (path === "/onboarding") return "Profile Setup";
     return "Dashboard";
   };
@@ -139,19 +140,19 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   return (
     <header
-      className="sticky top-0 z-50 h-[76px] pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
+      className="sticky top-0 z-50 h-14 sm:h-[76px] sm:pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
     >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
         <button
           onClick={onOpenMobileMenu}
-          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-600 dark:text-[#9396a8] transition shrink-0"
+          className="lg:hidden p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a1b26] text-gray-600 dark:text-[#9396a8] transition shrink-0"
           aria-label="Open navigation menu"
         >
-          <HiBars3 className="w-6 h-6" />
+          <HiBars3 className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
-        <h1 className="text-2xl sm:text-[26px] font-medium text-gray-900 dark:text-white tracking-tight">
+        <h1 className="text-lg sm:text-2xl lg:text-[26px] font-semibold sm:font-medium text-gray-900 dark:text-white tracking-tight truncate">
           {getPageTitle()}
         </h1>
       </div>
@@ -159,7 +160,7 @@ export const Header = ({ onOpenMobileMenu }) => {
       {/* RIGHT SECTION — DASHBOARD ------------- bell --- profile */}
       <div className="flex items-center gap-3 shrink-0">
         {/* Notification Icon & Dropdown */}
-        <div className="relative" ref={notificationDropdownRef}>
+        <div className="relative hidden sm:block" ref={notificationDropdownRef}>
           <button 
             onClick={() => {
               setNotificationDropdownOpen(!notificationDropdownOpen);
@@ -175,7 +176,7 @@ export const Header = ({ onOpenMobileMenu }) => {
           </button>
 
           {notificationDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-32px)] sm:w-96 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl z-50 overflow-hidden animate-scale-in flex flex-col max-h-[75vh] sm:max-h-[85vh]">
               <div className="p-3 border-b border-gray-100 dark:border-[#222433] flex items-center justify-between bg-gray-50/50 dark:bg-[#111218]">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">Notifications</h3>
                 {unreadCount > 0 && (
@@ -246,7 +247,7 @@ export const Header = ({ onOpenMobileMenu }) => {
         </div>
 
         {/* Subtle Divider */}
-        <div className="h-5 w-px bg-gray-200 dark:bg-[#222433] mx-0.5" />
+        <div className="h-5 w-px bg-gray-200 dark:bg-[#222433] mx-0.5 hidden sm:block" />
 
         {/* User Profile Dropdown Pill */}
         <div className="relative" ref={dropdownRef}>

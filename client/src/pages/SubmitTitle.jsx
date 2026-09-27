@@ -37,9 +37,12 @@ export const SubmitTitle = () => {
   // UI State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState('');
+  const [toastVariant, setToastVariant] = useState('success');
   const [loading, setLoading] = useState(true);
   const [existingWorkspace, setExistingWorkspace] = useState(null);
   const [isMatchingModalOpen, setIsMatchingModalOpen] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const [declinedAdviserIds, setDeclinedAdviserIds] = useState([]);
 
   // Document Processing State
   const [processingStage, setProcessingStage] = useState('idle'); // 'idle' | stage_id
@@ -48,6 +51,9 @@ export const SubmitTitle = () => {
 
   // Before allowing submission, check if student already has a pending/accepted request or workspace
   useEffect(() => {
+    let unsubscribe = null;
+    let isMounted = true;
+
     const checkExistingState = async () => {
       try {
         const group = await groupService.getGroupByStudentId(currentUser.uid);
@@ -55,41 +61,73 @@ export const SubmitTitle = () => {
         // 1. Check Workspace
         const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(currentUser.uid, group?.id);
         if (ws) {
-          setExistingWorkspace(ws);
-          setLoading(false);
+          if (isMounted) {
+            setExistingWorkspace(ws);
+            setLoading(false);
+          }
           return;
         }
 
-        // 2. Check existing Adviser Requests
-        const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
-        const activeRequest = requests.find(r => r.status === 'pending' || r.status === 'accepted');
-        if (activeRequest) {
-          if (activeRequest.status === 'accepted') {
-            navigate('/research/workspace');
-            return;
-          }
-          // Set title & open modal
-          setTitle(activeRequest.researchTitle || '');
-          setDescription(activeRequest.researchDescription || '');
-          setIsMatchingModalOpen(true);
-        }
+        // 2. Real-time subscription to Adviser Requests
+        unsubscribe = adviserRequestService.subscribeToStudentRequests(
+          currentUser.uid,
+          (requests) => {
+            if (!isMounted) return;
+            const activeRequest = requests.find(r => r.status === 'pending' || r.status === 'accepted');
+            
+            if (activeRequest) {
+              if (activeRequest.status === 'accepted') {
+                navigate('/research/workspace');
+                return;
+              }
+              // Set pending request
+              setPendingRequest(activeRequest);
+            } else {
+              setPendingRequest(null);
+              // Handle rejected/declined
+              // Sort to get the most recent declined request if any
+              const declinedRequests = requests.filter(r => r.status === 'declined');
+              declinedRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              
+              setDeclinedAdviserIds(declinedRequests.map(r => r.adviserId));
 
-        setLoading(false);
+              const declinedRequest = declinedRequests[0];
+              
+              if (declinedRequest) {
+                setTitle(declinedRequest.researchTitle || '');
+                setDescription(declinedRequest.researchDescription || '');
+                setInputMethod('manual');
+              }
+            }
+            setLoading(false);
+          },
+          group?.id
+        );
+
       } catch (err) {
-        setToast('Failed to verify state: ' + err.message);
-        setLoading(false);
+        if (isMounted) {
+          setToast('Failed to verify state: ' + err.message);
+          setToastVariant('error');
+          setLoading(false);
+        }
       }
     };
 
     if (currentUser?.uid) {
       checkExistingState();
     }
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [currentUser, navigate]);
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) {
       setToast('Research title is required.');
+      setToastVariant('error');
       return;
     }
     setIsMatchingModalOpen(true);
@@ -107,11 +145,13 @@ export const SubmitTitle = () => {
     
     if (!validTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx)$/i)) {
       setToast('Invalid file type. Please upload a PDF or DOCX file.');
+      setToastVariant('error');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
       setToast('File size exceeds the 10MB limit.');
+      setToastVariant('error');
       return;
     }
 
@@ -144,6 +184,7 @@ export const SubmitTitle = () => {
     } catch (err) {
       clearInterval(stageInterval);
       setToast(err.message || 'Failed to extract document.');
+      setToastVariant('error');
       setProcessingStage('idle');
     } finally {
       if (fileInputRef.current) {
@@ -220,10 +261,12 @@ export const SubmitTitle = () => {
       }
 
       setToast('Workspace deleted. You can now submit a new title.');
+      setToastVariant('success');
       setExistingWorkspace(null);
       setLoading(false);
     } catch (err) {
       setToast('Failed to reset workspace: ' + err.message);
+      setToastVariant('error');
       setLoading(false);
     }
   };
@@ -251,12 +294,89 @@ export const SubmitTitle = () => {
     );
   }
 
+  const handleCancelRequest = async () => {
+    if (!pendingRequest) return;
+    const isConfirmed = await confirm({
+      title: 'Cancel Request',
+      message: 'Are you sure you want to cancel this request and select another adviser?',
+      confirmText: 'Cancel Request',
+      variant: 'danger'
+    });
+    if (!isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await adviserRequestService.deleteRequest(pendingRequest.id);
+      
+      // Retain the title and description in the input fields
+      setTitle(pendingRequest.researchTitle || '');
+      setDescription(pendingRequest.researchDescription || '');
+      setInputMethod('manual');
+      
+      setPendingRequest(null);
+      setToast('Request cancelled. You can now submit a new one.');
+      setToastVariant('success');
+      setLoading(false);
+    } catch (err) {
+      setToast('Failed to cancel request: ' + err.message);
+      setToastVariant('error');
+      setLoading(false);
+    }
+  };
+
   // Get current stage info
   const currentStage = PROCESSING_STAGES.find(s => s.id === processingStage) || PROCESSING_STAGES[0];
 
+  if (pendingRequest) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 pb-12 mt-8">
+        {toast && <Toast message={toast} variant={toastVariant} onClose={() => setToast('')} />}
+        <div className="p-8 text-center space-y-6 rounded-3xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Adviser Request Pending
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 max-w-lg mx-auto">
+              Your request has been submitted to <strong className="text-gray-900 dark:text-white">{pendingRequest.adviserName}</strong>. 
+              Once accepted, your Research Workspace will be activated immediately.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-100 dark:border-[#222433] text-left space-y-4 shadow-sm max-w-2xl mx-auto">
+            <div>
+              <span className="text-xs uppercase font-bold text-gray-400 tracking-wider">Research Title</span>
+              <p className="font-semibold text-gray-900 dark:text-white mt-1 text-base">
+                {pendingRequest.researchTitle}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs uppercase font-bold text-gray-400 tracking-wider">Faculty Mentor</span>
+              <p className="font-medium text-gray-700 dark:text-gray-300 mt-1">
+                {pendingRequest.adviserName} <span className="text-blue-500 font-semibold">({pendingRequest.compatibilityScore}% Compatibility)</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-center pt-4">
+            <Button
+              variant="outline"
+              className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40 px-6 py-2.5 rounded-xl"
+              onClick={handleCancelRequest}
+            >
+              Cancel Request
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12">
-      {toast && <Toast message={toast} variant="error" onClose={() => setToast('')} />}
+      {toast && <Toast message={toast} variant={toastVariant} onClose={() => setToast('')} />}
 
       <PageHeader
         icon={BookOpen}
@@ -429,8 +549,12 @@ export const SubmitTitle = () => {
         description={description.trim()}
         currentUser={currentUser}
         userProfile={userProfile}
-        onSuccess={() => {
+        declinedAdviserIds={declinedAdviserIds}
+        onSuccess={(request) => {
           setToast('Adviser selection submitted successfully.');
+          setToastVariant('success');
+          setIsMatchingModalOpen(false);
+          setPendingRequest(request);
         }}
       />
     </div>

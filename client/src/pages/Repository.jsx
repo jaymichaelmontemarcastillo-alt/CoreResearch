@@ -137,25 +137,26 @@ export const Repository = () => {
       )}
 
       {/* Search Bar */}
-      <Card className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex-1 w-full flex items-center gap-2">
+      <Card className="p-3 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <form onSubmit={handleSearchSubmit} className="flex-1 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Input
-            placeholder="Search repository by title, abstract, keyword, or author name..."
+            placeholder="Search repository..."
             icon={HiMagnifyingGlass}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="w-full"
           />
-          <Button type="submit" variant="secondary" size="md">
+          <Button type="submit" variant="secondary" size="md" className="sm:w-auto w-full justify-center">
             Search
           </Button>
         </form>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 hide-scrollbar">
           {["all", "Computer Science", "Information Technology"].map((dept) => (
             <button
               key={dept}
               onClick={() => setDepartment(dept)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition whitespace-nowrap ${
                 department === dept
                   ? "bg-primary text-white shadow-sm"
                   : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
@@ -181,24 +182,24 @@ export const Repository = () => {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {publications.map((pub) => (
-            <Card key={pub.id} hover className="flex flex-col justify-between space-y-4">
-              <div className="space-y-3">
+            <Card key={pub.id} hover className="flex flex-col justify-between space-y-3 sm:space-y-4 p-4 sm:p-5">
+              <div className="space-y-2.5 sm:space-y-3">
                 <div className="flex items-center justify-between">
-                  <Badge variant="blue">{pub.department}</Badge>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  <Badge variant="blue" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">{pub.department}</Badge>
+                  <span className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-mono">
                     {pub.publicationYear}
                   </span>
                 </div>
 
-                <h3 className="text-base font-medium text-gray-900 dark:text-white leading-snug line-clamp-2">
+                <h3 className="text-[13px] sm:text-base font-bold sm:font-medium text-gray-900 dark:text-white leading-snug line-clamp-2">
                   {pub.title}
                 </h3>
 
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <HiUser className="w-3.5 h-3.5 text-primary" />
-                  <span>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                  <HiUser className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary shrink-0" />
+                  <span className="truncate">
                     Authors:{" "}
                     <strong className="text-gray-700 dark:text-gray-300">
                       {Array.isArray(pub.authors) ? pub.authors.join(", ") : pub.authors}
@@ -206,16 +207,16 @@ export const Repository = () => {
                   </span>
                 </div>
 
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 leading-relaxed">
+                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-2 sm:line-clamp-3 leading-relaxed">
                   {pub.abstract}
                 </p>
 
                 {pub.keywords && pub.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {pub.keywords.slice(0, 4).map((kw, i) => (
+                  <div className="flex flex-wrap gap-1 sm:gap-1.5 pt-0.5 sm:pt-1">
+                    {pub.keywords.slice(0, 3).map((kw, i) => (
                       <span
                         key={i}
-                        className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-[11px] text-gray-600 dark:text-gray-300"
+                        className="px-1.5 sm:px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-[10px] sm:text-[11px] text-gray-600 dark:text-gray-300 whitespace-nowrap"
                       >
                         #{kw}
                       </span>
@@ -224,13 +225,13 @@ export const Repository = () => {
                 )}
               </div>
 
-              <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
-                <Button size="sm" variant="outline" onClick={() => setSelectedPub(pub)}>
+              <div className="pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+                <Button size="sm" variant="outline" onClick={() => setSelectedPub(pub)} className="justify-center text-xs w-full sm:w-auto">
                   <HiEye className="w-3.5 h-3.5 mr-1.5" /> Read Abstract & Cite
                 </Button>
 
-                <a href={pub.pdfUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="secondary">
+                <a href={pub.pdfUrl} target="_blank" rel="noopener noreferrer" className="flex">
+                  <Button size="sm" variant="secondary" className="justify-center text-xs w-full sm:w-auto">
                     <HiArrowDownTray className="w-3.5 h-3.5 mr-1.5" /> PDF Paper
                   </Button>
                 </a>

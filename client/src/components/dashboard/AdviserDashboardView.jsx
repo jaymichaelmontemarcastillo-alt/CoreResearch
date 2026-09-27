@@ -80,7 +80,6 @@ export const AdviserDashboardView = () => {
   const [workspaces, setWorkspaces] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [schedules, setSchedules] = useState([]);
-  const [requests, setRequests] = useState([]);
   const [progressMap, setProgressMap] = useState({});
   const [coursesMap, setCoursesMap] = useState({});
   const [sectionsMap, setSectionsMap] = useState({});
@@ -242,81 +241,6 @@ export const AdviserDashboardView = () => {
     }
   };
 
-  useEffect(() => {
-    loadAdviserData();
-  }, [currentUser?.uid]);
-
-  // 2. Real-time subscription to pending Adviser Requests
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    const unsubscribe = adviserRequestService.subscribeToPendingAdviserRequests(
-      currentUser.uid,
-      (incomingRequests) => {
-        setRequests(incomingRequests || []);
-      }
-    );
-    return () => unsubscribe();
-  }, [currentUser?.uid]);
-
-  // 3. Real-time subscription to System Activity
-  useEffect(() => {
-    const unsubscribe = systemActivityService.subscribeRecentActivities((items) => {
-      setActivities(items || []);
-      setActivityLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Request Handlers
-  const handleAcceptRequest = async (reqId) => {
-    setActionLoading(reqId);
-    try {
-      const request = requests.find((r) => r.id === reqId);
-      if (!request) return;
-
-      await adviserRequestService.acceptRequest(reqId);
-
-      if (request.groupId) {
-        await groupService.updateGroup(request.groupId, {
-          adviserId: request.adviserId || currentUser.uid,
-          adviserName: request.adviserName || currentUser.displayName || 'Faculty Adviser',
-          title: request.researchTitle || '',
-        });
-      }
-
-      await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(request, userProfile);
-
-      setRequests((prev) => prev.filter((r) => r.id !== reqId));
-      setToast(`Accepted request for "${request.researchTitle || 'Research'}"!`);
-      setToastVariant('success');
-
-      // Refresh groups and workspaces list
-      loadAdviserData();
-    } catch (err) {
-      console.error('[AdviserDashboardView] handleAcceptRequest error:', err);
-      setToast('Failed to accept request: ' + err.message);
-      setToastVariant('error');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDeclineRequest = async (reqId) => {
-    setActionLoading(reqId);
-    try {
-      await adviserRequestService.declineRequest(reqId);
-      setRequests((prev) => prev.filter((r) => r.id !== reqId));
-      setToast('Mentorship request declined.');
-      setToastVariant('success');
-    } catch (err) {
-      console.error('[AdviserDashboardView] handleDeclineRequest error:', err);
-      setToast('Failed to decline request: ' + err.message);
-      setToastVariant('error');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   // ----------------------------------------------------
   // METRICS & COMPUTATIONS
   // ----------------------------------------------------
@@ -399,7 +323,6 @@ export const AdviserDashboardView = () => {
   // ACTION REQUIRED COMPILATION
   // ----------------------------------------------------
   const totalActionCount =
-    requests.length +
     manuscriptsNeedingReview.length +
     submittedTasks.length +
     overdueTasks.length;
@@ -537,79 +460,11 @@ export const AdviserDashboardView = () => {
                   No Actions Required
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-[#9396a8] max-w-md">
-                  There are currently no pending actions requiring your attention. All manuscripts, tasks, and mentorship requests are up to date.
+                  There are currently no pending actions requiring your attention. All manuscripts and tasks are up to date.
                 </p>
               </div>
             ) : (
               <div className="space-y-3 pt-1">
-                {/* Pending Student Mentorship Requests */}
-                {requests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="p-4 rounded-xl border border-amber-200/80 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/10 space-y-3 transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="amber">Mentorship Request</Badge>
-                          <span className="text-[11px] text-gray-400">
-                            Received {formatRelativeTime(req.createdAt)}
-                          </span>
-                        </div>
-                        <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                          {req.researchTitle || 'Research Proposal'}
-                        </h4>
-                        {req.researchDescription && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">
-                            {req.researchDescription}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500 dark:text-[#9396a8]">
-                          <div>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">
-                              Student:
-                            </span>{' '}
-                            {req.studentName}
-                          </div>
-                          {(req.courseName || req.sectionName) && (
-                            <div>
-                              <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                Program:
-                              </span>{' '}
-                              {req.courseName} {req.sectionName}
-                            </div>
-                          )}
-                          <div className="font-semibold text-blue-600 dark:text-blue-400">
-                            Match: {req.compatibilityScore || 0}%
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex sm:flex-col gap-2 shrink-0 pt-2 sm:pt-0">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={actionLoading === req.id}
-                          onClick={() => handleAcceptRequest(req.id)}
-                          className="w-full sm:w-28 text-xs font-semibold"
-                        >
-                          {actionLoading === req.id ? 'Accepting...' : 'Accept'}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          disabled={actionLoading === req.id}
-                          onClick={() => handleDeclineRequest(req.id)}
-                          className="w-full sm:w-28 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white border-transparent"
-                        >
-                          Decline
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
                 {/* Manuscripts Awaiting Review */}
                 {manuscriptsNeedingReview.map((item) => (
                   <div

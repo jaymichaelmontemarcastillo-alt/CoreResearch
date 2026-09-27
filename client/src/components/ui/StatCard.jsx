@@ -15,25 +15,25 @@ export const StatCard = ({
 }) => {
   return (
     <div
-      className={`bg-white dark:bg-[#15161e] rounded-xl border border-gray-200/90 dark:border-[#222433] p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-200 hover:border-gray-300 dark:hover:border-[#333649] ${className}`}
+      className={`bg-white dark:bg-[#15161e] rounded-xl border border-gray-200/90 dark:border-[#222433] p-3 sm:p-4 flex flex-col justify-between transition-all duration-200 hover:border-gray-300 dark:hover:border-[#333649] ${className}`}
     >
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[11px] sm:text-xs font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider truncate">
+      <div className="flex items-center justify-between gap-2 mb-0.5 sm:mb-1">
+        <span className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider truncate">
           {label}
         </span>
         {showIcon && Icon && (
-          <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-            <Icon className="w-3.5 h-3.5" />
+          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+            <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </div>
         )}
       </div>
 
-      <div className={`text-lg sm:text-xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
+      <div className={`text-xl sm:text-xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
         {value}
       </div>
 
       {(subtitle || trend) && (
-        <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+        <div className="mt-1 sm:mt-2 flex items-center gap-1.5 text-[10px] sm:text-[11px]">
           {trend && (
             <span
               className={`font-semibold flex items-center gap-0.5 ${

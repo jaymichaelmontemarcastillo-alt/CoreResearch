@@ -407,40 +407,40 @@ export const MyGroup = () => {
       {/* Main Group Card */}
       <Card className="overflow-hidden border border-gray-200/90 dark:border-[#222433] shadow-sm bg-white dark:bg-[#15161e] rounded-2xl">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-50/70 to-transparent dark:from-blue-950/20 p-6 md:p-8 border-b border-gray-100 dark:border-[#222433]">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+        <div className="bg-gradient-to-r from-blue-50/70 to-transparent dark:from-blue-950/20 p-4 sm:p-6 md:p-8 border-b border-gray-100 dark:border-[#222433]">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 sm:gap-4">
+            <div className="space-y-1 sm:space-y-1.5">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                   {group.name}
                 </h2>
-                <Badge variant="blue" className="text-xs font-mono">
+                <Badge variant="blue" className="text-[10px] sm:text-xs font-mono px-1.5 py-0 sm:px-2 sm:py-0.5">
                   ID: {group.id.slice(0, 8)}
                 </Badge>
               </div>
-              <p className="text-gray-500 dark:text-[#9396a8] font-medium text-sm">
+              <p className="text-gray-500 dark:text-[#9396a8] font-medium text-[11px] sm:text-sm">
                 {course?.name || "Program"} • {userProfile?.yearLevel || group.yearLevel || 4}th Year • {section?.name || "Section"}
               </p>
               {group.title && (
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                <p className="text-[13px] sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1 leading-snug">
                   Title: {group.title}
                 </p>
               )}
             </div>
 
-            <div className="flex flex-col items-start md:items-end gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
+            <div className="flex flex-col items-start md:items-end gap-1.5 sm:gap-2">
+              <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
                 Group Status
               </span>
               {group.status === "ready" ? (
-                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3.5 py-1.5 rounded-xl border border-emerald-100 dark:border-emerald-500/20">
-                  <HiCheckCircle className="w-4 h-4" />
-                  <span className="font-semibold text-xs">Ready for Defense</span>
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-emerald-100 dark:border-emerald-500/20">
+                  <HiCheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="font-semibold text-[11px] sm:text-xs">Ready for Defense</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3.5 py-1.5 rounded-xl border border-amber-100 dark:border-amber-500/20">
-                  <HiExclamationCircle className="w-4 h-4" />
-                  <span className="font-semibold text-xs">Incomplete Group ({group.members.length}/3)</span>
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-amber-100 dark:border-amber-500/20">
+                  <HiExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="font-semibold text-[11px] sm:text-xs">Incomplete ({group.members.length}/3)</span>
                 </div>
               )}
             </div>
@@ -448,62 +448,65 @@ export const MyGroup = () => {
         </div>
 
         {/* Assigned Adviser Banner (if assigned) */}
-        <div className="px-6 md:px-8 py-4 bg-gray-50/60 dark:bg-[#1a1b26]/60 border-b border-gray-100 dark:border-[#222433] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-sm">
-            <HiAcademicCap className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
-            <span className="text-gray-500 dark:text-[#9396a8]">Assigned Research Adviser:</span>
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {group.adviserName || "Pending Assignment by Coordinator"}
+        <div className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 bg-gray-50/60 dark:bg-[#1a1b26]/60 border-b border-gray-100 dark:border-[#222433] flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5 text-[13px] sm:text-sm">
+            <HiAcademicCap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="text-gray-500 dark:text-[#9396a8] hidden sm:inline">Assigned Research Adviser:</span>
+            <span className="text-gray-500 dark:text-[#9396a8] sm:hidden">Adviser:</span>
+            <span className="font-semibold text-gray-900 dark:text-white truncate">
+              {group.adviserName || "Pending Assignment"}
             </span>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleLeaveGroup}
-            className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+            className="text-[11px] sm:text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 px-2 sm:px-3"
           >
-            <HiArrowRightOnRectangle className="w-4 h-4 mr-1" />
-            Leave Group
+            <HiArrowRightOnRectangle className="w-3.5 h-3.5 mr-1" />
+            Leave
           </Button>
         </div>
 
         {/* Defense Schedule Banner (if scheduled) */}
         {defenseSchedule && (
-          <div className="p-6 md:p-8 bg-blue-50/30 dark:bg-blue-950/10 border-b border-gray-100 dark:border-[#222433]">
-            <div className="flex items-center gap-2 mb-3">
-              <HiCalendarDays className="w-5 h-5 text-blue-600" />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                Official Defense Schedule
-              </h3>
-              <Badge variant="emerald" className="capitalize text-[10px] ml-2">
+          <div className="p-4 sm:p-6 md:p-8 bg-blue-50/30 dark:bg-blue-950/10 border-b border-gray-100 dark:border-[#222433]">
+            <div className="flex items-center justify-between sm:justify-start gap-2 mb-2 sm:mb-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <HiCalendarDays className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                <h3 className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                  Defense Schedule
+                </h3>
+              </div>
+              <Badge variant="emerald" className="capitalize text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
                 {defenseSchedule.status || "Scheduled"}
               </Badge>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-white dark:bg-[#111218] rounded-xl border border-gray-200/80 dark:border-[#222433]">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 bg-white dark:bg-[#111218] rounded-xl border border-gray-200/80 dark:border-[#222433]">
               <div>
-                <span className="text-[11px] text-gray-400 uppercase font-semibold block">Defense Type</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white capitalize">
+                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Type</span>
+                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white capitalize truncate">
                   {(defenseSchedule.defenseType || "Proposal").replace("_", " ")}
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-gray-400 uppercase font-semibold block">Date</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Date</span>
+                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white">
                   {defenseSchedule.date}
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-gray-400 uppercase font-semibold block">Time</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                  <HiClock className="w-3.5 h-3.5 text-gray-400" />
-                  {defenseSchedule.startTime} – {defenseSchedule.endTime}
+                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Time</span>
+                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                  <HiClock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 shrink-0" />
+                  <span className="truncate">{defenseSchedule.startTime} – {defenseSchedule.endTime}</span>
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-gray-400 uppercase font-semibold block">Venue</span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                  <HiMapPin className="w-3.5 h-3.5 text-gray-400" />
-                  {defenseSchedule.venue || defenseSchedule.location || "Room TBA"}
+                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Venue</span>
+                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                  <HiMapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 shrink-0" />
+                  <span className="truncate">{defenseSchedule.venue || defenseSchedule.location || "TBA"}</span>
                 </span>
               </div>
             </div>
@@ -511,11 +514,11 @@ export const MyGroup = () => {
         )}
 
         {/* Members Section */}
-        <div className="p-6 md:p-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84] flex items-center gap-2">
-              <HiUsers className="w-4 h-4 text-blue-500" />
-              Group Members ({group.members.length}/3)
+        <div className="p-4 sm:p-6 md:p-8">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84] flex items-center gap-1.5 sm:gap-2">
+              <HiUsers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
+              Members ({group.members.length}/3)
             </h3>
 
             {group.members.length < 5 && (
@@ -523,26 +526,27 @@ export const MyGroup = () => {
                 variant="outline"
                 size="sm"
                 onClick={openAddClassmateModal}
-                className="flex items-center gap-1.5 text-xs font-semibold"
+                className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-semibold px-2 sm:px-3 py-1 sm:py-1.5"
               >
-                <HiUserPlus className="w-4 h-4" />
-                Add Classmate
+                <HiUserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Add Classmate</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {group.members.map((member) => (
               <div
                 key={member.uid}
-                className={`flex items-start p-4 rounded-xl border transition-all ${
+                className={`flex items-start p-3 sm:p-4 rounded-xl border transition-all ${
                   member.uid === userProfile.uid
                     ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40"
                     : "bg-gray-50/70 dark:bg-[#1c1d28] border-gray-100 dark:border-[#222433]"
                 }`}
               >
                 <div
-                  className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-base mr-3.5 shrink-0 ${
+                  className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-bold text-sm sm:text-base mr-3 sm:mr-3.5 shrink-0 ${
                     member.uid === userProfile.uid
                       ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
                       : "bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8]"
@@ -552,20 +556,20 @@ export const MyGroup = () => {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-gray-900 dark:text-white truncate text-sm">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <h4 className="font-semibold text-gray-900 dark:text-white truncate text-[13px] sm:text-sm">
                       {member.fullName}
                     </h4>
                     {member.uid === userProfile.uid && (
-                      <Badge variant="blue" className="text-[10px] px-1.5 py-0">
+                      <Badge variant="blue" className="text-[9px] sm:text-[10px] px-1 py-0 sm:px-1.5">
                         YOU
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs font-mono text-gray-500 dark:text-[#9396a8] mt-0.5">
+                  <p className="text-[11px] sm:text-xs font-mono text-gray-500 dark:text-[#9396a8] mt-0.5 truncate">
                     ID: {member.studentNumber || member.studentIdOrEmployeeId || "Not Set"}
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-[#6b6f84] truncate mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-gray-400 dark:text-[#6b6f84] truncate mt-0.5">
                     {member.email}
                   </p>
                 </div>
@@ -578,16 +582,16 @@ export const MyGroup = () => {
                 <div
                   key={`empty-${idx}`}
                   onClick={openAddClassmateModal}
-                  className="flex items-center p-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/30 transition cursor-pointer"
+                  className="flex items-center p-3 sm:p-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/30 transition cursor-pointer"
                 >
-                  <div className="w-11 h-11 rounded-full border-2 border-dashed border-gray-200 dark:border-[#333649] flex items-center justify-center mr-3.5 shrink-0 text-gray-400">
-                    <HiUserPlus className="w-5 h-5" />
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 border-dashed border-gray-200 dark:border-[#333649] flex items-center justify-center mr-3 sm:mr-3.5 shrink-0 text-gray-400">
+                    <HiUserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-400 dark:text-gray-500 text-sm">
+                    <h4 className="font-semibold text-gray-400 dark:text-gray-500 text-[13px] sm:text-sm">
                       Empty Slot ({group.members.length + idx + 1}/3)
                     </h4>
-                    <p className="text-xs text-blue-500 hover:underline">Click to invite classmate</p>
+                    <p className="text-[11px] sm:text-xs text-blue-500 hover:underline">Click to invite classmate</p>
                   </div>
                 </div>
               ))}

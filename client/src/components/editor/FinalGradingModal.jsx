@@ -1,19 +1,20 @@
-// src/components/editor/ProposalGradingModal.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, XCircle, Calculator, Loader2, ClipboardCheck, Download, Printer } from 'lucide-react';
+// src/components/editor/FinalGradingModal.jsx
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle, AlertTriangle, XCircle, Calculator, Loader2, ClipboardCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { buildProposalPrintHTML } from '../../utils/proposalPrintTemplate';
 
 const MAX_SCORES = {
-  format: 7,
-  researchProblems: 8,
-  relatedLiterature: 7,
-  methodology: 8,
-  presentation: 15,
-  defense: 15,
-  innovation: 15,
-  application: 15,
-  impact: 10,
+  format: 5,
+  researchProblems: 5,
+  relatedLiterature: 5,
+  methodology: 5,
+  technicalBackground: 5,
+  summaryConclusions: 5,
+  presentation: 10,
+  defense: 10,
+  functionality: 15,
+  usability: 20,
+  reliability: 15,
 };
 
 const INITIAL_SCORES = {
@@ -21,28 +22,30 @@ const INITIAL_SCORES = {
   researchProblems: '',
   relatedLiterature: '',
   methodology: '',
+  technicalBackground: '',
+  summaryConclusions: '',
   presentation: '',
   defense: '',
-  innovation: '',
-  application: '',
-  impact: '',
+  functionality: '',
+  usability: '',
+  reliability: '',
 };
 
 /**
- * Proposal Defense Rating Sheet Modal
+ * Final Oral Defense Rating Sheet Modal
  *
  * Props:
  *  isOpen        - boolean
  *  onClose       - () => void
- *  onSubmit      - async (payload: SubmitProposalEvaluationInput) => void
- *  defenseType   - 'proposal_defense' | 'final_defense' | undefined
+ *  onSubmit      - async (payload: SubmitFinalDefenseEvaluationInput) => void
+ *  defenseType   - 'final_defense'
  *  defenseId     - string  (the defense schedule ID)
  *  panelistId    - string  (currentUser.uid)
  *  panelistName  - string
  *  groupDetails  - { adviser, expert, title, date, time, groupNo, proponents[] }
- *  existingEval  - ProposalEvaluation | null  (pre-loaded from Firestore)
+ *  existingEval  - FinalDefenseEvaluation | null  (pre-loaded from Firestore)
  */
-export const ProposalGradingModal = ({
+export const FinalGradingModal = ({
   isOpen,
   onClose,
   onSubmit,
@@ -60,7 +63,6 @@ export const ProposalGradingModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Editable metadata — pre-filled from groupDetails, panelist can adjust
   const [meta, setMeta] = useState({
@@ -96,11 +98,13 @@ export const ProposalGradingModal = ({
         researchProblems: existingEval.scores.researchProblems ?? '',
         relatedLiterature: existingEval.scores.relatedLiterature ?? '',
         methodology: existingEval.scores.methodology ?? '',
+        technicalBackground: existingEval.scores.technicalBackground ?? '',
+        summaryConclusions: existingEval.scores.summaryConclusions ?? '',
         presentation: existingEval.scores.presentation ?? '',
         defense: existingEval.scores.defense ?? '',
-        innovation: existingEval.scores.innovation ?? '',
-        application: existingEval.scores.application ?? '',
-        impact: existingEval.scores.impact ?? '',
+        functionality: existingEval.scores.functionality ?? '',
+        usability: existingEval.scores.usability ?? '',
+        reliability: existingEval.scores.reliability ?? '',
       });
     } else {
       setScores(INITIAL_SCORES);
@@ -115,17 +119,23 @@ export const ProposalGradingModal = ({
       (Number(scores.format) || 0) +
       (Number(scores.researchProblems) || 0) +
       (Number(scores.relatedLiterature) || 0) +
-      (Number(scores.methodology) || 0);
+      (Number(scores.methodology) || 0) +
+      (Number(scores.technicalBackground) || 0) +
+      (Number(scores.summaryConclusions) || 0);
     const oral =
       (Number(scores.presentation) || 0) + (Number(scores.defense) || 0);
     const project =
-      (Number(scores.innovation) || 0) +
-      (Number(scores.application) || 0) +
-      (Number(scores.impact) || 0);
+      (Number(scores.functionality) || 0) +
+      (Number(scores.usability) || 0) +
+      (Number(scores.reliability) || 0);
     const overall = manuscript + oral + project;
+    
     setTotals({ manuscript, oral, project, overall });
-    if (overall >= 86) setVerdict('APPROVED');
-    else if (overall >= 75) setVerdict('APPROVED_WITH_REVISIONS');
+    
+    if (overall >= 95) setVerdict('PASSED');
+    else if (overall >= 85) setVerdict('PASSED_WITH_MINOR_REVISIONS');
+    else if (overall >= 75) setVerdict('PASSED_WITH_MAJOR_REVISIONS');
+    else if (overall >= 70) setVerdict('REDEFENSE');
     else if (overall > 0) setVerdict('DISAPPROVED');
     else setVerdict(null);
   }, [scores]);
@@ -143,45 +153,6 @@ export const ProposalGradingModal = ({
 
   const allFilled = Object.keys(INITIAL_SCORES).every((k) => scores[k] !== '');
 
-  // ─── PDF Download ────────────────────────────────────────────────────────
-  const handleDownloadPdf = async () => {
-    setIsGeneratingPdf(true);
-    try {
-      const html2pdf = (await import('html2pdf.js')).default;
-
-      const htmlString = buildProposalPrintHTML({
-        meta,
-        scores,
-        totals,
-        verdict,
-        panelistName,
-        MAX_SCORES,
-      });
-
-      const filename = `Proposal_Defense_Rating_${(meta.title || 'untitled').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}.pdf`;
-
-      // Pass htmlString directly instead of a manually positioned DOM element 
-      // to avoid off-screen culling in html2canvas
-      await html2pdf()
-        .set({
-          margin: [14, 18, 10, 18], // tight margins to fit 1 page
-          filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
-          jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
-          pagebreak: { mode: ['avoid-all'] },
-        })
-        .from(htmlString)
-        .save();
-
-    } catch (err) {
-      console.error('[ProposalGradingModal] PDF generation failed:', err);
-      setSubmitError('PDF download failed: ' + err.message);
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!allFilled || !verdict) return;
@@ -197,11 +168,13 @@ export const ProposalGradingModal = ({
           researchProblems: Number(scores.researchProblems),
           relatedLiterature: Number(scores.relatedLiterature),
           methodology: Number(scores.methodology),
+          technicalBackground: Number(scores.technicalBackground),
+          summaryConclusions: Number(scores.summaryConclusions),
           presentation: Number(scores.presentation),
           defense: Number(scores.defense),
-          innovation: Number(scores.innovation),
-          application: Number(scores.application),
-          impact: Number(scores.impact),
+          functionality: Number(scores.functionality),
+          usability: Number(scores.usability),
+          reliability: Number(scores.reliability),
         },
         subTotals: totals,
         verdict,
@@ -216,8 +189,8 @@ export const ProposalGradingModal = ({
     }
   };
 
-  // Only render for proposal_defense type
-  if (!isOpen || defenseType !== 'proposal_defense') return null;
+  // Only render for final_defense type
+  if (!isOpen || defenseType !== 'final_defense') return null;
 
   // ─── Success State ───────────────────────────────────────────────────────
   if (submitted) {
@@ -229,17 +202,18 @@ export const ProposalGradingModal = ({
           </div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Evaluation Submitted!</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            Your graded rubric has been recorded for this group's Proposal Defense.
+            Your graded rubric has been recorded for this group's Final Oral Defense.
           </p>
           <div className={`mt-4 px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 ${
-            verdict === 'APPROVED' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-            verdict === 'APPROVED_WITH_REVISIONS' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+            verdict === 'PASSED' || verdict === 'PASSED_WITH_MINOR_REVISIONS' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+            verdict === 'PASSED_WITH_MAJOR_REVISIONS' ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+            verdict === 'REDEFENSE' ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' :
             'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
           }`}>
-            {verdict === 'APPROVED' && <CheckCircle className="w-4 h-4" />}
-            {verdict === 'APPROVED_WITH_REVISIONS' && <AlertTriangle className="w-4 h-4" />}
+            {(verdict === 'PASSED' || verdict === 'PASSED_WITH_MINOR_REVISIONS') && <CheckCircle className="w-4 h-4" />}
+            {(verdict === 'PASSED_WITH_MAJOR_REVISIONS' || verdict === 'REDEFENSE') && <AlertTriangle className="w-4 h-4" />}
             {verdict === 'DISAPPROVED' && <XCircle className="w-4 h-4" />}
-            Verdict: {verdict === 'APPROVED' ? 'APPROVED' : verdict === 'APPROVED_WITH_REVISIONS' ? 'APPROVED WITH REVISIONS' : 'DISAPPROVED'} — {totals.overall.toFixed(1)} / 100
+            Verdict: {verdict.replace(/_/g, ' ')} — {totals.overall.toFixed(1)} / 100
           </div>
           <Button onClick={onClose} variant="primary" className="mt-8 px-10 bg-blue-600 hover:bg-blue-700 text-white">
             Close
@@ -261,7 +235,7 @@ export const ProposalGradingModal = ({
         <div className="px-6 py-4 border-b border-gray-200 dark:border-[#1c1d28] flex justify-between items-center bg-gray-50 dark:bg-[#12131b] shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-900 dark:text-white uppercase tracking-tight">
-              Proposal Defense Rating Sheet
+              Final Oral Defense Rating Sheet
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               College of Computer Studies — Laguna State Polytechnic University
@@ -365,7 +339,7 @@ export const ProposalGradingModal = ({
           </div>
 
           {/* ── FORM ── */}
-          <form id="proposal-grading-form" onSubmit={handleSubmit} className="space-y-10">
+          <form id="final-grading-form" onSubmit={handleSubmit} className="space-y-10">
 
             <div className="overflow-x-auto rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm">
               <table className="w-full border-collapse text-left bg-white dark:bg-[#0e0f15]">
@@ -382,34 +356,36 @@ export const ProposalGradingModal = ({
                       title: 'MANUSCRIPT',
                       weight: '30%',
                       rows: [
-                        { field: 'format', label: '1. Format', desc: 'documentation, chapter division, style including neatness and organization of details.' },
+                        { field: 'format', label: '1. Format', desc: 'documentation, style including neatness and organization of details' },
                         { field: 'researchProblems', label: '2. Research Problems and Objectives', desc: 'discuss the problems encountered by the client and answered with appropriate and adequate solutions' },
                         { field: 'relatedLiterature', label: '3. Related Literature and Studies', desc: 'includes 10 for literature and 10 studies and summarize the discussion on synthesis' },
-                        { field: 'methodology', label: '4. Research Methodology', desc: 'appropriateness of methods of study, statistical treatment, analysis and interpretations' },
+                        { field: 'methodology', label: '4. Research Methodology', desc: 'Appropriateness of methods of study, statistical treatment, analysis and interpretations' },
+                        { field: 'technicalBackground', label: '5. Technical Background', desc: 'relevant design tools, design, and implementation plan is appropriate on requirements' },
+                        { field: 'summaryConclusions', label: '6. Summary, Conclusions and Recommendations', desc: 'Findings, Conclusions and Recommendations are attuned with the objectives' },
                       ],
                       subtotal: totals.manuscript,
                       subtotalMax: 30,
                     },
                     {
                       title: 'ORAL DEFENSE',
-                      weight: '30%',
+                      weight: '20%',
                       rows: [
                         { field: 'presentation', label: '1. Presentation', desc: 'content and creativity of visual aid and/or graphics and mastery of study evidenced by logical presentation of the conclusion' },
-                        { field: 'defense', label: '2. Defense', desc: 'ability to answer reasoning capability and ability to justify interpretation and conclusion' },
+                        { field: 'defense', label: '2. Defense', desc: 'Ability to answer reasoning capability and ability to justify interpretation and conclusion' },
                       ],
                       subtotal: totals.oral,
-                      subtotalMax: 30,
+                      subtotalMax: 20,
                     },
                     {
-                      title: 'CAPSTONE/THESIS PROJECT',
-                      weight: '40%',
+                      title: 'CAPSTONE PROJECT / THESIS',
+                      weight: '50%',
                       rows: [
-                        { field: 'innovation', label: '1. Innovation', desc: '' },
-                        { field: 'application', label: '2. Application and Relevance', desc: '' },
-                        { field: 'impact', label: '3. Research Thrust Impact', desc: '' },
+                        { field: 'functionality', label: 'Functionality', desc: 'This characteristic represents the degree to which a product or system provides functions that meet stated and implied needs when used under specified conditions' },
+                        { field: 'usability', label: 'Usability', desc: 'Degree to which a product or system can be used by specified users to achieve specified goals with effectiveness, efficiency and satisfaction in a specified context of use' },
+                        { field: 'reliability', label: 'Reliability', desc: 'Degree to which a system, product or component performs specified functions under specified conditions for a specified period of time' },
                       ],
                       subtotal: totals.project,
-                      subtotalMax: 40,
+                      subtotalMax: 50,
                     },
                   ].map((section, idx) => (
                     <React.Fragment key={section.title}>
@@ -475,30 +451,45 @@ export const ProposalGradingModal = ({
 
             <div className="mt-2 pt-6 flex flex-col md:flex-row gap-5">
 
-              {/* Overall Score omitted here because it's now inside the table! */}
-
               {/* Verdict */}
               <div className="flex-1 bg-white dark:bg-[#0e0f15] border-2 border-gray-200 dark:border-[#222433] rounded-2xl p-6 flex flex-col justify-center shadow-sm relative overflow-hidden">
-                {verdict === 'APPROVED' && <div className="absolute top-0 w-full h-1 bg-emerald-500" />}
-                {verdict === 'APPROVED_WITH_REVISIONS' && <div className="absolute top-0 w-full h-1 bg-amber-500" />}
+                {(verdict === 'PASSED' || verdict === 'PASSED_WITH_MINOR_REVISIONS') && <div className="absolute top-0 w-full h-1 bg-emerald-500" />}
+                {verdict === 'PASSED_WITH_MAJOR_REVISIONS' && <div className="absolute top-0 w-full h-1 bg-amber-500" />}
+                {verdict === 'REDEFENSE' && <div className="absolute top-0 w-full h-1 bg-orange-500" />}
                 {verdict === 'DISAPPROVED' && <div className="absolute top-0 w-full h-1 bg-rose-500" />}
 
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Final Verdict</p>
 
-                {verdict === 'APPROVED' ? (
+                {verdict === 'PASSED' ? (
                   <div className="flex items-start gap-3 text-emerald-600 dark:text-emerald-400">
                     <CheckCircle className="w-8 h-8 shrink-0" />
                     <div>
-                      <h4 className="text-xl font-bold uppercase leading-none mb-1">Approved</h4>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-500/80 font-medium">86–100 (Minor revisions necessary)</p>
+                      <h4 className="text-xl font-bold uppercase leading-none mb-1">Passed</h4>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-500/80 font-medium">95–100 (Minor revisions necessary)</p>
                     </div>
                   </div>
-                ) : verdict === 'APPROVED_WITH_REVISIONS' ? (
+                ) : verdict === 'PASSED_WITH_MINOR_REVISIONS' ? (
+                  <div className="flex items-start gap-3 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle className="w-8 h-8 shrink-0" />
+                    <div>
+                      <h4 className="text-xl font-bold uppercase leading-none mb-1">Passed with Minor Revisions</h4>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-500/80 font-medium">85–94 (Revisions on document or system)</p>
+                    </div>
+                  </div>
+                ) : verdict === 'PASSED_WITH_MAJOR_REVISIONS' ? (
                   <div className="flex items-start gap-3 text-amber-600 dark:text-amber-400">
                     <AlertTriangle className="w-8 h-8 shrink-0" />
                     <div>
-                      <h4 className="text-xl font-bold uppercase leading-none mb-1">Revisions Needed</h4>
-                      <p className="text-xs text-amber-700 dark:text-amber-500/80 font-medium">75–85 (Major revisions required)</p>
+                      <h4 className="text-xl font-bold uppercase leading-none mb-1">Passed with Major Revisions</h4>
+                      <p className="text-xs text-amber-700 dark:text-amber-500/80 font-medium">75–84 (Represent system in panel)</p>
+                    </div>
+                  </div>
+                ) : verdict === 'REDEFENSE' ? (
+                  <div className="flex items-start gap-3 text-orange-600 dark:text-orange-400">
+                    <AlertTriangle className="w-8 h-8 shrink-0" />
+                    <div>
+                      <h4 className="text-xl font-bold uppercase leading-none mb-1">Redefense</h4>
+                      <p className="text-xs text-orange-700 dark:text-orange-500/80 font-medium">70–74 (Major revisions on doc & system)</p>
                     </div>
                   </div>
                 ) : verdict === 'DISAPPROVED' ? (
@@ -506,7 +497,7 @@ export const ProposalGradingModal = ({
                     <XCircle className="w-8 h-8 shrink-0" />
                     <div>
                       <h4 className="text-xl font-bold uppercase leading-none mb-1">Disapproved</h4>
-                      <p className="text-xs text-rose-700 dark:text-rose-500/80 font-medium">Below 75 (Failed to propose valid research)</p>
+                      <p className="text-xs text-rose-700 dark:text-rose-500/80 font-medium">Below 70 (Failed to defend deliverables)</p>
                     </div>
                   </div>
                 ) : (
@@ -543,61 +534,43 @@ export const ProposalGradingModal = ({
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-[#1c1d28] bg-gray-50 dark:bg-[#12131b] flex items-center justify-between shrink-0">
-          {/* Left side: Download PDF */}
-          {!readOnly && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              className="flex items-center gap-2 text-sm px-4 py-2 border-gray-300 dark:border-[#2a2c3d] hover:bg-gray-100 dark:hover:bg-[#1c1d28] text-gray-700 dark:text-gray-300 disabled:opacity-50"
-            >
-              {isGeneratingPdf ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  Download as PDF
-                </>
-              )}
-            </Button>
-          )}
-
-          {/* Right side: Cancel + Submit */}
-          <div className="flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose} className="px-6" disabled={isSubmitting}>
-              {readOnly ? 'Close' : 'Cancel'}
-            </Button>
-            {!readOnly && (
-              <Button
-                form="proposal-grading-form"
-                type="submit"
-                variant="primary"
-                className="px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 flex items-center gap-2 disabled:opacity-50"
-                disabled={!allFilled || !verdict || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <ClipboardCheck className="w-4 h-4" />
-                    Submit Final Grade
-                  </>
-                )}
-              </Button>
+        
+        {!readOnly ? (
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-[#1c1d28] bg-gray-50 dark:bg-[#12131b] flex justify-end gap-3 shrink-0">
+          <Button type="button" variant="ghost" onClick={onClose} className="px-6" disabled={readOnly || isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            form="final-grading-form"
+            type="submit"
+            variant="primary"
+            className="px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 flex items-center gap-2 disabled:opacity-50"
+            disabled={!allFilled || !verdict || (readOnly || isSubmitting)}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <ClipboardCheck className="w-4 h-4" />
+                Submit Final Grade
+              </>
             )}
-          </div>
+          </Button>
         </div>
+        ) : (
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-[#1c1d28] bg-gray-50 dark:bg-[#12131b] flex justify-end gap-3 shrink-0">
+             <Button type="button" variant="primary" onClick={onClose} className="px-6 bg-blue-600 hover:bg-blue-700 text-white">
+                Close
+             </Button>
+          </div>
+        )}
       </div>
     </div>
   );
+
 };
 
-export default ProposalGradingModal;
+export default FinalGradingModal;

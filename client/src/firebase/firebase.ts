@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, Firestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
@@ -76,7 +76,10 @@ const auth: Auth = getAuth(app);
 
 // Ito yung connection sa Firestore database natin. 
 // Dito ise-save yung "users" collection (para sa roles at profile) pati iba pang app data.
-const db: Firestore = getFirestore(app);
+// Enabled ang offline persistence para gumana ang app kahit walang internet
+const db: Firestore = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 
 // Para sa file uploads like profile pictures o manuscript documents.
 const storage: FirebaseStorage = getStorage(app);

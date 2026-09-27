@@ -527,11 +527,7 @@ export const Dashboard = () => {
           )}
 
           {/* ====== ADVISER & PANELIST CONTENT ====== */}
-          {effectiveRole === "adviser" && (
-            <div className="space-y-5">
-              <AdviserRequestsWidget />
-            </div>
-          )}
+          {/* Adviser specific dashboard content (Adviser Requests moved to separate page) */}
         </div>
 
         {/* Right Col: Recent Activity */}
@@ -713,102 +709,7 @@ const AdminDashboardMetrics = () => {
   );
 };
 
-/* Adviser Requests Widget */
-const AdviserRequestsWidget = () => {
-  const { currentUser, userProfile } = useAuth();
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-
-    setLoading(true);
-    const unsubscribe = adviserRequestService.subscribeToPendingAdviserRequests(currentUser.uid, (reqs) => {
-      setRequests(reqs);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  const handleAccept = async (reqId) => {
-    try {
-      const request = requests.find(r => r.id === reqId);
-      if (!request) return;
-
-      // 1. Accept the request
-      await adviserRequestService.acceptRequest(reqId);
-
-      // 2. Assign the adviser to the group
-      if (request.groupId) {
-        await groupService.updateGroup(request.groupId, {
-          adviserId: request.adviserId,
-          adviserName: request.adviserName
-        });
-      }
-
-      // 3. Provision the Research Workspace
-      await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(request, userProfile);
-
-      // Remove from pending list
-      setRequests(prev => prev.filter(r => r.id !== reqId));
-    } catch (err) {
-      console.error(err);
-      alert('Failed to accept request: ' + err.message);
-    }
-  };
-
-  const handleDecline = async (reqId) => {
-    try {
-      await adviserRequestService.declineRequest(reqId);
-      setRequests(prev => prev.filter(r => r.id !== reqId));
-    } catch (err) {
-      console.error(err);
-      alert('Failed to decline request: ' + err.message);
-    }
-  };
-
-  if (loading) return null;
-  if (requests.length === 0) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1a1b26]/50 text-xs text-gray-500 dark:text-[#9396a8]">
-        <HiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-        <span>No pending adviser requests.</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {requests.map(req => (
-        <Card key={req.id} className="p-5 border-l-4 border-l-amber-500">
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant="amber">New Request</Badge>
-                <span className="text-xs text-gray-400">Received {new Date(req.createdAt).toLocaleDateString()}</span>
-              </div>
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">{req.researchTitle}</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{req.researchDescription}</p>
-
-              <div className="flex gap-4 mt-3 text-xs text-gray-500">
-                <div><span className="font-semibold">Student:</span> {req.studentName}</div>
-                {(req.courseName || req.sectionName) && (
-                  <div><span className="font-semibold">Program/Section:</span> {req.courseName} {req.sectionName}</div>
-                )}
-                <div><span className="font-semibold text-blue-600 dark:text-blue-400">Match: {req.compatibilityScore}%</span></div>
-              </div>
-            </div>
-            <div className="flex md:flex-col gap-2 shrink-0 self-start md:self-center w-full md:w-auto">
-              <Button variant="primary" onClick={() => handleAccept(req.id)} className="flex-1 md:w-32">Accept</Button>
-              <Button variant="danger" onClick={() => handleDecline(req.id)} className="flex-1 md:w-32 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400">Decline</Button>
-            </div>
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-};
 
 /* Recent Activity Widget — Displays real system activities across research workflow */
 const RecentActivityWidget = () => {

@@ -214,22 +214,23 @@ export const AdvisersList = () => {
       />
 
       {/* Filter and Search Bar */}
-      <Card className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <Card className="p-3 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
         <div className="flex-1 w-full flex items-center gap-2">
           <Input
-            placeholder="Search advisers by name, department, or expertise (e.g. AI, Web, Cloud)..."
+            placeholder="Search advisers by name or expertise..."
             icon={HiMagnifyingGlass}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="w-full"
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto pb-1 sm:pb-0 hide-scrollbar shrink-0">
           {['all', 'Computer Science', 'Information Technology'].map((dept) => (
             <button
               key={dept}
               onClick={() => setDepartmentFilter(dept)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition whitespace-nowrap ${
                 departmentFilter === dept
                   ? 'bg-primary text-white shadow-sm'
                   : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
@@ -243,7 +244,7 @@ export const AdvisersList = () => {
 
       {/* Advisers Grid */}
       {loading ? (
-        <div className="py-16 text-center text-gray-400 dark:text-gray-500">
+        <div className="py-12 sm:py-16 text-center text-[13px] sm:text-sm text-gray-400 dark:text-gray-500">
           Loading faculty advisers directory...
         </div>
       ) : filteredAdvisers.length === 0 ? (
@@ -255,22 +256,22 @@ export const AdvisersList = () => {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredAdvisers.map((adv) => (
             <Card
               key={adv.uid || adv.id}
               hover
-              className="flex flex-col justify-between p-5 space-y-4 border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#15161e] transition-all"
+              className="flex flex-col justify-between p-4 sm:p-5 space-y-3 sm:space-y-4 border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#15161e] transition-all"
             >
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {/* Header: Photo & Name */}
-                <div className="flex items-start gap-3.5">
+                <div className="flex items-start gap-3 sm:gap-3.5">
                   <div className="relative shrink-0">
                     {adv.profile_image ? (
                       <img
                         src={adv.profile_image}
                         alt={adv.displayName}
-                        className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm"
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'flex';
@@ -278,7 +279,7 @@ export const AdvisersList = () => {
                       />
                     ) : null}
                     <div
-                      className={`w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-base items-center justify-center shadow-sm ${
+                      className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-sm sm:text-base items-center justify-center shadow-sm ${
                         adv.profile_image ? 'hidden' : 'flex'
                       }`}
                     >
@@ -292,14 +293,14 @@ export const AdvisersList = () => {
                   </div>
 
                   <div className="space-y-0.5 min-w-0 flex-1">
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white truncate">
+                    <h3 className="text-[13px] sm:text-base font-bold text-gray-900 dark:text-white truncate">
                       {adv.displayName}
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate">
                       {adv.department || 'Faculty Adviser'}
                     </p>
                     <div className="pt-1 flex items-center gap-2">
-                      <Badge variant="emerald" size="sm">
+                      <Badge variant="emerald" size="sm" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
                         Available for Advising
                       </Badge>
                     </div>
@@ -308,41 +309,41 @@ export const AdvisersList = () => {
 
                 {/* College / Academic Unit */}
                 {adv.college && (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <HiBuildingOffice2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <div className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                    <HiBuildingOffice2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary shrink-0" />
                     <span className="truncate">{adv.college}</span>
                   </div>
                 )}
 
                 {/* Expertise Badges */}
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <div className="space-y-1 sm:space-y-1.5">
+                  <div className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                     Core Expertise
                   </div>
                   {adv.allExpertise && adv.allExpertise.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1 sm:gap-1.5">
                       {adv.allExpertise.slice(0, 4).map((exp, i) => (
                         <span
                           key={i}
-                          className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/40"
+                          className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/40"
                         >
                           {exp}
                         </span>
                       ))}
                       {adv.allExpertise.length > 4 && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-gray-400 bg-gray-100 dark:bg-slate-800">
-                          +{adv.allExpertise.length - 4} more
+                        <span className="px-1.5 py-0.5 sm:py-1 rounded text-[9px] sm:text-[10px] font-semibold text-gray-400 bg-gray-100 dark:bg-slate-800 flex items-center">
+                          +{adv.allExpertise.length - 4}
                         </span>
                       )}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-400 italic">No expertise tags listed.</p>
+                    <p className="text-[11px] sm:text-xs text-gray-400 italic">No expertise tags listed.</p>
                   )}
                 </div>
 
                 {/* Published Works Count */}
-                <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 pt-1">
-                  <HiBookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-gray-600 dark:text-gray-300 pt-0.5 sm:pt-1">
+                  <HiBookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" />
                   <span>
                     <strong>{adv.matchedPublications.length}</strong> published{' '}
                     {adv.matchedPublications.length === 1 ? 'work' : 'works'}
@@ -351,14 +352,14 @@ export const AdvisersList = () => {
               </div>
 
               {/* Card Footer Action */}
-              <div className="pt-3 border-t border-gray-100 dark:border-[#222433] flex justify-end">
+              <div className="pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-[#222433] flex justify-end mt-2 sm:mt-0">
                 <Button
                   variant="primary"
                   size="sm"
-                  className="w-full sm:w-auto shadow-sm"
+                  className="w-full sm:w-auto shadow-sm justify-center text-xs"
                   onClick={() => setSelectedAdviser(adv)}
                 >
-                  <HiEye className="w-4 h-4 mr-1.5" /> View Profile &amp; Works
+                  <HiEye className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-1.5" /> View Profile <span className="hidden sm:inline">&amp; Works</span>
                 </Button>
               </div>
             </Card>

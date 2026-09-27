@@ -162,7 +162,7 @@ export const Masterlist = () => {
 
   // 2. ACTIVE SECTION MASTERLIST
   return (
-    <div className="space-y-6 font-inter">
+    <div className="space-y-4 sm:space-y-6 font-inter">
       {toast.message && (
         <Toast
           message={toast.message}
@@ -177,37 +177,37 @@ export const Masterlist = () => {
         description={`Class directory for ${course?.name || course?.code || "Program"} • ${userProfile?.yearLevel || 4}th Year • ${section?.name || "Section"}`}
       />
 
-      {/* Info Stats Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 flex items-center justify-center shrink-0 font-bold">
-            <HiUsers className="w-5 h-5" />
+      {/* Info Stats Bar — compact horizontal on mobile */}
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 sm:gap-4">
+        <div className="p-2.5 sm:p-4 bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-xs flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 flex items-center justify-center shrink-0">
+            <HiUsers className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold block">Total Classmates</span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">{students.length}</span>
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-xs text-gray-400 uppercase font-semibold block truncate">Classmates</span>
+            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{students.length}</span>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 flex items-center justify-center shrink-0 font-bold">
-            <HiCheckCircle className="w-5 h-5" />
+        <div className="p-2.5 sm:p-4 bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-xs flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 flex items-center justify-center shrink-0">
+            <HiCheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold block">In a Group</span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-xs text-gray-400 uppercase font-semibold block truncate">In Group</span>
+            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
               {students.filter((s) => getStudentGroupInfo(s.uid).inGroup).length}
             </span>
           </div>
         </div>
 
-        <div className="p-4 bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center shrink-0 font-bold">
-            <HiExclamationCircle className="w-5 h-5" />
+        <div className="p-2.5 sm:p-4 bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-xs flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center shrink-0">
+            <HiExclamationCircle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold block">Looking for a Group</span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-xs text-gray-400 uppercase font-semibold block truncate">No Group</span>
+            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
               {students.filter((s) => !getStudentGroupInfo(s.uid).inGroup).length}
             </span>
           </div>
@@ -215,7 +215,7 @@ export const Masterlist = () => {
       </div>
 
       {/* Search Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div className="relative w-full sm:max-w-xs">
           <Input
             icon={HiMagnifyingGlass}
@@ -231,8 +231,8 @@ export const Masterlist = () => {
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-sm overflow-hidden">
+      {/* Desktop Table — hidden on mobile */}
+      <div className="hidden md:block bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-sm overflow-hidden">
         <DataTable columns={tableColumns} className="shadow-none">
           {filteredStudents.length === 0 ? (
             <TableRow>
@@ -288,7 +288,6 @@ export const Masterlist = () => {
                       : "hover:bg-gray-50/70 dark:hover:bg-[#1a1b26]/50"
                   }`}
                 >
-                  {/* Student Name */}
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <div
@@ -317,36 +316,26 @@ export const Masterlist = () => {
                       </div>
                     </div>
                   </TableCell>
-
-                  {/* Student Number */}
                   <TableCell>
                     <span className="font-mono text-xs text-gray-700 dark:text-gray-300">
                       {studentNumber}
                     </span>
                   </TableCell>
-
-                  {/* Program */}
                   <TableCell>
                     <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
                       {programDisplay}
                     </span>
                   </TableCell>
-
-                  {/* Year Level */}
                   <TableCell>
                     <span className="text-xs text-gray-600 dark:text-gray-400">
                       {yearLevelDisplay}
                     </span>
                   </TableCell>
-
-                  {/* Section */}
                   <TableCell>
                     <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                       {sectionDisplay}
                     </span>
                   </TableCell>
-
-                  {/* Group Status */}
                   <TableCell>
                     {groupInfo.inGroup ? (
                       <div className="flex items-center gap-1.5">
@@ -374,6 +363,70 @@ export const Masterlist = () => {
             })
           )}
         </DataTable>
+      </div>
+
+      {/* Mobile Card List — shown only on mobile */}
+      <div className="md:hidden bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-sm overflow-hidden">
+        {filteredStudents.length === 0 ? (
+          <div className="py-12 text-center text-gray-400">
+            <HiUsers className="w-10 h-10 mx-auto mb-2 text-gray-300 dark:text-[#6b6f84]" />
+            <p className="text-sm font-medium">{students.length === 0 ? 'No students found' : 'No matching students'}</p>
+          </div>
+        ) : (
+          <div className="mobile-card-list divide-y divide-gray-100 dark:divide-[#222433]">
+            {filteredStudents.map((student) => {
+              const groupInfo = getStudentGroupInfo(student.uid);
+              const isCurrentUser = student.uid === userProfile.uid;
+              const studentName =
+                student.fullName ||
+                `${student.first_name || ""} ${student.last_name || ""}`.trim() ||
+                "Student";
+              const studentNumber =
+                student.studentIdOrEmployeeId ||
+                student.studentId ||
+                student.studentNumber ||
+                "N/A";
+
+              return (
+                <div
+                  key={student.uid}
+                  className={`flex items-center gap-3 px-4 py-3 ${
+                    isCurrentUser ? 'bg-blue-50/40 dark:bg-blue-950/10' : ''
+                  }`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      isCurrentUser
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 dark:bg-[#1f202e] text-gray-700 dark:text-gray-300"
+                    }`}
+                  >
+                    {studentName.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                        {studentName}
+                      </span>
+                      {isCurrentUser && (
+                        <Badge variant="blue" className="text-[9px] px-1.5 py-0">You</Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 block truncate">{student.email}</span>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="font-mono text-[11px] text-gray-500 block">{studentNumber}</span>
+                    {groupInfo.inGroup ? (
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">In Group</span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">No Group</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

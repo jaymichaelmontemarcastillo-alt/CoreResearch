@@ -116,6 +116,12 @@ export const Sidebar = ({
           icon: HiDocumentText,
           roles: ["adviser", "research_coordinator", "faculty", "admin"],
         },
+        {
+          label: "Adviser Requests",
+          path: "/adviser-requests",
+          icon: HiClipboardDocumentList,
+          roles: ["adviser", "faculty", "research_coordinator", "admin"],
+        },
         ...(effectiveRole === "student"
           ? [
               {
@@ -263,8 +269,8 @@ export const Sidebar = ({
     return currentPath === path;
   };
 
-  const renderContent = (expanded) => (
-    <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden`}>
+  const renderContent = (expanded, isMobile = false) => (
+    <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] ${isMobile ? 'rounded-r-2xl' : 'rounded-2xl'} shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden`}>
       {/* HEADER SECTION */}
       <div className={`flex items-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 ${
         expanded ? "px-3.5 justify-between" : "px-2 justify-center"
@@ -299,7 +305,7 @@ export const Sidebar = ({
       </div>
 
       {/* CATEGORIZED NAVIGATION */}
-      <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar py-3 space-y-4 ${expanded ? "px-3" : "px-2"}`}>
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar ${isMobile ? 'py-1 space-y-0.5 px-2' : `py-3 space-y-4 ${expanded ? "px-3" : "px-2"}`}`}>
         {navigationCategories.map((sec) => {
           const visibleItems = sec.items.filter((item) =>
             item.roles.includes(role || "student")
@@ -307,8 +313,8 @@ export const Sidebar = ({
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={sec.category} className="space-y-1">
-              <div className="space-y-1">
+            <div key={sec.category} className={isMobile ? 'space-y-0.5' : 'space-y-1'}>
+              <div className={isMobile ? 'space-y-0.5' : 'space-y-1'}>
                 {visibleItems.map((item) => {
                   const Icon = item.icon;
                   const active = isItemActive(item.path);
@@ -317,9 +323,10 @@ export const Sidebar = ({
                     <Link
                       key={item.label}
                       to={item.path}
+                      onClick={isMobile ? onCloseMobile : undefined}
                       className={`relative flex items-center rounded-xl font-medium transition-colors duration-150 ${
                         expanded
-                          ? "gap-3 h-10 px-3 text-sm"
+                          ? `gap-3 ${isMobile ? 'h-9 px-3 text-[13px]' : 'h-10 px-3 text-sm'}`
                           : "justify-center h-10 w-10 mx-auto"
                       } ${
                         active
@@ -351,7 +358,7 @@ export const Sidebar = ({
       </div>
 
       {/* BOTTOM SECTION: THEME SWITCH & LOGOUT */}
-      <div className={`p-3 border-t border-gray-100 dark:border-[#202230] shrink-0 space-y-2 ${expanded ? "px-3" : "px-2"}`}>
+      <div className={`${isMobile ? 'p-2 pt-1.5' : 'p-3'} border-t border-gray-100 dark:border-[#202230] shrink-0 space-y-1.5 ${expanded ? (isMobile ? 'px-2' : 'px-3') : 'px-2'}`}>
         
         {/* THEME TOGGLE SWITCH */}
         <div className={`relative flex items-center ${expanded ? "bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl border border-gray-200/60 dark:border-[#252839]" : "justify-center h-10"}`}>
@@ -429,18 +436,18 @@ export const Sidebar = ({
           isExpanded ? "w-[260px]" : "w-[80px]"
         }`}
       >
-        {renderContent(isExpanded)}
+        {renderContent(isExpanded, false)}
       </aside>
 
       {/* Mobile Drawer Overlay */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex p-3">
+        <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={onCloseMobile}
           />
-          <div className="relative w-64 h-full z-50 animate-slide-in">
-            {renderContent(true)}
+          <div className="relative w-[260px] h-full z-50 animate-slide-in">
+            {renderContent(true, true)}
           </div>
         </div>
       )}

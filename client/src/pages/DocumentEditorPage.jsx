@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { OnlyOfficeEditor } from '../components/editor/OnlyOfficeEditor';
 import { EditorTaskSidebar } from '../components/editor/EditorTaskSidebar';
 import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
+import { FinalGradingModal } from '../components/editor/FinalGradingModal';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Textarea';
@@ -194,23 +195,33 @@ export const DocumentEditorPage = () => {
     // Proposal Grading Modal state
     const [isGradingModalOpen, setIsGradingModalOpen] = useState(false);
     const [existingProposalEval, setExistingProposalEval] = useState(null);
+    const [existingFinalEval, setExistingFinalEval] = useState(null);
     const [gradingLoading, setGradingLoading] = useState(false);
+    const [studentProposalEvals, setStudentProposalEvals] = useState([]);
+    const [studentFinalEvals, setStudentFinalEvals] = useState([]);
 
-    // Load existing proposal evaluation for this panelist (if any) when modal is about to open
+    // Load existing evaluation for this panelist (if any) when modal is about to open
     useEffect(() => {
       if (!isPanelistMode || !urlDefenseId || !currentUser?.uid) return;
-      if (urlDefenseType !== 'proposal_defense') return;
 
       let mounted = true;
       const loadExistingEval = async () => {
         try {
-          const existing = await gradingService.getProposalEvaluationByPanelist(
-            urlDefenseId,
-            currentUser.uid
-          );
-          if (mounted) setExistingProposalEval(existing);
+          if (urlDefenseType === 'proposal_defense') {
+            const existing = await gradingService.getProposalEvaluationByPanelist(
+              urlDefenseId,
+              currentUser.uid
+            );
+            if (mounted) setExistingProposalEval(existing);
+          } else if (urlDefenseType === 'final_defense') {
+            const existing = await gradingService.getFinalDefenseEvaluationByPanelist(
+              urlDefenseId,
+              currentUser.uid
+            );
+            if (mounted) setExistingFinalEval(existing);
+          }
         } catch (err) {
-          console.warn('[DocumentEditorPage] Failed to load existing proposal eval:', err);
+          console.warn('[DocumentEditorPage] Failed to load existing eval:', err);
         }
       };
 
@@ -222,6 +233,8 @@ export const DocumentEditorPage = () => {
     useEffect(() => {
       let unsubscribeWs = () => {};
       let unsubscribeFb = () => {};
+      let unsubscribePEvals = () => {};
+      let unsubscribeFEvals = () => {};
       const fetchWorkspace = async () => {
         try {
           let wsId = urlWorkspaceId;
@@ -249,6 +262,15 @@ export const DocumentEditorPage = () => {
             unsubscribeFb = researchFeedbackService.subscribeWorkspaceFeedback(wsId, (list) => {
               setFeedbackList(list || []);
             });
+
+            if (!isPanelistMode) {
+              unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(wsId, (evals) => {
+                setStudentProposalEvals(evals);
+              });
+              unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(wsId, (evals) => {
+                setStudentFinalEvals(evals);
+              });
+            }
           }
         } catch (err) {
           console.warn('[DocumentEditorPage] Error loading workspace:', err);
@@ -259,8 +281,10 @@ export const DocumentEditorPage = () => {
       return () => {
         unsubscribeWs();
         unsubscribeFb();
+        if (typeof unsubscribePEvals === 'function') unsubscribePEvals();
+        if (typeof unsubscribeFEvals === 'function') unsubscribeFEvals();
       };
-    }, [urlWorkspaceId, documentId, urlChapterId]);
+    }, [urlWorkspaceId, documentId, urlChapterId, isPanelistMode]);
 
     // Subscribe to workspace tasks in real-time
     useEffect(() => {
@@ -300,6 +324,21 @@ export const DocumentEditorPage = () => {
         await gradingService.submitProposalEvaluation(input);
         setToastMessage('Proposal evaluation submitted!');
         setTimeout(() => setToastMessage(''), 5000);
+
+        if (workspace?.studentId) {
+          try {
+            await notificationService.createNotification({
+              userId: workspace.studentId,
+              title: 'Proposal Defense Rated',
+              message: `${currentUser?.displayName || 'A panelist'} has graded your Proposal Defense: ${input.verdict.replace(/_/g, ' ')}.`,
+              type: 'system',
+              linkUrl: '/research/workspace',
+            });
+          } catch (notifErr) {
+            console.warn('[DocumentEditorPage] Notification send failed:', notifErr);
+          }
+        }
+
         // Refresh existing eval so modal shows updated scores if reopened
         if (urlDefenseId && currentUser?.uid) {
           const updated = await gradingService.getProposalEvaluationByPanelist(
@@ -311,6 +350,39 @@ export const DocumentEditorPage = () => {
       } catch (err) {
         console.error('[DocumentEditorPage] Failed to submit proposal evaluation:', err);
         throw err; // re-throw so modal can show the error
+      }
+    };
+
+    const handleGradeFinalSubmit = async (input) => {
+      try {
+        await gradingService.submitFinalDefenseEvaluation(input);
+        setToastMessage('Final defense evaluation submitted!');
+        setTimeout(() => setToastMessage(''), 5000);
+
+        if (workspace?.studentId) {
+          try {
+            await notificationService.createNotification({
+              userId: workspace.studentId,
+              title: 'Final Oral Defense Rated',
+              message: `${currentUser?.displayName || 'A panelist'} has graded your Final Oral Defense: ${input.verdict.replace(/_/g, ' ')}.`,
+              type: 'system',
+              linkUrl: '/research/workspace',
+            });
+          } catch (notifErr) {
+            console.warn('[DocumentEditorPage] Notification send failed:', notifErr);
+          }
+        }
+
+        if (urlDefenseId && currentUser?.uid) {
+          const updated = await gradingService.getFinalDefenseEvaluationByPanelist(
+            urlDefenseId,
+            currentUser.uid
+          );
+          setExistingFinalEval(updated);
+        }
+      } catch (err) {
+        console.error('[DocumentEditorPage] Failed to submit final evaluation:', err);
+        throw err;
       }
     };
 
@@ -1009,40 +1081,77 @@ export const DocumentEditorPage = () => {
               onNavigateToAnchor={handleNavigateToAnchor}
               onCreateTask={handleEditorTaskCreate}
               defenseType={urlDefenseType}
-              onGradeProposal={isPanelistMode && urlDefenseType === 'proposal_defense' ? () => setIsGradingModalOpen(true) : undefined}
+              existingEval={urlDefenseType === 'proposal_defense' ? existingProposalEval : existingFinalEval}
+              studentProposalEvals={studentProposalEvals}
+              studentFinalEvals={studentFinalEvals}
+              onGradeProposal={(urlDefenseType === 'proposal_defense' || urlDefenseType === 'final_defense') ? () => setIsGradingModalOpen(true) : undefined}
             />
           )}
         </div>
 
         {/* Proposal Defense Grading Modal */}
-        <ProposalGradingModal
-          isOpen={isGradingModalOpen}
-          onClose={() => setIsGradingModalOpen(false)}
-          onSubmit={handleGradeProposalSubmit}
-          defenseType={urlDefenseType}
-          defenseId={urlDefenseId}
-          panelistId={currentUser?.uid}
-          panelistName={
-            userProfile?.fullName ||
-            (userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : null) ||
-            currentUser?.displayName ||
-            'Panelist'
-          }
-          groupDetails={{
-            adviser: location.state?.adviserName || workspace?.adviserName || '',
-            expert: location.state?.panelistRole || workspace?.specialization || '',
-            title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || '',
-            date: new URLSearchParams(location.search).get('defenseDate') || '',
-            time: new URLSearchParams(location.search).get('defenseTime') || '',
-            groupNo: workspace?.groupNo || workspace?.groupId || '',
-            proponents: location.state?.groupMembers?.length
-              ? location.state.groupMembers
-              : workspace?.members?.map(m => m.name || m.fullName || m.email) || [],
-            workspaceId: workspace?.id,
-            projectId: workspace?.projectId,
-          }}
-          existingEval={existingProposalEval}
-        />
+        {urlDefenseType === 'proposal_defense' && (
+          <ProposalGradingModal
+            isOpen={isGradingModalOpen}
+            onClose={() => setIsGradingModalOpen(false)}
+            onSubmit={handleGradeProposalSubmit}
+            defenseType={urlDefenseType}
+            defenseId={urlDefenseId}
+            panelistId={currentUser?.uid}
+            panelistName={
+              userProfile?.fullName ||
+              (userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : null) ||
+              currentUser?.displayName ||
+              'Panelist'
+            }
+            groupDetails={{
+              adviser: location.state?.adviserName || workspace?.adviserName || '',
+              expert: location.state?.panelistRole || workspace?.specialization || '',
+              title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || '',
+              date: new URLSearchParams(location.search).get('defenseDate') || '',
+              time: new URLSearchParams(location.search).get('defenseTime') || '',
+              groupNo: workspace?.groupNo || '',
+              proponents: location.state?.groupMembers?.length
+                ? location.state.groupMembers
+                : workspace?.members?.map(m => m.name || m.fullName || m.email) || [],
+              workspaceId: workspace?.id,
+              projectId: workspace?.projectId,
+            }}
+            existingEval={existingProposalEval}
+          />
+        )}
+
+        {/* Final Defense Grading Modal */}
+        {urlDefenseType === 'final_defense' && (
+          <FinalGradingModal
+            isOpen={isGradingModalOpen}
+            onClose={() => setIsGradingModalOpen(false)}
+            onSubmit={handleGradeFinalSubmit}
+            defenseType={urlDefenseType}
+            defenseId={urlDefenseId}
+            panelistId={currentUser?.uid}
+            panelistName={
+              userProfile?.fullName ||
+              (userProfile?.first_name ? `${userProfile.first_name} ${userProfile.last_name || ''}`.trim() : null) ||
+              currentUser?.displayName ||
+              'Panelist'
+            }
+            groupDetails={{
+              adviser: location.state?.adviserName || workspace?.adviserName || '',
+              expert: location.state?.panelistRole || workspace?.specialization || '',
+              title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || '',
+              date: new URLSearchParams(location.search).get('defenseDate') || '',
+              time: new URLSearchParams(location.search).get('defenseTime') || '',
+              groupNo: workspace?.groupNo || '',
+              proponents: location.state?.groupMembers?.length
+                ? location.state.groupMembers
+                : workspace?.members?.map(m => m.name || m.fullName || m.email) || [],
+              workspaceId: workspace?.id,
+              projectId: workspace?.projectId,
+            }}
+            existingEval={existingFinalEval}
+          />
+        )}
       </div>
     );
 };

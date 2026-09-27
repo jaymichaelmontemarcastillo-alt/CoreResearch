@@ -129,6 +129,19 @@ class AdviserRequestService {
   }
 
   /**
+   * Get all requests for a specific adviser (pending, accepted, declined).
+   */
+  async getAllRequestsForAdviser(adviserId: string): Promise<AdviserRequest[]> {
+    const q = query(
+      collection(db, COLLECTION),
+      where('adviserId', '==', adviserId)
+    );
+    const snap = await getDocs(q);
+    const requests = snap.docs.map(d => d.data() as AdviserRequest);
+    return requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  /**
    * Adviser Accepts the request
    */
   async acceptRequest(requestId: string): Promise<void> {
@@ -222,6 +235,21 @@ class AdviserRequestService {
       collection(db, COLLECTION),
       where('adviserId', '==', adviserId),
       where('status', '==', 'pending')
+    );
+    return onSnapshot(q, (snap) => {
+      const requests = snap.docs.map(d => d.data() as AdviserRequest);
+      const sorted = requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      callback(sorted);
+    });
+  }
+
+  /**
+   * Real-time subscription to all requests for an adviser (pending, accepted, declined).
+   */
+  subscribeToAllAdviserRequests(adviserId: string, callback: (requests: AdviserRequest[]) => void): () => void {
+    const q = query(
+      collection(db, COLLECTION),
+      where('adviserId', '==', adviserId)
     );
     return onSnapshot(q, (snap) => {
       const requests = snap.docs.map(d => d.data() as AdviserRequest);

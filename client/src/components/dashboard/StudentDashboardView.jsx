@@ -409,58 +409,64 @@ export const StudentDashboardView = () => {
   }, [revisions, tasks, groupDocuments, upcomingDeadlines, documentId, studentUid]);
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-3 sm:space-y-5">
       {/* Top Banner: Academic & Research Group Context */}
-      <Card padding={false} className="p-4 sm:p-5 border-blue-100/70 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/50 via-indigo-50/20 to-transparent dark:from-blue-950/20 dark:via-indigo-950/10">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-              <span className="text-[11px] uppercase font-bold tracking-wider text-blue-700 dark:text-blue-400">
+      <Card padding={false} className="p-3.5 sm:p-5 border-blue-100/70 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/50 via-indigo-50/20 to-transparent dark:from-blue-950/20 dark:via-indigo-950/10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-3.5">
+          <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-blue-700 dark:text-blue-400">
                 Active Research Cohort
               </span>
-              <Badge variant="blue" size="sm" className="text-[10px] py-0 px-1.5">
+              <Badge variant="blue" size="sm" className="text-[9px] sm:text-[10px] py-0 px-1.5 hidden sm:inline-flex">
                 {userProfile?.enrollmentStatus || 'Active Student'}
               </Badge>
             </div>
 
-            <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={workspace?.title}>
+            <h2 className="text-[13px] sm:text-base font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={workspace?.title}>
               {workspace?.title || (group?.name ? `${group.name} Research Cohort` : 'Undergraduate Research')}
             </h2>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600 dark:text-[#9396a8] pt-0.5">
+            <div className="flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-0.5 sm:gap-y-1 text-[10px] sm:text-[11px] text-gray-600 dark:text-[#9396a8] pt-0.5 sm:pt-1">
               {programInfo.course && (
                 <span>
-                  Program: <strong className="text-gray-800 dark:text-gray-200">{programInfo.course.name}</strong>
+                  <span className="hidden sm:inline">Program: </span><strong className="text-gray-800 dark:text-gray-200">{programInfo.course.code || programInfo.course.name}</strong>
                 </span>
               )}
               {programInfo.sectionName && (
-                <span>
-                  Section: <strong className="text-gray-800 dark:text-gray-200">{programInfo.sectionName}</strong>
-                </span>
+                <>
+                  <span className="text-gray-300 dark:text-gray-700 sm:hidden">•</span>
+                  <span>
+                    <span className="hidden sm:inline">Section: </span><strong className="text-gray-800 dark:text-gray-200">{programInfo.sectionName}</strong>
+                  </span>
+                </>
               )}
               {workspace?.adviserName && (
-                <span>
-                  Adviser: <strong className="text-gray-800 dark:text-gray-200">{workspace.adviserName}</strong>
-                </span>
+                <>
+                  <span className="text-gray-300 dark:text-gray-700 sm:hidden">•</span>
+                  <span>
+                    Adviser: <strong className="text-gray-800 dark:text-gray-200">{workspace.adviserName}</strong>
+                  </span>
+                </>
               )}
             </div>
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 pt-1 sm:pt-0">
             {documentId ? (
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() => navigate(`/documents/${documentId}`)}
-                className="shadow-xs text-xs"
+                className="shadow-xs text-xs justify-center"
               >
-                <HiDocumentText className="w-3.5 h-3.5 mr-1" /> Open Manuscript in ONLYOFFICE
+                <HiDocumentText className="w-3.5 h-3.5 mr-1" /> <span className="hidden sm:inline">Open Manuscript in </span>ONLYOFFICE
               </Button>
             ) : null}
-            <Link to="/research/workspace">
-              <Button variant="outline" size="sm" className="text-xs">
+            <Link to="/research/workspace" className="flex">
+              <Button variant="outline" size="sm" className="text-xs w-full justify-center">
                 <HiOutlineBookOpen className="w-3.5 h-3.5 mr-1" /> Research Workspace
               </Button>
             </Link>
