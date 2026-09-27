@@ -27,7 +27,6 @@ export const ResearchCompletionRateChart = ({
     <ChartCard
       title="Overall Research Completion Rate"
       subtitle="Institutional research success rate based on successfully completed manuscripts"
-      icon={HiCheckBadge}
       loading={loading}
       isEmpty={isEmpty}
       emptyMessage="No research projects initiated yet"
@@ -51,7 +50,7 @@ export const ResearchCompletionRateChart = ({
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke="url(#completionGradient)"
+              stroke="#34d399"
               strokeWidth={strokeWidth}
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
@@ -59,54 +58,47 @@ export const ResearchCompletionRateChart = ({
               fill="transparent"
               className="transition-all duration-1000 ease-out"
             />
-            {/* Gradient definition */}
-            <defs>
-              <linearGradient id="completionGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#10b981" />
-              </linearGradient>
-            </defs>
           </svg>
 
           {/* Central Rate Display */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-            <span className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            <span className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
               {rate}%
             </span>
-            <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-[#6b6f84] tracking-wider">
+            <span className="text-[10px] uppercase font-semibold text-gray-500 dark:text-[#6b6f84] tracking-wide mt-0.5">
               Completion Rate
             </span>
           </div>
         </div>
 
         {/* Breakdown Statistics */}
-        <div className="flex-1 w-full max-w-xs space-y-3">
-          <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433]">
-            <p className="text-xs font-medium text-gray-500 dark:text-[#9396a8]">
+        <div className="flex-1 w-full max-w-xs space-y-4">
+          <div>
+            <p className="text-[13px] text-gray-500 dark:text-[#9396a8]">
               Completion Metric
             </p>
-            <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">
+            <p className="text-[15px] font-semibold text-gray-900 dark:text-white mt-0.5">
               {completedCount} out of {totalProjects} Projects Completed
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-2.5 rounded-lg border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e]">
-              <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-[#9396a8]">
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
                 <span>In Progress</span>
               </div>
-              <p className="text-base font-bold text-gray-900 dark:text-white mt-1">
+              <p className="text-base font-semibold text-gray-900 dark:text-white mt-1">
                 {inProgressCount}
               </p>
             </div>
 
-            <div className="p-2.5 rounded-lg border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e]">
-              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
+            <div>
+              <div className="flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-[#9396a8]">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
                 <span>Under Review</span>
               </div>
-              <p className="text-base font-bold text-gray-900 dark:text-white mt-1">
+              <p className="text-base font-semibold text-gray-900 dark:text-white mt-1">
                 {underReviewCount}
               </p>
             </div>

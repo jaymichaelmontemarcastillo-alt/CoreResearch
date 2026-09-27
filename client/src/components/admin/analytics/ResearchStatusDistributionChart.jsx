@@ -35,7 +35,6 @@ export const ResearchStatusDistributionChart = ({ data = [], loading = false }) 
     <ChartCard
       title="Research Status Distribution"
       subtitle="Lifecycle distribution of active and submitted research projects"
-      icon={HiChartPie}
       loading={loading}
       isEmpty={isEmpty}
       emptyMessage="No research project data available"
@@ -50,9 +49,9 @@ export const ResearchStatusDistributionChart = ({ data = [], loading = false }) 
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
+                innerRadius={65}
+                outerRadius={80}
+                paddingAngle={2}
                 dataKey="value"
                 stroke="none"
               >
@@ -65,17 +64,17 @@ export const ResearchStatusDistributionChart = ({ data = [], loading = false }) 
 
           {/* Central Total Indicator */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            <span className="text-xl font-bold text-gray-900 dark:text-white">
               {totalCount}
             </span>
-            <span className="text-[10px] uppercase font-semibold text-gray-400 dark:text-[#6b6f84]">
+            <span className="text-[10px] uppercase font-semibold text-gray-500 dark:text-[#6b6f84] mt-0.5 tracking-wide">
               Projects
             </span>
           </div>
         </div>
 
         {/* Interactive Legend List */}
-        <div className="w-full md:w-1/2 space-y-1.5 max-h-[220px] overflow-y-auto pr-1 text-xs">
+        <div className="w-full md:w-1/2 space-y-2 max-h-[220px] overflow-y-auto pr-1 text-[13px]">
           {data.map((item) => (
             <div
               key={item.name}
@@ -94,7 +93,7 @@ export const ResearchStatusDistributionChart = ({ data = [], loading = false }) 
                 <span className="font-semibold text-gray-900 dark:text-white">
                   {item.value}
                 </span>
-                <span className="text-[11px] text-gray-400 dark:text-[#6b6f84] w-8 text-right">
+                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] w-8 text-right">
                   {item.percentage}%
                 </span>
               </div>

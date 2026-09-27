@@ -13,47 +13,56 @@ export const StatCard = ({
   className = "",
   showIcon = false,
 }) => {
+  const getIconColor = () => {
+    if (trendType === "positive") return "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400";
+    if (trendType === "negative") return "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400";
+    if (trendType === "neutral" && valueColor?.includes("amber")) return "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400";
+    return "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400";
+  };
+
   return (
     <div
-      className={`bg-white dark:bg-[#15161e] rounded-xl border border-gray-200/90 dark:border-[#222433] p-3 sm:p-4 flex flex-col justify-between transition-all duration-200 hover:border-gray-300 dark:hover:border-[#333649] ${className}`}
+      className={`bg-white dark:bg-[#15161e] rounded-[20px] border border-gray-100 dark:border-[#222433] p-6 flex flex-col transition-all duration-200 hover:shadow-sm ${className}`}
     >
-      <div className="flex items-center justify-between gap-2 mb-0.5 sm:mb-1">
-        <span className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider truncate">
+      <div className="flex items-center gap-3 mb-4">
+        {showIcon && Icon && (
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${getIconColor()}`}>
+            <Icon className="w-5 h-5" />
+          </div>
+        )}
+        <span className="text-[13px] font-semibold text-gray-500 dark:text-[#9396a8]">
           {label}
         </span>
-        {showIcon && Icon && (
-          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-            <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+      </div>
+
+      <div className="mt-auto">
+        <div className={`text-3xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
+          {value}
+        </div>
+
+        {(subtitle || trend) && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs">
+            {trend && (
+              <span
+                className={`font-medium ${
+                  trendType === "positive"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : trendType === "negative"
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                {trend}
+              </span>
+            )}
+            {subtitle && (
+              <span className="text-gray-400 dark:text-[#6b6f84] truncate">
+                {subtitle}
+              </span>
+            )}
           </div>
         )}
       </div>
-
-      <div className={`text-xl sm:text-xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
-        {value}
-      </div>
-
-      {(subtitle || trend) && (
-        <div className="mt-1 sm:mt-2 flex items-center gap-1.5 text-[10px] sm:text-[11px]">
-          {trend && (
-            <span
-              className={`font-semibold flex items-center gap-0.5 ${
-                trendType === "positive"
-                  ? "text-emerald-500 dark:text-emerald-400"
-                  : trendType === "negative"
-                  ? "text-rose-500 dark:text-rose-400"
-                  : "text-blue-500 dark:text-blue-400"
-              }`}
-            >
-              {trend}
-            </span>
-          )}
-          {subtitle && (
-            <span className="text-gray-400 dark:text-[#6b6f84] truncate">
-              {subtitle}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 };

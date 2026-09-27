@@ -61,7 +61,6 @@ export const AdviserWorkloadChart = ({ data = [], loading = false }) => {
     <ChartCard
       title="Adviser Workload Distribution"
       subtitle="Active research groups and projects mentored per faculty adviser"
-      icon={HiUserGroup}
       loading={loading}
       isEmpty={isEmpty}
       emptyMessage="No adviser mentorship assignments found"
@@ -79,8 +78,8 @@ export const AdviserWorkloadChart = ({ data = [], loading = false }) => {
             margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
           >
             <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e5e7eb"
+              strokeDasharray="2 2"
+              stroke="#f3f4f6"
               className="dark:stroke-[#222433]"
               horizontal={false}
             />
@@ -102,21 +101,21 @@ export const AdviserWorkloadChart = ({ data = [], loading = false }) => {
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine
               x={RECOMMENDED_ADVISER_LIMIT}
-              stroke="#ef4444"
+              stroke="#f87171"
               strokeDasharray="4 4"
               label={{
                 value: 'Limit',
                 position: 'top',
-                fill: '#ef4444',
+                fill: '#f87171',
                 fontSize: 10,
                 fontWeight: 600,
               }}
             />
-            <Bar dataKey="assignedProjects" name="Assigned Projects" radius={[0, 6, 6, 0]}>
+            <Bar dataKey="assignedProjects" name="Assigned Projects" radius={[0, 4, 4, 0]} barSize={14}>
               {displayData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.exceedsLimit ? '#f43f5e' : '#3b82f6'}
+                  fill={entry.exceedsLimit ? '#f87171' : '#60a5fa'}
                 />
               ))}
             </Bar>

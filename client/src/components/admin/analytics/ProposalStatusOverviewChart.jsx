@@ -46,7 +46,6 @@ export const ProposalStatusOverviewChart = ({ data = [], loading = false }) => {
     <ChartCard
       title="Proposal Status Overview"
       subtitle="Evaluation progress and outcomes of submitted research title proposals"
-      icon={HiDocumentText}
       loading={loading}
       isEmpty={isEmpty}
       emptyMessage="No title proposals submitted yet"
@@ -60,8 +59,8 @@ export const ProposalStatusOverviewChart = ({ data = [], loading = false }) => {
         <ResponsiveContainer width="100%" height="100%" debounce={200}>
           <BarChart data={data} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
             <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e5e7eb"
+              strokeDasharray="2 2"
+              stroke="#f3f4f6"
               className="dark:stroke-[#222433]"
               vertical={false}
             />
@@ -78,7 +77,7 @@ export const ProposalStatusOverviewChart = ({ data = [], loading = false }) => {
               tickLine={false}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="count" name="Proposals" radius={[6, 6, 0, 0]}>
+            <Bar dataKey="count" name="Proposals" radius={[4, 4, 0, 0]} barSize={32}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}

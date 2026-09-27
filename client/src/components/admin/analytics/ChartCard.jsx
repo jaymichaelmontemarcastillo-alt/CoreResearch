@@ -20,14 +20,13 @@ export const ChartCard = ({
       <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-gray-100 dark:border-[#222433]">
         <div className="space-y-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            {Icon && <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />}
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white tracking-tight truncate">
+            <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white tracking-tight truncate">
               {title}
             </h3>
             {badge && <span>{badge}</span>}
           </div>
           {subtitle && (
-            <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
+            <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
               {subtitle}
             </p>
           )}

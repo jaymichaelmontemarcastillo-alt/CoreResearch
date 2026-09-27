@@ -12,23 +12,20 @@ export const AdminAnalyticsFilters = ({
   totalActiveFilters = 0,
 }) => {
   return (
-    <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-sm transition-all">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Title & Filter Icon */}
+    <div className="p-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/80 dark:border-[#222433] transition-all">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        {/* Title */}
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
-            <HiFunnel className="w-4 h-4" />
-          </div>
           <div>
-            <h4 className="text-sm font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+            <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
               Institutional Filters
               {totalActiveFilters > 0 && (
-                <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-blue-600 text-white">
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-600 text-white">
                   {totalActiveFilters} active
                 </span>
               )}
-            </h4>
-            <p className="text-[11px] text-gray-500 dark:text-[#9396a8]">
+            </h3>
+            <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
               Filter metrics, status distributions, and research trends dynamically.
             </p>
           </div>

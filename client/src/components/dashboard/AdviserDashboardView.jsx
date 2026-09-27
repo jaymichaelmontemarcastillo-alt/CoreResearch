@@ -241,6 +241,21 @@ export const AdviserDashboardView = () => {
     }
   };
 
+  // Trigger initial data load
+  useEffect(() => {
+    loadAdviserData();
+  }, [currentUser?.uid]);
+
+  // Subscribe to system activities
+  useEffect(() => {
+    const unsubscribe = systemActivityService.subscribeRecentActivities((items) => {
+      setActivities(items);
+      setActivityLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+
   // ----------------------------------------------------
   // METRICS & COMPUTATIONS
   // ----------------------------------------------------
@@ -346,8 +361,9 @@ export const AdviserDashboardView = () => {
           icon={HiUsers}
           showIcon
           label="Active Research Groups"
-          value={`${activeGroupsCount} ${activeGroupsCount === 1 ? 'Group' : 'Groups'}`}
-          trend={activeGroupsCount > 0 ? 'Assigned Advisees' : 'No Advisees'}
+          value={activeGroupsCount}
+          subtitle="Assigned Advisees"
+          trend={activeGroupsCount > 0 ? 'Assigned' : 'None'}
           trendType={activeGroupsCount > 0 ? 'positive' : 'neutral'}
         />
 
@@ -356,11 +372,8 @@ export const AdviserDashboardView = () => {
           icon={HiDocumentText}
           showIcon
           label="Manuscripts Needing Review"
-          value={
-            manuscriptsNeedingReview.length > 0
-              ? `${manuscriptsNeedingReview.length} Pending`
-              : '0 Pending'
-          }
+          value={manuscriptsNeedingReview.length}
+          subtitle="Pending Review"
           trend={
             manuscriptsNeedingReview.length > 0
               ? 'Action Required'
@@ -379,10 +392,11 @@ export const AdviserDashboardView = () => {
           icon={HiClipboardDocumentList}
           showIcon
           label="Pending Advisee Tasks"
-          value={`${pendingTasks.length} Active`}
+          value={pendingTasks.length}
+          subtitle="Active tasks"
           trend={
             overdueTasks.length > 0
-              ? `${overdueTasks.length} Overdue • ${inProgressTasks.length} Active`
+              ? `${overdueTasks.length} Overdue`
               : `${inProgressTasks.length} in progress`
           }
           trendType={overdueTasks.length > 0 ? 'negative' : 'neutral'}
@@ -398,18 +412,11 @@ export const AdviserDashboardView = () => {
           icon={HiCalendarDays}
           showIcon
           label="Upcoming Defense"
-          value={
-            nearestDefense
-              ? `${formatDefenseDate(nearestDefense.date)}`
-              : 'No Upcoming'
-          }
+          value={nearestDefense ? nearestDefense.startTime || 'TBA' : '0'}
+          subtitle={nearestDefense ? formatDefenseDate(nearestDefense.date) : 'No Upcoming'}
           trend={
             nearestDefense
-              ? `${nearestDefense.startTime || 'TBA'} • ${
-                  nearestDefense.defenseType === 'final_defense'
-                    ? 'Final Defense'
-                    : 'Proposal Defense'
-                }`
+              ? `${nearestDefense.defenseType === 'final_defense' ? 'Final Defense' : 'Proposal Defense'}`
               : 'Oral Hearings'
           }
           trendType={nearestDefense ? 'positive' : 'neutral'}
@@ -426,22 +433,19 @@ export const AdviserDashboardView = () => {
           {/* -------------------------------------------------- */}
           {/* 2. ACTION REQUIRED SECTION */}
           {/* -------------------------------------------------- */}
-          <Card className="p-5 sm:p-6 border-l-4 border-l-amber-500 space-y-4">
+          <Card className="p-5 sm:p-6 space-y-5 border-0 shadow-sm ring-1 ring-gray-100 dark:ring-[#222433]">
             <div className="flex items-center justify-between pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                  <HiSparkles className="w-5 h-5" />
-                </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 tracking-tight">
                     Action Required
                     {totalActionCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500 text-white">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white uppercase tracking-wider">
                         {totalActionCount}
                       </span>
                     )}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-[#9396a8]">
+                  <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
                     Items currently requiring your review, sign-off, or intervention
                   </p>
                 </div>
@@ -469,16 +473,17 @@ export const AdviserDashboardView = () => {
                 {manuscriptsNeedingReview.map((item) => (
                   <div
                     key={item.workspaceId}
-                    className="p-3.5 sm:p-4 rounded-xl border border-blue-200/70 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-950/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] flex flex-col sm:flex-row sm:items-start justify-between gap-4 group hover:shadow-sm transition-all"
                   >
-                    <div className="space-y-1 min-w-0 flex-1">
+                    <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="blue">Manuscript Review</Badge>
-                        <span className="text-[11px] text-gray-400">
-                          {item.groupName}
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          Manuscript Review
                         </span>
+                        <span className="text-[11px] text-gray-400">· {item.groupName}</span>
                       </div>
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                         {item.title}
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-[#9396a8]">
@@ -486,18 +491,18 @@ export const AdviserDashboardView = () => {
                           ? `Sections submitted: ${item.submittedSections
                               .map((s) => s.name)
                               .join(', ')}`
-                          : 'Full manuscript submitted for adviser verification.'}
+                          : 'Full manuscript submitted for verification.'}
                       </p>
                     </div>
                     <Button
-                      variant="primary"
+                      variant="secondary"
                       size="sm"
                       onClick={() =>
                         navigate(`/faculty/workspace/${item.groupId || item.workspaceId}`)
                       }
-                      className="shrink-0 text-xs flex items-center gap-1 self-start sm:self-center"
+                      className="shrink-0 text-[11px] py-1.5 flex items-center gap-1 self-start"
                     >
-                      Review Manuscript <HiArrowRight className="w-3.5 h-3.5" />
+                      Review <HiArrowRight className="w-3 h-3" />
                     </Button>
                   </div>
                 ))}
@@ -506,18 +511,21 @@ export const AdviserDashboardView = () => {
                 {submittedTasks.map((t) => (
                   <div
                     key={t.id}
-                    className="p-3 sm:p-3.5 rounded-xl border border-emerald-200/70 dark:border-emerald-900/30 bg-emerald-50/20 dark:bg-emerald-950/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] flex flex-col sm:flex-row sm:items-start justify-between gap-4 group hover:shadow-sm transition-all"
                   >
-                    <div className="space-y-1 min-w-0 flex-1">
+                    <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="emerald">Task Submitted</Badge>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          Task Submitted
+                        </span>
                         {t.priority && (
                           <span className="text-[10px] uppercase font-bold text-amber-500">
-                            {t.priority} priority
+                            {t.priority}
                           </span>
                         )}
                       </div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                         {t.title}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-[#9396a8]">
@@ -530,9 +538,9 @@ export const AdviserDashboardView = () => {
                       onClick={() =>
                         navigate(`/faculty/workspace/${t.workspaceId || t.projectId}`)
                       }
-                      className="shrink-0 text-xs flex items-center gap-1 self-start sm:self-center"
+                      className="shrink-0 text-[11px] py-1.5 flex items-center gap-1 self-start"
                     >
-                      Verify Task <HiArrowRight className="w-3.5 h-3.5" />
+                      Verify <HiArrowRight className="w-3 h-3" />
                     </Button>
                   </div>
                 ))}
@@ -541,16 +549,19 @@ export const AdviserDashboardView = () => {
                 {overdueTasks.slice(0, 3).map((t) => (
                   <div
                     key={t.id}
-                    className="p-3 sm:p-3.5 rounded-xl border border-rose-200/70 dark:border-rose-900/30 bg-rose-50/20 dark:bg-rose-950/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] flex flex-col sm:flex-row sm:items-start justify-between gap-4 group hover:shadow-sm transition-all"
                   >
-                    <div className="space-y-1 min-w-0 flex-1">
+                    <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="rose">Overdue Task</Badge>
-                        <span className="text-[11px] text-rose-500 font-medium">
-                          Due {formatDefenseDate(t.dueDate)}
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-500 dark:text-rose-400">
+                          Overdue Task
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                          • Due {formatDefenseDate(t.dueDate)}
                         </span>
                       </div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                         {t.title}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-[#9396a8]">
@@ -563,9 +574,9 @@ export const AdviserDashboardView = () => {
                       onClick={() =>
                         navigate(`/faculty/workspace/${t.workspaceId || t.projectId}`)
                       }
-                      className="shrink-0 text-xs flex items-center gap-1 self-start sm:self-center"
+                      className="shrink-0 text-[11px] py-1.5 flex items-center gap-1 self-start"
                     >
-                      Check Workspace <HiArrowRight className="w-3.5 h-3.5" />
+                      Check <HiArrowRight className="w-3 h-3" />
                     </Button>
                   </div>
                 ))}
@@ -579,11 +590,10 @@ export const AdviserDashboardView = () => {
           <Card className="p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between pb-3">
               <div>
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <HiClipboardDocumentList className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                   Research Progress Overview
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-[#9396a8]">
+                <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
                   Live milestone completion across all active advisee research groups
                 </p>
               </div>
@@ -622,7 +632,7 @@ export const AdviserDashboardView = () => {
                   return (
                     <div
                       key={group.id}
-                      className="p-3.5 sm:p-4 rounded-xl border border-gray-200/80 dark:border-[#222433] bg-gray-50/50 dark:bg-[#171822]/60 hover:border-gray-300 dark:hover:border-[#333649] transition-all space-y-2.5"
+                      className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] hover:shadow-md transition-all space-y-3"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                         <div>
@@ -657,7 +667,7 @@ export const AdviserDashboardView = () => {
                             onClick={() => navigate(`/faculty/workspace/${group.id}`)}
                             className="text-xs py-1 px-2.5 h-auto"
                           >
-                            Workspace →
+                            Workspace ΓåÆ
                           </Button>
                         </div>
                       </div>
@@ -687,147 +697,7 @@ export const AdviserDashboardView = () => {
             )}
           </Card>
 
-          {/* -------------------------------------------------- */}
-          {/* 4. MY RESEARCH GROUPS (DETAILED TABLE / LIST) */}
-          {/* -------------------------------------------------- */}
-          <Card className="p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <HiFolder className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  My Research Groups
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-[#9396a8]">
-                  Complete directory of research groups under your mentorship
-                </p>
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                {groups.length} Cohorts
-              </span>
-            </div>
 
-            {loading ? (
-              <div className="py-12 text-center text-xs text-gray-400">
-                Loading research cohorts...
-              </div>
-            ) : groups.length === 0 ? (
-              /* Honest Empty State for Research Groups */
-              <div className="py-12 px-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] text-center space-y-2">
-                <HiUsers className="w-10 h-10 text-gray-300 dark:text-slate-600 mx-auto" />
-                <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                  No Active Research Groups
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-[#9396a8] max-w-sm mx-auto">
-                  You currently have no active research groups assigned to you. Once students invite you or coordinators assign advisees, they will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-[#222433] text-[11px] uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
-                      <th className="pb-3 px-3 font-semibold">Group &amp; Title</th>
-                      <th className="pb-3 px-3 font-semibold">Student Members</th>
-                      <th className="pb-3 px-3 font-semibold">Program / Section</th>
-                      <th className="pb-3 px-3 font-semibold">Progress</th>
-                      <th className="pb-3 px-3 font-semibold text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-[#222433]/60 text-xs">
-                    {groups.map((group) => {
-                      const progress = progressMap[group.id] || 0;
-                      const membersList = group.members || [];
-                      const course = coursesMap[group.courseId];
-                      const section = sectionsMap[group.sectionId];
-
-                      return (
-                        <tr
-                          key={group.id}
-                          className="hover:bg-gray-50/80 dark:hover:bg-[#1a1b26]/50 transition-colors"
-                        >
-                          {/* Group & Title */}
-                          <td className="py-3.5 px-3 min-w-[180px]">
-                            <div className="font-bold text-gray-900 dark:text-white">
-                              {group.name}
-                            </div>
-                            <div
-                              className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[220px] mt-0.5"
-                              title={group.title || 'No Title Set'}
-                            >
-                              {group.title || 'No Research Title Set'}
-                            </div>
-                          </td>
-
-                          {/* Student Members */}
-                          <td className="py-3.5 px-3 min-w-[160px]">
-                            {membersList.length === 0 ? (
-                              <span className="text-gray-400 italic">No members yet</span>
-                            ) : (
-                              <div className="space-y-0.5">
-                                {membersList.slice(0, 2).map((m, idx) => (
-                                  <div
-                                    key={m.uid || idx}
-                                    className="text-gray-700 dark:text-gray-300 font-medium"
-                                  >
-                                    {m.fullName || m.name}
-                                  </div>
-                                ))}
-                                {membersList.length > 2 && (
-                                  <span className="text-[10px] text-gray-400 font-semibold block">
-                                    +{membersList.length - 2} more members
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Program & Section */}
-                          <td className="py-3.5 px-3 min-w-[130px] text-gray-600 dark:text-gray-300">
-                            <div className="font-semibold text-gray-900 dark:text-white">
-                              {course?.code || course?.name || 'Academic Unit'}
-                            </div>
-                            <div className="text-[11px] text-gray-400">
-                              {section?.name || 'Regular Section'}
-                            </div>
-                          </td>
-
-                          {/* Progress */}
-                          <td className="py-3.5 px-3 min-w-[120px]">
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 bg-gray-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                                <div
-                                  className="bg-blue-600 h-full rounded-full"
-                                  style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-                                />
-                              </div>
-                              <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                {progress}%
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-gray-400 capitalize block mt-0.5">
-                              {group.status ? group.status.replace('_', ' ') : 'in progress'}
-                            </span>
-                          </td>
-
-                          {/* Action */}
-                          <td className="py-3.5 px-3 text-right">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => navigate(`/faculty/workspace/${group.id}`)}
-                              className="text-xs py-1 px-3"
-                            >
-                              View Workspace <HiArrowRight className="w-3 h-3 ml-1 inline" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
         </div>
 
         {/* RIGHT COLUMN (1 COL): Upcoming Defenses & Recent Activity */}
@@ -839,11 +709,10 @@ export const AdviserDashboardView = () => {
           <Card className="p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
               <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <HiCalendarDays className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                   Upcoming Defenses
                 </h3>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
                   Scheduled hearings for your advisees
                 </p>
               </div>
@@ -875,7 +744,7 @@ export const AdviserDashboardView = () => {
                 {upcomingDefenses.slice(0, 4).map((sch) => (
                   <div
                     key={sch.id}
-                    className="p-3.5 rounded-xl border border-gray-200/80 dark:border-[#222433] bg-gray-50/50 dark:bg-[#171822]/60 hover:border-blue-300 dark:hover:border-blue-900/50 transition-all space-y-2"
+                    className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] hover:shadow-md transition-all space-y-3"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <Badge variant={sch.defenseType === 'final_defense' ? 'emerald' : 'blue'}>
@@ -922,10 +791,10 @@ export const AdviserDashboardView = () => {
           <Card className="p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                   Recent System Activity
                 </h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">
+                <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
                   Real-time actions &amp; milestone events
                 </p>
               </div>
