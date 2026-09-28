@@ -38,6 +38,7 @@ export const MatchingModal = ({
   description = '',
   currentUser,
   userProfile,
+  declinedAdviserIds = [],
   onSuccess,
 }) => {
   const navigate = useNavigate();
@@ -47,14 +48,12 @@ export const MatchingModal = ({
   const [matches, setMatches] = useState([]);
   const [serviceError, setServiceError] = useState(null);
   const [submittingId, setSubmittingId] = useState(null);
-  const [pendingRequest, setPendingRequest] = useState(null);
-  const [declinedRequest, setDeclinedRequest] = useState(null);
   const [toast, setToast] = useState('');
   const loadingIntervalRef = useRef(null);
 
   // Progressive loading message animation
   useEffect(() => {
-    if (isOpen && loading && !pendingRequest) {
+    if (isOpen && loading) {
       let index = 0;
       loadingIntervalRef.current = setInterval(() => {
         index = (index + 1) % LOADING_MESSAGES.length;
@@ -67,50 +66,7 @@ export const MatchingModal = ({
         loadingIntervalRef.current = null;
       }
     };
-  }, [isOpen, loading, pendingRequest, declinedRequest]);
-
-  // Real-time listener for student requests
-  useEffect(() => {
-    let unsubscribe = null;
-    let isMounted = true;
-
-    const setupListener = async () => {
-      if (!isOpen || !currentUser) return;
-      
-      const group = await groupService.getGroupByStudentId(currentUser.uid);
-      unsubscribe = adviserRequestService.subscribeToStudentRequests(
-        currentUser.uid,
-        (requests) => {
-          if (!isMounted) return;
-          const active = requests.find((r) => r.status === 'pending');
-          const accepted = requests.find((r) => r.status === 'accepted');
-          const declined = requests.find((r) => r.status === 'declined');
-
-          if (accepted) {
-            onClose();
-            navigate('/research/workspace');
-          } else if (declined) {
-            setDeclinedRequest(declined);
-            setPendingRequest(null);
-          } else if (active) {
-            setPendingRequest(active);
-            setDeclinedRequest(null);
-          } else {
-            setPendingRequest(null);
-            setDeclinedRequest(null);
-          }
-        },
-        group?.id
-      );
-    };
-
-    setupListener();
-
-    return () => {
-      isMounted = false;
-      if (unsubscribe) unsubscribe();
-    };
-  }, [isOpen, currentUser, navigate, onClose]);
+  }, [isOpen, loading]);
 
   // Execute matching when modal opens
   const runMatching = async () => {
@@ -236,7 +192,6 @@ export const MatchingModal = ({
         });
       }
 
-      setPendingRequest(request);
       setToast(`Request successfully sent to ${adviser.adviserName}!`);
       if (onSuccess) onSuccess(request);
     } catch (err) {
@@ -247,27 +202,6 @@ export const MatchingModal = ({
     }
   };
 
-  const handleCancelRequest = async () => {
-    if (!pendingRequest) return;
-    const isConfirmed = await confirm({
-      title: 'Cancel Request',
-      message: 'Are you sure you want to cancel this request and select another adviser?',
-      confirmText: 'Cancel Request',
-      variant: 'danger'
-    });
-    if (!isConfirmed) return;
-
-    setLoading(true);
-    try {
-      await adviserRequestService.deleteRequest(pendingRequest.id);
-      setPendingRequest(null);
-      setToast('Request cancelled. You can now select a different adviser.');
-      await runMatching();
-    } catch (err) {
-      setToast('Failed to cancel request: ' + err.message);
-      setLoading(false);
-    }
-  };
 
   return (
     <Modal
@@ -328,92 +262,10 @@ export const MatchingModal = ({
           </div>
         )}
 
-        {/* Pending Request State */}
-        {!loading && !serviceError && pendingRequest && (
-          <div className="p-6 text-center space-y-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
-            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mx-auto">
-              <HiClock className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Adviser Request Pending
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-md mx-auto">
-                Your request has been submitted to{' '}
-                <strong className="text-gray-900 dark:text-white">
-                  {pendingRequest.adviserName}
-                </strong>
-                . Once accepted, your Research Workspace will be activated immediately.
-              </p>
-            </div>
 
-            <div className="p-4 rounded-xl bg-white dark:bg-[#15161e] border border-amber-200/70 dark:border-amber-900/30 text-left text-xs space-y-2">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-gray-400">Research Title</span>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  {pendingRequest.researchTitle}
-                </p>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-gray-400">Faculty Mentor</span>
-                <p className="font-medium text-gray-700 dark:text-gray-300">
-                  {pendingRequest.adviserName} ({pendingRequest.compatibilityScore}% Compatibility)
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-center gap-3 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40"
-                onClick={handleCancelRequest}
-              >
-                Cancel Request & Pick Another
-              </Button>
-              <Button variant="primary" size="sm" onClick={onClose}>
-                Done
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Declined Request State */}
-        {!loading && !serviceError && declinedRequest && (
-          <div className="p-6 text-center space-y-5 rounded-2xl bg-red-50/70 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
-            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 flex items-center justify-center mx-auto">
-              <HiExclamationCircle className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Adviser Request Declined
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-md mx-auto">
-                <strong className="text-gray-900 dark:text-white">
-                  {declinedRequest.adviserName}
-                </strong>{' '}
-                has declined your request. You may now pick another adviser.
-              </p>
-            </div>
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={async () => {
-                  setLoading(true);
-                  await adviserRequestService.deleteRequest(declinedRequest.id);
-                  setDeclinedRequest(null);
-                  await runMatching();
-                }}
-              >
-                Find Another Adviser
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Results List */}
-        {!loading && !serviceError && !pendingRequest && !declinedRequest && (
+        {!loading && !serviceError && (
           <div className="space-y-4">
             <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
               <HiSparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
@@ -512,21 +364,31 @@ export const MatchingModal = ({
 
                       {/* Right: Select Action */}
                       <div className="shrink-0 w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-[#222433]">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          className="w-full sm:w-auto shadow-sm"
-                          disabled={submittingId !== null}
-                          onClick={() => handleSelectAdviser(adviser)}
-                        >
-                          {submittingId === adviser.adviserId ? (
-                            'Sending...'
-                          ) : (
-                            <>
-                              Select Adviser <HiChevronRight className="w-4 h-4 ml-1" />
-                            </>
-                          )}
-                        </Button>
+                        {declinedAdviserIds.includes(adviser.adviserId) ? (
+                          <div className="text-xs font-semibold text-red-500 py-1.5 px-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                            Previously Declined
+                          </div>
+                        ) : score < 50 ? (
+                          <div className="text-xs font-semibold text-gray-400 py-1.5 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            Match Too Low
+                          </div>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="w-full sm:w-auto shadow-sm"
+                            disabled={submittingId !== null}
+                            onClick={() => handleSelectAdviser(adviser)}
+                          >
+                            {submittingId === adviser.adviserId ? (
+                              'Sending...'
+                            ) : (
+                              <>
+                                Select Adviser <HiChevronRight className="w-4 h-4 ml-1" />
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );

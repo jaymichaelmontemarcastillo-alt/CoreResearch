@@ -28,6 +28,9 @@ import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
 import titleProposalService from '../services/titleProposal.service';
 import { adviserRequestService } from '../services/adviserRequest.service';
 import groupService from '../services/group.service';
+import gradingService from '../services/grading.service';
+import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
+import { FinalGradingModal } from '../components/editor/FinalGradingModal';
 import { ResearchProgressCircle } from '../components/research/ResearchProgressCircle';
 import { MilestonesTracker } from '../components/research/MilestonesTracker';
 import { TaskCard } from '../components/research/TaskCard';
@@ -50,6 +53,10 @@ export const StudentResearchWorkspace = () => {
   const [toast, setToast] = useState('');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState('all');
+  const [proposalEvals, setProposalEvals] = useState([]);
+  const [finalEvals, setFinalEvals] = useState([]);
+  const [selectedEval, setSelectedEval] = useState(null);
+  const [gradingModalType, setGradingModalType] = useState(null);
 
   const isStudent = role === 'student';
   const isAdviser = role === 'adviser';
@@ -61,6 +68,8 @@ export const StudentResearchWorkspace = () => {
     let unsubscribeTasks = () => {};
     let unsubscribeFb = () => {};
     let unsubscribeRequests = () => {};
+    let unsubscribePEvals = () => {};
+    let unsubscribeFEvals = () => {};
 
     const loadWorkspace = async () => {
       setLoading(true);
@@ -125,6 +134,15 @@ export const StudentResearchWorkspace = () => {
         if (targetWorkspace) {
           setWorkspace(targetWorkspace);
 
+          // Subscribe to evaluations in real-time
+          unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
+             setProposalEvals(evals);
+          });
+          unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
+             setFinalEvals(evals);
+          });
+
+
           // Real-time subscriptions
           unsubscribeWs = researchWorkspaceService.subscribeWorkspace(
             targetWorkspace.id,
@@ -159,6 +177,8 @@ export const StudentResearchWorkspace = () => {
       unsubscribeTasks();
       unsubscribeFb();
       unsubscribeRequests();
+      unsubscribePEvals();
+      unsubscribeFEvals();
     };
   }, [currentUser?.uid, queryWorkspaceId, isStudent, userProfile?.groupId]);
 
@@ -507,6 +527,55 @@ export const StudentResearchWorkspace = () => {
             </div>
           </Card>
 
+          
+          {/* Defense Ratings Section */}
+          {(proposalEvals.length > 0 || finalEvals.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+              {proposalEvals.length > 0 && (
+                <Card className="p-4 sm:p-5 flex flex-col justify-between bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 mb-3">
+                    <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">Proposal Defense Ratings</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {proposalEvals.map(ev => (
+                      <div key={ev.id} className="p-3 border border-gray-100 dark:border-[#222433] rounded-lg bg-gray-50 dark:bg-[#1c1d28] flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{ev.panelistName}</p>
+                          <p className="text-xs text-gray-500">Verdict: {ev.verdict.replace(/_/g, ' ')}</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSelectedEval(ev); setGradingModalType('proposal'); }}>
+                          View Rubrics
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {finalEvals.length > 0 && (
+                <Card className="p-4 sm:p-5 flex flex-col justify-between bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
+                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 mb-3">
+                    <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">Final Defense Ratings</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {finalEvals.map(ev => (
+                      <div key={ev.id} className="p-3 border border-gray-100 dark:border-[#222433] rounded-lg bg-gray-50 dark:bg-[#1c1d28] flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{ev.panelistName}</p>
+                          <p className="text-xs text-gray-500">Verdict: {ev.verdict.replace(/_/g, ' ')}</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSelectedEval(ev); setGradingModalType('final'); }}>
+                          View Rubrics
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+
+
           {/* 2-Column Grid: Research Milestones (Left) & Manuscript Chapters (Right) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch">
             {/* Left Card: Milestones Tracker */}
@@ -757,6 +826,38 @@ export const StudentResearchWorkspace = () => {
           onClose={() => setIsTaskModalOpen(false)}
           workspace={workspace}
           onTaskCreated={handleTaskCreated}
+        />
+      )}
+
+      {/* Read-Only Modal for Students - Proposal */}
+      {selectedEval && gradingModalType === 'proposal' && (
+        <ProposalGradingModal
+          isOpen={!!selectedEval}
+          onClose={() => setSelectedEval(null)}
+          onSubmit={() => {}}
+          defenseType="proposal_defense"
+          defenseId={selectedEval.defenseId}
+          panelistId={selectedEval.panelistId}
+          panelistName={selectedEval.panelistName}
+          groupDetails={workspace}
+          existingEval={selectedEval}
+          readOnly={true}
+        />
+      )}
+
+      {/* Read-Only Modal for Students - Final */}
+      {selectedEval && gradingModalType === 'final' && (
+        <FinalGradingModal
+          isOpen={!!selectedEval}
+          onClose={() => setSelectedEval(null)}
+          onSubmit={() => {}}
+          defenseType="final_defense"
+          defenseId={selectedEval.defenseId}
+          panelistId={selectedEval.panelistId}
+          panelistName={selectedEval.panelistName}
+          groupDetails={workspace}
+          existingEval={selectedEval}
+          readOnly={true}
         />
       )}
     </div>

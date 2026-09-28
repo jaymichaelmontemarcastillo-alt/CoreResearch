@@ -176,8 +176,25 @@ export const Scheduling = () => {
   };
 
   const handleClearAllTimes = async () => {
+    if (!selectedSection) {
+       showToast("Please select a specific section to clear times.", "info");
+       return;
+    }
+    const sectionGroups = groups.filter((g) => g.sectionId === selectedSection);
+    const currentViewGroups = sectionGroups.filter((g) => {
+      const q = searchQuery.toLowerCase();
+      if (!q) return true;
+      const matchName = (g.name || "").toLowerCase().includes(q);
+      const matchMember = (g.members || []).some((m) =>
+        (m?.fullName || "").toLowerCase().includes(q)
+      );
+      const proposal = getProposalForGroup(g.id);
+      const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
+      return matchName || matchMember || matchTitle;
+    });
+
     // Find all schedules currently shown that have a time set
-    const schedulesToClear = filteredGroups.map(g => getScheduleForGroup(g.id))
+    const schedulesToClear = currentViewGroups.map(g => getScheduleForGroup(g.id))
       .filter(s => s && (s.startTime || s.date));
 
     if (schedulesToClear.length === 0) {
@@ -395,7 +412,27 @@ export const Scheduling = () => {
                               </TableCell>
                             </TableRow>
                           ) : (
-                            filteredSectionGroups.map((group) => {
+                            
+                            [...filteredSectionGroups].sort((a, b) => {
+                              const schedA = getScheduleForGroup(a.id);
+                              const schedB = getScheduleForGroup(b.id);
+                              
+                              const dateA = schedA?.date || '9999-12-31';
+                              const dateB = schedB?.date || '9999-12-31';
+                              
+                              if (dateA !== dateB) {
+                                return new Date(dateA) - new Date(dateB);
+                              }
+                              
+                              let timeA = schedA?.startTime || '23:59';
+                              let timeB = schedB?.startTime || '23:59';
+
+                              // Ensure times are properly padded for string comparison (e.g., '8:00' -> '08:00')
+                              if (timeA.length === 4) timeA = '0' + timeA;
+                              if (timeB.length === 4) timeB = '0' + timeB;
+                              
+                              return timeA.localeCompare(timeB);
+                            }).map((group) => {
                               const proposal = getProposalForGroup(group.id);
                               const schedule = getScheduleForGroup(group.id);
                               const activePanelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (group.panelists || []);

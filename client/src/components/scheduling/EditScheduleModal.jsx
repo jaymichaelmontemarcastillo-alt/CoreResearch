@@ -32,9 +32,11 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
         const pList = await userService.getUsersByRole('panelist');
         const aList = await userService.getUsersByRole('adviser');
         const fList = await userService.getUsersByRole('faculty');
+        const rcList = await userService.getUsersByRole('research_coordinator');
+        const adminList = await userService.getUsersByRole('admin');
         
-        // Allow anyone (faculty, adviser, panelist) to act as an adviser or panelist
-        const combined = [...pList, ...aList, ...fList];
+        // Allow anyone (faculty, adviser, panelist, admin, research coordinator) to act as an adviser or panelist
+        const combined = [...pList, ...aList, ...fList, ...rcList, ...adminList];
         
         // Deduplicate by uid
         const uniqueUsers = Array.from(new Map(combined.map(u => [u.uid, u])).values());

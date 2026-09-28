@@ -42,7 +42,6 @@ export const ResearchProgressTrendChart = ({ data = [], loading = false }) => {
     <ChartCard
       title="Research Progress Trend"
       subtitle="Monthly research activities, approved titles, and completed milestones"
-      icon={HiArrowTrendingUp}
       loading={loading}
       isEmpty={isEmpty}
       emptyMessage="No historical timeline data available"
@@ -81,28 +80,28 @@ export const ResearchProgressTrendChart = ({ data = [], loading = false }) => {
               type="monotone"
               dataKey="progressing"
               name="In Progress"
-              stroke="#3b82f6"
-              strokeWidth={2.5}
-              dot={{ r: 3.5, fill: '#3b82f6' }}
-              activeDot={{ r: 5 }}
+              stroke="#60a5fa"
+              strokeWidth={2}
+              dot={{ r: 3, fill: '#60a5fa' }}
+              activeDot={{ r: 4 }}
             />
             <Line
               type="monotone"
               dataKey="approved"
               name="Approved"
-              stroke="#10b981"
-              strokeWidth={2.5}
-              dot={{ r: 3.5, fill: '#10b981' }}
-              activeDot={{ r: 5 }}
+              stroke="#34d399"
+              strokeWidth={2}
+              dot={{ r: 3, fill: '#34d399' }}
+              activeDot={{ r: 4 }}
             />
             <Line
               type="monotone"
               dataKey="completed"
               name="Completed"
-              stroke="#8b5cf6"
-              strokeWidth={2.5}
-              dot={{ r: 3.5, fill: '#8b5cf6' }}
-              activeDot={{ r: 5 }}
+              stroke="#a78bfa"
+              strokeWidth={2}
+              dot={{ r: 3, fill: '#a78bfa' }}
+              activeDot={{ r: 4 }}
             />
           </LineChart>
         </ResponsiveContainer>

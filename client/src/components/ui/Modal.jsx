@@ -27,7 +27,7 @@ export const Modal = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${fullScreen ? '' : 'p-4'}`}>
+    <div className={`fixed inset-0 z-[9999] flex ${fullScreen ? '' : 'items-end md:items-center justify-center md:p-4'}`}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-fade-in"
@@ -36,16 +36,16 @@ export const Modal = ({
 
       {/* Modal Content */}
       <div
-        className={`relative w-full bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] shadow-modal animate-slide-up overflow-y-auto ${className} ${
+        className={`relative w-full bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] shadow-modal overflow-y-auto ${className} ${
           fullScreen 
-            ? 'h-full max-w-full rounded-none border-0' 
-            : `${maxWidth} max-h-[90vh] rounded-xl`
+            ? 'h-full max-w-full rounded-none border-0 animate-slide-up' 
+            : `${maxWidth} max-h-[90vh] md:rounded-xl mobile-bottom-sheet md:animate-slide-up`
         }`}
       >
         {/* Header */}
         {title && (
-          <div className={`flex items-center justify-between px-6 py-4 ${noHeaderBorder ? '' : 'border-b border-gray-200 dark:border-[#222433]'}`}>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <div className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 ${noHeaderBorder ? '' : 'border-b border-gray-200 dark:border-[#222433]'}`}>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               {Icon && <Icon className="w-5 h-5 text-primary" />}
               {title}
             </h3>
@@ -59,7 +59,7 @@ export const Modal = ({
         )}
 
         {/* Body */}
-        <div className={`p-6 ${fullScreen ? 'max-w-4xl mx-auto' : ''}`}>{children}</div>
+        <div className={`p-4 sm:p-6 ${fullScreen ? 'max-w-4xl mx-auto' : ''}`}>{children}</div>
       </div>
     </div>
   );

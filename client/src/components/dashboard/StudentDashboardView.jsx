@@ -1,18 +1,12 @@
 // src/components/dashboard/StudentDashboardView.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  HiAcademicCap, 
-  HiUserGroup, 
   HiDocumentText, 
   HiArrowTopRightOnSquare,
   HiOutlineBookOpen,
-  HiCalendarDays,
-  HiBolt
 } from 'react-icons/hi2';
 
 // Child Dashboard Cards
@@ -32,6 +26,13 @@ import manuscriptDocumentAdapter from '../../services/manuscriptDocumentAdapter'
 import { documentStore } from '../../services/documentStore';
 import { courseService } from '../../services/course.service';
 import { sectionService } from '../../services/section.service';
+
+/* ─── Dashboard Card Shell ─── */
+const DashboardCard = ({ children, className = '' }) => (
+  <div className={`bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] ${className}`}>
+    {children}
+  </div>
+);
 
 export const StudentDashboardView = () => {
   const { userProfile, currentUser } = useAuth();
@@ -327,7 +328,7 @@ export const StudentDashboardView = () => {
           id: `rev-add-${r.id}`,
           category: 'revision',
           title: 'Revision Response Submitted',
-          description: `Advisees addressed revision: "${r.comment.slice(0, 70)}..."`,
+          description: `Addressed revision on ${r.sectionId ? r.sectionId.replace('_', ' ') : 'manuscript'}.`,
           actorName: 'You',
           actorId: studentUid,
           timestamp: r.updatedAt,
@@ -338,7 +339,7 @@ export const StudentDashboardView = () => {
           id: `rev-new-${r.id}`,
           category: 'revision',
           title: 'Adviser Added Revision',
-          description: `"${r.comment.slice(0, 80)}" in ${r.sectionId ? r.sectionId.replace('_', ' ') : 'manuscript'}.`,
+          description: `New comment on ${r.sectionId ? r.sectionId.replace('_', ' ') : 'manuscript'}.`,
           actorName: r.authorName || 'Faculty Adviser',
           actorId: r.authorId,
           timestamp: r.createdAt,
@@ -374,14 +375,14 @@ export const StudentDashboardView = () => {
       }
     });
 
-    // Group Documents
+    // Group Documents — compact descriptions
     groupDocuments.forEach((doc) => {
       if (doc.updatedAt) {
         feed.push({
           id: `doc-up-${doc.id}`,
           category: 'document',
           title: 'Manuscript Draft Updated',
-          description: `Saved changes to "${doc.title || 'Research Document'}" in ONLYOFFICE.`,
+          description: 'Saved changes to the research manuscript.',
           actorName: doc.ownerName || 'Researcher',
           actorId: doc.ownerId,
           timestamp: doc.updatedAt,
@@ -408,107 +409,139 @@ export const StudentDashboardView = () => {
     return feed;
   }, [revisions, tasks, groupDocuments, upcomingDeadlines, documentId, studentUid]);
 
+  // Helper booleans for layout conditional rendering
+  const hasDeadlines = !loading && upcomingDeadlines.length > 0;
+  const hasRevisions = !loading && revisions.length > 0;
+  
+  const total7DayActions = dailyActivity.reduce((acc, curr) => acc + (curr.count || 0), 0);
+  const hasActivityChart = !loading && total7DayActions > 1;
+  const hasFeed = !loading && recentActivities.length > 0;
+  const hasGroupActivity = !loading && group?.members?.length > 0 && activityRecords.length > 0;
+
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* Top Banner: Academic & Research Group Context */}
-      <Card padding={false} className="p-4 sm:p-5 border-blue-100/70 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/50 via-indigo-50/20 to-transparent dark:from-blue-950/20 dark:via-indigo-950/10">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-              <span className="text-[11px] uppercase font-bold tracking-wider text-blue-700 dark:text-blue-400">
-                Active Research Cohort
+    <div className="space-y-5">
+      {/* ─────────────────────────────────────────────── */}
+      {/* SECTION 1: Active Research Card (Full Width)    */}
+      {/* ─────────────────────────────────────────────── */}
+      {workspace && (
+        <DashboardCard className="p-6 sm:p-7">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+            <div className="space-y-3 min-w-0 flex-1">
+              <span className="text-[11px] uppercase font-bold tracking-widest text-blue-600 dark:text-blue-400">
+                Active Research
               </span>
-              <Badge variant="blue" size="sm" className="text-[10px] py-0 px-1.5">
-                {userProfile?.enrollmentStatus || 'Active Student'}
-              </Badge>
-            </div>
 
-            <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={workspace?.title}>
-              {workspace?.title || (group?.name ? `${group.name} Research Cohort` : 'Undergraduate Research')}
-            </h2>
-
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600 dark:text-[#9396a8] pt-0.5">
-              {programInfo.course && (
-                <span>
-                  Program: <strong className="text-gray-800 dark:text-gray-200">{programInfo.course.name}</strong>
-                </span>
-              )}
-              {programInfo.sectionName && (
-                <span>
-                  Section: <strong className="text-gray-800 dark:text-gray-200">{programInfo.sectionName}</strong>
-                </span>
-              )}
-              {workspace?.adviserName && (
-                <span>
-                  Adviser: <strong className="text-gray-800 dark:text-gray-200">{workspace.adviserName}</strong>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {documentId ? (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => navigate(`/documents/${documentId}`)}
-                className="shadow-xs text-xs"
+              <h2
+                className="text-xl sm:text-[22px] font-bold text-gray-900 dark:text-white leading-snug line-clamp-2"
+                title={workspace.title}
               >
-                <HiDocumentText className="w-3.5 h-3.5 mr-1" /> Open Manuscript in ONLYOFFICE
-              </Button>
-            ) : null}
-            <Link to="/research/workspace">
-              <Button variant="outline" size="sm" className="text-xs">
-                <HiOutlineBookOpen className="w-3.5 h-3.5 mr-1" /> Research Workspace
-              </Button>
-            </Link>
+                {workspace.title || 'Untitled Research'}
+              </h2>
+
+              {/* Metadata line — dot-separated, no pills */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                {programInfo.course && (
+                  <span>
+                    Program: <strong className="text-gray-800 dark:text-gray-200">{programInfo.course.code || programInfo.course.name}</strong>
+                  </span>
+                )}
+                {programInfo.sectionName && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span>
+                      Section: <strong className="text-gray-800 dark:text-gray-200">{programInfo.sectionName}</strong>
+                    </span>
+                  </>
+                )}
+                {workspace.adviserName && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span>
+                      Adviser: <strong className="text-gray-800 dark:text-gray-200">{workspace.adviserName}</strong>
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-3 shrink-0 pt-1">
+              {documentId && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/documents/${documentId}`)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                  Open Manuscript
+                </button>
+              )}
+              <Link to="/research/workspace">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1d28] text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-[#222433] transition"
+                >
+                  Workspace
+                </button>
+              </Link>
+            </div>
           </div>
+        </DashboardCard>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="py-16 flex flex-col items-center justify-center space-y-3 text-gray-400">
+          <div className="w-7 h-7 border-[3px] border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <span className="text-sm font-medium">Loading research data...</span>
         </div>
-      </Card>
+      )}
 
-      {/* ====== ROW 1: UPCOMING DEADLINES & MANUSCRIPT REVISIONS ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-        {/* Module 1: Upcoming Deadlines */}
-        <UpcomingDeadlinesCard
-          deadlines={upcomingDeadlines}
-          loading={loading}
-        />
+      {/* ─────────────────────────────────────────────── */}
+      {/* SECTION 2: Recent Activity (LEFT) + Chart (RIGHT) */}
+      {/* ─────────────────────────────────────────────── */}
+      {(hasFeed || hasActivityChart) && (
+        <div className={`grid grid-cols-1 gap-5 ${hasFeed && hasActivityChart ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''}`}>
+          {/* LEFT: Recent Activity Feed */}
+          {hasFeed && (
+            <DashboardCard className="p-6">
+              <StudentRecentActivityFeed activities={recentActivities} currentUserId={studentUid} loading={loading} />
+            </DashboardCard>
+          )}
 
-        {/* Module 2: Manuscript Revisions */}
-        <ManuscriptRevisionsCard
-          revisions={revisions}
-          workspace={workspace}
-          documentId={documentId}
-          loading={loading}
-        />
-      </div>
+          {/* RIGHT: Research Activity Chart */}
+          {hasActivityChart && (
+            <DashboardCard className="p-6">
+              <ResearchActivityChart dailyActivity={dailyActivity} loading={loading} />
+            </DashboardCard>
+          )}
+        </div>
+      )}
 
-      {/* ====== ROW 2: RECENT RESEARCH ACTIVITY & RECENT ACTIVITY FEED ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch">
-        {/* Module 3: Recent Research Activity (7-Day Bar Chart) */}
-        <ResearchActivityChart
-          dailyActivity={dailyActivity}
-          loading={loading}
-        />
+      {/* ─────────────────────────────────────────────── */}
+      {/* SECTION 3: Deadlines (LEFT) + Revisions (RIGHT) */}
+      {/* ─────────────────────────────────────────────── */}
+      {(hasDeadlines || hasRevisions) && (
+        <div className={`grid grid-cols-1 gap-5 ${hasDeadlines && hasRevisions ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''}`}>
+          {hasDeadlines && (
+            <DashboardCard className="p-6">
+              <UpcomingDeadlinesCard deadlines={upcomingDeadlines} loading={loading} />
+            </DashboardCard>
+          )}
+          {hasRevisions && (
+            <DashboardCard className="p-6">
+              <ManuscriptRevisionsCard revisions={revisions} workspace={workspace} documentId={documentId} loading={loading} />
+            </DashboardCard>
+          )}
+        </div>
+      )}
 
-        {/* Module 4: Recent Activity Feed */}
-        <StudentRecentActivityFeed
-          activities={recentActivities}
-          currentUserId={studentUid}
-          loading={loading}
-        />
-      </div>
-
-      {/* ====== ROW 3: GROUP ACTIVITY ====== */}
-      {group?.members && group.members.length > 0 && (
-        <GroupActivityCard
-          members={group.members}
-          activityRecords={activityRecords}
-          currentUserId={studentUid}
-          loading={loading}
-        />
+      {/* ─────────────────────────────────────────────── */}
+      {/* SECTION 4: Group Activity (Full Width)          */}
+      {/* ─────────────────────────────────────────────── */}
+      {hasGroupActivity && (
+        <DashboardCard className="p-6">
+          <GroupActivityCard members={group.members} activityRecords={activityRecords} currentUserId={studentUid} loading={loading} />
+        </DashboardCard>
       )}
     </div>
   );

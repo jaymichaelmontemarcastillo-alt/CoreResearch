@@ -187,15 +187,29 @@ export const Panelists = () => {
 
       if (documentId) {
         // Navigate in Panelist Review Mode with schedule reference
-        navigate(`/documents/${documentId}?scheduleId=${sch.id}&mode=panelist`, {
+        const params = new URLSearchParams({
+          scheduleId: sch.id,
+          mode: 'panelist',
+          ...(sch.defenseType && { defenseType: sch.defenseType }),
+          ...(sch.id && { defenseId: sch.id }),
+          ...(sch.date && { defenseDate: sch.date }),
+          ...(sch.startTime && { defenseTime: formatTime12Hour(sch.startTime) }),
+        });
+        navigate(`/documents/${documentId}?${params.toString()}`, {
           state: {
             from: "/panelists",
             scheduleId: sch.id,
             isPanelistReview: true,
             groupId: groupId,
             groupName: sch.groupName,
+            // Pre-fill grading modal metadata
+            panelistRole: sch.roleInPanel || 'Panelist',
+            researchTitle: sch.researchTitle || sch.projectTitle || '',
+            adviserName: sch.groupData?.adviserName || sch.adviserName || '',
+            groupMembers: (sch.groupData?.members || []).map(m => m.fullName || m.email || '').filter(Boolean),
           },
         });
+
       } else {
         // Document Not Available modal
         setIsDocModalOpen(true);

@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
+import { NetworkStatus } from './components/NetworkStatus';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -39,6 +40,7 @@ import { Notifications } from './pages/Notifications';
 import { AdvisersList } from './pages/AdvisersList';
 import { ResearchDocumentsPage } from './pages/ResearchDocumentsPage';
 import { AdminMasterCalendar } from './pages/AdminMasterCalendar';
+import { AdviserRequests } from './pages/AdviserRequests';
 
 export default function App() {
   return (
@@ -46,6 +48,7 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <ConfirmProvider>
+            <NetworkStatus />
             <Routes>
               {/* Public Auth Routes */}
               <Route path="/login" element={<Login />} />
@@ -82,6 +85,7 @@ export default function App() {
                   <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
                   <Route path="/workspace" element={<StudentResearchWorkspace />} />
                   <Route path="/advisees" element={<AdviserAdvisees />} />
+                  <Route path="/adviser-requests" element={<AdviserRequests />} />
                   <Route path="/faculty/workspace/:id" element={<FacultyWorkspaceView />} />
                   <Route path="/panelists" element={<Panelists />} />
                   <Route path="/panelist/defendees" element={<PanelistDefendees />} />

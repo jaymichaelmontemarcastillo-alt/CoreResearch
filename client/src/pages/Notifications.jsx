@@ -77,7 +77,7 @@ export const Notifications = () => {
       navigate("/schedules");
     } else if (titleLower.includes("adviser request")) {
       if (userProfile?.role === "adviser") {
-        navigate("/dashboard");
+        navigate("/adviser-requests");
       } else {
         navigate("/research/workspace");
       }
@@ -212,23 +212,23 @@ export const Notifications = () => {
           />
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {filteredNotifications.map((notif) => {
             const isUnread = !notif.read;
             return (
               <div
                 key={notif.id}
                 onClick={() => handleNotificationClick(notif)}
-                className={`group relative p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer ${
+                className={`group relative p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
                   isUnread
                     ? "bg-white dark:bg-[#13141c] border-blue-200 dark:border-blue-900/40 shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-800"
                     : "bg-white dark:bg-[#101117] border-gray-200/80 dark:border-[#1c1d28]/70 hover:bg-gray-50/70 dark:hover:bg-[#151620]"
                 }`}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3 sm:gap-4">
                   {/* Status Indicator Icon */}
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                       isUnread
                         ? "bg-blue-50 dark:bg-blue-950/40"
                         : "bg-gray-100 dark:bg-[#1a1b26]"
@@ -238,14 +238,14 @@ export const Notifications = () => {
                   </div>
 
                   {/* Body */}
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
                       <div className="flex items-center gap-2">
                         {isUnread && (
-                          <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-600 shrink-0" />
                         )}
                         <h4
-                          className={`text-sm tracking-tight ${
+                          className={`text-[13px] sm:text-sm tracking-tight truncate ${
                             isUnread
                               ? "font-bold text-gray-900 dark:text-white"
                               : "font-medium text-gray-800 dark:text-[#c4c7d7]"
@@ -257,18 +257,18 @@ export const Notifications = () => {
 
                       <div className="flex items-center gap-2 shrink-0">
                         {notif.type && (
-                          <Badge variant={getBadgeVariant(notif.type)}>
+                          <Badge variant={getBadgeVariant(notif.type)} className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
                             {notif.type.toUpperCase()}
                           </Badge>
                         )}
-                        <span className="text-[11px] text-gray-400 dark:text-[#6b6f84]">
+                        <span className="text-[10px] sm:text-[11px] text-gray-400 dark:text-[#6b6f84]">
                           {formatRelativeTime(notif.createdAt)}
                         </span>
                       </div>
                     </div>
 
                     <p
-                      className={`text-xs sm:text-sm leading-relaxed ${
+                      className={`text-[11px] sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-none ${
                         isUnread
                           ? "text-gray-700 dark:text-[#a0a4b8]"
                           : "text-gray-500 dark:text-[#7f8397]"

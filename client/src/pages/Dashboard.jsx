@@ -1,28 +1,8 @@
 // src/pages/Dashboard.jsx
 import React from "react";
 import { useAuth } from "../context/AuthContext";
-import { Card } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { StatCard } from "../components/ui/StatCard";
-import {
-  HiDocumentText,
-  HiFolder,
-  HiChatBubbleLeftRight,
-  HiCalendarDays,
-  HiTrophy,
-  HiBookOpen,
-  HiUsers,
-  HiArrowUpRight,
-  HiCheckCircle,
-  HiClock,
-  HiPlusCircle,
-  HiShieldCheck,
-  HiAcademicCap,
-  HiCheckBadge,
-  HiBolt,
-  HiArrowRight,
-} from "react-icons/hi2";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { courseService } from "../services/course.service";
@@ -162,19 +142,17 @@ export const Dashboard = () => {
   }, [role, userProfile?.uid, userProfile?.courseId, userProfile?.sectionId, currentUser?.uid]);
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-5">
       {toastMessage && (
         <Toast message={toastMessage} variant="success" onClose={() => setToastMessage("")} />
       )}
 
-      {/* Page Header / Welcome Hero Section */}
-      <div className="px-5 py-4 sm:px-6 sm:py-5 rounded-xl bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all shadow-xs">
+      {/* Page Header / Welcome Card */}
+      <div className="px-6 py-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/80 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
-              {getGreeting()}, {displayName}
-            </h1>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
+            {getGreeting()}, {displayName}
+          </h1>
           {role === 'faculty' && (
             <div className="flex items-center gap-2 mt-2 bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-lg w-max border border-transparent dark:border-[#222433]">
               <button
@@ -197,8 +175,8 @@ export const Dashboard = () => {
               </button>
             </div>
           )}
-          <p className="text-gray-500 dark:text-[#9396a8] text-xs sm:text-sm max-w-2xl leading-relaxed">
-            Active under <span className="font-semibold text-gray-800 dark:text-white">{userProfile?.department || "Computer Studies"}</span>. Proposals, manuscripts, defense rubrics, and archiving.
+          <p className="text-gray-500 dark:text-[#9396a8] text-sm max-w-2xl leading-relaxed">
+            Active under <span className="font-semibold text-gray-800 dark:text-white">{userProfile?.department || "Computer Studies"}</span>. Track research performance, monitor progress and stay updated on feedbacks.
           </p>
         </div>
 
@@ -252,290 +230,60 @@ export const Dashboard = () => {
           {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
           {effectiveRole === "admin" && <AdminAnalyticsSection />}
 
-          {/* Main Content Grid: Pipeline + Active Papers + Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
-            {/* Left 2 Cols: Role-Specific Content */}
-            <div className="lg:col-span-2 space-y-6">
-
-          {/* ====== STUDENT CONTENT ====== */}
-          {(!effectiveRole || effectiveRole === "student") && (
-            <>
-              {/* Academic Profile Widget */}
-              {userProfile && (
-                <Card className="p-5 sm:p-6 border-blue-100/60 dark:border-blue-900/30 bg-gradient-to-r from-blue-50/40 to-transparent dark:from-blue-950/10">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Academic Profile</h3>
-                      <Badge variant="blue">{userProfile.enrollmentStatus || "Active Enrollee"}</Badge>
-                    </div>
-
-                    {userProfile.courseId ? (
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-[#9396a8] space-y-1.5 pt-1">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <p>
-                            <span className="font-medium text-gray-400 dark:text-[#6b6f84]">Program:</span>{" "}
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{academicInfo?.course?.name || userProfile.courseId}</span>
-                          </p>
-                          <p>
-                            <span className="font-medium text-gray-400 dark:text-[#6b6f84]">Section:</span>{" "}
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{academicInfo?.sectionName || "Unassigned"}</span>
-                          </p>
-                        </div>
-
-                        {academicInfo?.group ? (
-                          <div className="mt-3 pt-3 border-t border-blue-200/50 dark:border-[#222433]">
-                            <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                              {academicInfo.group.name}
-                            </p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {academicInfo.group.members.map((m) => (
-                                <span
-                                  key={m.uid}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8]"
-                                >
-                                  {m.fullName} {m.uid === userProfile.uid ? "(You)" : ""}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2 pt-2 border-t border-blue-200/50 dark:border-[#222433] text-amber-600 dark:text-amber-400 text-xs font-medium">
-                            No Research Group Assigned Yet
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 dark:text-[#9396a8]">
-                        You have not been assigned to a Course and Section yet. Please contact your coordinator.
-                      </p>
-                    )}
-                  </div>
-                </Card>
-              )}
-
-              {/* Module Cards Grid (Always 2 balanced cards, no dead space) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                {!studentResearch.workspace ? (
-                  <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Workflow</span>
-                      <Badge variant="blue">Proposal Stage</Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                        Submit Title Proposal
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
-                        Submit a new research title to find and match with a faculty adviser.
-                      </p>
-                    </div>
-                    <Link
-                      to="/submit-title"
-                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                    >
-                      Start Submission →
-                    </Link>
-                  </Card>
-                ) : (
-                  <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Workspace</span>
-                      <Badge variant="purple">Active Team</Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                        Research Workspace
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
-                        Collaborate on manuscript chapters, view adviser comments, and track defense milestones.
-                      </p>
-                    </div>
-                    <Link
-                      to="/research/workspace"
-                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                    >
-                      Open Workspace →
-                    </Link>
-                  </Card>
-                )}
-
-                <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Repository</span>
-                    <Badge variant="emerald">Published Papers</Badge>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      Research Manuscripts
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
-                      Upload PDF/DOCX drafts, track submission timelines, and download revisions.
-                    </p>
-                  </div>
-                  <Link
-                    to="/repository"
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                  >
-                    Open Repository →
-                  </Link>
-                </Card>
-              </div>
-
-              {/* Active Proposal Card - REMOVED Proposal Status metric, keeping workspace info */}
-              <Card className="p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
-                    Active Research
-                  </h3>
-                  {studentResearch.workspace ? (
-                    <Badge variant="purple">Active Workspace</Badge>
-                  ) : studentResearch.proposal ? (
-                    <Badge variant={
-                      studentResearch.proposal.status === 'approved' ? 'emerald' :
-                        studentResearch.proposal.status === 'needs_revision' ? 'amber' : 'blue'
-                    }>
-                      {studentResearch.proposal.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
-                  ) : (
-                    <Link to="/submit-title" className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-                      Submit Proposal →
-                    </Link>
-                  )}
-                </div>
-
-                {studentResearch.loading ? (
-                  <div className="py-8 flex flex-col items-center justify-center space-y-2 text-gray-400">
-                    <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-                    <span className="text-xs">Loading research data...</span>
-                  </div>
-                ) : (studentResearch.proposal || studentResearch.workspace) ? (
-                  <div className="space-y-3">
-                    <div>
-                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">
-                        {studentResearch.proposal?.title || studentResearch.workspace?.title}
-                      </h4>
-                      <div className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 space-y-0.5">
-                        {studentResearch.proposal?.researchCategory && (
-                          <p><span className="font-medium text-gray-400">Category:</span> {studentResearch.proposal.researchCategory}</p>
-                        )}
-                        {studentResearch.proposal?.submittedAt && (
-                          <p><span className="font-medium text-gray-400">Submitted:</span> {new Date(studentResearch.proposal.submittedAt).toLocaleDateString()}</p>
-                        )}
-                        {studentResearch.workspace && (
-                          <p><span className="font-medium text-gray-400">Department:</span> {studentResearch.workspace.department || 'Computer Studies'}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex items-center gap-3">
-                      {studentResearch.workspace ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
-                                studentResearch.workspace,
-                                userProfile
-                              );
-                              navigate(doc.editorUrl);
-                            } catch (e) {
-                              navigate('/research/workspace');
-                            }
-                          }}
-                        >
-                          Open Manuscript
-                        </Button>
-                      ) : studentResearch.proposal ? (
-                        <Link to={`/proposals/${studentResearch.proposal.id}`}>
-                          <Button variant="primary" size="sm">
-                            View Proposal Details
-                          </Button>
-                        </Link>
-                      ) : null}
-                      {studentResearch.workspace && (
-                        <Link to="/research/workspace">
-                          <Button variant="outline" size="sm">
-                            View Workspace
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <HiDocumentText className="w-10 h-10 mx-auto text-gray-300 dark:text-[#6b6f84] mb-2" />
-                    <h4 className="font-semibold text-gray-900 dark:text-white text-base">
-                      No Active Research
-                    </h4>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
-                      Start by submitting a research proposal.
-                    </p>
-                  </div>
-                )}
-              </Card>
-            </>
-          )}
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Left 2 Cols */}
+            <div className="lg:col-span-2 space-y-5">
 
           {/* ====== ADMIN CONTENT ====== */}
           {effectiveRole === "admin" && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Access</span>
-                    <Badge variant="amber">User Directory</Badge>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      User Directory
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
-                      Manage institutional accounts, assign roles, and handle department assignments.
-                    </p>
-                  </div>
-                  <Link
-                    to="/admin/users"
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                  >
-                    Manage Users →
-                  </Link>
-                </Card>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 flex flex-col justify-between gap-4 hover:border-gray-300 dark:hover:border-gray-600 transition">
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Access</span>
+                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+                    User Directory
+                  </h3>
+                  <p className="text-[13px] text-gray-500 dark:text-[#9396a8] leading-relaxed">
+                    Manage institutional accounts, assign roles, and handle department assignments.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/users"
+                  className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Manage Users →
+                </Link>
+              </div>
 
-                <Card hover className="p-5 sm:p-6 flex flex-col justify-between space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">Repository</span>
-                    <Badge variant="emerald">Knowledge Base</Badge>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      Repository Overview
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1 leading-relaxed">
-                      Monitor published papers and institutional research output.
-                    </p>
-                  </div>
-                  <Link
-                    to="/repository"
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline pt-2"
-                  >
-                    View Repository →
-                  </Link>
-                </Card>
+              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 flex flex-col justify-between gap-4 hover:border-gray-300 dark:hover:border-gray-600 transition">
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Repository</span>
+                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+                    Repository Overview
+                  </h3>
+                  <p className="text-[13px] text-gray-500 dark:text-[#9396a8] leading-relaxed">
+                    Monitor published papers and institutional research output.
+                  </p>
+                </div>
+                <Link
+                  to="/repository"
+                  className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  View Repository →
+                </Link>
               </div>
             </div>
           )}
 
           {/* ====== ADVISER & PANELIST CONTENT ====== */}
-          {effectiveRole === "adviser" && (
-            <div className="space-y-5">
-              <AdviserRequestsWidget />
-            </div>
-          )}
+          {/* Adviser specific dashboard content (Adviser Requests moved to separate page) */}
         </div>
 
         {/* Right Col: Recent Activity */}
-        <RecentActivityWidget currentUser={currentUser} />
+        <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6">
+          <RecentActivityWidget currentUser={currentUser} />
+        </div>
       </div>
     </>
   )}
@@ -567,26 +315,30 @@ const AdviserDashboardMetrics = () => {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
       <StatCard
         label="Active Advisees"
-        value={`${metrics.groups} Groups`}
+        value={metrics.groups}
+        subtitle="Groups"
         trend="Current Cohort"
         trendType="positive"
       />
       <StatCard
         label="Pending Reviews"
-        value="Action Hub"
+        value={metrics.reviews || 0}
+        subtitle="Action Hub"
         trend="Manuscripts & Feedback"
         trendType="neutral"
         valueColor="text-blue-600 dark:text-blue-400"
       />
       <StatCard
         label="Title Proposals"
-        value="Matching"
+        value={metrics.proposals || 0}
+        subtitle="Matching"
         trend="Adviser Requests"
         trendType="neutral"
       />
       <StatCard
         label="Upcoming Defenses"
-        value="Schedules"
+        value={metrics.defenses || 0}
+        subtitle="Schedules"
         trend="Oral Examinations"
         trendType="positive"
       />
@@ -617,25 +369,29 @@ const PanelistDashboardMetrics = () => {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
       <StatCard
         label="Assigned Defenses"
-        value={`${metrics.defenses}`}
+        value={metrics.defenses}
+        subtitle="Schedules"
         trend="Upcoming Hearings"
         trendType="positive"
       />
       <StatCard
         label="Panel Defendees"
-        value={`${metrics.groups}`}
+        value={metrics.groups}
+        subtitle="Groups"
         trend="Assigned Research Groups"
         trendType="neutral"
       />
       <StatCard
         label="Rubric Evaluations"
-        value="Pending"
+        value="0"
+        subtitle="Pending"
         trend="Grading Matrix"
         trendType="neutral"
       />
       <StatCard
         label="Repository Drafts"
-        value="Available"
+        value="0"
+        subtitle="Available"
         trend="Pre-Defense Manuscripts"
         trendType="positive"
       />
@@ -713,102 +469,7 @@ const AdminDashboardMetrics = () => {
   );
 };
 
-/* Adviser Requests Widget */
-const AdviserRequestsWidget = () => {
-  const { currentUser, userProfile } = useAuth();
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-
-    setLoading(true);
-    const unsubscribe = adviserRequestService.subscribeToPendingAdviserRequests(currentUser.uid, (reqs) => {
-      setRequests(reqs);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  const handleAccept = async (reqId) => {
-    try {
-      const request = requests.find(r => r.id === reqId);
-      if (!request) return;
-
-      // 1. Accept the request
-      await adviserRequestService.acceptRequest(reqId);
-
-      // 2. Assign the adviser to the group
-      if (request.groupId) {
-        await groupService.updateGroup(request.groupId, {
-          adviserId: request.adviserId,
-          adviserName: request.adviserName
-        });
-      }
-
-      // 3. Provision the Research Workspace
-      await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(request, userProfile);
-
-      // Remove from pending list
-      setRequests(prev => prev.filter(r => r.id !== reqId));
-    } catch (err) {
-      console.error(err);
-      alert('Failed to accept request: ' + err.message);
-    }
-  };
-
-  const handleDecline = async (reqId) => {
-    try {
-      await adviserRequestService.declineRequest(reqId);
-      setRequests(prev => prev.filter(r => r.id !== reqId));
-    } catch (err) {
-      console.error(err);
-      alert('Failed to decline request: ' + err.message);
-    }
-  };
-
-  if (loading) return null;
-  if (requests.length === 0) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1a1b26]/50 text-xs text-gray-500 dark:text-[#9396a8]">
-        <HiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-        <span>No pending adviser requests.</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {requests.map(req => (
-        <Card key={req.id} className="p-5 border-l-4 border-l-amber-500">
-          <div className="flex flex-col md:flex-row justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant="amber">New Request</Badge>
-                <span className="text-xs text-gray-400">Received {new Date(req.createdAt).toLocaleDateString()}</span>
-              </div>
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">{req.researchTitle}</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{req.researchDescription}</p>
-
-              <div className="flex gap-4 mt-3 text-xs text-gray-500">
-                <div><span className="font-semibold">Student:</span> {req.studentName}</div>
-                {(req.courseName || req.sectionName) && (
-                  <div><span className="font-semibold">Program/Section:</span> {req.courseName} {req.sectionName}</div>
-                )}
-                <div><span className="font-semibold text-blue-600 dark:text-blue-400">Match: {req.compatibilityScore}%</span></div>
-              </div>
-            </div>
-            <div className="flex md:flex-col gap-2 shrink-0 self-start md:self-center w-full md:w-auto">
-              <Button variant="primary" onClick={() => handleAccept(req.id)} className="flex-1 md:w-32">Accept</Button>
-              <Button variant="danger" onClick={() => handleDecline(req.id)} className="flex-1 md:w-32 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400">Decline</Button>
-            </div>
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-};
 
 /* Recent Activity Widget — Displays real system activities across research workflow */
 const RecentActivityWidget = () => {
@@ -822,23 +483,6 @@ const RecentActivityWidget = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  const getCategoryBadge = (category) => {
-    switch (category) {
-      case 'task':
-        return <Badge variant="emerald" size="sm">Task</Badge>;
-      case 'adviser':
-        return <Badge variant="blue" size="sm">Adviser</Badge>;
-      case 'repository':
-        return <Badge variant="purple" size="sm">Repository</Badge>;
-      case 'feedback':
-        return <Badge variant="amber" size="sm">Feedback</Badge>;
-      case 'schedule':
-        return <Badge variant="indigo" size="sm">Schedule</Badge>;
-      default:
-        return <Badge variant="gray" size="sm">System</Badge>;
-    }
-  };
 
   const getDotColor = (category) => {
     switch (category) {
@@ -858,57 +502,60 @@ const RecentActivityWidget = () => {
   };
 
   return (
-    <Card className="p-5 sm:p-6 space-y-4 flex flex-col justify-between">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
-              Recent System Activity
-            </h3>
-            <p className="text-[11px] text-gray-400 mt-0.5">Real-time actions &amp; milestone events across CoreResearch</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center space-y-2 text-gray-400">
-            <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-            <span className="text-xs">Loading system events...</span>
-          </div>
-        ) : activities && activities.length > 0 ? (
-          <div className="space-y-3.5 text-xs">
-            {activities.slice(0, 6).map((item) => (
-              <div key={item.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50/70 dark:hover:bg-[#1c1d28]/60 transition-colors">
-                <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${getDotColor(item.category)}`} />
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-semibold text-gray-900 dark:text-white truncate">
-                      {item.title}
-                    </div>
-                    {getCategoryBadge(item.category)}
-                  </div>
-                  <div className="text-gray-500 dark:text-[#9396a8] line-clamp-2 leading-relaxed">
-                    {item.description}
-                  </div>
-                  <div className="flex items-center justify-between pt-0.5 text-[10px] text-gray-400 dark:text-[#6b6f84]">
-                    <span>{item.actorName || 'System'}</span>
-                    <span>{formatRelativeTime(item.timestamp)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-10">
-            <HiClock className="w-10 h-10 mx-auto text-gray-300 dark:text-[#6b6f84] mb-2" />
-            <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
-              No Recent Activity
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-[#9396a8] mt-1">
-              System activities will appear here as researchers and faculty take action.
-            </p>
-          </div>
-        )}
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="mb-5">
+        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+          Recent System Activity
+        </h3>
+        <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
+          Real-time actions & milestone events
+        </p>
       </div>
-    </Card>
+
+      {loading ? (
+        <div className="py-10 flex flex-col items-center justify-center space-y-3 text-gray-400 flex-1">
+          <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+          <span className="text-sm">Loading events...</span>
+        </div>
+      ) : activities && activities.length > 0 ? (
+        <div className="flex-1 divide-y divide-gray-100 dark:divide-[#222433]/70">
+          {activities.slice(0, 6).map((item) => (
+            <div key={item.id} className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3">
+              <span className={`w-2 h-2 rounded-full mt-2 shrink-0 ${getDotColor(item.category)}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white leading-snug">
+                    {item.title}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mt-0.5 font-medium">
+                    {formatRelativeTime(item.timestamp)}
+                  </span>
+                </div>
+                <p className="text-[13px] text-gray-500 dark:text-[#9396a8] leading-relaxed mt-0.5 line-clamp-2">
+                  {item.actorName && (
+                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                      {item.actorName}
+                    </span>
+                  )}
+                  {item.actorName ? " - " : ""}
+                  {item.description}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-10 flex-1 flex flex-col items-center justify-center">
+          <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+            No recent activity
+          </h4>
+          <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-1">
+            Events will appear here as you work.
+          </p>
+        </div>
+      )}
+    </div>
   );
 };
+
