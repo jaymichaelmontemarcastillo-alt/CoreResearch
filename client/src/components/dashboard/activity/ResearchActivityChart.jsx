@@ -13,30 +13,12 @@ export const ResearchActivityChart = ({
   if (!loading && total7DayActions <= 1) return null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full justify-between">
       {/* Header */}
-<<<<<<< HEAD
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-[#222433] pb-2.5">
-        <div>
-          <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-            Recent Research Activity
-          </h3>
-          <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
-            Daily Manuscript Edits, Task Completions &amp; Revisions (Last 7 Days)
-          </p>
-        </div>
-
-        {total7DayActions > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] text-gray-500 dark:text-gray-400">
-              Total 7-Day Actions:
-            </span>
-            <Badge variant="blue" size="sm" className="font-semibold text-[10px] py-0.5 px-2">
-=======
-      <div className="mb-5">
+      <div className="mb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white leading-tight">
               Research Activity
             </h3>
             <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
@@ -44,8 +26,7 @@ export const ResearchActivityChart = ({
             </p>
           </div>
           {total7DayActions > 0 && (
-            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-lg shrink-0">
->>>>>>> 68296efb39d6f1783a2b591ec86554ec12380bd1
+            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-md shrink-0">
               {total7DayActions} events
             </span>
           )}
@@ -53,20 +34,25 @@ export const ResearchActivityChart = ({
       </div>
 
       {loading ? (
-        <div className="py-8 flex flex-col items-center justify-center space-y-3 text-gray-400">
+        <div className="py-6 flex flex-col items-center justify-center space-y-2 text-gray-400">
           <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-          <span className="text-sm">Loading data...</span>
+          <span className="text-xs">Loading data...</span>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col justify-end">
-          {/* Chart area */}
-          <div className="h-36 w-full flex items-end justify-between gap-2 relative">
-            {/* Subtle horizontal grid */}
-            <div className="absolute inset-x-0 bottom-0 border-b border-gray-100 dark:border-[#222433]/50 pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-1/2 border-b border-dashed border-gray-100 dark:border-[#222433]/30 pointer-events-none" />
+        <div className="flex-1 flex flex-col justify-between min-h-[120px]">
+          {/* Chart area — fills available vertical space without excess gap */}
+          <div className="flex-1 w-full min-h-[96px] flex items-end justify-between gap-2.5 relative pt-2">
+            {/* Subtle horizontal grid lines */}
+            <div className="absolute inset-x-0 bottom-5 border-b border-gray-100 dark:border-[#222433]/50 pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-[calc(50%+6px)] border-b border-dashed border-gray-100 dark:border-[#222433]/30 pointer-events-none" />
 
             {dailyActivity.map((day, idx) => {
-              const heightPercent = Math.round(((day.count || 0) / maxDailyCount) * 100);
+              const rawRatio = (day.count || 0) / maxDailyCount;
+              // Scale from 25% to 100% on active days so bars stand tall and use available space
+              const heightPercent = day.count > 0 
+                ? Math.round(25 + rawRatio * 75)
+                : 0;
+
               const isHovered = hoveredDay?.date === day.date;
               const isToday = idx === dailyActivity.length - 1;
 
@@ -79,31 +65,31 @@ export const ResearchActivityChart = ({
                 >
                   {/* Tooltip */}
                   {isHovered && (
-                    <div className="absolute -top-8 px-2.5 py-1 rounded-md bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs font-semibold whitespace-nowrap shadow-md pointer-events-none z-30">
-                      {day.count} {day.count === 1 ? 'action' : 'actions'}
+                    <div className="absolute -top-7 px-2 py-0.5 rounded-md bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[11px] font-semibold whitespace-nowrap shadow-md pointer-events-none z-30">
+                      {day.count} {day.count === 1 ? 'event' : 'events'}
                     </div>
                   )}
 
-                  {/* Bar */}
-                  <div className="w-full max-w-[28px] bg-gray-50 dark:bg-[#1c1d28] rounded-t overflow-hidden flex items-end h-full">
+                  {/* Bar Column Track */}
+                  <div className="w-full max-w-[28px] bg-gray-50/70 dark:bg-[#1c1d28]/70 rounded-t overflow-hidden flex items-end h-[calc(100%-18px)]">
                     <div
-                      style={{ height: `${Math.max(heightPercent, day.count > 0 ? 8 : 0)}%` }}
+                      style={{ height: `${heightPercent}%` }}
                       className={`w-full rounded-t transition-all duration-300 ease-out ${
                         day.count === 0
-                          ? 'bg-gray-100 dark:bg-[#222433]/40'
+                          ? 'bg-transparent'
                           : isToday
-                          ? 'bg-blue-600 dark:bg-blue-500'
+                          ? 'bg-blue-600 dark:bg-blue-500 shadow-sm shadow-blue-500/20'
                           : isHovered
                           ? 'bg-blue-500 dark:bg-blue-400'
-                          : 'bg-blue-400/70 dark:bg-blue-600/60'
+                          : 'bg-blue-500/80 dark:bg-blue-600/70'
                       }`}
                     />
                   </div>
 
                   {/* Day label */}
-                  <span className={`text-[11px] font-medium mt-2 leading-none transition ${
+                  <span className={`text-[11px] font-medium mt-1 leading-none transition ${
                     isToday 
-                      ? 'text-blue-600 dark:text-blue-400 font-semibold' 
+                      ? 'text-blue-600 dark:text-blue-400 font-bold' 
                       : 'text-gray-400 dark:text-gray-500'
                   }`}>
                     {day.day}
@@ -114,13 +100,13 @@ export const ResearchActivityChart = ({
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 mt-4 pt-3 border-t border-gray-100 dark:border-[#222433]/50">
+          <div className="flex items-center gap-4 text-[11px] text-gray-400 dark:text-gray-500 mt-2.5 pt-2 border-t border-gray-100 dark:border-[#222433]/50">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+              <span className="w-2 h-2 rounded-sm bg-blue-500" />
               Research events
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-gray-100 dark:bg-[#222433]/40" />
+              <span className="w-2 h-2 rounded-sm bg-gray-200 dark:bg-[#222433]" />
               No activity
             </span>
           </div>

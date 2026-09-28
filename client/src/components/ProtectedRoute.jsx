@@ -15,6 +15,11 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Pending or rejected student accounts are prevented from accessing any protected routes
+  if (userProfile?.role === 'student' && (userProfile?.status === 'pending' || userProfile?.status === 'rejected' || userProfile?.is_approved === false)) {
+    return <Navigate to="/student/login?pending=1" replace />;
+  }
+
   // Kung ang profile ay naka-flag for onboarding pero wala sila sa /onboarding page, redirect sila dun.
   if (userProfile?.needsOnboarding && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
@@ -26,6 +31,12 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    if (role === 'adviser' || role === 'faculty') {
+      return <Navigate to="/advisees" replace />;
+    }
+    if (role === 'student') {
+      return <Navigate to="/dashboard" replace />;
+    }
     return <Navigate to="/unauthorized" replace />;
   }
 

@@ -5,39 +5,59 @@ import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
 import { HiLockClosed, HiEnvelope, HiEye, HiEyeSlash } from "react-icons/hi2";
 
-export const Login = () => {
+export const Login = ({ portal: initialPortal }) => {
+  const navigate = useNavigate();
+  const location = window.location;
+  const isFacultyPath = location.pathname.includes('/faculty');
+  const isAdminPath = location.pathname.includes('/admin');
+  const portal = initialPortal || (isAdminPath ? 'admin' : (isFacultyPath ? 'faculty' : 'student'));
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const { login, loginWithGoogle } = useAuth();
-  const navigate = useNavigate();
 
-  // Extract returnTo from URL if present
+  // Extract returnTo and pending notices from URL if present
   const queryParams = new URLSearchParams(window.location.search);
-  const returnTo = queryParams.get("returnTo") || "/dashboard";
+  const defaultReturn = portal === 'admin' ? '/admin/users' : '/dashboard';
+  const returnTo = queryParams.get("returnTo") || defaultReturn;
+
+  React.useEffect(() => {
+    if (queryParams.get("pending") === "1") {
+      setNotice(
+        "Account Pending Approval: Your account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account."
+      );
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, portal);
       navigate(returnTo);
     } catch (err) {
-      if (
+      if (err.code === "auth/account-pending" || err.message?.includes("Account Pending Approval")) {
+        setError("Account Pending Approval: Your account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.");
+      } else if (err.code === "auth/account-rejected" || err.message?.includes("Registration Not Approved")) {
+        setError("Registration Not Approved: Your registration was not approved by the administrator.");
+      } else if (
         err.code === "auth/invalid-credential" ||
         err.code === "auth/user-not-found" ||
         err.code === "auth/wrong-password" ||
         err.code === "auth/invalid-email" ||
         err.message?.includes("invalid-credential")
       ) {
-        setError("Invalid email or password. If you haven't registered an account yet, please sign up or use Google Sign-In.");
+        setError("Invalid email or password. If you haven't registered an account yet, please sign up.");
       } else if (err.code === "auth/too-many-requests") {
         setError("Too many failed attempts. Access is temporarily disabled. Try again later or reset your password.");
       } else if (err.code === "auth/user-disabled") {
@@ -54,16 +74,21 @@ export const Login = () => {
 
   const handleGoogleSignIn = async () => {
     setError("");
+    setNotice("");
     setGoogleLoading(true);
     try {
-      const res = await loginWithGoogle();
+      const res = await loginWithGoogle(portal);
       if (res?.needsOnboarding) {
         navigate(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`);
       } else {
         navigate(returnTo);
       }
     } catch (err) {
-      if (err.code !== "auth/popup-closed-by-user") {
+      if (err.code === "auth/account-pending" || err.message?.includes("Account Pending Approval")) {
+        setError("Account Pending Approval: Your account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.");
+      } else if (err.code === "auth/account-rejected" || err.message?.includes("Registration Not Approved")) {
+        setError("Registration Not Approved: Your registration was not approved by the administrator.");
+      } else if (err.code !== "auth/popup-closed-by-user") {
         setError(err.message || "Google Sign-In failed. Please try again.");
       }
     } finally {
@@ -71,13 +96,36 @@ export const Login = () => {
     }
   };
 
+  const isStudent = portal === 'student';
+  const isAdmin = portal === 'admin';
+
   return (
     <AuthLayout
-      title="Login"
-      subtitle="Login to your account to continue"
+      title={
+        isAdmin
+          ? "ADMIN PORTAL"
+          : isStudent
+          ? "STUDENT PORTAL"
+          : "FACULTY PORTAL"
+      }
+      subtitle={
+        isAdmin
+          ? "Sign in with admin credentials to manage research users, approvals, and system configuration"
+          : isStudent
+          ? "Sign in with your student credentials to access your research workspace"
+          : "Sign in with your faculty credentials to access your advising dashboard"
+      }
+      quoteTitle={isAdmin ? "Centralized governance for institutional research excellence." : undefined}
+      quoteSubtitle={isAdmin ? "Oversee programs, student masterlists, faculty assignments, defense panels, and academic compliance from a single administrative hub." : undefined}
     >
+      {notice && (
+        <div className="mb-5 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs sm:text-sm font-medium leading-relaxed">
+          {notice}
+        </div>
+      )}
+
       {error && (
-        <div className="mb-5 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium">
+        <div className="mb-5 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium leading-relaxed whitespace-pre-line">
           {error}
         </div>
       )}
@@ -86,14 +134,20 @@ export const Login = () => {
         {/* Email */}
         <div className="space-y-1.5">
           <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
-            Email
+            {isAdmin ? "Admin Email" : isStudent ? "Email / Gmail" : "Faculty Email"}
           </label>
           <div className="relative">
             <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
             <input
               type="email"
               autoComplete="email"
-              placeholder="name@company.com"
+              placeholder={
+                isAdmin
+                  ? ""
+                  : isStudent
+                  ? "student@university.edu or gmail"
+                  : "faculty@university.edu"
+              }
               className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -112,7 +166,7 @@ export const Login = () => {
             <input
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              placeholder="••••••••"
+              placeholder={isAdmin ? "" : "••••••••"}
               className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:dark:border-blue-500 rounded-xl text-sm pl-10 pr-10 transition"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -147,7 +201,7 @@ export const Login = () => {
           </Link>
         </div>
 
-        {/* Submit / Login Button (Vibrant Blue) */}
+        {/* Submit / Login Button */}
         <button
           type="submit"
           disabled={loading}
@@ -159,14 +213,14 @@ export const Login = () => {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              Logging in...
+              Signing in...
             </span>
           ) : (
-            "Login"
+            isAdmin ? "Admin Sign In" : isStudent ? "Sign In" : "Faculty Sign In"
           )}
         </button>
 
-        {/* Divider */}
+        {/* Google Sign In option */}
         <div className="relative flex items-center py-2">
           <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
           <span className="flex-shrink mx-3 text-xs text-gray-400 dark:text-[#6b6f84] font-normal">
@@ -175,7 +229,6 @@ export const Login = () => {
           <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
         </div>
 
-        {/* Google Sign In — Direct Log In */}
         <button
           type="button"
           disabled={googleLoading || loading}
@@ -204,12 +257,47 @@ export const Login = () => {
         </button>
       </form>
 
-      {/* Register link */}
-      <div className="mt-5 text-center text-xs sm:text-sm text-gray-500 dark:text-[#9396a8]">
-        Don't have an account?{" "}
-        <Link to="/register" className="text-gray-900 dark:text-white font-bold hover:underline">
-          Sign up here
-        </Link>
+      {/* Registration link (Students & Faculty only) */}
+      {!isAdmin && (
+        <div className="mt-5 text-center text-xs sm:text-sm text-gray-500 dark:text-[#9396a8]">
+          Don't have an account?{" "}
+          <Link
+            to={isStudent ? "/student/register" : "/faculty/register"}
+            className="text-blue-600 dark:text-blue-400 font-bold hover:underline"
+          >
+            {isStudent ? "Create Student Account" : "Register as Faculty"}
+          </Link>
+        </div>
+      )}
+
+      {/* Switch between portals */}
+      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#222433] text-center text-xs text-gray-400 dark:text-[#6b6f84] space-y-1">
+        {isAdmin ? (
+          <div>
+            Need to access user portals?{" "}
+            <Link to="/student/login" className="text-gray-700 dark:text-gray-300 font-semibold hover:underline">
+              Student Portal
+            </Link>{" "}
+            &bull;{" "}
+            <Link to="/faculty/login" className="text-gray-700 dark:text-gray-300 font-semibold hover:underline">
+              Faculty Portal
+            </Link>
+          </div>
+        ) : isStudent ? (
+          <div className="flex items-center justify-center gap-2">
+            <span>Are you a Faculty member?</span>
+            <Link to="/faculty/login" className="text-gray-700 dark:text-gray-300 font-semibold hover:underline">
+              Faculty Portal &rarr;
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <span>Are you a Student?</span>
+            <Link to="/student/login" className="text-gray-700 dark:text-gray-300 font-semibold hover:underline">
+              Student Portal &rarr;
+            </Link>
+          </div>
+        )}
       </div>
     </AuthLayout>
   );

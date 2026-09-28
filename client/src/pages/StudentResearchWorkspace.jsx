@@ -64,6 +64,12 @@ export const StudentResearchWorkspace = () => {
 
   // 1. Initial Load
   useEffect(() => {
+    // Advisers and faculty manage advisee research from /advisees and should not see the student workspace
+    if (!queryWorkspaceId && (role === 'adviser' || role === 'faculty')) {
+      navigate('/advisees', { replace: true });
+      return;
+    }
+
     let unsubscribeWs = () => {};
     let unsubscribeTasks = () => {};
     let unsubscribeFb = () => {};
@@ -452,7 +458,7 @@ export const StudentResearchWorkspace = () => {
                   </div>
 
                   {/* Title */}
-                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-snug line-clamp-2" title={workspace.title}>
+                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-snug break-words" title={workspace.title}>
                     {workspace.title}
                   </h1>
                 </div>
@@ -487,8 +493,8 @@ export const StudentResearchWorkspace = () => {
                 <div className="flex-1 flex flex-col items-center justify-center lg:items-end w-full py-1">
                   <ResearchProgressCircle
                     progress={overallProgress}
-                    size={80}
-                    strokeWidth={7}
+                    size={116}
+                    strokeWidth={9}
                     showDetails={false}
                   />
                   <div className="text-center lg:text-right mt-1.5">

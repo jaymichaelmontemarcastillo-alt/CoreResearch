@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { StatCard } from '../components/ui/StatCard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
 import { HiUsers, HiCheckCircle, HiMagnifyingGlass, HiArrowRight, HiFolder, HiClock, HiArrowTrendingUp, HiCalendar } from 'react-icons/hi2';
@@ -94,10 +93,9 @@ export const AdviserAdvisees = () => {
         return {
           ...group,
           title: resolvedTitle,
-          programCode: course?.code || course?.name || 'N/A',
-          sectionName: section?.name || 'N/A',
-          yearLevelDisplay: `${group.yearLevel || 4}th Year`,
-          specialization: group.specialization || course?.specializations?.[0]?.code || '',
+          programCode: course?.code || course?.name || 'BSIT',
+          sectionName: section?.name || group.sectionName || 'A',
+          majorDisplay: group.specialization || group.majorCode || course?.specializations?.[0]?.code || '',
           schedule: schMap[group.id] || null,
         };
       });
@@ -123,10 +121,6 @@ export const AdviserAdvisees = () => {
     (g.programCode && g.programCode.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const avgProgress = groups.length > 0
-    ? Math.round(Object.values(progressMap).reduce((acc, curr) => acc + (curr || 0), 0) / groups.length)
-    : 0;
-
   return (
     <div className="space-y-6">
       {toast && <Toast message={toast} variant="error" onClose={() => setToast('')} />}
@@ -136,31 +130,6 @@ export const AdviserAdvisees = () => {
         title="My Advisees"
         description="Monitor research progress, review milestone drafts, and guide your assigned advisee research groups."
       />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          icon={HiUsers}
-          title="Total Advisee Groups"
-          value={groups.length}
-          description="Assigned research groups"
-          trend="neutral"
-        />
-        <StatCard
-          icon={HiArrowTrendingUp}
-          title="Average Progress"
-          value={`${avgProgress}%`}
-          description="Across all advised groups"
-          color="blue"
-          valueColor="text-blue-600 dark:text-blue-400"
-        />
-        <StatCard
-          icon={HiCheckCircle}
-          title="Active Workspaces"
-          value={groups.length}
-          description="Groups with active workspaces"
-          color="emerald"
-        />
-      </div>
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -252,10 +221,10 @@ export const AdviserAdvisees = () => {
                         )}
                       </td>
 
-                      {/* Program, Year Level & Section */}
+                      {/* Program, Major & Section */}
                       <td className="py-4 px-4 text-xs text-gray-700 dark:text-gray-300 min-w-[140px]">
                         <div className="font-semibold text-gray-900 dark:text-white">{group.programCode}</div>
-                        <div className="text-gray-500 dark:text-gray-400">{group.yearLevelDisplay} • {group.sectionName}</div>
+                        <div className="text-gray-500 dark:text-gray-400">{group.majorDisplay ? `${group.majorDisplay} • ` : ''}Section {group.sectionName}</div>
                       </td>
 
                       {/* Manuscript Status */}

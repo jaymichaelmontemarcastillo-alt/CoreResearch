@@ -71,6 +71,7 @@ export const Dashboard = () => {
   }, [location]);
 
   const [academicInfo, setAcademicInfo] = useState(null);
+  const [hasActiveResearch, setHasActiveResearch] = useState(false);
   const [studentResearch, setStudentResearch] = useState({
     workspace: null,
     proposal: null,
@@ -124,6 +125,7 @@ export const Dashboard = () => {
           } catch (e) { }
 
           if (isMounted) {
+            if (workspace) setHasActiveResearch(true);
             setAcademicInfo({ course, sectionName, group });
             setStudentResearch({
               workspace,
@@ -141,89 +143,94 @@ export const Dashboard = () => {
     }
   }, [role, userProfile?.uid, userProfile?.courseId, userProfile?.sectionId, currentUser?.uid]);
 
+  const isStudent = effectiveRole === "student" || (!effectiveRole && role !== 'admin' && role !== 'faculty');
+  const showGreetingCard = !isStudent || (!hasActiveResearch && !studentResearch.workspace && !studentResearch.loading);
+
   return (
     <div className="space-y-5">
       {toastMessage && (
         <Toast message={toastMessage} variant="success" onClose={() => setToastMessage("")} />
       )}
 
-      {/* Page Header / Welcome Card */}
-      <div className="px-6 py-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/80 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
-            {getGreeting()}, {displayName}
-          </h1>
-          {role === 'faculty' && (
-            <div className="flex items-center gap-2 mt-2 bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-lg w-max border border-transparent dark:border-[#222433]">
-              <button
-                onClick={() => setFacultyMode('adviser')}
-                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${currentFacultyMode === 'adviser'
-                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
-                  }`}
-              >
-                Adviser Mode
-              </button>
-              <button
-                onClick={() => setFacultyMode('panelist')}
-                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${currentFacultyMode === 'panelist'
-                    ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
-                  }`}
-              >
-                Panelist Mode
-              </button>
-            </div>
-          )}
-          <p className="text-gray-500 dark:text-[#9396a8] text-sm max-w-2xl leading-relaxed">
-            Active under <span className="font-semibold text-gray-800 dark:text-white">{userProfile?.department || "Computer Studies"}</span>. Track research performance, monitor progress and stay updated on feedbacks.
-          </p>
-        </div>
+      {/* Page Header / Welcome Card — hidden for students with an active research */}
+      {showGreetingCard && (
+        <div className="px-6 py-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/80 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
+              {getGreeting()}, {displayName}
+            </h1>
+            {role === 'faculty' && (
+              <div className="flex items-center gap-2 mt-2 bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-lg w-max border border-transparent dark:border-[#222433]">
+                <button
+                  onClick={() => setFacultyMode('adviser')}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${currentFacultyMode === 'adviser'
+                      ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
+                    }`}
+                >
+                  Adviser Mode
+                </button>
+                <button
+                  onClick={() => setFacultyMode('panelist')}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${currentFacultyMode === 'panelist'
+                      ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-[#9396a8] dark:hover:text-white'
+                    }`}
+                >
+                  Panelist Mode
+                </button>
+              </div>
+            )}
+            <p className="text-gray-500 dark:text-[#9396a8] text-sm max-w-2xl leading-relaxed">
+              Active under <span className="font-semibold text-gray-800 dark:text-white">{userProfile?.department || "Computer Studies"}</span>. Track research performance, monitor progress and stay updated on feedbacks.
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          {effectiveRole === "student" && (
-            <>
-              <Link to="/research/workspace">
-                <Button variant="secondary" size="sm">
-                  Research Workspace
-                </Button>
-              </Link>
-              <Link to="/submit-title">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {isStudent && (
+              <>
+                <Link to="/research/workspace">
+                  <Button variant="secondary" size="sm">
+                    Research Workspace
+                  </Button>
+                </Link>
+                <Link to="/submit-title">
+                  <Button variant="primary" size="sm">
+                    Submit Title
+                  </Button>
+                </Link>
+              </>
+            )}
+            {effectiveRole === "adviser" && (
+              <Link to="/advisees">
                 <Button variant="primary" size="sm">
-                  Submit Title
+                  My Advisees
                 </Button>
               </Link>
-            </>
-          )}
-          {effectiveRole === "adviser" && (
-            <Link to="/advisees">
-              <Button variant="primary" size="sm">
-                My Advisees
-              </Button>
-            </Link>
-          )}
-          {effectiveRole === "panelist" && (
-            <Link to="/panelist/defendees">
-              <Button variant="primary" size="sm">
-                Panel Defendees
-              </Button>
-            </Link>
-          )}
-          {effectiveRole === "admin" && (
-            <Link to="/admin/users">
-              <Button variant="primary" size="sm">
-                Manage Users
-              </Button>
-            </Link>
-          )}
+            )}
+            {effectiveRole === "panelist" && (
+              <Link to="/panelist/defendees">
+                <Button variant="primary" size="sm">
+                  Panel Defendees
+                </Button>
+              </Link>
+            )}
+            {effectiveRole === "admin" && (
+              <Link to="/admin/users">
+                <Button variant="primary" size="sm">
+                  Manage Users
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Role-Specific Dashboard Content */}
       {effectiveRole === "adviser" ? (
         <AdviserDashboardView />
       ) : effectiveRole === "student" || (!effectiveRole && role !== 'admin' && role !== 'faculty') ? (
-        <StudentDashboardView />
+        <StudentDashboardView onActiveResearchChange={setHasActiveResearch} />
       ) : (
         <>
           {/* Metric Cards Row */}

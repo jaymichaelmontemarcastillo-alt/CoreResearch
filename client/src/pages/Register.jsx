@@ -1,6 +1,6 @@
 // src/pages/Register.jsx
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
 import {
@@ -12,71 +12,140 @@ import {
   HiAcademicCap,
   HiUser,
   HiIdentification,
+  HiCheckCircle,
+  HiBuildingOffice2,
 } from "react-icons/hi2";
+import { courseService, BSIT_SPECIALIZATIONS } from "../services/course.service";
+import { sectionService } from "../services/section.service";
 
-const ROLE_OPTIONS = [
-  { value: "student", label: "Student" },
-  { value: "adviser", label: "Faculty Member" },
-];
+export const Register = ({ portal: initialPortal }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isFacultyPath = location.pathname.includes("/faculty");
+  const portal = initialPortal || (isFacultyPath ? "faculty" : "student");
+  const isStudent = portal === "student";
 
-const PROGRAM_OPTIONS = [
-  {
-    value: "Bachelor of Science in Information Technology",
-    label: "Bachelor of Science in Information Technology",
-    department: "Information Technology",
-  },
-  {
-    value: "Bachelor of Science in Computer Science",
-    label: "Bachelor of Science in Computer Science",
-    department: "Computer Science",
-  },
-];
+  // Common Auth Context
+  const { registerStudent, registerFaculty } = useAuth();
 
-const SPECIALIZATION_OPTIONS = [
-  { value: "Web and Mobile Development (WMAD)", label: "Web and Mobile Development (WMAD)" },
-  { value: "Animation and Motion Graphics (AMG)", label: "Animation and Motion Graphics (AMG)" },
-  { value: "Service Management Program (SMP)", label: "Service Management Program (SMP)" },
-];
-
-export const Register = () => {
+  // Student Form State
+  const [studentId, setStudentId] = useState("");
+  const [studentEmail, setStudentEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("student");
-  const [program, setProgram] = useState("Bachelor of Science in Information Technology");
-  const [programSpecialization, setProgramSpecialization] = useState("Web and Mobile Development (WMAD)");
-  const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState("");
+  const [programs, setPrograms] = useState([]);
+  const [selectedProgramId, setSelectedProgramId] = useState("bsit");
+  const [availableMajors, setAvailableMajors] = useState(BSIT_SPECIALIZATIONS);
+  const [selectedMajorCode, setSelectedMajorCode] = useState("WMAD");
+  const [availableSections, setAvailableSections] = useState([]);
+  const [selectedSectionName, setSelectedSectionName] = useState("A");
+
+  // Faculty Form State
+  const [facultyName, setFacultyName] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [facultyEmail, setFacultyEmail] = useState("");
+  const [department, setDepartment] = useState("Information Technology");
+
+  // Password & Security State
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Status & Feedback State
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
 
-  const { register, registerWithGoogle } = useAuth();
-  const navigate = useNavigate();
+  // Load programs from DB
+  useEffect(() => {
+    const loadAcademicData = async () => {
+      try {
+        const courses = await courseService.getAllCourses();
+        if (courses && courses.length > 0) {
+          setPrograms(courses);
+          const defaultProg = courses.find((c) => c.code?.toUpperCase() === "BSIT" || c.id === "bsit") || courses[0];
+          setSelectedProgramId(defaultProg.id);
+        }
+      } catch (err) {
+        console.warn("[Register] Failed to load courses:", err);
+      }
+    };
+    loadAcademicData();
+  }, []);
 
-  // Extract returnTo from URL if present
-  const queryParams = new URLSearchParams(window.location.search);
-  const returnTo = queryParams.get("returnTo") || "/dashboard";
+  // Update Majors & Sections when Program changes
+  useEffect(() => {
+    if (!selectedProgramId) return;
 
-  const handleSubmit = async (e) => {
+    const prog = programs.find((p) => p.id === selectedProgramId || p.code?.toLowerCase() === selectedProgramId.toLowerCase());
+    
+    // Majors dependency
+    if (prog?.specializations && prog.specializations.length > 0) {
+      setAvailableMajors(prog.specializations);
+      setSelectedMajorCode(prog.specializations[0].code || prog.specializations[0].id);
+    } else if (selectedProgramId === "bsit" || prog?.code?.toUpperCase() === "BSIT") {
+      setAvailableMajors(BSIT_SPECIALIZATIONS);
+      setSelectedMajorCode("WMAD");
+    } else {
+      setAvailableMajors([]);
+      setSelectedMajorCode("");
+    }
+
+    // Sections dependency: fetch Admin-controlled sections from DB
+    const loadSections = async () => {
+      try {
+        const sectionsData = await sectionService.getSectionsByCourseId(selectedProgramId, true);
+        if (sectionsData && sectionsData.length > 0) {
+          setAvailableSections(sectionsData);
+          setSelectedSectionName(sectionsData[0].name);
+        } else {
+          setAvailableSections([
+            { id: "sec-a", name: "A" },
+            { id: "sec-b", name: "B" },
+            { id: "sec-c", name: "C" },
+          ]);
+          setSelectedSectionName("A");
+        }
+      } catch (err) {
+        console.warn("[Register] Failed to load sections:", err);
+        setAvailableSections([
+          { id: "sec-a", name: "A" },
+          { id: "sec-b", name: "B" },
+          { id: "sec-c", name: "C" },
+        ]);
+        setSelectedSectionName("A");
+      }
+    };
+    loadSections();
+  }, [selectedProgramId, programs]);
+
+  const handleStudentSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
+    if (!studentId.trim()) {
+      setError("Student ID Number is required.");
+      return;
+    }
+
     if (!firstName.trim() || !lastName.trim()) {
-      setError("Please provide both your First Name and Last Name.");
+      setError("Please provide your Complete Name (First Name and Last Name).");
       return;
     }
 
-    if (!studentIdOrEmployeeId.trim()) {
-      setError(role === "student" ? "Please enter your Student ID Number." : "Please enter your Employee ID Number.");
+    if (!studentEmail.trim()) {
+      setError("Gmail / Email is required.");
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+    if (availableMajors.length > 0 && !selectedMajorCode) {
+      setError("Please select your major.");
+      return;
+    }
+
+    if (!selectedSectionName) {
+      setError("Please select your section.");
       return;
     }
 
@@ -85,67 +154,204 @@ export const Register = () => {
       return;
     }
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    const selectedProgObj = PROGRAM_OPTIONS.find((p) => p.value === program);
-    const department = selectedProgObj ? selectedProgObj.department : "Information Technology";
 
     try {
-      await register(
-        email,
-        password,
-        fullName,
-        role || "student",
-        department,
-        studentIdOrEmployeeId.trim(),
-        program,
-        program === "Bachelor of Science in Information Technology" ? programSpecialization : ""
+      const selectedProg = programs.find((p) => p.id === selectedProgramId) || {
+        id: "bsit",
+        code: "BSIT",
+        name: "Bachelor of Science in Information Technology",
+      };
+
+      const selectedMajorObj = availableMajors.find(
+        (m) => (m.code || m.id) === selectedMajorCode
       );
-      
-      setSuccess("Successfully signed up! Redirecting to your workspace...");
-      setTimeout(() => {
-        navigate(returnTo);
-      }, 2000);
+      const majorDisplay = selectedMajorObj
+        ? `${selectedMajorObj.name} (${selectedMajorObj.code})`
+        : "";
+
+      const selectedSecObj = availableSections.find((s) => s.name === selectedSectionName);
+
+      await registerStudent({
+        email: studentEmail.trim().toLowerCase(),
+        password,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        fullName: `${firstName.trim()} ${lastName.trim()}`,
+        studentId: studentId.trim(),
+        program: selectedProg.name,
+        programCode: selectedProg.code || "BSIT",
+        major: majorDisplay,
+        majorCode: selectedMajorCode,
+        section: selectedSectionName,
+        sectionId: selectedSecObj?.id || "",
+      });
+
+      setRegistrationSubmitted(true);
     } catch (err) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("This email is already registered. Please log in instead.");
+      if (err.message?.includes("Student ID Already Registered") || err.code === "auth/student-id-exists") {
+        setError("Student ID Already Registered\nThis Student ID Number is already associated with an account.");
+      } else if (err.message?.includes("Email Already Registered") || err.code === "auth/email-already-in-use") {
+        setError("Email Already Registered\nAn account with this email address already exists.");
       } else {
-        setError(err.message || "Failed to create account.");
+        setError(err.message || "Failed to create student account.");
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFacultySubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!facultyName.trim()) {
+      setError("Complete Name is required.");
+      return;
+    }
+
+    if (!employeeId.trim()) {
+      setError("Employee ID Number is required.");
+      return;
+    }
+
+    if (!facultyEmail.trim()) {
+      setError("Faculty Email is required.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await registerFaculty({
+        email: facultyEmail.trim().toLowerCase(),
+        password,
+        fullName: facultyName.trim(),
+        employeeId: employeeId.trim(),
+        department,
+        role: "adviser",
+      });
+
+      navigate("/dashboard");
+    } catch (err) {
+      if (err.message?.includes("Employee ID Already Registered")) {
+        setError("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
+      } else if (err.message?.includes("Email Already Registered") || err.code === "auth/email-already-in-use") {
+        setError("Email Already Registered\nAn account with this email address already exists.");
+      } else {
+        setError(err.message || "Failed to register faculty account.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Success State for Student Registration (Pending Approval Notice) ──
+  if (registrationSubmitted) {
+    return (
+      <AuthLayout
+        title="REGISTRATION SUBMITTED"
+        subtitle="Your student account has been created successfully"
+      >
+        <div className="text-center py-6 space-y-4">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
+            <HiCheckCircle className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Account Pending Approval
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-md mx-auto">
+              Your account has been successfully registered and is waiting for administrator approval.
+              Please wait until an administrator approves your account before logging in.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 text-left text-xs text-gray-600 dark:text-gray-300 space-y-1.5 max-w-sm mx-auto">
+            <div><span className="font-semibold text-gray-700 dark:text-gray-200">Student ID:</span> {studentId}</div>
+            <div><span className="font-semibold text-gray-700 dark:text-gray-200">Name:</span> {firstName} {lastName}</div>
+            <div><span className="font-semibold text-gray-700 dark:text-gray-200">Email:</span> {studentEmail}</div>
+            <div><span className="font-semibold text-gray-700 dark:text-gray-200">Academic:</span> BSIT • {selectedMajorCode || "N/A"} • Section {selectedSectionName}</div>
+            <div><span className="font-semibold text-amber-600 dark:text-amber-400">Status:</span> Pending Review</div>
+          </div>
+
+          <div className="pt-4">
+            <Link
+              to="/student/login?pending=1"
+              className="inline-flex items-center justify-center px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-full transition shadow-md shadow-blue-500/20"
+            >
+              Go to Student Sign In
+            </Link>
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="Join CoreResearch and manage your research journey"
+      title={isStudent ? "CREATE STUDENT ACCOUNT" : "FACULTY REGISTRATION"}
+      subtitle={
+        isStudent
+          ? "Register your student research account"
+          : "Register your faculty advising account"
+      }
     >
-      {success && (
-        <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-400 text-sm">
-          {success}
-        </div>
-      )}
-      
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">
+        <div className="mb-5 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium whitespace-pre-line leading-relaxed">
           {error}
         </div>
       )}
 
-      {!success && (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* First Name & Last Name */}
-          <div className="grid grid-cols-2 gap-3">
+      {isStudent ? (
+        // ── STUDENT REGISTRATION FORM ──
+        <form onSubmit={handleStudentSubmit} className="space-y-4">
+          {/* Student ID */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Student ID Number
+            </label>
+            <div className="relative">
+              <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <input
+                type="text"
+                placeholder="e.g. 0423-4197"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition font-mono"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Name (First Name & Last Name) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">First Name</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                First Name
+              </label>
               <div className="relative">
                 <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                 <input
                   type="text"
-                  placeholder="e.g. Alex"
-                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
+                  placeholder="John Paul"
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
@@ -153,219 +359,364 @@ export const Register = () => {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Last Name</label>
-              <div className="relative">
-                <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
-                <input
-                  type="text"
-                  placeholder="e.g. Rivera"
-                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Email */}
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Institutional email</label>
-            <div className="relative">
-              <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                Last Name
+              </label>
               <input
-                type="email"
-                placeholder="Enter your university email"
-                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="Empalmado"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm px-3.5 transition"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
                 required
               />
             </div>
           </div>
 
-          {/* Role & Program */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Role</label>
-              <div className="relative">
-                <HiBriefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
+          {/* Gmail / Email */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Gmail / Email
+            </label>
+            <div className="relative">
+              <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <input
+                type="email"
+                placeholder="example@gmail.com"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
+                value={studentEmail}
+                onChange={(e) => setStudentEmail(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Program Dropdown */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Program
+            </label>
+            <div className="relative">
+              <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <select
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition appearance-none cursor-pointer"
+                value={selectedProgramId}
+                onChange={(e) => setSelectedProgramId(e.target.value)}
+                required
+              >
+                {programs.length > 0 ? (
+                  programs.map((prog) => (
+                    <option key={prog.id} value={prog.id}>
+                      {prog.name} ({prog.code || prog.id.toUpperCase()})
+                    </option>
+                  ))
+                ) : (
+                  <option value="bsit">Bachelor of Science in Information Technology (BSIT)</option>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {/* Major Dropdown (Dependent on Program) */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Major {availableMajors.length > 0 && <span className="text-red-500">*</span>}
+            </label>
+            <div className="relative">
+              <HiBriefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              {availableMajors.length > 0 ? (
                 <select
-                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition appearance-none cursor-pointer"
+                  value={selectedMajorCode}
+                  onChange={(e) => setSelectedMajorCode(e.target.value)}
                   required
                 >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                  <option value="" disabled>Select Major</option>
+                  {availableMajors.map((major) => (
+                    <option key={major.code || major.id} value={major.code || major.id}>
+                      {major.name} ({major.code})
+                    </option>
                   ))}
                 </select>
+              ) : (
+                <input
+                  type="text"
+                  disabled
+                  value="Not Applicable"
+                  className="w-full h-11 sm:h-12 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-[#222433] text-gray-400 dark:text-gray-500 rounded-xl text-sm pl-10 pr-3.5 cursor-not-allowed"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Section Dropdown (Admin Controlled, Simple identifiers A, B, C...) */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Section
+            </label>
+            <div className="relative">
+              <select
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm px-3.5 transition appearance-none cursor-pointer font-semibold"
+                value={selectedSectionName}
+                onChange={(e) => setSelectedSectionName(e.target.value)}
+                required
+              >
+                <option value="" disabled>Select Section</option>
+                {availableSections.map((sec) => (
+                  <option key={sec.id || sec.name} value={sec.name}>
+                    Section {sec.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Password & Confirm Password */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                Password
+              </label>
+              <div className="relative">
+                <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-9 transition"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Program</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                Confirm Password
+              </label>
               <div className="relative">
-                <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
-                <select
-                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
-                  value={program}
-                  onChange={(e) => setProgram(e.target.value)}
+                <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-9 transition"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 >
-                  {PROGRAM_OPTIONS.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
+                  {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Conditionally render Specialization for BSIT */}
-          {program === "Bachelor of Science in Information Technology" && (
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Specialization</label>
-              <div className="relative">
-                <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84] pointer-events-none" />
-                <select
-                  className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
-                  value={programSpecialization}
-                  onChange={(e) => setProgramSpecialization(e.target.value)}
-                  required
-                >
-                  {SPECIALIZATION_OPTIONS.map((spec) => (
-                    <option key={spec.value} value={spec.value}>{spec.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Student / Employee ID Number */}
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-11 sm:h-12 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-blue-500/20 active:scale-[0.99] mt-3"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Creating Account...
+              </span>
+            ) : (
+              "Create Account"
+            )}
+          </button>
+        </form>
+      ) : (
+        // ── FACULTY REGISTRATION FORM ──
+        <form onSubmit={handleFacultySubmit} className="space-y-4">
+          {/* Full Name */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">
-              {role === "student" ? "Student ID Number" : "Employee ID Number"}
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Complete Name
+            </label>
+            <div className="relative">
+              <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <input
+                type="text"
+                placeholder="Dr. Maria Santos"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
+                value={facultyName}
+                onChange={(e) => setFacultyName(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Employee ID */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Employee ID Number
             </label>
             <div className="relative">
               <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type="text"
-                placeholder={role === "student" ? "e.g. 2024-1002" : "e.g. EMP-2024"}
-                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-3.5 transition"
-                value={studentIdOrEmployeeId}
-                onChange={(e) => setStudentIdOrEmployeeId(e.target.value)}
+                placeholder="EMP-8821"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition font-mono"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
                 required
               />
             </div>
           </div>
 
-          {/* Password */}
+          {/* Faculty Email */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Password</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Faculty Email
+            </label>
             <div className="relative">
-              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="Create a password (min 6 characters)"
-                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-10 transition"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type="email"
+                placeholder="faculty@university.edu"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
+                value={facultyEmail}
+                onChange={(e) => setFacultyEmail(e.target.value)}
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#6b6f84] hover:text-gray-600 dark:hover:text-[#f3f4f8] transition"
-              >
-                {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
-              </button>
             </div>
           </div>
 
-          {/* Confirm Password */}
+          {/* Department */}
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#9396a8]">Confirm password</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+              Department
+            </label>
             <div className="relative">
-              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="Re-enter your password"
-                className="w-full h-11 bg-white dark:bg-[#0e0f15] border border-gray-300 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:dark:border-blue-500 rounded-lg text-sm pl-10 pr-10 transition"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+              <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+              <select
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition appearance-none cursor-pointer"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
                 required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#6b6f84] hover:text-gray-600 dark:hover:text-[#f3f4f8] transition"
               >
-                {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
-              </button>
+                <option value="Information Technology">Department of Information Technology</option>
+                <option value="Computer Science">Department of Computer Science</option>
+                <option value="Information Systems">Department of Information Systems</option>
+              </select>
             </div>
           </div>
 
-          {/* Submit */}
+          {/* Password & Confirm */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                Password
+              </label>
+              <div className="relative">
+                <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-9 transition"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-9 transition"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-11 bg-primary hover:bg-primary-hover text-white font-medium text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xs"
+            className="w-full h-11 sm:h-12 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-blue-500/20 active:scale-[0.99] mt-3"
           >
             {loading ? (
               <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Signing up...
+                Registering Faculty...
               </span>
             ) : (
-              "Sign up with Email"
+              "Register as Faculty"
             )}
-          </button>
-
-          {/* Divider */}
-          <div className="relative flex items-center py-1">
-            <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
-            <span className="flex-shrink mx-4 text-xs text-gray-400 dark:text-[#6b6f84] font-medium uppercase tracking-wider">or</span>
-            <div className="flex-grow border-t border-gray-200 dark:border-[#222433]" />
-          </div>
-
-          {/* Google Sign Up */}
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const res = await registerWithGoogle("student");
-                if (res?.needsOnboarding) {
-                  navigate(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`);
-                } else {
-                  navigate(returnTo);
-                }
-              } catch (err) {
-                if (err.code !== "auth/popup-closed-by-user") {
-                  setError(err.message || "Google Sign-Up failed.");
-                }
-              }
-            }}
-            className="w-full h-11 px-4 rounded-lg bg-white dark:bg-[#0e0f15] hover:bg-gray-50 dark:hover:bg-[#1c1d28] border border-gray-300 dark:border-[#222433] text-gray-700 dark:text-[#f3f4f8] text-sm font-medium flex items-center justify-center gap-3 transition"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-            </svg>
-            <span>Sign up with Google</span>
           </button>
         </form>
       )}
 
-      <div className="mt-6 text-center text-sm text-gray-500 dark:text-[#9396a8]">
+      {/* Login link */}
+      <div className="mt-5 text-center text-xs sm:text-sm text-gray-500 dark:text-[#9396a8]">
         Already have an account?{" "}
-        <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+        <Link
+          to={isStudent ? "/student/login" : "/faculty/login"}
+          className="text-blue-600 dark:text-blue-400 font-bold hover:underline"
+        >
+          Sign In
+        </Link>
+      </div>
+
+      {/* Switch Portal */}
+      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#222433] text-center text-xs text-gray-400 dark:text-[#6b6f84]">
+        {isStudent ? (
+          <>
+            Are you a Faculty member?{" "}
+            <Link to="/faculty/register" className="text-gray-700 dark:text-gray-300 font-semibold hover:underline">
+              Faculty Registration &rarr;
+            </Link>
+          </>
+        ) : (
+          <>
+            Are you a Student?{" "}
+            <Link to="/student/register" className="text-gray-700 dark:text-gray-300 font-semibold hover:underline">
+              Student Registration &rarr;
+            </Link>
+          </>
+        )}
       </div>
     </AuthLayout>
   );

@@ -130,11 +130,10 @@ export const MyGroup = () => {
 
       const created = await groupService.createGroup({
         name: newGroupName.trim() || undefined,
-        courseId: userProfile.courseId,
-        courseName: course?.name || course?.code || "",
-        sectionId: userProfile.sectionId,
-        sectionName: section?.name || "",
-        yearLevel: userProfile.yearLevel || 4,
+        courseId: userProfile.courseId || "bsit",
+        courseName: course?.name || course?.code || userProfile?.program || "BSIT",
+        sectionId: userProfile.sectionId || "section-a",
+        sectionName: section?.name || userProfile?.sectionName || "A",
         memberIds: [userProfile.uid],
         members: [
           {
@@ -341,11 +340,11 @@ export const MyGroup = () => {
                 Academic Grouping (Auto-Assigned)
               </label>
               <div className="p-3 bg-gray-50 dark:bg-[#1a1b26] rounded-xl border border-gray-200 dark:border-[#222433] text-sm text-gray-700 dark:text-gray-300 flex flex-wrap gap-2">
-                <span><strong>Program:</strong> {course?.name || "N/A"}</span>
+                <span><strong>Program:</strong> {course?.code || userProfile?.programCode || "BSIT"}</span>
                 <span>•</span>
-                <span><strong>Year:</strong> {userProfile?.yearLevel || 4}th Year</span>
+                <span><strong>Major:</strong> {userProfile?.majorCode || (userProfile?.programSpecialization?.includes("WMAD") ? "WMAD" : userProfile?.programSpecialization?.includes("AMG") ? "AMG" : userProfile?.programSpecialization?.includes("SMP") ? "SMP" : userProfile?.programSpecialization) || "N/A"}</span>
                 <span>•</span>
-                <span><strong>Section:</strong> {section?.name || "N/A"}</span>
+                <span><strong>Section:</strong> {section?.name || userProfile?.sectionName || "A"}</span>
               </div>
             </div>
 
@@ -419,7 +418,7 @@ export const MyGroup = () => {
                 </Badge>
               </div>
               <p className="text-gray-500 dark:text-[#9396a8] font-medium text-[11px] sm:text-sm">
-                {course?.name || "Program"} • {userProfile?.yearLevel || group.yearLevel || 4}th Year • {section?.name || "Section"}
+                {course?.code || userProfile?.programCode || "BSIT"} • {userProfile?.majorCode || (userProfile?.programSpecialization?.includes("WMAD") ? "WMAD" : userProfile?.programSpecialization?.includes("AMG") ? "AMG" : userProfile?.programSpecialization?.includes("SMP") ? "SMP" : userProfile?.programSpecialization) || "Major"} • Section {section?.name || userProfile?.sectionName || group.sectionName || "A"}
               </p>
               {group.title && (
                 <p className="text-[13px] sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1 leading-snug">

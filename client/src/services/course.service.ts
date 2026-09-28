@@ -14,6 +14,54 @@ import { Course, CreateCourseInput, UpdateCourseInput } from '../types/course.ty
 
 const COLLECTION_NAME = 'courses';
 
+export const BSIT_SPECIALIZATIONS: Specialization[] = [
+  { id: 'wmad', code: 'WMAD', name: 'Web and Mobile Application Development' },
+  { id: 'amg', code: 'AMG', name: 'Animation and Motion Graphics' },
+  { id: 'smp', code: 'SMP', name: 'Service Management Program' },
+];
+
+export const DEFAULT_PROGRAMS: Course[] = [
+  {
+    id: 'bsit',
+    code: 'BSIT',
+    name: 'Bachelor of Science in Information Technology',
+    departmentId: 'it',
+    active: true,
+    specializations: BSIT_SPECIALIZATIONS,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'bscs',
+    code: 'BSCS',
+    name: 'Bachelor of Science in Computer Science',
+    departmentId: 'cs',
+    active: true,
+    specializations: [],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'bsis',
+    code: 'BSIS',
+    name: 'Bachelor of Science in Information Systems',
+    departmentId: 'is',
+    active: true,
+    specializations: [],
+    createdAt: new Date().toISOString(),
+  },
+];
+
+const enrichCourseWithMajors = (course: Course): Course => {
+  if (course.code?.toUpperCase() === 'BSIT' || course.id?.toLowerCase() === 'bsit') {
+    return {
+      ...course,
+      specializations: (course.specializations && course.specializations.length > 0)
+        ? course.specializations
+        : BSIT_SPECIALIZATIONS,
+    };
+  }
+  return course;
+};
+
 let coursesCache: Course[] | null = null;
 
 export const courseService = {
@@ -21,11 +69,9 @@ export const courseService = {
    * Create a new course.
    */
   async createCourse(input: CreateCourseInput): Promise<Course> {
-    // Generate an ID similar to how seed data is created (e.g. 'bsit')
     const id = input.code.toLowerCase().replace(/[^a-z0-9]/g, '');
     const courseRef = doc(db, COLLECTION_NAME, id);
     
-    // Check if exists
     const docSnap = await getDoc(courseRef);
     if (docSnap.exists()) {
       throw new Error(`Course with code ${input.code} already exists.`);
@@ -41,7 +87,7 @@ export const courseService = {
     
     await setDoc(courseRef, newCourse);
     coursesCache = null; // Invalidate cache
-    return newCourse;
+    return enrichCourseWithMajors(newCourse);
   },
 
   /**
@@ -50,12 +96,20 @@ export const courseService = {
   async getCourseById(id: string): Promise<Course | null> {
     if (coursesCache) {
       const found = coursesCache.find(c => c.id === id);
-      if (found) return found;
+      if (found) return enrichCourseWithMajors(found);
     }
-    const courseRef = doc(db, COLLECTION_NAME, id);
-    const docSnap = await getDoc(courseRef);
-    if (!docSnap.exists()) return null;
-    return docSnap.data() as Course;
+    try {
+      const courseRef = doc(db, COLLECTION_NAME, id);
+      const docSnap = await getDoc(courseRef);
+      if (!docSnap.exists()) {
+        const fallback = DEFAULT_PROGRAMS.find(p => p.id === id || p.code.toLowerCase() === id.toLowerCase());
+        return fallback ? enrichCourseWithMajors(fallback) : null;
+      }
+      return enrichCourseWithMajors(docSnap.data() as Course);
+    } catch (err) {
+      const fallback = DEFAULT_PROGRAMS.find(p => p.id === id || p.code.toLowerCase() === id.toLowerCase());
+      return fallback ? enrichCourseWithMajors(fallback) : null;
+    }
   },
 
   /**
@@ -65,10 +119,17 @@ export const courseService = {
     if (coursesCache && !forceRefresh) {
       return coursesCache;
     }
-    const q = query(collection(db, COLLECTION_NAME), orderBy('name', 'asc'));
-    const querySnap = await getDocs(q);
-    coursesCache = querySnap.docs.map((docSnap) => docSnap.data() as Course);
-    return coursesCache;
+    try {
+      const q = query(collection(db, COLLECTION_NAME), orderBy('name', 'asc'));
+      const querySnap = await getDocs(q);
+      const courses = querySnap.docs.map((docSnap) => enrichCourseWithMajors(docSnap.data() as Course));
+      coursesCache = courses.length > 0 ? courses : DEFAULT_PROGRAMS.map(enrichCourseWithMajors);
+      return coursesCache;
+    } catch (err) {
+      console.warn('[courseService] Falling back to default programs:', err);
+      coursesCache = DEFAULT_PROGRAMS.map(enrichCourseWithMajors);
+      return coursesCache;
+    }
   },
 
   /**

@@ -7,6 +7,7 @@ import { Input } from "../components/ui/Input";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
+import { Modal } from "../components/ui/Modal";
 import {
   HiSquares2X2,
   HiPlus,
@@ -39,6 +40,10 @@ export const Sections = () => {
     active: true,
   });
   const [saving, setSaving] = useState(false);
+
+  // Edit state
+  const [editingSection, setEditingSection] = useState(null);
+  const [updatingSection, setUpdatingSection] = useState(false);
 
   // Spec Form state
   const [isAddingSpec, setIsAddingSpec] = useState(false);
@@ -101,6 +106,27 @@ export const Sections = () => {
       showToast(error.message || "Failed to add section", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEditSectionSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingSection) return;
+    setUpdatingSection(true);
+    try {
+      await sectionService.updateSection(editingSection.id, {
+        name: editingSection.name,
+        specializationId: editingSection.specializationId || null,
+        active: editingSection.active,
+      });
+      showToast("Section updated successfully.");
+      setEditingSection(null);
+      const sectionsData = await sectionService.getSectionsByCourseId(courseId);
+      setSections(sectionsData);
+    } catch (error) {
+      showToast(error.message || "Failed to update section", "error");
+    } finally {
+      setUpdatingSection(false);
     }
   };
 
@@ -368,30 +394,101 @@ export const Sections = () => {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleToggleActive(section)}
-                    title="Toggle Status"
+                  <button
+                    type="button"
+                    onClick={() => setEditingSection({ ...section })}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                    title="Edit Section"
                   >
-                    <HiPencilSquare className="w-4 h-4 text-gray-500" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    <HiPencilSquare className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleDelete(section.id)}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
                     title="Delete Section"
                   >
                     <HiTrash className="w-4 h-4" />
-                  </Button>
+                  </button>
                 </div>
               </TableCell>
             </TableRow>
           ))
         )}
       </DataTable>
+
+      {/* Edit Section Modal */}
+      <Modal
+        isOpen={!!editingSection}
+        onClose={() => setEditingSection(null)}
+        title="Edit Section"
+        icon={HiSquares2X2}
+      >
+        {editingSection && (
+          <form onSubmit={handleEditSectionSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                Section Name
+              </label>
+              <Input
+                value={editingSection.name}
+                onChange={(e) => setEditingSection({ ...editingSection, name: e.target.value })}
+                required
+                placeholder="e.g. BSIT 4A"
+              />
+            </div>
+
+            {course?.specializations?.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                  Specialization / Major
+                </label>
+                <select
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm px-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  value={editingSection.specializationId || ""}
+                  onChange={(e) => setEditingSection({ ...editingSection, specializationId: e.target.value || null })}
+                >
+                  <option value="">No Specialization (General)</option>
+                  {course.specializations.map((spec) => (
+                    <option key={spec.id} value={spec.id}>
+                      {spec.name} ({spec.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-[#12131b] border border-gray-200 dark:border-[#222433]">
+              <div>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white block">Status</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {editingSection.active ? "Section is active and students can join" : "Section is inactive"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSection({ ...editingSection, active: !editingSection.active })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  editingSection.active
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                    : "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+              >
+                {editingSection.active ? "Active" : "Inactive"}
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
+              <Button type="button" variant="outline" onClick={() => setEditingSection(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" isLoading={updatingSection}>
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

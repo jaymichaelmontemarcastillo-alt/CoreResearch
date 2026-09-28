@@ -6,6 +6,7 @@ import { Input } from "../components/ui/Input";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
+import { Modal } from "../components/ui/Modal";
 import {
   HiBookOpen,
   HiPlus,
@@ -34,6 +35,10 @@ export const Courses = () => {
     active: true
   });
   const [saving, setSaving] = useState(false);
+
+  // Edit state
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [updating, setUpdating] = useState(false);
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -75,6 +80,27 @@ export const Courses = () => {
       showToast("Failed to create course.", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingCourse) return;
+    setUpdating(true);
+    try {
+      await courseService.updateCourse(editingCourse.id, {
+        code: editingCourse.code.toUpperCase(),
+        name: editingCourse.name,
+        departmentId: editingCourse.departmentId,
+        active: editingCourse.active
+      });
+      showToast("Course updated successfully.");
+      setEditingCourse(null);
+      fetchCourses();
+    } catch (error) {
+      showToast("Failed to update course.", "error");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -213,40 +239,117 @@ export const Courses = () => {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Link to={`/admin/courses/${course.id}/sections`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      title="View Sections"
-                    >
-                      <HiQueueList className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleToggleActive(course)}
-                    title="Toggle Status"
+                  <Link
+                    to={`/admin/courses/${course.id}/sections`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200/60 dark:border-blue-800/40 transition"
+                    title="View & Manage Sections"
                   >
-                    <HiPencilSquare className="w-4 h-4 text-gray-500" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    <HiQueueList className="w-3.5 h-3.5" />
+                    <span>Sections</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCourse({ ...course })}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                    title="Edit Course"
+                  >
+                    <HiPencilSquare className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleDelete(course.id)}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
                     title="Delete Course"
                   >
                     <HiTrash className="w-4 h-4" />
-                  </Button>
+                  </button>
                 </div>
               </TableCell>
             </TableRow>
           ))
         )}
       </DataTable>
+
+      {/* Edit Course Modal */}
+      <Modal
+        isOpen={!!editingCourse}
+        onClose={() => setEditingCourse(null)}
+        title="Edit Course / Program"
+        icon={HiBookOpen}
+      >
+        {editingCourse && (
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                Course Code
+              </label>
+              <Input
+                value={editingCourse.code}
+                onChange={(e) => setEditingCourse({ ...editingCourse, code: e.target.value.toUpperCase() })}
+                required
+                placeholder="e.g. BSCS"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                Course / Program Name
+              </label>
+              <Input
+                value={editingCourse.name}
+                onChange={(e) => setEditingCourse({ ...editingCourse, name: e.target.value })}
+                required
+                placeholder="e.g. Bachelor of Science in Computer Science"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                Department
+              </label>
+              <select
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm px-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                value={editingCourse.departmentId}
+                onChange={(e) => setEditingCourse({ ...editingCourse, departmentId: e.target.value })}
+              >
+                <option value="cs">Computer Science</option>
+                <option value="it">Information Technology</option>
+                <option value="is">Information Systems</option>
+                <option value="cpe">Computer Engineering</option>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-[#12131b] border border-gray-200 dark:border-[#222433]">
+              <div>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white block">Status</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {editingCourse.active ? "Course is active and visible in registration" : "Course is inactive"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCourse({ ...editingCourse, active: !editingCourse.active })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  editingCourse.active
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                    : "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+              >
+                {editingCourse.active ? "Active" : "Inactive"}
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
+              <Button type="button" variant="outline" onClick={() => setEditingCourse(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" isLoading={updating}>
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

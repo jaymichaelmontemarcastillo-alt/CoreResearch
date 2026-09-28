@@ -1,5 +1,5 @@
 // src/pages/Onboarding.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
@@ -12,10 +12,14 @@ import {
   HiEyeSlash,
   HiBriefcase,
   HiAcademicCap,
+  HiSquares2X2,
 } from "react-icons/hi2";
-import { updatePassword } from "firebase/auth";
+import { updatePassword, signOut } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "../services/firebase";
+import { auth, db } from "../services/firebase";
+import { notificationService } from "../services/notification.service";
+import { userService } from "../services/user.service";
+import { sectionService } from "../services/section.service";
 
 const ROLE_OPTIONS = [
   { value: "student", label: "Student" },
@@ -26,19 +30,21 @@ const PROGRAM_OPTIONS = [
   {
     value: "Bachelor of Science in Information Technology",
     label: "Bachelor of Science in Information Technology",
+    code: "BSIT",
     department: "Information Technology",
   },
   {
     value: "Bachelor of Science in Computer Science",
     label: "Bachelor of Science in Computer Science",
+    code: "BSCS",
     department: "Computer Science",
   },
 ];
 
-const SPECIALIZATION_OPTIONS = [
-  { value: "Web and Mobile Development (WMAD)", label: "Web and Mobile Development (WMAD)" },
-  { value: "Animation and Motion Graphics (AMG)", label: "Animation and Motion Graphics (AMG)" },
-  { value: "Service Management Program (SMP)", label: "Service Management Program (SMP)" },
+const BSIT_MAJOR_OPTIONS = [
+  { value: "Web and Mobile Application Development (WMAD)", label: "Web and Mobile Application Development (WMAD)", code: "WMAD" },
+  { value: "Animation and Motion Graphics (AMG)", label: "Animation and Motion Graphics (AMG)", code: "AMG" },
+  { value: "Service Management Program (SMP)", label: "Service Management Program (SMP)", code: "SMP" },
 ];
 
 export const Onboarding = () => {
@@ -52,8 +58,10 @@ export const Onboarding = () => {
     userProfile?.program || "Bachelor of Science in Information Technology"
   );
   const [programSpecialization, setProgramSpecialization] = useState(
-    userProfile?.programSpecialization || "Web and Mobile Development (WMAD)"
+    userProfile?.programSpecialization || "Web and Mobile Application Development (WMAD)"
   );
+  const [section, setSection] = useState(userProfile?.sectionName || "A");
+  const [availableSections, setAvailableSections] = useState(["A", "B", "C"]);
   const [studentIdOrEmployeeId, setStudentIdOrEmployeeId] = useState(
     userProfile?.studentIdOrEmployeeId || ""
   );
@@ -63,6 +71,22 @@ export const Onboarding = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Fetch sections from database
+  useEffect(() => {
+    const loadSections = async () => {
+      try {
+        const secs = await sectionService.getSectionsByCourseId("bsit", true);
+        if (secs && secs.length > 0) {
+          setAvailableSections(secs.map((s) => s.name));
+          setSection(secs[0].name);
+        }
+      } catch (err) {
+        console.warn("[Onboarding] Error loading sections:", err);
+      }
+    };
+    loadSections();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -79,28 +103,39 @@ export const Onboarding = () => {
           : "Please enter your Employee ID Number."
       );
     }
+
+    if (password.length < 6) {
+      return setError("Password must be at least 6 characters.");
+    }
     
     if (password !== confirmPassword) {
       return setError("Passwords do not match.");
-    }
-    
-    if (password.length < 6) {
-      return setError("Password must be at least 6 characters.");
     }
 
     setLoading(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     const selectedProgObj = PROGRAM_OPTIONS.find((p) => p.value === program);
     const department = selectedProgObj ? selectedProgObj.department : "Information Technology";
+    const programCode = selectedProgObj ? selectedProgObj.code : "BSIT";
 
     try {
       if (currentUser) {
+        // Uniqueness check for Student ID
+        if (role === "student") {
+          const idExists = await userService.checkStudentIdExists(studentIdOrEmployeeId.trim());
+          if (idExists && userProfile?.studentIdOrEmployeeId !== studentIdOrEmployeeId.trim()) {
+            throw new Error("Student ID Already Registered: This Student ID Number is already associated with an account.");
+          }
+        }
+
         await updatePassword(currentUser, password);
         
         const first_name = firstName.trim();
         const last_name = lastName.trim();
 
         const userRef = doc(db, "users", currentUser.uid);
+        const isStudentRole = role === "student";
+
         const profileData = {
           uid: currentUser.uid,
           email: currentUser.email,
@@ -110,24 +145,33 @@ export const Onboarding = () => {
           role: role || "student",
           role_id: role || "student",
           department,
-          department_id: department,
+          department_id: department === "Computer Science" ? "cs" : "it",
           program,
+          programCode,
           programSpecialization: program === "Bachelor of Science in Information Technology" ? programSpecialization : "",
+          majorCode: programSpecialization?.includes("WMAD") ? "WMAD" : programSpecialization?.includes("AMG") ? "AMG" : programSpecialization?.includes("SMP") ? "SMP" : "",
+          sectionName: isStudentRole ? section : "",
           studentIdOrEmployeeId: studentIdOrEmployeeId.trim(),
-          status: "active",
-          is_approved: true,
+          status: isStudentRole ? "pending" : "active",
+          is_approved: isStudentRole ? false : true,
           profile_image: currentUser.photoURL || "",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          needsOnboarding: false,
         };
 
         await setDoc(userRef, profileData, { merge: true });
 
+        // If newly registered student, trigger admin notification and sign out pending approval
+        if (isStudentRole) {
+          await notificationService.notifyAdminsNewStudentRegistration(profileData);
+          await signOut(auth);
+          navigate("/student/login?pending=1");
+          return;
+        }
+
         if (updateProfileLocal) {
-          updateProfileLocal({
-            ...profileData,
-            needsOnboarding: false,
-          });
+          updateProfileLocal(profileData);
         }
       }
 
@@ -163,7 +207,7 @@ export const Onboarding = () => {
               <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <input
                 type="text"
-                placeholder="e.g. Alex"
+                placeholder="e.g. John"
                 className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -177,7 +221,7 @@ export const Onboarding = () => {
               <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <input
                 type="text"
-                placeholder="e.g. Rivera"
+                placeholder="e.g. Empalmado"
                 className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -224,22 +268,41 @@ export const Onboarding = () => {
           </div>
         </div>
 
-        {/* Conditionally render Specialization for BSIT */}
-        {program === "Bachelor of Science in Information Technology" && (
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Specialization</label>
-            <div className="relative">
-              <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-              <select
-                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
-                value={programSpecialization}
-                onChange={(e) => setProgramSpecialization(e.target.value)}
-                required
-              >
-                {SPECIALIZATION_OPTIONS.map((spec) => (
-                  <option key={spec.value} value={spec.value}>{spec.label}</option>
-                ))}
-              </select>
+        {/* Conditionally render Major and Section for Students */}
+        {role === "student" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Major</label>
+              <div className="relative">
+                <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                <select
+                  className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer"
+                  value={programSpecialization}
+                  onChange={(e) => setProgramSpecialization(e.target.value)}
+                  required
+                >
+                  {BSIT_MAJOR_OPTIONS.map((spec) => (
+                    <option key={spec.value} value={spec.value}>{spec.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Section</label>
+              <div className="relative">
+                <HiSquares2X2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                <select
+                  className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3 transition appearance-none cursor-pointer font-semibold"
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                  required
+                >
+                  {availableSections.map((sec) => (
+                    <option key={sec} value={sec}>Section {sec}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -253,8 +316,8 @@ export const Onboarding = () => {
             <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
-              placeholder={role === "student" ? "e.g. 2024-1002" : "e.g. EMP-2024"}
-              className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition"
+              placeholder={role === "student" ? "e.g. 0423-4197" : "e.g. EMP-10482"}
+              className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-3.5 transition font-mono"
               value={studentIdOrEmployeeId}
               onChange={(e) => setStudentIdOrEmployeeId(e.target.value)}
               required
@@ -262,70 +325,71 @@ export const Onboarding = () => {
           </div>
         </div>
 
-        {/* Password */}
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
-          <div className="relative">
-            <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Create a password (min 6 characters)"
-              className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition"
-            >
-              {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
-            </button>
+        {/* Set a Permanent Password */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">New Password</label>
+            <div className="relative">
+              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+              >
+                {showPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm Password</label>
+            <div className="relative">
+              <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="••••••••"
+                className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+              >
+                {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Confirm Password */}
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm password</label>
-          <div className="relative">
-            <HiLockClosed className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Re-enter your password"
-              className="w-full h-11 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-lg text-sm pl-10 pr-10 transition"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition"
-            >
-              {showConfirmPassword ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 bg-primary hover:bg-primary-hover text-white font-medium text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xs"
+          className="w-full h-11 bg-primary hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm mt-5"
         >
           {loading ? (
             <span className="flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              Completing Registration...
+              Saving Profile...
             </span>
           ) : (
-            <span className="flex items-center">
-              Complete Registration <HiArrowRight className="w-4 h-4 ml-2" />
-            </span>
+            <>
+              <span>Complete Setup</span>
+              <HiArrowRight className="w-4 h-4" />
+            </>
           )}
         </button>
       </form>

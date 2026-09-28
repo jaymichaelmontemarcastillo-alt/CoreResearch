@@ -10,6 +10,8 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../services/firebase';
 import api from '../services/api';
+import { userService } from '../services/user.service';
+import { notificationService } from '../services/notification.service';
 
 
 const AuthContext = createContext(null);
@@ -36,32 +38,40 @@ export const AuthProvider = ({ children }) => {
   // kailangan nating i-sync yung UID nila papunta sa backend natin.
   // Dito natin kinukuha yung buong Profile details galing sa Firestore 'users' collection 
   // gamit ang API natin para magamit ng buong app (e.g. for Dashboard at Protected Routes).
+  // Sync profile with Firestore 'users' collection
   const syncProfileWithBackend = async (firebaseUser, defaultRole = 'student') => {
     try {
-      // Fetch directly from Firestore users collection
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
-        // User is fully registered in our database
-        setUserProfile(userDoc.data());
+        const profile = userDoc.data();
+
+        // Enforce approval for student accounts: pending/rejected cannot remain logged in
+        if (profile.role === 'student' && (profile.status === 'pending' || profile.status === 'rejected' || profile.is_approved === false)) {
+          console.warn('[AuthContext] Student account is pending or rejected. Logging out.');
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          return null;
+        }
+
+        setUserProfile(profile);
+        return profile;
       } else {
-        // User account exists in Firebase Auth but NOT in our users collection.
-        // Eto yung scenario na di natapos yung registration o bago silang Google user.
-        // HINDI tayo dapat mag-mock ng full profile. Itatag natin silang needsOnboarding
-        // para ma-redirect sila ng ProtectedRoute papunta sa /onboarding.
         console.warn('[AuthContext] User document not found in Firestore. Marking for onboarding.');
-        
-        setUserProfile({
+        const partialProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           needsOnboarding: true
-        });
+        };
+        setUserProfile(partialProfile);
+        return partialProfile;
       }
     } catch (error) {
       console.error('[AuthContext] Firestore fetch failed:', error.message);
-      // Kung network error or permission error, null profile para hindi mag crash pero safe.
       setUserProfile(null);
+      return null;
     }
   };
 
@@ -75,14 +85,12 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser({ uid: parsed.uid, email: parsed.email });
         setDevMode(true);
         setLoading(false);
-        // We don't return here so that the Firebase listener is still attached.
       } catch (err) {
         localStorage.removeItem('core_research_dev_profile');
       }
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // If dev profile is active, ignore Firebase Auth state changes
       if (localStorage.getItem('core_research_dev_profile')) {
         setLoading(false);
         return;
@@ -103,15 +111,71 @@ export const AuthProvider = ({ children }) => {
 
   // Standard Authentication Actions
 
-  // Normal na login gamit email at password.
-  // Flow: 
-  // 1. Firebase Auth vavalidate yung credentials.
-  // 2. Pag okay, babalik yung `result.user` (may UID).
-  // 3. Ite-trigger yung `syncProfileWithBackend` para kunin ang Firestore 'users' data nila.
-  const login = async (email, password) => {
+  /**
+   * Normal login using email & password.
+   * Supports optional portal check ('student' | 'faculty') and validates account status.
+   */
+  const login = async (email, password, portal = null) => {
     setLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      const normalizedEmail = email.trim();
+      const result = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      
+      // Fetch Firestore profile directly to inspect role & approval
+      const userDocRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const profile = userDoc.data();
+
+        // 1. Validate Portal Role Separation
+        if (portal === 'admin' && profile.role !== 'admin') {
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          throw new Error('Access denied. This portal is strictly for System Administrators only.');
+        }
+
+        if (portal === 'student' && profile.role !== 'student') {
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          throw new Error('This portal is for Students only. Please use the Faculty or Admin Portal to sign in.');
+        }
+
+        if (portal === 'faculty' && profile.role === 'student') {
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          throw new Error('This portal is for Faculty only. Please use the Student Portal to sign in.');
+        }
+
+        // 2. Validate Student Approval Status
+        if (profile.role === 'student') {
+          if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
+            await signOut(auth);
+            setCurrentUser(null);
+            setUserProfile(null);
+            const pendingErr = new Error('Account Pending Approval\nYour account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.');
+            pendingErr.code = 'auth/account-pending';
+            throw pendingErr;
+          }
+
+          if (profile.status === 'rejected') {
+            await signOut(auth);
+            setCurrentUser(null);
+            setUserProfile(null);
+            const rejectedErr = new Error('Registration Not Approved\nYour registration was not approved by the administrator.');
+            rejectedErr.code = 'auth/account-rejected';
+            throw rejectedErr;
+          }
+        }
+
+        setUserProfile(profile);
+        setCurrentUser(result.user);
+        return { result, profile };
+      }
+
       await syncProfileWithBackend(result.user);
       return result;
     } catch (error) {
@@ -121,47 +185,168 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Dito kino-create yung Firebase Authentication account ng bagong user.
-  // Pag successful, ginagamit yung returned UID para ma-identify yung user sa backend.
-  // Connected ito sa Register page. Kahit incomplete pa yung ibang details (kasi sa Onboarding pa yun),
-  // gagawa na tayo ng record sa backend/Firestore via API para may connection na.
-  const register = async (email, password, fullName, role, department, studentIdOrEmployeeId, program = '', programSpecialization = '') => {
+  /**
+   * Dedicated Student Registration:
+   * Fields: Student ID, Complete Name, Gmail/Email, Program, Major, Section, Password.
+   * Excludes Year Level completely.
+   * Creates account with status = 'pending', is_approved = false.
+   * Generates admin notification and logs out immediately.
+   */
+  const registerStudent = async ({
+    email,
+    password,
+    fullName,
+    firstName,
+    lastName,
+    studentId,
+    program,
+    programCode,
+    major,
+    majorCode,
+    section,
+    sectionId,
+  }) => {
     setLoading(true);
     try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      
-      const nameParts = (fullName || '').trim().split(' ');
-      const first_name = nameParts[0] || 'User';
-      const last_name = nameParts.slice(1).join(' ') || '';
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedStudentId = studentId.trim();
 
-      // Register record directly to Firestore users collection
-      try {
-        const userRef = doc(db, 'users', result.user.uid);
-        const userProfileData = {
-          uid: result.user.uid,
-          email,
-          first_name,
-          last_name,
-          fullName: `${first_name} ${last_name}`.trim(),
-          role: role || 'student',
-          role_id: role || 'student',
-          department: department || 'Information Technology',
-          department_id: department || 'Information Technology',
-          program: program || '',
-          programSpecialization: programSpecialization || '',
-          studentIdOrEmployeeId: studentIdOrEmployeeId || '',
-          status: 'active',
-          is_approved: true,
-          profile_image: result.user.photoURL || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        await setDoc(userRef, userProfileData, { merge: true });
-      } catch (dbErr) {
-        console.warn('[AuthContext] Firestore registration warning:', dbErr.message);
+      // 1. Check unique Student ID
+      const studentIdExists = await userService.checkStudentIdExists(normalizedStudentId);
+      if (studentIdExists) {
+        const idErr = new Error("Student ID Already Registered\nThis Student ID Number is already associated with an account.");
+        idErr.code = "auth/student-id-exists";
+        throw idErr;
       }
 
-      await syncProfileWithBackend(result.user, role || 'student');
+      // 2. Check unique Email
+      const emailExists = await userService.checkEmailExists(normalizedEmail);
+      if (emailExists) {
+        const emailErr = new Error("Email Already Registered\nAn account with this email address already exists.");
+        emailErr.code = "auth/email-already-in-use";
+        throw emailErr;
+      }
+
+      // 3. Create Firebase Auth user
+      const result = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+
+      const fName = (firstName?.trim() || fullName?.trim().split(' ')[0] || 'Student');
+      const lName = (lastName?.trim() || fullName?.trim().split(' ').slice(1).join(' ') || '');
+      const completeName = (fullName?.trim() || `${fName} ${lName}`).trim();
+
+      const userProfileData = {
+        uid: result.user.uid,
+        email: normalizedEmail,
+        first_name: fName,
+        last_name: lName,
+        fullName: completeName,
+        studentIdOrEmployeeId: normalizedStudentId,
+        program: program || 'Bachelor of Science in Information Technology',
+        programCode: programCode || 'BSIT',
+        programSpecialization: major || '',
+        majorCode: majorCode || '',
+        sectionName: section || 'A',
+        sectionId: sectionId || '',
+        role: 'student',
+        role_id: 'student',
+        department: 'Information Technology',
+        department_id: 'it',
+        status: 'pending',
+        is_approved: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // 4. Save directly into Firestore users collection
+      const userRef = doc(db, 'users', result.user.uid);
+      await setDoc(userRef, userProfileData);
+
+      // 5. Notify all system administrators
+      await notificationService.notifyAdminsNewStudentRegistration({
+        uid: result.user.uid,
+        fullName: completeName,
+        studentIdOrEmployeeId: normalizedStudentId,
+        email: normalizedEmail,
+        program: userProfileData.program,
+        programCode: userProfileData.programCode,
+        programSpecialization: userProfileData.programSpecialization,
+        majorCode: userProfileData.majorCode,
+        sectionName: userProfileData.sectionName,
+      });
+
+      // 6. Sign out immediately so pending student cannot enter the dashboard
+      await signOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+
+      return { success: true, pendingApproval: true, studentData: userProfileData };
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Dedicated Faculty Registration:
+   * Keeps existing faculty fields without student-specific fields.
+   */
+  const registerFaculty = async ({
+    email,
+    password,
+    fullName,
+    firstName,
+    lastName,
+    employeeId,
+    department,
+    role = 'adviser',
+  }) => {
+    setLoading(true);
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedEmployeeId = employeeId.trim();
+
+      // Check unique employee id
+      const empExists = await userService.checkStudentIdExists(normalizedEmployeeId);
+      if (empExists) {
+        throw new Error("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
+      }
+
+      // Check unique email
+      const emailExists = await userService.checkEmailExists(normalizedEmail);
+      if (emailExists) {
+        const emailErr = new Error("Email Already Registered\nAn account with this email address already exists.");
+        emailErr.code = "auth/email-already-in-use";
+        throw emailErr;
+      }
+
+      const result = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+
+      const fName = (firstName?.trim() || fullName?.trim().split(' ')[0] || 'Faculty');
+      const lName = (lastName?.trim() || fullName?.trim().split(' ').slice(1).join(' ') || '');
+      const completeName = (fullName?.trim() || `${fName} ${lName}`).trim();
+
+      const userProfileData = {
+        uid: result.user.uid,
+        email: normalizedEmail,
+        first_name: fName,
+        last_name: lName,
+        fullName: completeName,
+        studentIdOrEmployeeId: normalizedEmployeeId,
+        role: role || 'adviser',
+        role_id: role || 'adviser',
+        department: department || 'Information Technology',
+        department_id: department || 'it',
+        status: 'active',
+        is_approved: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const userRef = doc(db, 'users', result.user.uid);
+      await setDoc(userRef, userProfileData);
+
+      await syncProfileWithBackend(result.user, role || 'adviser');
       return result;
     } catch (error) {
       throw error;
@@ -170,13 +355,32 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // General legacy register (for backwards compatibility)
+  const register = async (email, password, fullName, role, department, studentIdOrEmployeeId, program = '', programSpecialization = '', sectionName = 'A') => {
+    if (role === 'student') {
+      return registerStudent({
+        email,
+        password,
+        fullName,
+        studentId: studentIdOrEmployeeId,
+        program,
+        major: programSpecialization,
+        section: sectionName,
+      });
+    } else {
+      return registerFaculty({
+        email,
+        password,
+        fullName,
+        employeeId: studentIdOrEmployeeId,
+        department,
+        role: role || 'adviser',
+      });
+    }
+  };
+
   // Google Auth — Direct Log In
-  // Flow:
-  // 1. Popup Google authentication.
-  // 2. Checks Firestore 'users' collection to see if user has already registered.
-  // 3. If account does NOT exist, signs out immediately and throws an error asking user to register.
-  // 4. If account exists, logs in directly.
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (portal = null) => {
     setLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -186,6 +390,50 @@ export const AuthProvider = ({ children }) => {
       
       if (userDoc.exists()) {
         const profile = userDoc.data();
+
+        // 1. Role portal separation
+        if (portal === 'admin' && profile.role !== 'admin') {
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          throw new Error('Access denied. This portal is strictly for System Administrators only.');
+        }
+
+        if (portal === 'student' && profile.role !== 'student') {
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          throw new Error('This portal is for Students only. Please use the Faculty or Admin Portal to sign in.');
+        }
+
+        if (portal === 'faculty' && profile.role === 'student') {
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+          throw new Error('This portal is for Faculty only. Please use the Student Portal to sign in.');
+        }
+
+        // 2. Student approval status
+        if (profile.role === 'student') {
+          if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
+            await signOut(auth);
+            setCurrentUser(null);
+            setUserProfile(null);
+            const pendingErr = new Error('Account Pending Approval\nYour account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.');
+            pendingErr.code = 'auth/account-pending';
+            throw pendingErr;
+          }
+
+          if (profile.status === 'rejected') {
+            await signOut(auth);
+            setCurrentUser(null);
+            setUserProfile(null);
+            const rejectedErr = new Error('Registration Not Approved\nYour registration was not approved by the administrator.');
+            rejectedErr.code = 'auth/account-rejected';
+            throw rejectedErr;
+          }
+        }
+
         if (!profile.studentIdOrEmployeeId || profile.studentIdOrEmployeeId === 'GOOGLE-USER') {
           profile.needsOnboarding = true;
         } else {
@@ -211,10 +459,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Google Auth — Registration
-  // Flow:
-  // 1. Popup Google authentication.
-  // 2. If user already exists, logs them in directly.
-  // 3. If new user, creates an initial profile marked with needsOnboarding = true to proceed to Onboarding.
   const registerWithGoogle = async (defaultRole = 'student') => {
     setLoading(true);
     try {
@@ -245,10 +489,10 @@ export const AuthProvider = ({ children }) => {
         role: defaultRole,
         role_id: defaultRole,
         department: 'Information Technology',
-        department_id: 'Information Technology',
+        department_id: 'it',
         studentIdOrEmployeeId: '',
-        status: 'active',
-        is_approved: true,
+        status: defaultRole === 'student' ? 'pending' : 'active',
+        is_approved: defaultRole === 'student' ? false : true,
         profile_image: result.user.photoURL || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -415,6 +659,8 @@ export const AuthProvider = ({ children }) => {
     devMode,
     login,
     register,
+    registerStudent,
+    registerFaculty,
     loginWithGoogle,
     registerWithGoogle,
     logout,

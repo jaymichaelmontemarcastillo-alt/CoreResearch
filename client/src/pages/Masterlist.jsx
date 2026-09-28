@@ -115,11 +115,11 @@ export const Masterlist = () => {
   });
 
   const tableColumns = [
-    { label: "Student Name", className: "min-w-[200px]" },
-    { label: "Student Number", className: "min-w-[140px]" },
-    { label: "Program", className: "min-w-[160px]" },
-    { label: "Year Level", className: "min-w-[110px]" },
-    { label: "Section", className: "min-w-[110px]" },
+    { label: "Student ID", className: "min-w-[130px]" },
+    { label: "Name", className: "min-w-[200px]" },
+    { label: "Program", className: "min-w-[120px]" },
+    { label: "Major", className: "min-w-[140px]" },
+    { label: "Section", className: "min-w-[90px]" },
     { label: "Group Status", className: "min-w-[170px]" },
   ];
 
@@ -174,7 +174,7 @@ export const Masterlist = () => {
       <PageHeader
         icon={HiClipboardDocumentList}
         title="Section Masterlist"
-        description={`Class directory for ${course?.name || course?.code || "Program"} • ${userProfile?.yearLevel || 4}th Year • ${section?.name || "Section"}`}
+        description={`Class directory for ${course?.code || userProfile?.programCode || "BSIT"} • ${userProfile?.majorCode || userProfile?.programSpecialization || "Major"} • Section ${section?.name || userProfile?.sectionName || "A"}`}
       />
 
       {/* Info Stats Bar — compact horizontal on mobile */}
@@ -273,11 +273,12 @@ export const Masterlist = () => {
                 student.studentIdOrEmployeeId ||
                 student.studentId ||
                 student.studentNumber ||
-                "N/A";
+                "—";
               const programDisplay =
-                course?.code || course?.name || student.department || "BSIT";
-              const yearLevelDisplay = `${student.yearLevel || userProfile.yearLevel || 4}th Year`;
-              const sectionDisplay = section?.name || "A";
+                student.programCode || course?.code || (student.program?.includes("Information Technology") ? "BSIT" : student.program) || "BSIT";
+              const majorDisplay =
+                student.majorCode || (student.programSpecialization?.includes("WMAD") ? "WMAD" : student.programSpecialization?.includes("AMG") ? "AMG" : student.programSpecialization?.includes("SMP") ? "SMP" : student.programSpecialization) || "—";
+              const sectionDisplay = section?.name || student.sectionName || "A";
 
               return (
                 <TableRow
@@ -288,6 +289,14 @@ export const Masterlist = () => {
                       : "hover:bg-gray-50/70 dark:hover:bg-[#1a1b26]/50"
                   }`}
                 >
+                  {/* 1. Student ID */}
+                  <TableCell>
+                    <span className="font-mono text-xs font-bold text-gray-800 dark:text-gray-200">
+                      {studentNumber}
+                    </span>
+                  </TableCell>
+
+                  {/* 2. Name */}
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <div
@@ -316,26 +325,29 @@ export const Masterlist = () => {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <span className="font-mono text-xs text-gray-700 dark:text-gray-300">
-                      {studentNumber}
-                    </span>
-                  </TableCell>
+
+                  {/* 3. Program */}
                   <TableCell>
                     <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
                       {programDisplay}
                     </span>
                   </TableCell>
+
+                  {/* 4. Major */}
                   <TableCell>
-                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                      {yearLevelDisplay}
+                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                      {majorDisplay}
                     </span>
                   </TableCell>
+
+                  {/* 5. Section */}
                   <TableCell>
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
                       {sectionDisplay}
                     </span>
                   </TableCell>
+
+                  {/* 6. Group Status */}
                   <TableCell>
                     {groupInfo.inGroup ? (
                       <div className="flex items-center gap-1.5">

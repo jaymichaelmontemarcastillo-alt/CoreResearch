@@ -8,6 +8,7 @@ export interface AppNotification {
   type: NotificationType;
   read: boolean;
   linkUrl?: string;
+  relatedStudentId?: string;
   createdAt: string;
 }
 
@@ -17,4 +18,5 @@ export interface CreateNotificationInput {
   message: string;
   type: NotificationType;
   linkUrl?: string;
+  relatedStudentId?: string;
 }

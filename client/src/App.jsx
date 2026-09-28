@@ -51,8 +51,14 @@ export default function App() {
             <NetworkStatus />
             <Routes>
               {/* Public Auth Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+              <Route path="/login" element={<Login portal="student" />} />
+              <Route path="/register" element={<Register portal="student" />} />
+              <Route path="/student/login" element={<Login portal="student" />} />
+              <Route path="/student/register" element={<Register portal="student" />} />
+              <Route path="/faculty/login" element={<Login portal="faculty" />} />
+              <Route path="/faculty/register" element={<Register portal="faculty" />} />
+              <Route path="/admin/login" element={<Login portal="admin" />} />
+              <Route path="/admin-login" element={<Login portal="admin" />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
 
@@ -75,23 +81,25 @@ export default function App() {
                     <Route path="/my-group" element={<MyGroup />} />
                     <Route path="/masterlist" element={<Masterlist />} />
                     <Route path="/advisers" element={<AdvisersList />} />
+                    <Route path="/submit-title" element={<SubmitTitle />} />
+                    <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
+                    <Route path="/workspace" element={<StudentResearchWorkspace />} />
                   </Route>
 
-                  {/* Title & Adviser Matching Routes */}
-                  <Route path="/submit-title" element={<SubmitTitle />} />
+                  {/* Adviser & Faculty specific */}
+                  <Route element={<ProtectedRoute allowedRoles={['adviser', 'faculty', 'research_coordinator', 'admin']} />}>
+                    <Route path="/advisees" element={<AdviserAdvisees />} />
+                    <Route path="/adviser-requests" element={<AdviserRequests />} />
+                    <Route path="/faculty/workspace/:id" element={<FacultyWorkspaceView />} />
+                  </Route>
 
-                  {/* Research Projects & Workspace */}
+                  {/* Shared Research & Panelist Routes */}
                   <Route path="/projects" element={<Projects />} />
-                  <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
-                  <Route path="/workspace" element={<StudentResearchWorkspace />} />
-                  <Route path="/advisees" element={<AdviserAdvisees />} />
-                  <Route path="/adviser-requests" element={<AdviserRequests />} />
-                  <Route path="/faculty/workspace/:id" element={<FacultyWorkspaceView />} />
                   <Route path="/panelists" element={<Panelists />} />
                   <Route path="/panelist/defendees" element={<PanelistDefendees />} />
 
                   {/* Real-time Documents Editor */}
-                  <Route path="/documents" element={<Documents />} />
+                  <Route path="/documents" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/documents/:id" element={<DocumentEditorPage />} />
 
                   {/* Reviews */}

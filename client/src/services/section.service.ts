@@ -35,29 +35,66 @@ export const sectionService = {
   },
 
   /**
+   * Helper to normalize section name removing any old year level prefix (e.g. "3A" -> "A")
+   */
+  normalizeSectionName(name: string): string {
+    if (!name) return '';
+    const trimmed = name.trim().toUpperCase();
+    const match = trimmed.match(/^[1-5]?([A-Z])$/);
+    if (match) return match[1];
+    return trimmed;
+  },
+
+  /**
    * Fetch all sections globally.
    */
   async getAllSections(): Promise<Section[]> {
-    const q = query(collection(db, COLLECTION_NAME));
-    const querySnap = await getDocs(q);
-    const sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
-    return sections.sort((a, b) => a.name.localeCompare(b.name));
+    try {
+      const q = query(collection(db, COLLECTION_NAME));
+      const querySnap = await getDocs(q);
+      const sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
+      return sections.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (err) {
+      console.warn('[sectionService] getAllSections error:', err);
+      return [];
+    }
   },
 
   /**
    * Fetch sections by course ID.
+   * If none are configured in Firestore yet, returns default section letters (A, B, C).
    */
-  async getSectionsByCourseId(courseId: string): Promise<Section[]> {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('courseId', '==', courseId)
-    );
-    // Note: To use orderBy with where, an index might be required in Firestore.
-    // For simplicity, we fetch and sort on the client, or just let it return unordered if no index.
-    const querySnap = await getDocs(q);
-    const sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
-    // Client-side sort by name
-    return sections.sort((a, b) => a.name.localeCompare(b.name));
+  async getSectionsByCourseId(courseId: string, activeOnly = false): Promise<Section[]> {
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('courseId', '==', courseId)
+      );
+      const querySnap = await getDocs(q);
+      let sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
+
+      if (activeOnly) {
+        sections = sections.filter(s => s.active !== false);
+      }
+
+      if (sections.length > 0) {
+        return sections.sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      // Default baseline admin sections (A, B, C) if database has not been seeded yet
+      return [
+        { id: `${courseId}-sec-a`, courseId, name: 'A', active: true, createdAt: new Date().toISOString() },
+        { id: `${courseId}-sec-b`, courseId, name: 'B', active: true, createdAt: new Date().toISOString() },
+        { id: `${courseId}-sec-c`, courseId, name: 'C', active: true, createdAt: new Date().toISOString() },
+      ];
+    } catch (err) {
+      console.warn('[sectionService] getSectionsByCourseId error:', err);
+      return [
+        { id: `${courseId}-sec-a`, courseId, name: 'A', active: true, createdAt: new Date().toISOString() },
+        { id: `${courseId}-sec-b`, courseId, name: 'B', active: true, createdAt: new Date().toISOString() },
+        { id: `${courseId}-sec-c`, courseId, name: 'C', active: true, createdAt: new Date().toISOString() },
+      ];
+    }
   },
 
   /**

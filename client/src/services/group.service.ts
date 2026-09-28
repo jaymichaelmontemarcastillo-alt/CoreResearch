@@ -22,6 +22,11 @@ export const groupService = {
    * Enforces One Group Per Student rule and auto-associates academic details.
    */
   async createGroup(input: CreateResearchGroupInput): Promise<ResearchGroup> {
+    // 0. Enforce maximum 3 members rule
+    if (input.memberIds && input.memberIds.length > 3) {
+      throw new Error('Group Limit Exceeded: A research group can have a maximum of 3 members.');
+    }
+
     // 1. Enforce One Group Per Student rule for all initial members
     for (const memberId of input.memberIds) {
       const existing = await this.getGroupByStudentId(memberId);
@@ -58,8 +63,9 @@ export const groupService = {
   /**
    * Add a student member to an existing group.
    * Validates:
-   * 1. Student does not already belong to any research group.
-   * 2. Student is not already in this group.
+   * 1. Group does not already have 3 members.
+   * 2. Student does not already belong to any research group.
+   * 3. Student is not already in this group.
    */
   async addMemberToGroup(
     groupId: string,
@@ -68,6 +74,11 @@ export const groupService = {
     const group = await this.getGroupById(groupId);
     if (!group) {
       throw new Error('Research group not found.');
+    }
+
+    // Validate maximum 3 members rule
+    if ((group.members && group.members.length >= 3) || (group.memberIds && group.memberIds.length >= 3)) {
+      throw new Error('Group is Full: A research group can have a maximum of 3 members.');
     }
 
     // Validate if student is already in this group

@@ -56,24 +56,6 @@ export const GroupActivityCard = ({
   const maxActions = Math.max(...memberStats.map((m) => m.count), 1);
 
   return (
-<<<<<<< HEAD
-    <Card padding={false} className="p-4 sm:p-5 flex flex-col h-full border border-gray-200/90 dark:border-[#222433] bg-white dark:bg-[#15161e] shadow-xs">
-      {/* Header with Title & Filter Buttons */}
-      <div className="space-y-2 border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-          <div>
-            <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-              Group Activity
-            </h3>
-            <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
-              Recent Measurable Actions by Member
-            </p>
-          </div>
-
-          <Badge variant="gray" size="sm" className="text-[10px] py-0 px-1.5">
-            {members.length} {members.length === 1 ? 'Researcher' : 'Researchers'}
-          </Badge>
-=======
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
@@ -87,7 +69,6 @@ export const GroupActivityCard = ({
           <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
             Recent measurable actions by member
           </p>
->>>>>>> 68296efb39d6f1783a2b591ec86554ec12380bd1
         </div>
 
         {/* Filter tabs */}

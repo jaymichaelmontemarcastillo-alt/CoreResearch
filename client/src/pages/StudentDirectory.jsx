@@ -55,7 +55,6 @@ export const StudentDirectory = () => {
   // --- Manual Assign Form State (Legacy/Maintained functionality) ---
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [assignUid, setAssignUid] = useState("");
-  const [yearLevel, setYearLevel] = useState(3);
   const [enrollmentStatus, setEnrollmentStatus] = useState("enrolled");
   const [assigning, setAssigning] = useState(false);
 
@@ -286,7 +285,6 @@ export const StudentDirectory = () => {
       const payload = {
         courseId: selectedCourse,
         sectionId: selectedSection,
-        yearLevel: Number(yearLevel),
         enrollmentStatus,
       };
       if (selectedSpecialization) payload.specializationId = selectedSpecialization;
@@ -344,7 +342,6 @@ export const StudentDirectory = () => {
     { label: "Program", className: "min-w-[100px]" },
     { label: "Specialization", className: "min-w-[130px]" },
     { label: "Section", className: "min-w-[90px]" },
-    { label: "Year Level", className: "min-w-[110px] text-center whitespace-nowrap" },
     { label: "Status", className: "min-w-[110px] text-right" },
   ];
 
@@ -379,17 +376,6 @@ export const StudentDirectory = () => {
                     {u.fullName} ({u.studentIdOrEmployeeId || u.email})
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="w-full md:w-32">
-              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9396a8] mb-1">Year Level</label>
-              <select
-                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-xl text-sm px-3 text-gray-900 dark:text-[#f3f4f8] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
-                value={yearLevel}
-                onChange={(e) => setYearLevel(e.target.value)}
-              >
-                <option value={3}>3rd Year</option>
-                <option value={4}>4th Year</option>
               </select>
             </div>
             <div className="w-full md:w-48">
@@ -636,10 +622,6 @@ export const StudentDirectory = () => {
 
               <TableCell className="max-w-[100px] font-semibold text-gray-700 dark:text-gray-300 truncate">
                 {u.courseId && u.sectionId ? getSectionName(u.courseId, u.sectionId) : "—"}
-              </TableCell>
-
-              <TableCell className="text-center max-w-[110px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                {u.yearLevel ? `${u.yearLevel}${u.yearLevel === 3 ? "rd" : "th"} Year` : "—"}
               </TableCell>
 
               <TableCell className="text-right max-w-[120px]">

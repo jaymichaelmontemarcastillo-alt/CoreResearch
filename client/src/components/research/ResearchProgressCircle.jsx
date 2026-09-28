@@ -50,11 +50,17 @@ export const ResearchProgressCircle = ({
           />
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-medium text-gray-900 dark:text-white tracking-tight" style={{ fontSize: size < 80 ? '1.25rem' : '1.5rem' }}>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span
+            className="font-extrabold text-gray-900 dark:text-white tracking-tight leading-none"
+            style={{ fontSize: `${Math.max(15, Math.round(size * 0.25))}px` }}
+          >
             {validProgress}%
           </span>
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider" style={{ fontSize: size < 80 ? '0.5rem' : '0.625rem', marginTop: size < 80 ? '-2px' : '0' }}>
+          <span
+            className="font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1"
+            style={{ fontSize: `${Math.max(8, Math.round(size * 0.095))}px` }}
+          >
             Done
           </span>
         </div>

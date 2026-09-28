@@ -140,11 +140,7 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   return (
     <header
-<<<<<<< HEAD
-      className="sticky top-0 z-50 h-16 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-6 sm:px-8 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
-=======
       className="sticky top-0 z-50 h-14 sm:h-[76px] sm:pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
->>>>>>> 68296efb39d6f1783a2b591ec86554ec12380bd1
     >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">

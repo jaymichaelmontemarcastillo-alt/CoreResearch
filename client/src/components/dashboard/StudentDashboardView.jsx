@@ -34,7 +34,7 @@ const DashboardCard = ({ children, className = '' }) => (
   </div>
 );
 
-export const StudentDashboardView = () => {
+export const StudentDashboardView = ({ onActiveResearchChange }) => {
   const { userProfile, currentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -69,7 +69,12 @@ export const StudentDashboardView = () => {
           studentUid,
           studentGroup?.id
         );
-        if (isMounted) setWorkspace(ws);
+        if (isMounted) {
+          setWorkspace(ws);
+          if (onActiveResearchChange) {
+            onActiveResearchChange(Boolean(ws));
+          }
+        }
 
         // 3. Resolve ONLYOFFICE Document ID
         let resolvedDocId = ws?.documentId || null;
@@ -432,7 +437,7 @@ export const StudentDashboardView = () => {
               </span>
 
               <h2
-                className="text-xl sm:text-[22px] font-bold text-gray-900 dark:text-white leading-snug line-clamp-2"
+                className="text-xl sm:text-[22px] font-bold text-gray-900 dark:text-white leading-snug break-words"
                 title={workspace.title}
               >
                 {workspace.title || 'Untitled Research'}
@@ -500,17 +505,17 @@ export const StudentDashboardView = () => {
       {/* SECTION 2: Recent Activity (LEFT) + Chart (RIGHT) */}
       {/* ─────────────────────────────────────────────── */}
       {(hasFeed || hasActivityChart) && (
-        <div className={`grid grid-cols-1 gap-5 ${hasFeed && hasActivityChart ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''}`}>
+        <div className={`grid grid-cols-1 gap-5 ${hasFeed && hasActivityChart ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''} items-stretch`}>
           {/* LEFT: Recent Activity Feed */}
           {hasFeed && (
-            <DashboardCard className="p-6">
+            <DashboardCard className="p-5 flex flex-col justify-between">
               <StudentRecentActivityFeed activities={recentActivities} currentUserId={studentUid} loading={loading} />
             </DashboardCard>
           )}
 
           {/* RIGHT: Research Activity Chart */}
           {hasActivityChart && (
-            <DashboardCard className="p-6">
+            <DashboardCard className="p-5 flex flex-col justify-between">
               <ResearchActivityChart dailyActivity={dailyActivity} loading={loading} />
             </DashboardCard>
           )}

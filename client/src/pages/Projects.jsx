@@ -164,7 +164,7 @@ export const Projects = () => {
 
               <div className="pt-2 flex justify-end">
                 <Link
-                  to="/manuscripts"
+                  to="/research/workspace"
                   className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
                 >
                   View Manuscripts & Files <HiArrowRight className="w-3.5 h-3.5" />

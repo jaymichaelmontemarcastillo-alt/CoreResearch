@@ -65,7 +65,7 @@ export const manuscriptDocumentAdapter = {
    * Generate canonical editor navigation route for a document
    */
   getManuscriptEditorUrl(documentId: string): string {
-    if (!documentId) return '/documents';
+    if (!documentId) return '/research/workspace';
     return `/documents/${documentId}`;
   },
 

@@ -44,16 +44,6 @@ export const ManuscriptRevisionsCard = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-<<<<<<< HEAD
-      <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
-        <div>
-          <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-            Manuscript Revisions
-          </h3>
-          <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-[#9396a8]">
-            ONLYOFFICE In-Document Feedback
-=======
       <div className="flex items-start justify-between mb-5">
         <div>
           <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
@@ -61,7 +51,6 @@ export const ManuscriptRevisionsCard = ({
           </h3>
           <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
             In-document feedback
->>>>>>> 68296efb39d6f1783a2b591ec86554ec12380bd1
           </p>
         </div>
         {documentId && (

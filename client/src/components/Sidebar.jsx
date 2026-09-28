@@ -238,6 +238,12 @@ export const Sidebar = ({
           roles: ["admin"],
         },
         {
+          label: "Programs & Sections",
+          path: "/admin/courses",
+          icon: HiSquares2X2,
+          roles: ["admin"],
+        },
+        {
           label: "Students",
           path: "/admin/students",
           icon: HiAcademicCap,
@@ -269,16 +275,11 @@ export const Sidebar = ({
     return currentPath === path;
   };
 
-<<<<<<< HEAD
-  const renderContent = (expanded) => (
-    <div className="relative flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none">
-=======
   const renderContent = (expanded, isMobile = false) => (
-    <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] ${isMobile ? 'rounded-r-2xl' : 'rounded-2xl'} shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none overflow-hidden`}>
->>>>>>> 68296efb39d6f1783a2b591ec86554ec12380bd1
+    <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] ${isMobile ? 'rounded-r-2xl' : 'rounded-2xl'} shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none relative`}>
       {/* HEADER SECTION */}
       {expanded ? (
-        <div className="relative flex items-center justify-between shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-3.5 pr-6">
+        <div className={`relative flex items-center justify-between shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-3.5 ${isMobile ? 'rounded-tr-2xl' : 'rounded-t-2xl'}`}>
           <Link
             to="/dashboard"
             className="flex items-center gap-2.5 min-w-0 overflow-hidden group"
@@ -295,10 +296,10 @@ export const Sidebar = ({
             </span>
           </Link>
 
-          {/* Floating Toggle Button on top-right edge */}
+          {/* Toggle Button cleanly positioned on the right inside header */}
           <button
             onClick={toggleSidebar}
-            className="absolute -right-3.5 top-4.5 z-40 flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-md hover:shadow-lg hover:bg-gray-50 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer"
+            className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-xs hover:shadow-md hover:bg-gray-100 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
             title="Collapse Sidebar"
             aria-label="Collapse Sidebar"
           >
@@ -306,7 +307,7 @@ export const Sidebar = ({
           </button>
         </div>
       ) : (
-        <div className="relative flex items-center justify-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-2">
+        <div className={`relative flex items-center justify-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-2 ${isMobile ? 'rounded-tr-2xl' : 'rounded-t-2xl'}`}>
           <Link
             to="/dashboard"
             className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-colors group"
@@ -319,7 +320,7 @@ export const Sidebar = ({
             />
           </Link>
 
-          {/* Floating Toggle Button on top-right edge */}
+          {/* Floating Toggle Button on top-right edge in collapsed state */}
           <button
             onClick={toggleSidebar}
             className="absolute -right-3.5 top-4.5 z-40 flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-md hover:shadow-lg hover:bg-gray-50 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer"
@@ -473,13 +474,8 @@ export const Sidebar = ({
             className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={onCloseMobile}
           />
-<<<<<<< HEAD
-          <div className="relative w-[275px] h-full z-50 animate-slide-in">
-            {renderContent(true)}
-=======
           <div className="relative w-[260px] h-full z-50 animate-slide-in">
             {renderContent(true, true)}
->>>>>>> 68296efb39d6f1783a2b591ec86554ec12380bd1
           </div>
         </div>
       )}

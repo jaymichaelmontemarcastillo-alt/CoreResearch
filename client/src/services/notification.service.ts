@@ -100,6 +100,56 @@ export const notificationService = {
     const docRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(docRef);
   },
+
+  /**
+   * Notify all system administrators about a new student registration event.
+   */
+  async notifyAdminsNewStudentRegistration(studentData: {
+    uid: string;
+    fullName: string;
+    studentIdOrEmployeeId: string;
+    email: string;
+    program?: string;
+    programCode?: string;
+    programSpecialization?: string;
+    majorCode?: string;
+    sectionName?: string;
+  }): Promise<void> {
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('role', '==', 'admin')
+      );
+      const querySnap = await getDocs(q);
+      const adminUsers = querySnap.docs.map((docSnap) => docSnap.data());
+
+      const now = new Date().toISOString();
+      const programDisplay = studentData.programCode || studentData.program || 'BSIT';
+      const majorDisplay = studentData.majorCode || studentData.programSpecialization || 'None';
+      const sectionDisplay = studentData.sectionName || 'None';
+
+      const notificationPromises = adminUsers.map((admin) => {
+        const docRef = doc(collection(db, COLLECTION_NAME));
+        const notification: AppNotification = {
+          id: docRef.id,
+          userId: admin.uid,
+          title: 'New Student Registration',
+          message: `${studentData.fullName} has registered a new Student account. Student ID: ${studentData.studentIdOrEmployeeId} | Email: ${studentData.email} | Program: ${programDisplay} | Major: ${majorDisplay} | Section: ${sectionDisplay} | Status: Pending Approval`,
+          type: 'system',
+          read: false,
+          relatedId: studentData.uid,
+          relatedStudentId: studentData.uid,
+          link: '/admin/users?tab=pending',
+          createdAt: now,
+        };
+        return setDoc(docRef, notification);
+      });
+
+      await Promise.all(notificationPromises);
+    } catch (error) {
+      console.error('Failed to notify admins of new student registration:', error);
+    }
+  },
 };
 
 export default notificationService;
