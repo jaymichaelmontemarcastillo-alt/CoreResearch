@@ -655,19 +655,17 @@ export const DocumentEditorPage = () => {
               </Button>
 
               {/* Tasks Sidebar Toggle */}
-              {workspace && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsTaskSidebarOpen(!isTaskSidebarOpen)}
-                  className={`p-2 rounded-lg shadow-xs transition-colors ${isTaskSidebarOpen ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'}`}
-                  title={isTaskSidebarOpen ? 'Hide Tasks Panel' : 'Open Tasks Panel'}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTaskSidebarOpen(!isTaskSidebarOpen)}
+                className={`p-2 rounded-lg shadow-xs transition-colors ${isTaskSidebarOpen ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'}`}
+                title={isTaskSidebarOpen ? 'Hide Tasks Panel' : 'Open Tasks Panel'}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </Button>
 
               <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1"></div>
 
@@ -1063,30 +1061,28 @@ export const DocumentEditorPage = () => {
           </div>
 
           {/* Editor Task Sidebar */}
-          {workspace && (
-            <EditorTaskSidebar
-              isOpen={isTaskSidebarOpen}
-              onClose={() => setIsTaskSidebarOpen(false)}
-              workspace={workspace}
-              tasks={tasks}
-              currentUser={currentUser}
-              userProfile={userProfile}
-              isAdviser={isAdviser}
-              isStudent={isStudent}
-              isPanelist={isPanelistMode}
-              activeChapterId={activeChapterId}
-              setActiveChapterId={setActiveChapterId}
-              onTaskStatusChange={handleEditorTaskStatusChange}
-              onTaskReview={handleEditorTaskReview}
-              onNavigateToAnchor={handleNavigateToAnchor}
-              onCreateTask={handleEditorTaskCreate}
-              defenseType={urlDefenseType}
-              existingEval={urlDefenseType === 'proposal_defense' ? existingProposalEval : existingFinalEval}
-              studentProposalEvals={studentProposalEvals}
-              studentFinalEvals={studentFinalEvals}
-              onGradeProposal={(urlDefenseType === 'proposal_defense' || urlDefenseType === 'final_defense') ? () => setIsGradingModalOpen(true) : undefined}
-            />
-          )}
+          <EditorTaskSidebar
+            isOpen={isTaskSidebarOpen}
+            onClose={() => setIsTaskSidebarOpen(false)}
+            workspace={workspace}
+            tasks={tasks}
+            currentUser={currentUser}
+            userProfile={userProfile}
+            isAdviser={isAdviser}
+            isStudent={isStudent}
+            isPanelist={isPanelistMode}
+            activeChapterId={activeChapterId}
+            setActiveChapterId={setActiveChapterId}
+            onTaskStatusChange={handleEditorTaskStatusChange}
+            onTaskReview={handleEditorTaskReview}
+            onNavigateToAnchor={handleNavigateToAnchor}
+            onCreateTask={handleEditorTaskCreate}
+            defenseType={urlDefenseType}
+            existingEval={urlDefenseType === 'proposal_defense' ? existingProposalEval : existingFinalEval}
+            studentProposalEvals={studentProposalEvals}
+            studentFinalEvals={studentFinalEvals}
+            onGradeProposal={(urlDefenseType === 'proposal_defense' || urlDefenseType === 'final_defense') ? () => setIsGradingModalOpen(true) : undefined}
+          />
         </div>
 
         {/* Proposal Defense Grading Modal */}

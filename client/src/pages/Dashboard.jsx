@@ -42,7 +42,7 @@ const formatRelativeTime = (dateStr) => {
 export const Dashboard = () => {
   const { userProfile, currentUser, role, currentFacultyMode, setFacultyMode } = useAuth();
 
-  const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
+  const effectiveRole = role === 'faculty' ? currentFacultyMode : (role === 'research_coordinator' ? 'admin' : role);
   const navigate = useNavigate();
 
   const getGreeting = () => {
@@ -362,8 +362,11 @@ const PanelistDashboardMetrics = () => {
     if (!currentUser?.uid) return;
     const fetchMetrics = async () => {
       try {
-        const groups = await facultyService.getPanelistGroups(currentUser.uid);
-        const defenses = await facultyService.getUpcomingDefenses(currentUser.uid);
+        const { default: dataCache, CACHE_TTL } = await import('../services/dataCache');
+        const [groups, defenses] = await Promise.all([
+          dataCache.getOrFetch(`panelist_groups_${currentUser.uid}`, () => facultyService.getPanelistGroups(currentUser.uid), CACHE_TTL.MODERATE),
+          dataCache.getOrFetch(`panelist_defenses_${currentUser.uid}`, () => facultyService.getUpcomingDefenses(currentUser.uid), CACHE_TTL.MODERATE),
+        ]);
         setMetrics({ defenses: defenses.length, groups: groups.length });
       } catch (e) {
         console.error(e);

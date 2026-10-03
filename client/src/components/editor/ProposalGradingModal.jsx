@@ -91,16 +91,17 @@ export const ProposalGradingModal = ({
   // Pre-fill scores if we have an existing evaluation
   useEffect(() => {
     if (existingEval) {
+      const s = existingEval.scores || {};
       setScores({
-        format: existingEval.scores.format ?? '',
-        researchProblems: existingEval.scores.researchProblems ?? '',
-        relatedLiterature: existingEval.scores.relatedLiterature ?? '',
-        methodology: existingEval.scores.methodology ?? '',
-        presentation: existingEval.scores.presentation ?? '',
-        defense: existingEval.scores.defense ?? '',
-        innovation: existingEval.scores.innovation ?? '',
-        application: existingEval.scores.application ?? '',
-        impact: existingEval.scores.impact ?? '',
+        format: s.format ?? '',
+        researchProblems: s.researchProblems ?? '',
+        relatedLiterature: s.relatedLiterature ?? '',
+        methodology: s.methodology ?? '',
+        presentation: s.presentation ?? '',
+        defense: s.defense ?? '',
+        innovation: s.innovation ?? '',
+        application: s.application ?? '',
+        impact: s.impact ?? '',
       });
     } else {
       setScores(INITIAL_SCORES);
@@ -164,7 +165,7 @@ export const ProposalGradingModal = ({
       // to avoid off-screen culling in html2canvas
       await html2pdf()
         .set({
-          margin: [14, 18, 10, 18], // tight margins to fit 1 page
+          margin: [15, 25, 15, 25], // adjusted to match original reference margins
           filename,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },

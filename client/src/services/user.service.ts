@@ -115,19 +115,19 @@ export const userService = {
   },
 
   /**
-   * Fetch all pending student registrations awaiting admin approval.
+   * Fetch all pending user registrations awaiting admin approval.
    */
-  async getPendingStudents(): Promise<UserProfile[]> {
+  async getPendingUsers(): Promise<UserProfile[]> {
     const allUsers = await this.getAllUsers();
     return allUsers.filter(
-      (u) => u.role === 'student' && (u.status === 'pending' || u.is_approved === false)
+      (u) => u.status === 'pending' || u.is_approved === false
     );
   },
 
   /**
-   * Approve a pending student account.
+   * Approve a pending user account.
    */
-  async approveStudent(uid: string, adminUid: string): Promise<void> {
+  async approveUser(uid: string, adminUid: string): Promise<void> {
     const user = await this.getUserById(uid);
     if (!user) {
       throw new Error('User not found.');
@@ -144,9 +144,9 @@ export const userService = {
   },
 
   /**
-   * Reject a pending student account.
+   * Reject a pending user account.
    */
-  async rejectStudent(uid: string, adminUid: string, reason?: string): Promise<void> {
+  async rejectUser(uid: string, adminUid: string, reason?: string): Promise<void> {
     const user = await this.getUserById(uid);
     if (!user) {
       throw new Error('User not found.');

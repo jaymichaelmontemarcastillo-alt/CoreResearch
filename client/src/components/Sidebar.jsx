@@ -235,13 +235,13 @@ export const Sidebar = ({
           label: "User Directory",
           path: "/admin/users",
           icon: HiUsers,
-          roles: ["admin"],
+          roles: ["admin", "research_coordinator"],
         },
         {
           label: "Programs & Sections",
           path: "/admin/courses",
           icon: HiSquares2X2,
-          roles: ["admin"],
+          roles: ["admin", "research_coordinator"],
         },
         {
           label: "Students",

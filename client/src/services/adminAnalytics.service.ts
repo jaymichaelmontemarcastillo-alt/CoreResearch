@@ -148,24 +148,27 @@ export const adminAnalyticsService = {
    * Fetch all raw database entities concurrently.
    */
   async fetchRawData() {
+    // @ts-ignore
+    const { default: dataCache, CACHE_TTL } = await import('./dataCache');
+    
     const [users, proposals, workspaces, groups, courses] = await Promise.all([
-      userService.getAllUsers().catch((e) => {
+      dataCache.getOrFetch('all_users', () => userService.getAllUsers(), CACHE_TTL.LONG).catch((e: any) => {
         console.warn('[adminAnalytics] Error fetching users:', e);
         return [] as UserProfile[];
       }),
-      titleProposalService.getAllProposals().catch((e) => {
+      dataCache.getOrFetch('all_proposals', () => titleProposalService.getAllProposals(), CACHE_TTL.MODERATE).catch((e: any) => {
         console.warn('[adminAnalytics] Error fetching proposals:', e);
         return [] as TitleProposal[];
       }),
-      researchWorkspaceService.getAllWorkspaces().catch((e) => {
+      dataCache.getOrFetch('all_workspaces', () => researchWorkspaceService.getAllWorkspaces(), CACHE_TTL.MODERATE).catch((e: any) => {
         console.warn('[adminAnalytics] Error fetching workspaces:', e);
         return [] as ManuscriptWorkspace[];
       }),
-      groupService.getAllGroups().catch((e) => {
+      dataCache.getOrFetch('all_groups', () => groupService.getAllGroups(), CACHE_TTL.MODERATE).catch((e: any) => {
         console.warn('[adminAnalytics] Error fetching groups:', e);
         return [] as ResearchGroup[];
       }),
-      courseService.getAllCourses().catch((e) => {
+      dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE).catch((e: any) => {
         console.warn('[adminAnalytics] Error fetching courses:', e);
         return [] as Course[];
       }),

@@ -16,6 +16,7 @@ import {
   HiChevronDown,
   HiChevronUp,
 } from 'react-icons/hi2';
+import { X, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 
 const PRIORITY_STYLES = {
   low: { label: 'Low', variant: 'gray' },

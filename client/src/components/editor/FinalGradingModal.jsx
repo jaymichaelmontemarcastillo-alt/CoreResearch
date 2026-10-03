@@ -93,18 +93,19 @@ export const FinalGradingModal = ({
   // Pre-fill scores if we have an existing evaluation
   useEffect(() => {
     if (existingEval) {
+      const s = existingEval.scores || {};
       setScores({
-        format: existingEval.scores.format ?? '',
-        researchProblems: existingEval.scores.researchProblems ?? '',
-        relatedLiterature: existingEval.scores.relatedLiterature ?? '',
-        methodology: existingEval.scores.methodology ?? '',
-        technicalBackground: existingEval.scores.technicalBackground ?? '',
-        summaryConclusions: existingEval.scores.summaryConclusions ?? '',
-        presentation: existingEval.scores.presentation ?? '',
-        defense: existingEval.scores.defense ?? '',
-        functionality: existingEval.scores.functionality ?? '',
-        usability: existingEval.scores.usability ?? '',
-        reliability: existingEval.scores.reliability ?? '',
+        format: s.format ?? '',
+        researchProblems: s.researchProblems ?? '',
+        relatedLiterature: s.relatedLiterature ?? '',
+        methodology: s.methodology ?? '',
+        technicalBackground: s.technicalBackground ?? '',
+        summaryConclusions: s.summaryConclusions ?? '',
+        presentation: s.presentation ?? '',
+        defense: s.defense ?? '',
+        functionality: s.functionality ?? '',
+        usability: s.usability ?? '',
+        reliability: s.reliability ?? '',
       });
     } else {
       setScores(INITIAL_SCORES);

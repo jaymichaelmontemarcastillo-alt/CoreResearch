@@ -15,9 +15,9 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Pending or rejected student accounts are prevented from accessing any protected routes
-  if (userProfile?.role === 'student' && (userProfile?.status === 'pending' || userProfile?.status === 'rejected' || userProfile?.is_approved === false)) {
-    return <Navigate to="/student/login?pending=1" replace />;
+  // Pending or rejected accounts are prevented from accessing any protected routes
+  if (userProfile?.role !== 'admin' && (userProfile?.status === 'pending' || userProfile?.status === 'rejected' || userProfile?.is_approved === false)) {
+    return <Navigate to="/login?pending=1" replace />;
   }
 
   // Kung ang profile ay naka-flag for onboarding pero wala sila sa /onboarding page, redirect sila dun.

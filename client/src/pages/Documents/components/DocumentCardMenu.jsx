@@ -38,15 +38,7 @@ export const DocumentCardMenu = ({
     };
   }, [isOpen]);
 
-  const handleExportDocx = async (e) => {
-    e.stopPropagation();
-    setIsOpen(false);
-    try {
-      await documentService.exportDocx(document);
-    } catch (err) {
-      console.error('Export DOCX failed:', err);
-    }
-  };
+
 
   const handleExportPdf = async (e) => {
     e.stopPropagation();
@@ -138,15 +130,6 @@ export const DocumentCardMenu = ({
 
           <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
 
-          {/* Export to Word (.docx) */}
-          <button
-            type="button"
-            onClick={handleExportDocx}
-            className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <HiDocument className="w-4 h-4 text-blue-600" />
-            <span>Export as Word (.docx)</span>
-          </button>
 
           {/* Export to PDF (.pdf) */}
           <button

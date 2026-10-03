@@ -28,6 +28,7 @@ import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
 import titleProposalService from '../services/titleProposal.service';
 import { adviserRequestService } from '../services/adviserRequest.service';
 import groupService from '../services/group.service';
+import { documentStore } from '../services/documentStore';
 import gradingService from '../services/grading.service';
 import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
 import { FinalGradingModal } from '../components/editor/FinalGradingModal';
@@ -222,10 +223,23 @@ export const StudentResearchWorkspace = () => {
     if (!isConfirmed) return;
 
     try {
-      // 1. Delete Workspace
+      // 1. Delete all tasks tied to the workspace
+      const tasks = await researchTaskService.getTasksByWorkspace(workspace.id);
+      await Promise.all(tasks.map(t => researchTaskService.deleteTask(t.id)));
+
+      // 2. Delete all feedback/revisions tied to the workspace
+      const feedback = await researchFeedbackService.getFeedbackByWorkspace(workspace.id);
+      await Promise.all(feedback.map(f => researchFeedbackService.deleteFeedback(f.id)));
+
+      // 3. Delete the actual manuscript document
+      if (workspace.documentId) {
+        await documentStore.deleteDocument(workspace.documentId);
+      }
+
+      // 4. Delete Workspace
       await researchWorkspaceService.deleteWorkspace(workspace.id);
       
-      // 2. Fetch Group and clear adviser fields
+      // 5. Fetch Group and clear adviser fields
       const group = await groupService.getGroupByStudentId(currentUser.uid);
       if (group) {
         await groupService.updateGroup(group.id, {
@@ -234,7 +248,7 @@ export const StudentResearchWorkspace = () => {
         });
       }
 
-      // 3. Delete any associated adviser requests
+      // 6. Delete any associated adviser requests
       const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
       for (const req of requests) {
         await adviserRequestService.deleteRequest(req.id);

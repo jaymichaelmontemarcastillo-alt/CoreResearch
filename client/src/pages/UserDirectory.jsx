@@ -152,11 +152,11 @@ export const UserDirectory = () => {
     }
   };
 
-  // ── Admin Approve Pending Student ──
-  const handleApproveStudent = async (u) => {
+  // ── Admin Approve Pending User ──
+  const handleApproveUser = async (u) => {
     const confirmed = await confirm({
-      title: "Approve Student Registration",
-      message: `Are you sure you want to approve registration for ${u.fullName || u.email} (${u.studentIdOrEmployeeId})? This will grant them access to the Student Dashboard.`,
+      title: "Approve User Registration",
+      message: `Are you sure you want to approve registration for ${u.fullName || u.email} (${u.studentIdOrEmployeeId})? This will grant them access to the Dashboard.`,
       confirmText: "Approve",
       variant: "primary",
     });
@@ -165,8 +165,8 @@ export const UserDirectory = () => {
 
     setActionLoadingUid(u.uid);
     try {
-      await userService.approveStudent(u.uid, currentUser?.uid || "admin");
-      showToast(`Student ${u.fullName || u.email} approved successfully.`);
+      await userService.approveUser(u.uid, currentUser?.uid || "admin");
+      showToast(`User ${u.fullName || u.email} approved successfully.`);
       setUsers((prev) =>
         prev.map((user) =>
           user.uid === u.uid
@@ -181,10 +181,10 @@ export const UserDirectory = () => {
     }
   };
 
-  // ── Admin Reject Pending Student ──
-  const handleRejectStudent = async (u) => {
+  // ── Admin Reject Pending User ──
+  const handleRejectUser = async (u) => {
     const confirmed = await confirm({
-      title: "Reject Student Registration",
+      title: "Reject User Registration",
       message: `Are you sure you want to reject the registration of ${u.fullName || u.email}? They will not be able to log in to CoreResearch.`,
       confirmText: "Reject",
       variant: "danger",
@@ -194,8 +194,8 @@ export const UserDirectory = () => {
 
     setActionLoadingUid(u.uid);
     try {
-      await userService.rejectStudent(u.uid, currentUser?.uid || "admin");
-      showToast(`Student registration rejected for ${u.fullName || u.email}.`);
+      await userService.rejectUser(u.uid, currentUser?.uid || "admin");
+      showToast(`User registration rejected for ${u.fullName || u.email}.`);
       setUsers((prev) =>
         prev.map((user) =>
           user.uid === u.uid
@@ -212,16 +212,16 @@ export const UserDirectory = () => {
 
   const facultyRoles = ["adviser", "research_coordinator", "panelist"];
 
-  // Pending students calculation
-  const pendingStudents = users.filter(
-    (u) => u.role === "student" && (u.status === "pending" || u.is_approved === false)
+  // Pending users calculation
+  const pendingUsers = users.filter(
+    (u) => (u.status === "pending" || u.is_approved === false)
   );
 
   // ── Filtering Logic ──
   const filteredUsers = users.filter((u) => {
     // 1. Tab Filter
     if (selectedTab === "pending") {
-      if (u.role !== "student" || (u.status !== "pending" && u.is_approved !== false)) {
+      if (u.status !== "pending" && u.is_approved !== false) {
         return false;
       }
     } else if (selectedTab === "student") {
@@ -310,7 +310,7 @@ export const UserDirectory = () => {
             {
               id: "pending",
               label: "Pending",
-              badge: pendingStudents.length > 0 ? pendingStudents.length : null,
+              badge: pendingUsers.length > 0 ? pendingUsers.length : null,
             },
             { id: "student", label: "Student" },
             { id: "faculty", label: "Faculty" },
@@ -411,7 +411,7 @@ export const UserDirectory = () => {
                       size="xs"
                       variant="primary"
                       disabled={actionLoadingUid === u.uid}
-                      onClick={() => handleApproveStudent(u)}
+                      onClick={() => handleApproveUser(u)}
                       className="!px-3 !py-1 text-xs"
                     >
                       {actionLoadingUid === u.uid ? "Approving..." : "Approve"}
@@ -420,7 +420,7 @@ export const UserDirectory = () => {
                       size="xs"
                       variant="danger"
                       disabled={actionLoadingUid === u.uid}
-                      onClick={() => handleRejectStudent(u)}
+                      onClick={() => handleRejectUser(u)}
                       className="!px-3 !py-1 text-xs"
                     >
                       {actionLoadingUid === u.uid ? "Rejecting..." : "Reject"}
@@ -476,22 +476,28 @@ export const UserDirectory = () => {
 
                 <TableCell>
                   <div className="w-40">
-                    <Select
-                      value={u.role || "student"}
-                      disabled={updatingUid === u.uid}
-                      onChange={(e) => handleRoleChange(u.uid, e.target.value)}
-                      className="rounded-full !py-1.5 font-medium text-gray-700 dark:text-gray-300 text-sm text-center"
-                    >
-                      <option value="student">Student</option>
-                      <optgroup label="Faculty Roles">
-                        <option value="adviser">Adviser</option>
-                        <option value="research_coordinator">Research Coordinator</option>
-                        <option value="panelist">Panelist</option>
-                      </optgroup>
-                      <optgroup label="System Roles">
-                        <option value="admin">Administrator</option>
-                      </optgroup>
-                    </Select>
+                    {u.role === 'student' ? (
+                      <div className="font-medium text-gray-700 dark:text-gray-300 text-sm text-center py-1.5 px-3 border border-transparent">
+                        Student
+                      </div>
+                    ) : (
+                      <Select
+                        value={u.role || "student"}
+                        disabled={updatingUid === u.uid}
+                        onChange={(e) => handleRoleChange(u.uid, e.target.value)}
+                        className="rounded-full !py-1.5 font-medium text-gray-700 dark:text-gray-300 text-sm text-center"
+                      >
+                        <option value="student">Student</option>
+                        <optgroup label="Faculty Roles">
+                          <option value="adviser">Adviser</option>
+                          <option value="research_coordinator">Research Coordinator</option>
+                          <option value="panelist">Panelist</option>
+                        </optgroup>
+                        <optgroup label="System Roles">
+                          <option value="admin">Administrator</option>
+                        </optgroup>
+                      </Select>
+                    )}
                   </div>
                 </TableCell>
 

@@ -94,6 +94,8 @@ export const AdviserDashboardView = () => {
     setLoading(true);
 
     try {
+      const { default: dataCache, CACHE_TTL } = await import('../../services/dataCache');
+
       const [
         adviserGroups,
         adviserWorkspaces,
@@ -102,24 +104,24 @@ export const AdviserDashboardView = () => {
         allCourses,
         allSections,
       ] = await Promise.all([
-        facultyService.getAdviserGroups(currentUser.uid).catch((err) => {
+        dataCache.getOrFetch(`adviser_groups_${currentUser.uid}`, () => facultyService.getAdviserGroups(currentUser.uid), CACHE_TTL.MODERATE).catch((err) => {
           console.warn('[AdviserDashboardView] getAdviserGroups error:', err);
           return [];
         }),
-        researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid).catch((err) => {
+        dataCache.getOrFetch(`adviser_ws_${currentUser.uid}`, () => researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid), CACHE_TTL.MODERATE).catch((err) => {
           console.warn('[AdviserDashboardView] getWorkspaces error:', err);
           return [];
         }),
-        researchTaskService.getTasksByAdviser(currentUser.uid).catch((err) => {
+        dataCache.getOrFetch(`adviser_tasks_${currentUser.uid}`, () => researchTaskService.getTasksByAdviser(currentUser.uid), CACHE_TTL.SHORT).catch((err) => {
           console.warn('[AdviserDashboardView] getTasks error:', err);
           return [];
         }),
-        scheduleService.getAllSchedules().catch((err) => {
+        dataCache.getOrFetch('schedules', () => scheduleService.getAllSchedules(), CACHE_TTL.MODERATE).catch((err) => {
           console.warn('[AdviserDashboardView] getAllSchedules error:', err);
           return [];
         }),
-        courseService.getAllCourses().catch(() => []),
-        sectionService.getAllSections().catch(() => []),
+        dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE).catch(() => []),
+        dataCache.getOrFetch('sections', () => sectionService.getAllSections(), CACHE_TTL.STABLE).catch(() => []),
       ]);
 
       // 1. Map known workspaces by groupId, id, and studentId

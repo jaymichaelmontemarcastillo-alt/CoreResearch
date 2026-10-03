@@ -60,23 +60,36 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     const initData = async () => {
       setLoading(true);
       try {
-        // 1. Fetch Group
-        const studentGroup = await groupService.getGroupByStudentId(studentUid);
-        if (isMounted) setGroup(studentGroup);
+        const { default: dataCache, CACHE_TTL } = await import('../../services/dataCache');
 
-        // 2. Fetch Workspace
-        const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
-          studentUid,
-          studentGroup?.id
-        );
+        // 1. Parallel Fetching for independent data
+        const [studentGroup, courses, allSchedules, docs] = await Promise.all([
+          dataCache.getOrFetch(`group_${studentUid}`, () => groupService.getGroupByStudentId(studentUid), CACHE_TTL.MODERATE),
+          userProfile?.courseId ? dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE) : Promise.resolve([]),
+          dataCache.getOrFetch('schedules', () => scheduleService.getAllSchedules(), CACHE_TTL.MODERATE),
+          dataCache.getOrFetch('user_docs', () => documentStore.fetchDocuments(userProfile), CACHE_TTL.SHORT).catch(() => [])
+        ]);
+
         if (isMounted) {
-          setWorkspace(ws);
-          if (onActiveResearchChange) {
-            onActiveResearchChange(Boolean(ws));
-          }
+          setGroup(studentGroup);
+          setSchedules(allSchedules || []);
         }
 
-        // 3. Resolve ONLYOFFICE Document ID
+        // 2. Dependent fetches: Workspace and Sections
+        const [ws, sections] = await Promise.all([
+          dataCache.getOrFetch(`workspace_${studentUid}`, () => 
+            researchWorkspaceService.getWorkspaceByStudentOrGroup(studentUid, studentGroup?.id), 
+          CACHE_TTL.SHORT),
+          (userProfile?.courseId && userProfile?.sectionId) ? 
+            dataCache.getOrFetch(`sections_${userProfile.courseId}`, () => sectionService.getSectionsByCourseId(userProfile.courseId), CACHE_TTL.STABLE) : Promise.resolve([])
+        ]);
+
+        if (isMounted) {
+          setWorkspace(ws);
+          if (onActiveResearchChange) onActiveResearchChange(Boolean(ws));
+        }
+
+        // 3. Resolve ONLYOFFICE Document ID (requires workspace)
         let resolvedDocId = ws?.documentId || null;
         if (!resolvedDocId && ws) {
           try {
@@ -88,37 +101,21 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
         }
         if (isMounted) setDocumentId(resolvedDocId);
 
-        // 4. Fetch Course / Section name
-        if (userProfile?.courseId) {
-          try {
-            const courses = await courseService.getAllCourses();
-            const course = courses.find((c) => c.id === userProfile.courseId);
-            let sectionName = userProfile.sectionId || '';
-            if (course && userProfile.sectionId) {
-              const sections = await sectionService.getSectionsByCourseId(course.id);
-              const sec = sections.find((s) => s.id === userProfile.sectionId);
-              if (sec) sectionName = sec.name;
-            }
-            if (isMounted) setProgramInfo({ course, sectionName });
-          } catch (e) {}
+        // 4. Set Program Info
+        if (isMounted && userProfile?.courseId) {
+          const course = courses.find((c) => c.id === userProfile.courseId);
+          const sec = sections.find((s) => s.id === userProfile.sectionId);
+          setProgramInfo({ course, sectionName: sec?.name || userProfile.sectionId || '' });
         }
 
-        // 5. Fetch Schedules
-        try {
-          const allSchedules = await scheduleService.getAllSchedules();
-          if (isMounted) setSchedules(allSchedules || []);
-        } catch (e) {
-          console.warn('[StudentDashboardView] Schedules fetch error:', e);
-        }
-
-        // 6. Fetch Documents owned by group or student
-        try {
-          const docs = await documentStore.fetchDocuments(userProfile);
+        // 5. Set Filtered Documents
+        if (isMounted) {
           const filtered = (docs || []).filter(
             (d) => d.ownerId === studentUid || (studentGroup?.id && d.groupId === studentGroup.id)
           );
-          if (isMounted) setGroupDocuments(filtered);
-        } catch (e) {}
+          setGroupDocuments(filtered);
+        }
+
       } catch (err) {
         console.error('[StudentDashboardView] Init error:', err);
       } finally {

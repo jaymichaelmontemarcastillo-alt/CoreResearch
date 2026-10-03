@@ -47,9 +47,9 @@ export const AuthProvider = ({ children }) => {
       if (userDoc.exists()) {
         const profile = userDoc.data();
 
-        // Enforce approval for student accounts: pending/rejected cannot remain logged in
-        if (profile.role === 'student' && (profile.status === 'pending' || profile.status === 'rejected' || profile.is_approved === false)) {
-          console.warn('[AuthContext] Student account is pending or rejected. Logging out.');
+        // Enforce approval for non-admin accounts: pending/rejected cannot remain logged in
+        if (profile.role !== 'admin' && (profile.status === 'pending' || profile.status === 'rejected' || profile.is_approved === false)) {
+          console.warn('[AuthContext] Account is pending or rejected. Logging out.');
           await signOut(auth);
           setCurrentUser(null);
           setUserProfile(null);
@@ -150,8 +150,8 @@ export const AuthProvider = ({ children }) => {
           throw new Error('This portal is for Faculty only. Please use the Student Portal to sign in.');
         }
 
-        // 2. Validate Student Approval Status
-        if (profile.role === 'student') {
+        // 2. Validate Approval Status for non-admins
+        if (profile.role !== 'admin') {
           if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
             await signOut(auth);
             setCurrentUser(null);
@@ -413,8 +413,8 @@ export const AuthProvider = ({ children }) => {
           throw new Error('This portal is for Faculty only. Please use the Student Portal to sign in.');
         }
 
-        // 2. Student approval status
-        if (profile.role === 'student') {
+        // 2. Approval status for non-admins
+        if (profile.role !== 'admin') {
           if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
             await signOut(auth);
             setCurrentUser(null);
@@ -491,8 +491,8 @@ export const AuthProvider = ({ children }) => {
         department: 'Information Technology',
         department_id: 'it',
         studentIdOrEmployeeId: '',
-        status: defaultRole === 'student' ? 'pending' : 'active',
-        is_approved: defaultRole === 'student' ? false : true,
+        status: defaultRole === 'admin' ? 'active' : 'pending',
+        is_approved: defaultRole === 'admin' ? true : false,
         profile_image: result.user.photoURL || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

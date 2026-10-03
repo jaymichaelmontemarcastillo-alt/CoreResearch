@@ -152,8 +152,8 @@ export const Onboarding = () => {
           majorCode: programSpecialization?.includes("WMAD") ? "WMAD" : programSpecialization?.includes("AMG") ? "AMG" : programSpecialization?.includes("SMP") ? "SMP" : "",
           sectionName: isStudentRole ? section : "",
           studentIdOrEmployeeId: studentIdOrEmployeeId.trim(),
-          status: isStudentRole ? "pending" : "active",
-          is_approved: isStudentRole ? false : true,
+          status: "pending",
+          is_approved: false,
           profile_image: currentUser.photoURL || "",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -162,13 +162,16 @@ export const Onboarding = () => {
 
         await setDoc(userRef, profileData, { merge: true });
 
-        // If newly registered student, trigger admin notification and sign out pending approval
+        // Trigger admin notification and sign out pending approval
         if (isStudentRole) {
           await notificationService.notifyAdminsNewStudentRegistration(profileData);
-          await signOut(auth);
-          navigate("/student/login?pending=1");
-          return;
+        } else {
+          // You could add a faculty specific notification here if desired
+          // await notificationService.notifyAdminsNewFacultyRegistration(profileData);
         }
+        await signOut(auth);
+        navigate("/login?pending=1");
+        return;
 
         if (updateProfileLocal) {
           updateProfileLocal(profileData);
