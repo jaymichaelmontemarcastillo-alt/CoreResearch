@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'script-defer',
       devOptions: {
         enabled: true
       },
@@ -43,6 +44,21 @@ export default defineConfig({
   ],
   resolve: {
     dedupe: ['y-prosemirror', 'yjs', '@tiptap/core', '@tiptap/pm']
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('firebase')) return 'vendor-firebase';
+            if (id.includes('html2pdf') || id.includes('jspdf')) return 'vendor-pdf';
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
+            if (id.includes('framer-motion') || id.includes('lucide') || id.includes('recharts')) return 'vendor-ui';
+            return 'vendor-core';
+          }
+        }
+      }
+    }
   },
   server: {
     port: 5173,

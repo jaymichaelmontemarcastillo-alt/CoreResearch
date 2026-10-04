@@ -11,7 +11,18 @@ import { ProposalStatusOverviewChart } from './ProposalStatusOverviewChart';
 import { ResearchCompletionRateChart } from './ResearchCompletionRateChart';
 
 export const AdminAnalyticsSection = () => {
-  const [processed, setProcessed] = useState(null);
+  const [processed, setProcessed] = useState({
+    summary: { totalStudents: 0, activeProjects: 0, pendingReviews: 0, completedProjects: 0 },
+    statusDistribution: [],
+    progressTrend: [],
+    adviserWorkload: [],
+    studentsByProgram: [],
+    proposalOverview: [],
+    completionRate: [],
+    availableAcademicYears: [],
+    availableSemesters: [],
+    availablePrograms: []
+  });
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     academicYear: 'all',
@@ -51,8 +62,6 @@ export const AdminAnalyticsSection = () => {
       program: 'all',
     });
   };
-
-  if (!processed) return null;
 
   return (
     <div className="space-y-6">

@@ -7,6 +7,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
+import dataCache, { CACHE_TTL } from "../services/dataCache";
 import { groupService } from "../services/group.service";
 import titleProposalService from "../services/titleProposal.service";
 import researchWorkspaceService from "../services/researchWorkspace.service";
@@ -89,15 +90,15 @@ export const Dashboard = () => {
       const fetchAcademicInfo = async () => {
         try {
           const [courses, group] = await Promise.all([
-            courseId ? courseService.getAllCourses() : Promise.resolve([]),
-            studentUid ? groupService.getGroupByStudentId(studentUid) : Promise.resolve(null),
+            courseId ? dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE) : Promise.resolve([]),
+            studentUid ? dataCache.getOrFetch(`group_${studentUid}`, () => groupService.getGroupByStudentId(studentUid), CACHE_TTL.MODERATE) : Promise.resolve(null),
           ]);
 
           const course = courses.find((c) => c.id === courseId);
           let sectionName = sectionId || "";
 
           if (course && sectionId) {
-            const sections = await sectionService.getSectionsByCourseId(course.id);
+            const sections = await dataCache.getOrFetch(`sections_${course.id}`, () => sectionService.getSectionsByCourseId(course.id), CACHE_TTL.STABLE);
             const sec = sections.find((s) => s.id === sectionId);
             if (sec) sectionName = sec.name;
           }
