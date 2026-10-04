@@ -40,7 +40,7 @@ export const systemActivityService = {
   /**
    * Fetch recent system activities (aggregating across system collections + system_activities)
    */
-  async getRecentActivities(maxItems: number = 8): Promise<SystemActivity[]> {
+  async getRecentActivities(maxItems: number = 50): Promise<SystemActivity[]> {
     const activities: SystemActivity[] = [];
 
     // 1. Check logged system_activities in Firestore
@@ -207,21 +207,21 @@ export const systemActivityService = {
   /**
    * Subscribe to real-time system activities
    */
-  subscribeRecentActivities(callback: (activities: SystemActivity[]) => void): () => void {
+  subscribeRecentActivities(callback: (activities: SystemActivity[]) => void, maxItems: number = 50): () => void {
     // Initial fetch
-    this.getRecentActivities().then(callback).catch(console.error);
+    this.getRecentActivities(maxItems).then(callback).catch(console.error);
 
     // Also listen to system_activities collection in real-time
     try {
       const q = query(
         collection(db, 'system_activities'),
         orderBy('timestamp', 'desc'),
-        limit(10)
+        limit(maxItems)
       );
       return onSnapshot(
         q,
         () => {
-          this.getRecentActivities().then(callback).catch(console.error);
+          this.getRecentActivities(maxItems).then(callback).catch(console.error);
         },
         () => {
           // Fallback: poll every 30s
