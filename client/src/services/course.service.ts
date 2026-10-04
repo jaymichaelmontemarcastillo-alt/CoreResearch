@@ -10,7 +10,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
-import { Course, CreateCourseInput, UpdateCourseInput } from '../types/course.types';
+import { Course, CreateCourseInput, UpdateCourseInput, Specialization } from '../types/course.types';
 
 const COLLECTION_NAME = 'courses';
 
@@ -18,6 +18,10 @@ export const BSIT_SPECIALIZATIONS: Specialization[] = [
   { id: 'wmad', code: 'WMAD', name: 'Web and Mobile Application Development' },
   { id: 'amg', code: 'AMG', name: 'Animation and Motion Graphics' },
   { id: 'smp', code: 'SMP', name: 'Service Management Program' },
+];
+
+export const BSCS_SPECIALIZATIONS: Specialization[] = [
+  { id: 'is', code: 'IS', name: 'Intelligent Systems' },
 ];
 
 export const DEFAULT_PROGRAMS: Course[] = [
@@ -36,7 +40,7 @@ export const DEFAULT_PROGRAMS: Course[] = [
     name: 'Bachelor of Science in Computer Science',
     departmentId: 'cs',
     active: true,
-    specializations: [],
+    specializations: BSCS_SPECIALIZATIONS,
     createdAt: new Date().toISOString(),
   },
   {
@@ -57,6 +61,14 @@ const enrichCourseWithMajors = (course: Course): Course => {
       specializations: (course.specializations && course.specializations.length > 0)
         ? course.specializations
         : BSIT_SPECIALIZATIONS,
+    };
+  }
+  if (course.code?.toUpperCase() === 'BSCS' || course.id?.toLowerCase() === 'bscs') {
+    return {
+      ...course,
+      specializations: (course.specializations && course.specializations.length > 0)
+        ? course.specializations
+        : BSCS_SPECIALIZATIONS,
     };
   }
   return course;

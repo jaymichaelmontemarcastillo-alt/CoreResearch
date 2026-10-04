@@ -76,6 +76,9 @@ const COURSES_DATA = [
     name: 'Bachelor of Science in Computer Science',
     departmentId: 'cs',
     active: true,
+    specializations: [
+      { id: 'is', code: 'IS', name: 'Intelligent Systems' }
+    ],
     createdAt: new Date().toISOString()
   },
   {

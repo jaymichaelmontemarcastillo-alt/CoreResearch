@@ -15,7 +15,7 @@ import {
   HiCheckCircle,
   HiBuildingOffice2,
 } from "react-icons/hi2";
-import { courseService, BSIT_SPECIALIZATIONS } from "../services/course.service";
+import { courseService, BSIT_SPECIALIZATIONS, BSCS_SPECIALIZATIONS } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 
 export const Register = ({ portal: initialPortal }) => {
@@ -87,6 +87,9 @@ export const Register = ({ portal: initialPortal }) => {
     } else if (selectedProgramId === "bsit" || prog?.code?.toUpperCase() === "BSIT") {
       setAvailableMajors(BSIT_SPECIALIZATIONS);
       setSelectedMajorCode("WMAD");
+    } else if (selectedProgramId === "bscs" || prog?.code?.toUpperCase() === "BSCS") {
+      setAvailableMajors(BSCS_SPECIALIZATIONS);
+      setSelectedMajorCode("IS");
     } else {
       setAvailableMajors([]);
       setSelectedMajorCode("");

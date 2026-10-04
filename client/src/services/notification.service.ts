@@ -140,6 +140,7 @@ export const notificationService = {
           relatedId: studentData.uid,
           relatedStudentId: studentData.uid,
           link: '/admin/users?tab=pending',
+          linkUrl: '/admin/users?tab=pending',
           createdAt: now,
         };
         return setDoc(docRef, notification);
