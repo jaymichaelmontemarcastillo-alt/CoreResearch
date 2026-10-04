@@ -62,8 +62,103 @@ export const scheduleService = {
    * Fetch defense schedules for a specific project.
    */
   async getSchedulesByProject(projectId: string): Promise<DefenseSchedule[]> {
-    const allSchedules = await this.getAllSchedules();
-    return allSchedules.filter(s => s.projectId === projectId);
+    try {
+      const snap = await getDocs(query(collection(db, COLLECTION_NAME), where('projectId', '==', projectId)));
+      const schedules = snap.docs.map(d => ({ id: d.id, ...d.data() } as DefenseSchedule));
+      
+      // Fallback for older records using groupId
+      const snapGroup = await getDocs(query(collection(db, COLLECTION_NAME), where('groupId', '==', projectId)));
+      snapGroup.docs.forEach(d => {
+        if (!schedules.find(s => s.id === d.id)) {
+          schedules.push({ id: d.id, ...d.data() } as DefenseSchedule);
+        }
+      });
+      return schedules;
+    } catch (fsErr) {
+      console.error('[scheduleService] getSchedulesByProject error:', fsErr);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch defense schedules for a student dashboard.
+   */
+  async getSchedulesForStudent(
+    studentId: string, 
+    groupId?: string | null,
+    studentName?: string | null,
+    projectTitle?: string | null
+  ): Promise<DefenseSchedule[]> {
+    try {
+      const schedulesRef = collection(db, COLLECTION_NAME);
+      const queries = [];
+      
+      if (studentId) {
+        queries.push(getDocs(query(schedulesRef, where('studentId', '==', studentId))));
+      }
+      if (groupId) {
+        queries.push(getDocs(query(schedulesRef, where('projectId', '==', groupId))));
+        queries.push(getDocs(query(schedulesRef, where('groupId', '==', groupId))));
+      }
+      if (studentName) {
+        queries.push(getDocs(query(schedulesRef, where('studentName', '==', studentName))));
+      }
+      if (projectTitle) {
+        queries.push(getDocs(query(schedulesRef, where('projectTitle', '==', projectTitle))));
+      }
+
+      const snapshots = await Promise.all(queries);
+      const uniqueSchedules = new Map<string, DefenseSchedule>();
+      
+      snapshots.forEach(snap => {
+        snap.docs.forEach(docSnap => {
+          uniqueSchedules.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as DefenseSchedule);
+        });
+      });
+
+      return Array.from(uniqueSchedules.values());
+    } catch (fsErr) {
+      console.error('[scheduleService] getSchedulesForStudent error:', fsErr);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch defense schedules for an adviser dashboard.
+   */
+  async getSchedulesForAdviser(adviserId: string, groupIds: string[] = []): Promise<DefenseSchedule[]> {
+    try {
+      const schedulesRef = collection(db, COLLECTION_NAME);
+      const queries = [];
+      
+      if (adviserId) {
+        queries.push(getDocs(query(schedulesRef, where('adviserId', '==', adviserId))));
+      }
+      
+      // Firestore 'in' query supports max 10 items. Chunk groupIds if any.
+      if (groupIds && groupIds.length > 0) {
+        const uniqueGroupIds = Array.from(new Set(groupIds));
+        for (let i = 0; i < uniqueGroupIds.length; i += 10) {
+          const chunk = uniqueGroupIds.slice(i, i + 10);
+          queries.push(getDocs(query(schedulesRef, where('projectId', 'in', chunk))));
+          queries.push(getDocs(query(schedulesRef, where('groupId', 'in', chunk))));
+        }
+      }
+
+      const snapshots = await Promise.all(queries);
+      const uniqueSchedules = new Map<string, DefenseSchedule>();
+      
+      snapshots.forEach(snap => {
+        snap.docs.forEach(docSnap => {
+          uniqueSchedules.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as DefenseSchedule);
+        });
+      });
+
+      return Array.from(uniqueSchedules.values());
+    } catch (fsErr) {
+      console.error('[scheduleService] getSchedulesForAdviser error:', fsErr);
+      return [];
+    }
   },
 
   /**

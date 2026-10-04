@@ -49,6 +49,16 @@ export const researchWorkspaceService = {
     }
 
     const now = new Date().toISOString();
+    
+    const d = new Date(now);
+    const year = d.getFullYear();
+    const month = d.getMonth(); // 0 = Jan, 7 = Aug
+    const academicYear = month >= 7 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+    
+    let semester = 'summer';
+    if (month >= 7 && month <= 11) semester = '1st';
+    else if (month >= 0 && month <= 4) semester = '2nd';
+
     const newWorkspace: ManuscriptWorkspace = {
       id: workspaceId,
       proposalId: request.id, // Keeping proposalId field but pointing to request ID for backward compatibility
@@ -57,13 +67,69 @@ export const researchWorkspaceService = {
       studentName: request.studentName || userProfile.fullName || 'Student Researcher',
       groupId: request.groupId || '',
       groupName: request.groupName || 'Research Group',
+      courseId: request.courseId || userProfile.courseId || '',
       adviserId: request.adviserId || '',
       adviserName: request.adviserName || 'Assigned Adviser',
       department: userProfile.department || 'Computer Studies',
+      academicYear,
+      semester,
       status: 'in_progress',
       researchPhase: 'CHAPTERS_1_3',
       sections: DEFAULT_MANUSCRIPT_SECTIONS,
       overallProgress: 0, // Manuscript progress starts at 0% until chapters are completed
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(docRef, stripUndefined(newWorkspace) as ManuscriptWorkspace);
+    return newWorkspace;
+  },
+
+  /**
+   * Get or create a manuscript workspace for an approved proposal / group
+   */
+  async getOrCreateWorkspaceForProposal(
+    proposal: TitleProposal,
+    userProfile: UserProfile,
+    adviserInfo?: { id: string; name: string }
+  ): Promise<ManuscriptWorkspace> {
+    const workspaceId = `ws-${proposal.id}`;
+    const docRef = doc(db, COLLECTION_NAME, workspaceId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data() as ManuscriptWorkspace;
+    }
+
+    const now = new Date().toISOString();
+    
+    const d = new Date(now);
+    const year = d.getFullYear();
+    const month = d.getMonth(); // 0 = Jan, 7 = Aug
+    const academicYear = month >= 7 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+    
+    let semester = 'summer';
+    if (month >= 7 && month <= 11) semester = '1st';
+    else if (month >= 0 && month <= 4) semester = '2nd';
+
+    const newWorkspace: ManuscriptWorkspace = {
+      id: workspaceId,
+      proposalId: proposal.id,
+      title: proposal.title || 'Research Manuscript',
+      studentId: proposal.submittedByUid || userProfile.uid,
+      studentName: proposal.submittedByName || userProfile.fullName || 'Student Researcher',
+      groupId: proposal.groupId || '',
+      groupName: proposal.groupName || 'Research Group',
+      courseId: proposal.courseId || userProfile.courseId || '',
+      adviserId: adviserInfo?.id || '',
+      adviserName: adviserInfo?.name || 'Pending Adviser',
+      department: userProfile.department || 'Computer Studies',
+      academicYear,
+      semester,
+      status: 'in_progress',
+      researchPhase: 'CHAPTERS_1_3',
+      sections: DEFAULT_MANUSCRIPT_SECTIONS,
+      overallProgress: 0,
       createdAt: now,
       updatedAt: now,
     };

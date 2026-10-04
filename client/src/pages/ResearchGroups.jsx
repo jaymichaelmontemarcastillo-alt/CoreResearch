@@ -128,6 +128,23 @@ export const ResearchGroups = () => {
         })
       );
       setAllSectionsByCourse(sectionMap);
+
+      if (coursesData && coursesData.length > 0) {
+        const firstCourse = coursesData[0];
+        setSelectedCourse(firstCourse.id);
+        const courseSections = sectionMap[firstCourse.id] || [];
+        
+        if (firstCourse.specializations && firstCourse.specializations.length > 0) {
+          const firstSpec = firstCourse.specializations[0];
+          setSelectedSpecialization(firstSpec.id);
+          const specSections = courseSections.filter(s => s.specializationId === firstSpec.id);
+          if (specSections.length > 0) {
+            setSelectedSection(specSections[0].id);
+          }
+        } else if (courseSections.length > 0) {
+          setSelectedSection(courseSections[0].id);
+        }
+      }
     } catch (error) {
       console.error("Failed to load initial data:", error);
       showToast("Failed to load initial data.", "error");

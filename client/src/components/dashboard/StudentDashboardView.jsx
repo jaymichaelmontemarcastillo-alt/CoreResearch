@@ -62,11 +62,13 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
       try {
         const { default: dataCache, CACHE_TTL } = await import('../../services/dataCache');
 
-        // 1. Parallel Fetching for independent data
-        const [studentGroup, courses, allSchedules, docs] = await Promise.all([
-          dataCache.getOrFetch(`group_${studentUid}`, () => groupService.getGroupByStudentId(studentUid), CACHE_TTL.MODERATE),
+        // 1. Fetch group first because schedules depends on it
+        const studentGroup = await dataCache.getOrFetch(`group_${studentUid}`, () => groupService.getGroupByStudentId(studentUid), CACHE_TTL.MODERATE);
+
+        // 2. Parallel Fetching for independent data
+        const [courses, allSchedules, docs] = await Promise.all([
           userProfile?.courseId ? dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE) : Promise.resolve([]),
-          dataCache.getOrFetch('schedules', () => scheduleService.getAllSchedules(), CACHE_TTL.MODERATE),
+          dataCache.getOrFetch(`schedules_${studentUid}`, () => scheduleService.getSchedulesForStudent(studentUid, studentGroup?.id, userProfile?.fullName), CACHE_TTL.MODERATE),
           dataCache.getOrFetch('user_docs', () => documentStore.fetchDocuments(userProfile), CACHE_TTL.SHORT).catch(() => [])
         ]);
 

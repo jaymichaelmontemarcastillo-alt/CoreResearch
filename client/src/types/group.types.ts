@@ -25,6 +25,8 @@ export interface ResearchGroup {
   panelistIds?: string[];
   createdAt: string;
   updatedAt: string;
+  academicYear?: string;
+  semester?: string;
 }
 
 export interface CreateResearchGroupInput {

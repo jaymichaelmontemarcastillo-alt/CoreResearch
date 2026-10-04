@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { PageLoadingFallback } from "./ui/PageLoadingFallback";
 
 export const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -50,7 +51,9 @@ export const Layout = () => {
           }`}
         >
           <div className={isDocumentEditor ? "w-full h-full" : "w-full"}>
-            <Outlet />
+            <Suspense fallback={<PageLoadingFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

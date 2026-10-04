@@ -279,7 +279,7 @@ export const Sidebar = ({
     <div className={`flex flex-col h-full bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] ${isMobile ? 'rounded-r-2xl' : 'rounded-2xl'} shadow-xl shadow-gray-200/50 dark:shadow-black/60 select-none relative`}>
       {/* HEADER SECTION */}
       {expanded ? (
-        <div className={`relative flex items-center justify-between shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-3.5 ${isMobile ? 'rounded-tr-2xl' : 'rounded-t-2xl'}`}>
+        <div className={`relative flex items-center justify-between shrink-0 h-16 px-3.5 ${isMobile ? 'rounded-tr-2xl' : 'rounded-t-2xl'}`}>
           <Link
             to="/dashboard"
             className="flex items-center gap-2.5 min-w-0 overflow-hidden group"
@@ -299,35 +299,45 @@ export const Sidebar = ({
           {/* Toggle Button cleanly positioned on the right inside header */}
           <button
             onClick={toggleSidebar}
-            className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-xs hover:shadow-md hover:bg-gray-100 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
-            title="Collapse Sidebar"
-            aria-label="Collapse Sidebar"
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
+            title="Close sidebar"
+            aria-label="Close sidebar"
           >
-            <HiChevronLeft className="w-4 h-4" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
           </button>
         </div>
       ) : (
-        <div className={`relative flex items-center justify-center shrink-0 border-b border-gray-100 dark:border-[#202230] h-16 px-2 ${isMobile ? 'rounded-tr-2xl' : 'rounded-t-2xl'}`}>
-          <Link
-            to="/dashboard"
-            className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-colors group"
-            title="CoreResearch Dashboard"
+        <div className={`relative flex items-center justify-center shrink-0 h-16 px-2 ${isMobile ? 'rounded-tr-2xl' : 'rounded-t-2xl'}`}>
+          <button
+            onClick={toggleSidebar}
+            className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-all group overflow-hidden"
+            title="Open sidebar"
+            aria-label="Open sidebar"
           >
+            {/* Logo shown by default, hidden on hover */}
             <img
               src={logoImg}
               alt="CoreResearch Logo"
-              className="w-8 h-8 object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
+              className="w-8 h-8 object-contain drop-shadow-sm transition-all duration-200 opacity-100 scale-100 group-hover:opacity-0 group-hover:scale-75 absolute"
             />
-          </Link>
-
-          {/* Floating Toggle Button on top-right edge in collapsed state */}
-          <button
-            onClick={toggleSidebar}
-            className="absolute -right-3.5 top-4.5 z-40 flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-[#1c1d28] text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-[#2f3246] shadow-md hover:shadow-lg hover:bg-gray-50 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer"
-            title="Expand Sidebar"
-            aria-label="Expand Sidebar"
-          >
-            <HiChevronRight className="w-4 h-4" />
+            {/* Sidebar icon hidden by default, shown on hover */}
+            <svg 
+              width="22" 
+              height="22" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-all duration-200 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 absolute"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
           </button>
         </div>
       )}

@@ -11,13 +11,7 @@ import { ProposalStatusOverviewChart } from './ProposalStatusOverviewChart';
 import { ResearchCompletionRateChart } from './ResearchCompletionRateChart';
 
 export const AdminAnalyticsSection = () => {
-  const [rawData, setRawData] = useState({
-    users: [],
-    proposals: [],
-    workspaces: [],
-    groups: [],
-    courses: [],
-  });
+  const [processed, setProcessed] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     academicYear: 'all',
@@ -28,14 +22,14 @@ export const AdminAnalyticsSection = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminAnalyticsService.fetchRawData();
-      setRawData(data);
+      const data = await adminAnalyticsService.fetchAnalyticsData(filters);
+      setProcessed(data);
     } catch (err) {
       console.error('[AdminAnalyticsSection] loadData error:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   useEffect(() => {
     loadData();
@@ -58,10 +52,7 @@ export const AdminAnalyticsSection = () => {
     });
   };
 
-  // Process data in-memory dynamically when rawData or filters change
-  const processed = useMemo(() => {
-    return adminAnalyticsService.processAnalytics(rawData, filters);
-  }, [rawData, filters]);
+  if (!processed) return null;
 
   return (
     <div className="space-y-6">

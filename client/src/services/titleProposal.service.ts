@@ -46,6 +46,15 @@ export const titleProposalService = {
     const ref = doc(collection(db, COLLECTION));
     const now = new Date().toISOString();
 
+    const d = new Date(now);
+    const year = d.getFullYear();
+    const month = d.getMonth(); // 0 = Jan, 7 = Aug
+    const academicYear = month >= 7 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+    
+    let semester = 'summer';
+    if (month >= 7 && month <= 11) semester = '1st';
+    else if (month >= 0 && month <= 4) semester = '2nd';
+
     const newProposal: TitleProposal = {
       id: ref.id,
       title: input.title,
@@ -67,6 +76,8 @@ export const titleProposalService = {
       courseName: input.courseName,
       sectionId: input.sectionId,
       sectionName: input.sectionName,
+      academicYear,
+      semester,
 
       submittedByUid: input.submittedByUid,
       submittedByName: input.submittedByName,

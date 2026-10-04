@@ -79,6 +79,9 @@ export interface ManuscriptWorkspace {
   adviserId: string;
   adviserName: string;
   department?: string;
+  courseId?: string;
+  academicYear?: string;
+  semester?: string;
   status: ManuscriptWorkspaceStatus;
   researchPhase: ResearchPhase;
   sections: ManuscriptSection[];

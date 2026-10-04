@@ -96,18 +96,21 @@ export const AdviserDashboardView = () => {
     try {
       const { default: dataCache, CACHE_TTL } = await import('../../services/dataCache');
 
+      // 1. Fetch groups first since schedules depends on group IDs
+      const adviserGroups = await dataCache.getOrFetch(`adviser_groups_${currentUser.uid}`, () => facultyService.getAdviserGroups(currentUser.uid), CACHE_TTL.MODERATE).catch((err) => {
+        console.warn('[AdviserDashboardView] getAdviserGroups error:', err);
+        return [];
+      });
+
+      const adviseeGroupIds = (adviserGroups || []).map((g) => g.id).filter(Boolean);
+
       const [
-        adviserGroups,
         adviserWorkspaces,
         adviserTasks,
         allSchedules,
         allCourses,
         allSections,
       ] = await Promise.all([
-        dataCache.getOrFetch(`adviser_groups_${currentUser.uid}`, () => facultyService.getAdviserGroups(currentUser.uid), CACHE_TTL.MODERATE).catch((err) => {
-          console.warn('[AdviserDashboardView] getAdviserGroups error:', err);
-          return [];
-        }),
         dataCache.getOrFetch(`adviser_ws_${currentUser.uid}`, () => researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid), CACHE_TTL.MODERATE).catch((err) => {
           console.warn('[AdviserDashboardView] getWorkspaces error:', err);
           return [];
@@ -116,8 +119,8 @@ export const AdviserDashboardView = () => {
           console.warn('[AdviserDashboardView] getTasks error:', err);
           return [];
         }),
-        dataCache.getOrFetch('schedules', () => scheduleService.getAllSchedules(), CACHE_TTL.MODERATE).catch((err) => {
-          console.warn('[AdviserDashboardView] getAllSchedules error:', err);
+        dataCache.getOrFetch(`schedules_adviser_${currentUser.uid}`, () => scheduleService.getSchedulesForAdviser(currentUser.uid, adviseeGroupIds), CACHE_TTL.MODERATE).catch((err) => {
+          console.warn('[AdviserDashboardView] getSchedulesForAdviser error:', err);
           return [];
         }),
         dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE).catch(() => []),
@@ -204,16 +207,16 @@ export const AdviserDashboardView = () => {
       setSectionsMap(sMap);
 
       // Filter upcoming defenses specifically for this adviser's groups
-      const adviseeGroupIds = new Set(
-        (adviserGroups || []).map((g) => g.id).filter(Boolean)
-      );
+      // The new getSchedulesForAdviser already queries Firestore correctly, but we keep the client filter
+      // as a safety guard to ensure no unrelated schedules bleed through.
+      const adviseeGroupIdsSet = new Set(adviseeGroupIds);
 
       const adviserSchedules = (allSchedules || []).filter((s) => {
         if (s.status === 'cancelled') return false;
         const matchesAdviser = s.adviserId === currentUser.uid;
         const matchesGroup =
-          (s.projectId && adviseeGroupIds.has(s.projectId)) ||
-          (s.groupId && adviseeGroupIds.has(s.groupId));
+          (s.projectId && adviseeGroupIdsSet.has(s.projectId)) ||
+          (s.groupId && adviseeGroupIdsSet.has(s.groupId));
         return matchesAdviser || matchesGroup;
       });
 

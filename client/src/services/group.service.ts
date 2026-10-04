@@ -47,10 +47,21 @@ export const groupService = {
     const groupRef = doc(collection(db, COLLECTION_NAME));
     const now = new Date().toISOString();
     
+    const d = new Date(now);
+    const year = d.getFullYear();
+    const month = d.getMonth(); // 0 = Jan, 7 = Aug
+    const academicYear = month >= 7 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+    
+    let semester = 'summer';
+    if (month >= 7 && month <= 11) semester = '1st';
+    else if (month >= 0 && month <= 4) semester = '2nd';
+
     const newGroup: ResearchGroup = {
       id: groupRef.id,
       name,
       ...input,
+      academicYear,
+      semester,
       status: input.memberIds.length >= 3 ? 'ready' : 'incomplete',
       createdAt: now,
       updatedAt: now,

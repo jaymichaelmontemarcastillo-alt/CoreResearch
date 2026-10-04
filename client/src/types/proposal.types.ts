@@ -54,6 +54,8 @@ export interface TitleProposal {
   courseName: string;             // e.g. "BSIT"
   sectionId: string;
   sectionName: string;            // e.g. "Section A"
+  academicYear?: string;
+  semester?: string;
 
   // ── Submission tracking ──
   submittedByUid: string;         // which member clicked submit
