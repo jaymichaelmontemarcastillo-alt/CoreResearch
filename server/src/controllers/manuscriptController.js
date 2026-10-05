@@ -1110,6 +1110,8 @@ export const addManuscriptFeedback = async (req, res) => {
 /**
  * Publish manuscript directly to Institutional Repository
  */
+import { getStorageProvider } from '../services/storage/storageManager.js';
+
 export const publishManuscriptToRepository = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1137,6 +1139,22 @@ export const publishManuscriptToRepository = async (req, res) => {
       manuscript = { id: doc.id, ...doc.data(), status: 'published' };
     }
 
+    let finalPdfUrl = manuscript.fileUrl || '';
+
+    if (finalPdfUrl && finalPdfUrl.startsWith('data:application/pdf;base64,')) {
+      try {
+        const base64Data = finalPdfUrl.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        const storage = getStorageProvider();
+        const storageKey = `repository/repo-${Date.now()}.pdf`;
+        const uploadResult = await storage.upload(storageKey, buffer, 'application/pdf');
+        finalPdfUrl = uploadResult.url;
+      } catch (uploadErr) {
+        console.warn('[ManuscriptController] Error uploading base64 pdfUrl to storage:', uploadErr);
+        // Fallback or leave as is (will likely fail firestore if too large)
+      }
+    }
+
     // Insert into repository publications
     const repoPub = {
       id: `repo-${Date.now()}`,
@@ -1149,7 +1167,7 @@ export const publishManuscriptToRepository = async (req, res) => {
       publicationYear: new Date().getFullYear(),
       abstract: manuscript.abstract || 'Institutional Research Publication',
       keywords: manuscript.keywords || ['Research'],
-      pdfUrl: manuscript.fileUrl || '',
+      pdfUrl: finalPdfUrl,
       fileName: manuscript.fileName || 'manuscript.pdf',
       viewsCount: 1,
       downloadsCount: 0,
@@ -1173,6 +1191,40 @@ export const publishManuscriptToRepository = async (req, res) => {
     });
   } catch (error) {
     console.error('[ManuscriptController] publishManuscriptToRepository error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Admin: Delete manuscripts
+ */
+export const deleteAdminManuscripts = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'No manuscript IDs provided.' });
+    }
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      if (map) {
+        ids.forEach(id => map.delete(id));
+      }
+    } else {
+      const batch = db.batch();
+      ids.forEach(id => {
+        const ref = db.collection('manuscript_versions').doc(id);
+        batch.delete(ref);
+      });
+      await batch.commit();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Deleted ${ids.length} manuscript(s) successfully.`
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] deleteAdminManuscripts error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

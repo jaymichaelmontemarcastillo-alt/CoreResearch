@@ -15,7 +15,8 @@ import {
   toggleArchiveManuscript,
   toggleBestThesis,
   addManuscriptFeedback,
-  publishManuscriptToRepository
+  publishManuscriptToRepository,
+  deleteAdminManuscripts
 } from '../controllers/manuscriptController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
@@ -23,6 +24,9 @@ const router = express.Router();
 
 // Admin: Get all manuscripts across all stages
 router.get('/admin/all', verifyToken, requireRole(['admin', 'research_coordinator']), getAllAdminManuscripts);
+
+// Admin: Delete manuscripts
+router.delete('/admin/delete', verifyToken, requireRole(['admin', 'research_coordinator']), deleteAdminManuscripts);
 
 // Admin: Update manuscript metadata & status
 router.patch('/:id/admin-update', verifyToken, requireRole(['admin', 'research_coordinator']), adminUpdateManuscript);

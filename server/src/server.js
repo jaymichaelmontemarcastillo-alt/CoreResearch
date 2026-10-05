@@ -1,5 +1,5 @@
-import dotenv from 'dotenv';
-dotenv.config(); // MUST be first — services read env vars in their constructors
+﻿import dotenv from 'dotenv';
+dotenv.config(); // MUST be first â€” services read env vars in their constructors
 
 import http from 'http';
 import express from 'express';
@@ -74,7 +74,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Public Client Config Endpoint — serves runtime config to the frontend
+// Public Client Config Endpoint â€” serves runtime config to the frontend
 // so env vars like ONLYOFFICE_SERVER_URL don't need to be baked into the build.
 app.get('/api/config', (req, res) => {
   res.status(200).json({
@@ -127,8 +127,8 @@ const startServer = async () => {
 
   httpServer.listen(PORT, () => {
     console.log(`=================================================`);
-    console.log(`🚀 CoreResearch API Server running on port ${PORT}`);
-    console.log(`🌐 Health check: http://0.0.0.0:${PORT}/api/health`);
+    console.log(`ðŸš€ CoreResearch API Server running on port ${PORT}`);
+    console.log(`ðŸŒ Health check: http://0.0.0.0:${PORT}/api/health`);
     console.log(`=================================================`);
   });
 };
@@ -136,4 +136,3 @@ const startServer = async () => {
 startServer();
 
 export default app;
-

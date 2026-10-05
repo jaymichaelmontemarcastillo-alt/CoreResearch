@@ -1,0 +1,23 @@
+const mongoose = require('mongoose');
+const { Buffer } = require('buffer');
+
+async function test() {
+  await mongoose.connect("mongodb+srv://jaymichaelmontemarcastillo_db_user:UWIt1KgwttLDcFej@cluster0.2kqoljr.mongodb.net/coreresearch?appName=Cluster0");
+  const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'storage' });
+  
+  const uploadStream = bucket.openUploadStream('test.pdf', { contentType: 'application/pdf' });
+  
+  uploadStream.on('error', (err) => {
+    console.error("Upload error:", err);
+    process.exit(1);
+  });
+  
+  uploadStream.on('finish', () => {
+    console.log("Upload finished");
+    process.exit(0);
+  });
+  
+  const buffer = Buffer.from('JVBERi0xLjMKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDwgL0xlbmd0aCA1IDAgUiAvRmlsdGVyIC9GbGF0ZURlY29kZSA+PgpzdHJlYW0KeAErVAhUKMxNTE8NSkzOTs1LzSspVsgvKinWy03My0xJTWFgyAHSDAaGJhACAL9RDdIKZW5kc3RyZWFtCmVuZG9iago1IDAgb2JqCjQ3CmVuZG9iagoyIDAgb2JqCjw8IC9UeXBlIC9QYWdlIC9QYXJlbnQgMyAwIFIgL1Jlc291cmNlcyA2IDAgUiAvQ29udGVudHMgNCAwIFIgL01lZGlhQm94IFswIDAgNTk1LjI4IDg0MS44OV0KPj4KZW5kb2JqCjYgMCBvYmoKPDwgL1Byb2NTZXQgWyAvUERGIC9UZXh0IF0gL0NvbG9yU3BhY2UgPDwgL0NzMSA3IDAgUiA+PiAvRm9udCA8PCAvRjEuMCA4IDAgUiA+Pgo+PgplbmRvYmoKNyAwIG9iagpbIC9JQ0NCYXNlZCA5IDAgUiBdCmVuZG9iago5IDAgb2JqCjw8IC9MZW5ndGggMTAgMCBSIC9OIDMgL0FsdGVybmF0ZSAvRGV2aWNlUkdCIC9GaWx0ZXIgL0ZsYXRlRGVjb2RlID4+CnN0cmVhbQp4AYVSS28bVRD+9q6d1EnTphW0KVBBSYkT1yWkH3k1LglOQ/R2XTuu47W9sT2JvQcO4FhxEoHEH0DEgQOQoHJBiAsCB9pTz4ADEhICcbFj/Zp1XFt1pNFqZubtzHe+b2YGUDO+tW1XNQCqtpvORmPx1OTUlPXEERjQgiI0V3Ndcy6Xj8Bw/P/v+x69AwRz9m7ZfX/v/z3dYtv1ACiJ8JmuW6kIX4X2jW2l5qB9iQZlWkP3Rvh2jHMG7x6xN3L5UoR3Q/vOtiy1iHoQOhtr3VY9QnsI3dxxszOoz0JbNfO5fA56G3on8s4H3wV/K8L9Ua9b4zH+K82aN6d8q/56t91+39YtLwU1w7T2I9wb09pXoF80rX0L2t8wzeR5/84eH/86gU5vGzWb3e2V37p4Y0x3O6n57s2ZmdnF5eV+x7jXzL2/5j7d1H73f4LffW7+H9/oV/4Czv8QzwplbmRzdHJlYW0KZW5kb2JqCjEwIDAgb2JqCjE5NQplbmRvYmoKOCAwIG9iago8PCAvVHlwZSAvRm9udCAvU3VidHlwZSAvVHlwZTEgL0Jhc2VGb250IC9IZWx2ZXRpY2EgL0VuY29kaW5nIC9XaW5BbnNpRW5jb2RpbmcKPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFsgMiAwIFIgXSAvQ291bnQgMSAvSVRBVCA0LjIuMyA+PgplbmRvYmoKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMyAwIFIgPj4KZW5kb2JqCjExIDAgb2JqCjw8IC9DcmVhdG9yIChwZGZib3gpIC9Qcm9kdWNlciAocGRmYm94KSAvQ3JlYXRpb25EYXRlIChEOjIwMjQxMDI0MTQyNzA3KzA4JzAwJykgPj4KZW5kb2JqCnhyZWYKMCAxMgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDA3MzQgMDAwMDAgbiAKMDAwMDAwMDExNyAwMDAwMCBuIAowMDAwMDAwNjc0IDAwMDAwIG4gCjAwMDAwMDAwMTUgMDAwMDAgbiAKMDAwMDAwMDA5NiAwMDAwMCBuIAowMDAwMDAwMjE5IDAwMDAwIG4gCjAwMDAwMDAzMjAgMDAwMDAgbiAKMDAwMDAwMDU3NiAwMDAwMCBuIAowMDAwMDAwMzU1IDAwMDAwIG4gCjAwMDAwMDA1NTUgMDAwMDAgbiAKMDAwMDAwMDc4MSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDEyIC9Sb290IDEgMCBSIC9JbmZvIDExIDAgUiAvSUQgWyA8ODc2NDZGNzMyMkM5RTk4OEQ0RDU4RjdGMDE1RTZBMEE+IDw4NzY0NkY3MzIyQzlFOTg4RDRENThGN0YwMTVFNkEwQT4gXSA+PgpzdGFydHhyZWYKODg2CiUlRU9GCg==', 'base64');
+  uploadStream.end(buffer);
+}
+test();

@@ -44,6 +44,8 @@ export const seedMockRepositoryIfEmpty = () => {
   }
 };
 
+import { getStorageProvider } from '../services/storage/storageManager.js';
+
 /**
  * Publish approved research project to Public Repository (Admin only)
  */
@@ -59,6 +61,19 @@ export const publishToRepository = async (req, res) => {
       });
     }
 
+    let finalPdfUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+
+    if (pdfUrl && pdfUrl.startsWith('data:application/pdf;base64,')) {
+      const base64Data = pdfUrl.split(',')[1];
+      const buffer = Buffer.from(base64Data, 'base64');
+      const storage = getStorageProvider();
+      const storageKey = `repository/repo-${Date.now()}.pdf`;
+      const uploadResult = await storage.upload(storageKey, buffer, 'application/pdf');
+      finalPdfUrl = uploadResult.url;
+    } else if (pdfUrl) {
+      finalPdfUrl = pdfUrl;
+    }
+
     const newPublication = {
       id: `repo-${Date.now()}`,
       projectId: projectId || 'proj-501',
@@ -69,7 +84,7 @@ export const publishToRepository = async (req, res) => {
       publicationYear: Number(publicationYear) || new Date().getFullYear(),
       abstract,
       keywords: Array.isArray(keywords) ? keywords : (keywords ? keywords.split(',').map(k => k.trim()) : []),
-      pdfUrl: pdfUrl || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      pdfUrl: finalPdfUrl,
       citation: citation || `${title}. (${new Date().getFullYear()}). Institutional Repository.`,
       viewsCount: 1,
       downloadsCount: 0,
@@ -146,6 +161,43 @@ export const getRepositoryPublications = async (req, res) => {
     });
   } catch (error) {
     console.error('[RepositoryController] getRepositoryPublications error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+export const updateRepositoryPublication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { department } = req.body;
+    
+    if (isDevMockMode) {
+      seedMockRepositoryIfEmpty();
+      const map = mockFirestoreDb.get('repository');
+      const pub = map.get(id);
+      if (!pub) return res.status(404).json({ success: false, message: 'Publication not found' });
+      pub.department = department || pub.department;
+      map.set(id, pub);
+    } else {
+      await db.collection('repository_publications').doc(id).update({ department });
+    }
+    
+    return res.status(200).json({ success: true, message: 'Updated successfully' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const deleteRepositoryPublication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (isDevMockMode) {
+      seedMockRepositoryIfEmpty();
+      const map = mockFirestoreDb.get('repository');
+      map.delete(id);
+    } else {
+      await db.collection('repository_publications').doc(id).delete();
+    }
+    return res.status(200).json({ success: true, message: 'Deleted successfully' });
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
 };

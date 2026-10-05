@@ -413,6 +413,21 @@ export const manuscriptService = {
     const docRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(docRef);
   },
+
+  /**
+   * Delete multiple manuscripts (Admin)
+   */
+  async deleteAdminManuscripts(ids: string[]): Promise<void> {
+    try {
+      await api.delete('/manuscripts/admin/delete', { data: { ids } });
+    } catch (err) {
+      console.warn('[manuscriptService] deleteAdminManuscripts API fallback:', err);
+      // Fallback: delete from firestore directly if the API isn't available
+      for (const id of ids) {
+        await this.deleteManuscript(id);
+      }
+    }
+  }
 };
 
 export default manuscriptService;
