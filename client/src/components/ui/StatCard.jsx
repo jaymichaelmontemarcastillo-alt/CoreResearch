@@ -14,15 +14,15 @@ export const StatCard = ({
   showIcon = false,
 }) => {
   const getIconColor = () => {
-    if (trendType === "positive") return "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400";
-    if (trendType === "negative") return "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400";
-    if (trendType === "neutral" && valueColor?.includes("amber")) return "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400";
-    return "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400";
+    if (trendType === "positive") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400";
+    if (trendType === "negative") return "bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400";
+    if (trendType === "neutral" && valueColor?.includes("amber")) return "bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400";
+    return "bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400";
   };
 
   return (
     <div
-      className={`bg-white dark:bg-[#15161e] rounded-[20px] border border-gray-100 dark:border-[#222433] p-6 flex flex-col transition-all duration-200 hover:shadow-sm ${className}`}
+      className={`bg-white dark:bg-[#15161e] rounded-[20px] border border-gray-100 dark:border-[#222433] p-6 flex flex-col transition-colors duration-200 hover:bg-gray-50 dark:hover:bg-[#1c1d27] ${className}`}
     >
       <div className="flex items-center gap-3 mb-4">
         {showIcon && Icon && (
@@ -30,7 +30,7 @@ export const StatCard = ({
             <Icon className="w-5 h-5" />
           </div>
         )}
-        <span className="text-[13px] font-semibold text-gray-500 dark:text-[#9396a8]">
+        <span className="text-[13px] font-semibold text-gray-600 dark:text-[#a1a4b5]">
           {label}
         </span>
       </div>
@@ -46,17 +46,17 @@ export const StatCard = ({
               <span
                 className={`font-medium ${
                   trendType === "positive"
-                    ? "text-emerald-600 dark:text-emerald-400"
+                    ? "text-emerald-700 dark:text-emerald-400"
                     : trendType === "negative"
-                    ? "text-rose-600 dark:text-rose-400"
-                    : "text-gray-500 dark:text-gray-400"
+                    ? "text-rose-700 dark:text-rose-400"
+                    : "text-gray-600 dark:text-gray-400"
                 }`}
               >
                 {trend}
               </span>
             )}
             {subtitle && (
-              <span className="text-gray-400 dark:text-[#6b6f84] truncate">
+              <span className="text-gray-600 dark:text-[#8387a1] truncate">
                 {subtitle}
               </span>
             )}

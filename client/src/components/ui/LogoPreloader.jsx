@@ -47,6 +47,8 @@ export const LogoPreloader = ({
         <img
           src={logoImg}
           alt="CoreResearch Logo"
+          width="96"
+          height="96"
           className="relative w-full h-full object-contain select-none pointer-events-none drop-shadow-md animate-logo-breathe"
         />
       </div>

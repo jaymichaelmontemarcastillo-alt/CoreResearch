@@ -288,6 +288,8 @@ export const Sidebar = ({
             <img
               src={logoImg}
               alt="CoreResearch Logo"
+              width="32"
+              height="32"
               className="w-8 h-8 object-contain shrink-0 drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
             />
             <span className="font-brand font-extrabold text-[14px] tracking-wide uppercase whitespace-nowrap overflow-hidden flex items-center">
@@ -321,6 +323,8 @@ export const Sidebar = ({
             <img
               src={logoImg}
               alt="CoreResearch Logo"
+              width="32"
+              height="32"
               className="w-8 h-8 object-contain drop-shadow-sm transition-all duration-200 opacity-100 scale-100 group-hover:opacity-0 group-hover:scale-75 absolute"
             />
             {/* Sidebar icon hidden by default, shown on hover */}
