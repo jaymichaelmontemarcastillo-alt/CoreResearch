@@ -455,8 +455,9 @@ export const researchWorkspaceService = {
         where('groupId', '==', groupId)
       );
       const snap = await getDocs(q);
-      if (!snap.empty) {
-        const ws = snap.docs[0].data() as ManuscriptWorkspace;
+      const activeDocs = snap.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      if (activeDocs.length > 0) {
+        const ws = activeDocs[0];
         // Ensure studentUid is included in memberIds if missing
         if (studentUid && ws.memberIds && !ws.memberIds.includes(studentUid)) {
           const updatedIds = Array.from(new Set([...ws.memberIds, studentUid]));
@@ -489,7 +490,8 @@ export const researchWorkspaceService = {
         where('studentId', '==', leaderUid)
       );
       const snapLeader = await getDocs(qLeader);
-      let leaderWs = snapLeader.empty ? null : (snapLeader.docs[0].data() as ManuscriptWorkspace);
+      const activeLeaderDocs = snapLeader.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      let leaderWs = activeLeaderDocs.length === 0 ? null : activeLeaderDocs[0];
 
       if (!leaderWs) {
         const qLeaderMember = query(
@@ -497,8 +499,9 @@ export const researchWorkspaceService = {
           where('memberIds', 'array-contains', leaderUid)
         );
         const snapLeaderMember = await getDocs(qLeaderMember);
-        if (!snapLeaderMember.empty) {
-          leaderWs = snapLeaderMember.docs[0].data() as ManuscriptWorkspace;
+        const activeLeaderMemberDocs = snapLeaderMember.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+        if (activeLeaderMemberDocs.length > 0) {
+          leaderWs = activeLeaderMemberDocs[0];
         }
       }
 
@@ -532,8 +535,9 @@ export const researchWorkspaceService = {
         where('memberIds', 'array-contains', studentUid)
       );
       const snapMember = await getDocs(qMember);
-      if (!snapMember.empty) {
-        return snapMember.docs[0].data() as ManuscriptWorkspace;
+      const activeMemberDocs = snapMember.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      if (activeMemberDocs.length > 0) {
+        return activeMemberDocs[0];
       }
 
       // 4. Query by studentId (creator)
@@ -542,8 +546,9 @@ export const researchWorkspaceService = {
         where('studentId', '==', studentUid)
       );
       const snap = await getDocs(q);
-      if (!snap.empty) {
-        return snap.docs[0].data() as ManuscriptWorkspace;
+      const activeDocs = snap.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      if (activeDocs.length > 0) {
+        return activeDocs[0];
       }
     }
 

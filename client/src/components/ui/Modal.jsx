@@ -1,5 +1,5 @@
-// src/components/ui/Modal.jsx
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { HiXMark } from "react-icons/hi2";
 
 export const Modal = ({
@@ -26,7 +26,7 @@ export const Modal = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className={`fixed inset-0 z-[9999] flex ${fullScreen ? '' : 'items-end md:items-center justify-center md:p-4'}`}>
       {/* Backdrop */}
       <div
@@ -61,6 +61,7 @@ export const Modal = ({
         {/* Body */}
         <div className={`p-4 sm:p-6 ${fullScreen ? 'max-w-4xl mx-auto' : ''}`}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

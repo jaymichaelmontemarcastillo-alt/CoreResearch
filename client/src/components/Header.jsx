@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { useNotifications } from "../hooks/useNotifications";
 import { useConfirm } from "../context/ConfirmContext";
 import { Avatar } from "./ui/Avatar";
@@ -12,10 +13,14 @@ import {
   HiUserCircle,
   HiLockClosed,
   HiChevronDown,
+  HiSun,
+  HiMoon,
+  HiComputerDesktop,
 } from "react-icons/hi2";
 
 export const Header = ({ onOpenMobileMenu }) => {
   const { userProfile, currentUser, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { confirm } = useConfirm();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
@@ -271,7 +276,7 @@ export const Header = ({ onOpenMobileMenu }) => {
 
           {/* Profile Dropdown Menu */}
           {profileDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl z-50 p-2 animate-scale-in">
+            <div className="absolute right-0 mt-2 w-[280px] bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl shadow-2xl z-50 p-2 animate-scale-in">
               {/* User Header Summary */}
               <div className="p-3 bg-gray-50 dark:bg-[#1c1d28] border border-transparent dark:border-[#222433] rounded-xl mb-1">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
@@ -315,6 +320,25 @@ export const Header = ({ onOpenMobileMenu }) => {
                   <HiLockClosed className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
                   <span>Password & Security</span>
                 </button>
+              </div>
+
+              {/* Appearance / Theme */}
+              <div className="px-3 py-2 space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider block">
+                  Appearance
+                </label>
+                <div className="relative">
+                  <select
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value)}
+                    className="w-full appearance-none bg-gray-50 dark:bg-[#1a1c27] border border-gray-200 dark:border-[#252839] text-gray-700 dark:text-gray-300 text-sm rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
+                  >
+                    <option value="system">System (Default)</option>
+                    <option value="light">Light Mode</option>
+                    <option value="dark">Dark Mode</option>
+                  </select>
+                  <HiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
               </div>
 
               {/* Divider & Logout */}

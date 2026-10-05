@@ -22,6 +22,10 @@ export interface AdviserMatchResult {
   }>;
   explanation: string;
   algorithmVersion?: string;
+  maxCapacity?: number;
+  activeGroupsCount?: number;
+  isAvailable?: boolean;
+  profile_image?: string;
 }
 
 export interface MatchMeta {
@@ -71,6 +75,10 @@ class AdviserMatchingService {
         matchedResearch: r.matchedResearch || [],
         explanation: r.explanation || 'Match based on research compatibility analysis.',
         algorithmVersion: r.algorithmVersion || meta?.algorithmVersion,
+        maxCapacity: r.maxCapacity ?? 5,
+        activeGroupsCount: r.activeGroupsCount ?? 0,
+        isAvailable: r.isAvailable ?? true,
+        profile_image: r.profile_image || '',
       }));
     } catch (error: any) {
       // Re-throw with user-friendly messages based on status

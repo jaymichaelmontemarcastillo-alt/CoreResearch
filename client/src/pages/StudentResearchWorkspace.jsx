@@ -258,49 +258,72 @@ export const StudentResearchWorkspace = () => {
   const handleResetWorkspace = async () => {
     if (!workspace) return;
     const isConfirmed = await confirm({
-      title: "Restart Workspace",
-      message: "WARNING: This will permanently delete your current workspace so you can restart the title submission process. Proceed?",
-      confirmText: "Restart Workspace",
+      title: "Restart Research Progress",
+      message: "WARNING: This will archive your current workspace, manuscript, and group progress. You will be prompted to submit a new research title proposal to start fresh. Proceed?",
+      confirmText: "Archive and Restart",
       variant: "danger"
     });
     if (!isConfirmed) return;
 
     try {
-      // 1. Delete all tasks tied to the workspace
-      const tasks = await researchTaskService.getTasksByWorkspace(workspace.id);
-      await Promise.all(tasks.map(t => researchTaskService.deleteTask(t.id)));
+      const now = new Date().toISOString();
+      const reason = 'Student restarted research progress';
+      const actorName = userProfile?.fullName || 'Student';
+      const { updateDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../firebase/firebase');
 
-      // 2. Delete all feedback/revisions tied to the workspace
-      const feedback = await researchFeedbackService.getFeedbackByWorkspace(workspace.id);
-      await Promise.all(feedback.map(f => researchFeedbackService.deleteFeedback(f.id)));
-
-      // 3. Delete the actual manuscript document
-      if (workspace.documentId) {
-        await documentStore.deleteDocument(workspace.documentId);
+      // 1. Archive Workspace
+      try {
+        await updateDoc(doc(db, 'manuscript_workspaces', workspace.id), {
+          isArchived: true,
+          status: 'archived',
+          archivedAt: now,
+          archivedBy: currentUser.uid,
+          archivedByName: actorName,
+          archiveReason: reason
+        });
+      } catch (wsErr) {
+        console.warn('Failed to archive workspace:', wsErr);
       }
 
-      // 4. Delete Workspace
-      await researchWorkspaceService.deleteWorkspace(workspace.id);
-      
-      // 5. Fetch Group and clear adviser fields
+      // 2. Archive Document
+      if (workspace.documentId) {
+        try {
+          await updateDoc(doc(db, 'manuscript_documents', workspace.documentId), {
+             isArchived: true,
+             status: 'archived'
+          });
+        } catch (docErr) {
+          console.warn('Failed to archive document:', docErr);
+        }
+      }
+
+      // 3. Archive Group
       const group = await groupService.getGroupByStudentId(currentUser.uid);
       if (group) {
         await groupService.updateGroup(group.id, {
-          adviserId: "",
-          adviserName: ""
+          isArchived: true,
+          status: 'archived',
+          archivedAt: now,
+          archivedBy: currentUser.uid,
+          archivedByName: actorName,
+          archiveReason: reason
         });
       }
 
-      // 6. Delete any associated adviser requests
+      // 4. Archive/Cancel any pending adviser requests
       const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
       for (const req of requests) {
-        await adviserRequestService.deleteRequest(req.id);
+        if (req.status === 'pending' || req.status === 'accepted') {
+          await adviserRequestService.updateRequestStatus(req.id, 'rejected', 'Archived due to student restarting progress.');
+        }
       }
 
-      setToast('Workspace deleted. You can now submit a new title.');
+      setToast('Workspace archived. You can now submit a new title.');
       navigate('/submit-title');
     } catch (err) {
-      setToast('Failed to reset workspace: ' + err.message);
+      console.error('Reset workspace error:', err);
+      setToast('Failed to restart workspace: ' + err.message);
     }
   };
 

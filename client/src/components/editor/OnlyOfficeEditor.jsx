@@ -108,12 +108,12 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
     );
   }
 
-  if (error || loadError) {
+  if (loadError) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center min-h-[500px] bg-slate-900/50 rounded-xl border border-slate-800 text-slate-200">
         <div className="text-amber-400 text-5xl mb-4">⚠️</div>
         <h3 className="text-lg font-bold text-white mb-2">ONLYOFFICE Document Server Offline</h3>
-        <p className="text-slate-400 text-sm max-w-md mb-4">{loadError || error}</p>
+        <p className="text-slate-400 text-sm max-w-md mb-4">{loadError}</p>
         <div className="text-left text-xs bg-slate-950 p-4 rounded-xl border border-slate-800 max-w-lg space-y-2 text-slate-300">
           <p className="font-semibold text-white">How to fix this:</p>
           <ol className="list-decimal list-inside space-y-1 text-slate-400">
@@ -132,6 +132,22 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
           className="mt-5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs"
         >
           Retry Connection
+        </button>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center min-h-[500px] bg-slate-50 rounded-xl border border-slate-200 dark:bg-slate-900/50 dark:border-slate-800">
+        <div className="text-red-500 text-5xl mb-4">📄</div>
+        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Could Not Open Document</h3>
+        <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mb-4">{error}</p>
+        <button
+          onClick={() => window.history.back()}
+          className="mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold"
+        >
+          Go Back
         </button>
       </div>
     );

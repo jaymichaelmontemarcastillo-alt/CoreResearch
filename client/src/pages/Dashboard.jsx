@@ -203,20 +203,7 @@ export const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {isStudent && (
-              <>
-                <Link to="/research/workspace">
-                  <Button variant="secondary" size="sm">
-                    Research Workspace
-                  </Button>
-                </Link>
-                <Link to="/submit-title">
-                  <Button variant="primary" size="sm">
-                    Submit Title
-                  </Button>
-                </Link>
-              </>
-            )}
+
             {effectiveRole === "adviser" && (
               <Link to="/advisees">
                 <Button variant="primary" size="sm">

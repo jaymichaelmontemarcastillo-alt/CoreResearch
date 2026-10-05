@@ -362,7 +362,7 @@ export const AdviserAdvisees = () => {
               placeholder="Search by name, title, or program..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full text-xs sm:text-sm focus:outline-none focus:border-blue-500 transition-colors"
             />
           </div>
         </div>
@@ -404,12 +404,12 @@ export const AdviserAdvisees = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-slate-700 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  <th className="pb-3 px-4 font-semibold">Group & Title</th>
-                  <th className="pb-3 px-4 font-semibold">Student Members</th>
-                  <th className="pb-3 px-4 font-semibold">Program / Section</th>
-                  <th className="pb-3 px-4 font-semibold">Manuscript Status</th>
-                  <th className="pb-3 px-4 font-semibold">Defense Schedule</th>
-                  <th className="pb-3 px-4 font-semibold text-right">Actions</th>
+                  <th className="py-3 px-4 font-semibold w-[25%] max-w-[200px]">Research Title</th>
+                  <th className="py-3 px-4 font-semibold w-[20%]">Student Members</th>
+                  <th className="py-3 px-4 font-semibold w-[15%]">Program / Section</th>
+                  <th className="py-3 px-4 font-semibold w-[15%]">Manuscript Status</th>
+                  <th className="py-3 px-4 font-semibold w-[15%]">Defense Schedule</th>
+                  <th className="py-3 px-4 font-semibold w-[10%] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
@@ -427,27 +427,26 @@ export const AdviserAdvisees = () => {
                         group.isArchived ? 'bg-gray-50/40 dark:bg-slate-900/20 opacity-90' : ''
                       }`}
                     >
-                      {/* Group & Title */}
-                      <td className="py-4 px-4 min-w-[220px]">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-gray-900 dark:text-white">
-                            {group.name}
-                          </span>
+                      {/* Research Title */}
+                      <td className="py-4 px-4 w-[25%] max-w-[200px] align-top">
+                        <div className="flex flex-col gap-1.5">
                           {group.isArchived && (
-                            <Badge variant="purple" size="sm" className="font-semibold text-[10px]">
-                              Archived
-                            </Badge>
+                            <div className="flex items-center">
+                              <Badge variant="purple" size="sm" className="font-semibold text-[10px]">
+                                Archived
+                              </Badge>
+                            </div>
                           )}
-                        </div>
-                        <div
-                          className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs"
-                          title={group.title || 'No Research Title Set'}
-                        >
-                          {group.title || 'No Research Title Set'}
+                          <div
+                            className="font-bold text-sm text-gray-900 dark:text-white line-clamp-3"
+                            title={group.title || 'No Research Title Set'}
+                          >
+                            {group.title || 'No Research Title Set'}
+                          </div>
                         </div>
                         {group.isArchived && group.archiveReason && (
                           <div
-                            className="mt-1 text-[11px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 px-2 py-0.5 rounded border border-purple-200/50 dark:border-purple-800/30 inline-block max-w-xs truncate"
+                            className="mt-2 text-[11px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 px-2 py-0.5 rounded border border-purple-200/50 dark:border-purple-800/30 inline-block w-full truncate"
                             title={group.archiveReason}
                           >
                             Reason: {group.archiveReason}
@@ -456,33 +455,30 @@ export const AdviserAdvisees = () => {
                       </td>
 
                       {/* Student Members */}
-                      <td className="py-4 px-4 min-w-[180px]">
+                      <td className="py-4 px-4 w-[20%] align-top">
                         {membersList.length === 0 ? (
                           <span className="text-xs text-gray-400 italic">No members assigned</span>
                         ) : (
                           <div className="space-y-1">
-                            {membersList.slice(0, 3).map((m, idx) => (
+                            {membersList.map((m, idx) => (
                               <div key={m.uid || idx} className="text-xs text-gray-700 dark:text-gray-300">
-                                <span className="font-medium">{m.fullName || m.name}</span>
+                                <span className="font-medium block truncate" title={m.fullName || m.name}>
+                                  {m.fullName || m.name}
+                                </span>
                                 {(m.studentNumber || m.studentIdOrEmployeeId) && (
-                                  <span className="text-gray-400 font-mono ml-1.5 text-[11px]">
+                                  <span className="text-gray-400 font-mono text-[11px] block">
                                     ({m.studentNumber || m.studentIdOrEmployeeId})
                                   </span>
                                 )}
                               </div>
                             ))}
-                            {membersList.length > 3 && (
-                              <span className="text-[10px] text-gray-400 font-semibold block">
-                                +{membersList.length - 3} more
-                              </span>
-                            )}
                           </div>
                         )}
                       </td>
 
                       {/* Program, Major & Section */}
-                      <td className="py-4 px-4 text-xs text-gray-700 dark:text-gray-300 min-w-[140px]">
-                        <div className="font-semibold text-gray-900 dark:text-white">
+                      <td className="py-4 px-4 text-xs text-gray-700 dark:text-gray-300 w-[15%] align-top">
+                        <div className="font-semibold text-gray-900 dark:text-white mb-1">
                           {group.programCode}
                         </div>
                         <div className="text-gray-500 dark:text-gray-400">
@@ -491,7 +487,7 @@ export const AdviserAdvisees = () => {
                       </td>
 
                       {/* Manuscript Status */}
-                      <td className="py-4 px-4 min-w-[140px]">
+                      <td className="py-4 px-4 w-[15%] align-top">
                         {group.isArchived ? (
                           <div className="space-y-1">
                             <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">
@@ -504,8 +500,8 @@ export const AdviserAdvisees = () => {
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <div className="w-16 bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                                 <div
                                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                   style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
@@ -515,7 +511,7 @@ export const AdviserAdvisees = () => {
                                 {progress}%
                               </span>
                             </div>
-                            <span className="text-[11px] text-gray-400 capitalize block mt-1">
+                            <span className="text-[11px] text-gray-400 capitalize block">
                               {group.status || 'in_progress'}
                             </span>
                           </>
@@ -523,18 +519,18 @@ export const AdviserAdvisees = () => {
                       </td>
 
                       {/* Defense Schedule */}
-                      <td className="py-4 px-4 min-w-[170px]">
+                      <td className="py-4 px-4 w-[15%] align-top">
                         {sch ? (
-                          <div className="space-y-0.5">
-                            <div className="text-xs font-semibold text-gray-900 dark:text-white flex items-center gap-1">
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
                               <HiCalendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                               {sch.date}
                             </div>
-                            <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                              <HiClock className="w-3 h-3 text-gray-400 shrink-0" />
+                            <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <HiClock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                               {sch.startTime} – {sch.endTime}
                             </div>
-                            <div className="text-[11px] text-gray-400 truncate max-w-[150px]">
+                            <div className="text-[11px] text-gray-400 truncate max-w-full" title={sch.venue || sch.location || 'Room TBA'}>
                               {sch.venue || sch.location || 'Room TBA'}
                             </div>
                           </div>
@@ -544,13 +540,14 @@ export const AdviserAdvisees = () => {
                       </td>
 
                       {/* Action */}
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="py-4 px-4 text-right align-top w-[10%]">
+                        <div className="flex flex-col items-end gap-2">
                           <Button
                             size="sm"
                             variant="secondary"
                             onClick={() => navigate(`/faculty/workspace/${group.id}`)}
                             title="Open collaborative workspace and drafts"
+                            className="w-full justify-center"
                           >
                             Workspace <HiArrowRight className="w-3 h-3 ml-1" />
                           </Button>
@@ -562,7 +559,7 @@ export const AdviserAdvisees = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenArchiveModal(group)}
-                                  className="px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-medium transition flex items-center gap-1 shadow-2xs"
+                                  className="w-full justify-center px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-medium transition flex items-center gap-1 shadow-2xs"
                                   title="Archive this advisee group upon completion"
                                 >
                                   <HiArchiveBox className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
@@ -572,7 +569,7 @@ export const AdviserAdvisees = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenRestoreModal(group)}
-                                  className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 text-xs font-medium transition flex items-center gap-1 shadow-2xs"
+                                  className="w-full justify-center px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 text-xs font-medium transition flex items-center gap-1 shadow-2xs"
                                   title="Restore advisee group back to active list"
                                 >
                                   <HiArrowPath className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />

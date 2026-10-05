@@ -220,6 +220,9 @@ export const matchAdvisers = async (req, res) => {
           expertise: adv.expertise || adv.selectedExpertise || [],
           score: Math.round(Math.min(Math.max(r.score || 0, 0), 100)),
           compatibilityScore: Math.round(Math.min(Math.max(r.score || 0, 0), 100)),
+          maxCapacity: adv.maxCapacity ?? 5,
+          activeGroupsCount: adv.activeGroupsCount ?? 0,
+          isAvailable: adv.isAvailable ?? true,
         };
       });
 

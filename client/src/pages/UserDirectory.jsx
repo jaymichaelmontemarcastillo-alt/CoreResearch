@@ -10,6 +10,7 @@ import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
 import { Modal } from "../components/ui/Modal";
+import { Avatar } from "../components/ui/Avatar";
 import { useConfirm } from "../context/ConfirmContext";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -450,9 +451,11 @@ export const UserDirectory = () => {
             filteredUsers.map((u, index) => (
               <TableRow key={u.uid || u.id || index}>
                 <TableCell className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-primary dark:text-blue-400 flex items-center justify-center font-bold text-xs">
-                    {u.fullName ? u.fullName.charAt(0).toUpperCase() : "U"}
-                  </div>
+                  <Avatar 
+                    src={u.profile_image || u.photoURL} 
+                    name={u.fullName || "User"} 
+                    size="sm" 
+                  />
                   <div>
                     <div className="font-medium text-gray-700 dark:text-gray-300 text-sm flex items-center gap-2">
                       <span>{u.fullName || "Unnamed User"}</span>

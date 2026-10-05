@@ -335,9 +335,19 @@ export const MatchingModal = ({
                             </Badge>
                           </div>
 
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            {adviser.department || 'Faculty Adviser'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              {adviser.department || 'Faculty Adviser'}
+                            </p>
+                            <span className="text-[10px] text-gray-300 dark:text-gray-600 hidden sm:block">•</span>
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <HiUser className="w-3 h-3 text-gray-400" />
+                              <span className={adviser.activeGroupsCount >= (adviser.maxCapacity || 5) ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}>
+                                {adviser.activeGroupsCount || 0}/{adviser.maxCapacity || 5} Groups
+                                {adviser.activeGroupsCount >= (adviser.maxCapacity || 5) ? ' (Full)' : ''}
+                              </span>
+                            </div>
+                          </div>
 
                           {/* Matched Keywords */}
                           {adviser.matchedKeywords && adviser.matchedKeywords.length > 0 && (
@@ -368,9 +378,9 @@ export const MatchingModal = ({
                           <div className="text-xs font-semibold text-red-500 py-1.5 px-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                             Previously Declined
                           </div>
-                        ) : score < 50 ? (
-                          <div className="text-xs font-semibold text-gray-400 py-1.5 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            Match Too Low
+                        ) : (adviser.activeGroupsCount >= (adviser.maxCapacity || 5) || adviser.isAvailable === false) ? (
+                          <div className="text-xs font-semibold text-amber-600 dark:text-amber-500 py-1.5 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                            Capacity Full
                           </div>
                         ) : (
                           <Button

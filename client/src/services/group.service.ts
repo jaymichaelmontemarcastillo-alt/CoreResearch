@@ -199,13 +199,25 @@ export const groupService = {
     let group: ResearchGroup | null = null;
 
     if (!querySnap.empty) {
-      group = querySnap.docs[0].data() as ResearchGroup;
-    } else {
+      // Filter out archived groups to only return the active one
+      const activeGroups = querySnap.docs
+        .map(doc => doc.data() as ResearchGroup)
+        .filter(g => g.status !== 'archived' && !g.isArchived);
+      
+      if (activeGroups.length > 0) {
+        group = activeGroups[0];
+      }
+    } 
+
+    if (!group) {
       // Fallback: check if the student's user profile has groupId
       try {
         const userDoc = await getDoc(doc(db, 'users', studentId));
         if (userDoc.exists() && userDoc.data().groupId) {
-          group = await this.getGroupById(userDoc.data().groupId);
+          const fallbackGroup = await this.getGroupById(userDoc.data().groupId);
+          if (fallbackGroup && fallbackGroup.status !== 'archived' && !fallbackGroup.isArchived) {
+            group = fallbackGroup;
+          }
         }
       } catch (e) {}
     }

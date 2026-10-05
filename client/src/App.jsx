@@ -143,6 +143,7 @@ export default function App() {
                       <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
                       <Route path="/admin/profile" element={<ProfileSettings />} />
                     </Route>
+                  </Route>
                 </Route>
 
                 {/* Fallback Redirect */}

@@ -323,11 +323,11 @@ export const Sidebar = ({
           {/* Toggle Button cleanly positioned on the right inside header */}
           <button
             onClick={toggleSidebar}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#252837] active:scale-95 transition-all duration-150 cursor-pointer shrink-0 group"
             title="Close sidebar"
             aria-label="Close sidebar"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-5 h-5 transition-colors duration-150" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" shapeRendering="geometricPrecision">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <line x1="9" y1="3" x2="9" y2="21" />
             </svg>
@@ -351,15 +351,14 @@ export const Sidebar = ({
             />
             {/* Sidebar icon hidden by default, shown on hover */}
             <svg 
-              width="22" 
-              height="22" 
               viewBox="0 0 24 24" 
               fill="none" 
               stroke="currentColor" 
-              strokeWidth="2" 
+              strokeWidth="1.5" 
               strokeLinecap="round" 
               strokeLinejoin="round" 
-              className="text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-all duration-200 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 absolute"
+              shapeRendering="geometricPrecision"
+              className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-all duration-200 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 absolute"
             >
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <line x1="9" y1="3" x2="9" y2="21" />
@@ -369,7 +368,7 @@ export const Sidebar = ({
       )}
 
       {/* CATEGORIZED NAVIGATION */}
-      <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar ${isMobile ? 'py-1 space-y-0.5 px-2' : `py-3 space-y-4 ${expanded ? "px-3" : "px-2"}`}`}>
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar ${isMobile ? 'py-1 space-y-1 px-2' : `py-3 space-y-1.5 ${expanded ? "px-3" : "px-2"}`}`}>
         {navigationCategories.map((sec) => {
           const visibleItems = sec.items.filter((item) =>
             item.roles.includes(role || "student")
@@ -377,9 +376,8 @@ export const Sidebar = ({
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={sec.category} className={isMobile ? 'space-y-0.5' : 'space-y-1'}>
-              <div className={isMobile ? 'space-y-0.5' : 'space-y-1'}>
-                {visibleItems.map((item) => {
+            <React.Fragment key={sec.category}>
+              {visibleItems.map((item) => {
                   const Icon = item.icon;
                   const active = isItemActive(item.path);
 
@@ -388,21 +386,21 @@ export const Sidebar = ({
                       key={item.label}
                       to={item.path}
                       onClick={isMobile ? onCloseMobile : undefined}
-                      className={`relative flex items-center rounded-xl font-medium transition-colors duration-150 ${
+                      className={`relative flex items-center rounded-r-lg font-medium transition-all duration-150 border-l-[3px] ${
                         expanded
                           ? `gap-3 ${isMobile ? 'h-9 px-3 text-[13px]' : 'h-10 px-3 text-sm'}`
                           : "justify-center h-10 w-10 mx-auto"
                       } ${
                         active
-                          ? "bg-gray-100 dark:bg-[#1f212d] text-gray-900 dark:text-white border border-gray-200 dark:border-[#2c2f42] font-semibold shadow-sm"
-                          : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26]"
+                          ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-bold border-blue-600 dark:border-blue-500"
+                          : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26] border-transparent"
                       }`}
                       title={!expanded ? item.label : undefined}
                     >
                       <Icon
                         className={`w-5 h-5 shrink-0 transition-colors duration-150 ${
                           active
-                            ? "text-gray-900 dark:text-white"
+                            ? "text-blue-600 dark:text-blue-400"
                             : "text-gray-500 dark:text-[#888ca3] group-hover:text-gray-800 dark:group-hover:text-white"
                         }`}
                       />
@@ -415,8 +413,7 @@ export const Sidebar = ({
                     </Link>
                   );
                 })}
-              </div>
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
@@ -424,52 +421,7 @@ export const Sidebar = ({
       {/* BOTTOM SECTION: THEME SWITCH & LOGOUT */}
       <div className={`${isMobile ? 'p-2 pt-1.5' : 'p-3'} border-t border-gray-100 dark:border-[#202230] shrink-0 space-y-1.5 ${expanded ? (isMobile ? 'px-2' : 'px-3') : 'px-2'}`}>
         
-        {/* THEME TOGGLE SWITCH */}
-        <div className={`relative flex items-center ${expanded ? "bg-gray-100/90 dark:bg-[#1a1c27] p-1 rounded-xl border border-gray-200/60 dark:border-[#252839]" : "justify-center h-10"}`}>
-          {expanded ? (
-            <>
-              <button
-                type="button"
-                onClick={() => { if (theme === "dark") toggleTheme(); }}
-                className={`flex items-center justify-center rounded-lg text-xs font-medium overflow-hidden flex-1 gap-1.5 py-1.5 transition-colors duration-150 ${
-                  theme === "light"
-                    ? "bg-white text-gray-900 shadow-sm font-semibold"
-                    : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
-                }`}
-                title="Light Mode"
-              >
-                <HiSun className={`w-4 h-4 shrink-0 ${theme === "light" ? "text-amber-500" : ""}`} />
-                <span className="whitespace-nowrap w-auto">Light</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { if (theme === "light") toggleTheme(); }}
-                className={`flex items-center justify-center rounded-lg text-xs font-medium overflow-hidden flex-1 gap-1.5 py-1.5 transition-colors duration-150 ${
-                  theme === "dark"
-                    ? "bg-[#252839] text-white shadow-sm font-semibold"
-                    : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white"
-                }`}
-                title="Dark Mode"
-              >
-                <HiMoon className={`w-4 h-4 shrink-0 ${theme === "dark" ? "text-amber-300 dark:text-white" : ""}`} />
-                <span className="whitespace-nowrap w-auto">Dark</span>
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="flex items-center justify-center rounded-xl h-10 w-10 text-gray-500 dark:text-[#9ea3be] hover:text-amber-500 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-[#1f212d] transition-colors duration-150"
-              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
-            >
-              {theme === "light" ? (
-                <HiMoon className="w-5 h-5 shrink-0" />
-              ) : (
-                <HiSun className="w-5 h-5 shrink-0 text-amber-300" />
-              )}
-            </button>
-          )}
-        </div>
+
 
         {/* LOGOUT BUTTON */}
         <button
