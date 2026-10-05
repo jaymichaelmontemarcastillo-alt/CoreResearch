@@ -312,7 +312,9 @@ export const AdviserDashboardView = () => {
   // ----------------------------------------------------
 
   // 1. Active Research Groups
-  const activeGroupsCount = groups.length;
+  const activeGroups = useMemo(() => groups.filter((g) => !g.isArchived), [groups]);
+  const activeGroupsCount = activeGroups.length;
+  const archivedGroupsCount = useMemo(() => groups.filter((g) => g.isArchived).length, [groups]);
 
   // 2. Manuscripts Needing Review
   // Either workspace status is under_review / submitted_for_review, or any section is submitted / under_review
@@ -425,15 +427,15 @@ export const AdviserDashboardView = () => {
       {/* ==================================================== */}
       {/* 1. 4 RESPONSIVE SUMMARY METRIC CARDS */}
       {/* ==================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
         {/* Card 1: Active Research Groups */}
         <StatCard
           icon={HiUsers}
           showIcon
           label="Active Research Groups"
           value={activeGroupsCount}
-          subtitle="Assigned Advisees"
-          trend={activeGroupsCount > 0 ? 'Assigned' : 'None'}
+          subtitle={archivedGroupsCount > 0 ? `${archivedGroupsCount} archived` : 'Assigned Advisees'}
+          trend={activeGroupsCount > 0 ? `${activeGroupsCount} Active` : 'None'}
           trendType={activeGroupsCount > 0 ? 'positive' : 'neutral'}
         />
 
@@ -490,6 +492,7 @@ export const AdviserDashboardView = () => {
               : 'Oral Hearings'
           }
           trendType={nearestDefense ? 'positive' : 'neutral'}
+          className="col-span-3 sm:col-span-1"
         />
       </div>
 
@@ -508,7 +511,7 @@ export const AdviserDashboardView = () => {
               <div className="flex items-center gap-2.5">
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 tracking-tight">
-                    Action Required
+                    Pending Items
                     {totalActionCount > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white uppercase tracking-wider">
                         {totalActionCount}
@@ -524,17 +527,17 @@ export const AdviserDashboardView = () => {
 
             {loading ? (
               <div className="py-8 text-center text-xs text-gray-400">
-                Checking pending actions...
+                Checking pending items...
               </div>
             ) : totalActionCount === 0 ? (
-              /* Honest Empty State for Action Required */
+              /* Honest Empty State for Pending Items */
               <div className="py-6 px-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] bg-gray-50/50 dark:bg-[#1a1b26]/30 flex flex-col items-center justify-center text-center space-y-1.5">
                 <HiCheckBadge className="w-8 h-8 text-emerald-500 shrink-0" />
                 <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  No Actions Required
+                  No Pending Items
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-[#9396a8] max-w-md">
-                  There are currently no pending actions requiring your attention. All manuscripts and tasks are up to date.
+                  There are currently no pending items requiring your attention. All manuscripts and tasks are up to date.
                 </p>
               </div>
             ) : (
@@ -681,13 +684,15 @@ export const AdviserDashboardView = () => {
               <div className="py-8 text-center text-xs text-gray-400">
                 Calculating group progress...
               </div>
-            ) : groups.length === 0 ? (
+            ) : activeGroups.length === 0 ? (
               <div className="py-8 text-center text-xs text-gray-400 italic">
-                No active advisee research groups currently assigned.
+                {archivedGroupsCount > 0
+                  ? `All ${archivedGroupsCount} advisee ${archivedGroupsCount === 1 ? 'group is' : 'groups are'} currently archived.`
+                  : 'No active advisee research groups currently assigned.'}
               </div>
             ) : (
               <div className="space-y-4 pt-1">
-                {groups.map((group) => {
+                {activeGroups.map((group) => {
                   const progress = progressMap[group.id] || 0;
                   const membersCount = group.members?.length || 0;
 
@@ -763,6 +768,20 @@ export const AdviserDashboardView = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {archivedGroupsCount > 0 && (
+              <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>
+                  {archivedGroupsCount} completed advisee {archivedGroupsCount === 1 ? 'group' : 'groups'} archived
+                </span>
+                <Link
+                  to="/advisees?tab=archived"
+                  className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  View Archived →
+                </Link>
               </div>
             )}
           </Card>

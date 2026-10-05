@@ -89,10 +89,28 @@ export const StudentResearchWorkspace = () => {
         } else if (isStudent) {
           // Resolve student's group & proposal
           const group = await groupService.getGroupByStudentId(currentUser.uid);
+          const leaderUid = group?.memberIds?.[0] || group?.members?.[0]?.uid;
+          
+          if (group) {
+            groupService.syncMemberToGroupProject(group.id, currentUser.uid, userProfile).catch((e) => {
+              console.warn('[StudentResearchWorkspace] syncMemberToGroupProject fallback:', e);
+            });
+          }
+
           targetWorkspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
             currentUser.uid,
-            group?.id
+            group?.id,
+            leaderUid
           );
+
+          // If no workspace found yet, check if group already has title, adviser, or accepted request/proposal
+          if (!targetWorkspace && group) {
+            try {
+              targetWorkspace = await researchWorkspaceService.getOrCreateWorkspaceForGroup(group, userProfile, leaderUid);
+            } catch (e) {
+              console.warn('[StudentResearchWorkspace] Auto workspace create fallback:', e);
+            }
+          }
 
           // If no workspace yet, subscribe to requests for real-time creation/feedback
           if (!targetWorkspace) {
@@ -128,7 +146,24 @@ export const StudentResearchWorkspace = () => {
                      });
                   }, 2000);
                 } else if (!pending && !accepted && !declined) {
-                  // No requests at all, go to submit title
+                  // Check if group has an active proposal
+                  if (group?.id) {
+                    try {
+                      const props = await titleProposalService.getProposalsByGroup(group.id, leaderUid);
+                      if (props && props.length > 0) {
+                        const approvedProp = props.find((p) => p.status === 'approved');
+                        if (approvedProp) {
+                          const newWs = await researchWorkspaceService.getOrCreateWorkspaceForProposal(approvedProp, userProfile);
+                          setWorkspace(newWs);
+                          return;
+                        }
+                        // Non-approved proposal (e.g. submitted or needs_revision): redirect to proposals
+                        navigate('/proposals');
+                        return;
+                      }
+                    } catch (e) {}
+                  }
+                  // No requests and no proposals at all, go to submit title
                   navigate('/submit-title');
                 }
               },
@@ -139,6 +174,14 @@ export const StudentResearchWorkspace = () => {
         }
 
         if (targetWorkspace) {
+          // Ensure current user is in workspace memberIds
+          if (currentUser?.uid && (!targetWorkspace.memberIds || !targetWorkspace.memberIds.includes(currentUser.uid))) {
+            researchWorkspaceService.addMemberToWorkspace(targetWorkspace.id, {
+              uid: currentUser.uid,
+              fullName: userProfile?.fullName || 'Student Researcher',
+              email: userProfile?.email || '',
+            }).catch(() => {});
+          }
           setWorkspace(targetWorkspace);
 
           // Subscribe to evaluations in real-time

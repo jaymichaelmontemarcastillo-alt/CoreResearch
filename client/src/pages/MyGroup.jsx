@@ -82,6 +82,9 @@ export const MyGroup = () => {
       const myGroup = await groupService.getGroupByStudentId(userProfile.uid);
       if (myGroup) {
         setGroup(myGroup);
+        // Ensure student profile and assets are synced to this group project
+        groupService.syncMemberToGroupProject(myGroup.id, userProfile.uid, userProfile).catch(() => {});
+
         if (myGroup.courseId && !course) {
           setCourse(allCourses.find((c) => c.id === myGroup.courseId) || null);
         }
@@ -215,7 +218,8 @@ export const MyGroup = () => {
 
       setGroup(updated);
       setIsAddModalOpen(false);
-      showToast(`${candidate.fullName} has been added to your group!`);
+      const titleNotice = updated.title ? ` and automatically assigned to "${updated.title}"` : "";
+      showToast(`${candidate.fullName} has been added to your group${titleNotice}!`);
     } catch (err) {
       console.error("[MyGroup] Add member error:", err);
       showToast(err.message || "Failed to add member to group.", "error");

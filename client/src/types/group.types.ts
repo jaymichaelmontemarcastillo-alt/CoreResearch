@@ -16,13 +16,18 @@ export interface ResearchGroup {
   yearLevel?: number;
   memberIds: string[];
   members: ResearchGroupMember[];
-  status: 'incomplete' | 'ready' | 'active';
+  status: 'incomplete' | 'ready' | 'active' | 'completed' | 'archived';
   adviserId?: string;      // UID of the assigned adviser (set by admin/coordinator)
   adviserName?: string;    // Denormalized for display
   title?: string;          // Research title
   manuscriptId?: string;   // Associated manuscript ID
   panelists?: any[];
   panelistIds?: string[];
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+  archivedByName?: string;
+  archiveReason?: string;
   createdAt: string;
   updatedAt: string;
   academicYear?: string;

@@ -44,6 +44,10 @@ const AdvisersList = React.lazy(() => import('./pages/AdvisersList').then(m => (
 const ResearchDocumentsPage = React.lazy(() => import('./pages/ResearchDocumentsPage').then(m => ({ default: m.ResearchDocumentsPage })));
 const AdminMasterCalendar = React.lazy(() => import('./pages/AdminMasterCalendar').then(m => ({ default: m.AdminMasterCalendar })));
 const AdviserRequests = React.lazy(() => import('./pages/AdviserRequests').then(m => ({ default: m.AdviserRequests })));
+const AdminManuscripts = React.lazy(() => import('./pages/AdminManuscripts').then(m => ({ default: m.AdminManuscripts })));
+const AdminAnalyticsPage = React.lazy(() => import('./pages/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })));
+const AdminAdvisers = React.lazy(() => import('./pages/AdminAdvisers').then(m => ({ default: m.AdminAdvisers })));
+
 
 export default function App() {
   return (
@@ -132,7 +136,13 @@ export default function App() {
                       <Route path="/admin/courses" element={<Courses />} />
                       <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
                     </Route>
-                  </Route>
+                    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                      <Route path="/admin/advisers" element={<AdminAdvisers />} />
+                      <Route path="/admin/manuscripts" element={<AdminManuscripts />} />
+                      <Route path="/manuscripts" element={<AdminManuscripts />} />
+                      <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+                      <Route path="/admin/profile" element={<ProfileSettings />} />
+                    </Route>
                 </Route>
 
                 {/* Fallback Redirect */}

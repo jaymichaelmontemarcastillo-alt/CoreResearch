@@ -109,27 +109,120 @@ export const titleProposalService = {
    * Fetch all proposals belonging to a specific research group.
    * Students should always query by groupId.
    */
-  async getProposalsByGroup(groupId: string): Promise<TitleProposal[]> {
+  async getProposalsByGroup(groupId: string, leaderUid?: string): Promise<TitleProposal[]> {
     if (!groupId) return [];
     const q = query(collection(db, COLLECTION), where('groupId', '==', groupId));
     const snap = await getDocs(q);
-    const list = snap.docs.map((d) => d.data() as TitleProposal);
+    let list = snap.docs.map((d) => d.data() as TitleProposal);
+
+    if (list.length === 0) {
+      // If no leaderUid passed, attempt reading from group doc
+      let resolvedLeaderUid = leaderUid;
+      let groupMembers: any[] = [];
+      let groupMemberIds: string[] = [];
+      try {
+        const gSnap = await getDoc(doc(db, 'research_groups', groupId));
+        if (gSnap.exists()) {
+          const gData = gSnap.data();
+          if (!resolvedLeaderUid) {
+            resolvedLeaderUid = gData.memberIds?.[0] || gData.members?.[0]?.uid;
+          }
+          groupMembers = gData.members || [];
+          groupMemberIds = gData.memberIds || [];
+        }
+      } catch (e) {}
+
+      if (resolvedLeaderUid) {
+        const leaderQ = query(collection(db, COLLECTION), where('submittedByUid', '==', resolvedLeaderUid));
+        const leaderSnap = await getDocs(leaderQ);
+        if (!leaderSnap.empty) {
+          list = leaderSnap.docs.map((d) => d.data() as TitleProposal);
+          // Link this proposal to the group in Firestore
+          for (const d of leaderSnap.docs) {
+            const prop = d.data() as TitleProposal;
+            const curMemberIds = Array.isArray(prop.memberIds) ? prop.memberIds : [prop.submittedByUid];
+            const mergedIds = Array.from(new Set([...curMemberIds, ...groupMemberIds]));
+            updateDoc(d.ref, {
+              groupId: groupId,
+              memberIds: mergedIds,
+              members: groupMembers.length > 0 ? groupMembers : (prop.members || []),
+              updatedAt: new Date().toISOString(),
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+
     return list.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   },
 
   /**
-   * Fetch all proposals submitted by a specific student UID.
+   * Fetch all proposals submitted by or associated with a specific student UID.
    */
   async getProposalsByStudentId(studentUid: string): Promise<TitleProposal[]> {
     if (!studentUid) return [];
-    const q = query(collection(db, COLLECTION), where('submittedByUid', '==', studentUid));
-    const snap = await getDocs(q);
-    const list = snap.docs.map((d) => d.data() as TitleProposal);
-    return list.sort(
+    const qSubmitted = query(collection(db, COLLECTION), where('submittedByUid', '==', studentUid));
+    const snapSubmitted = await getDocs(qSubmitted);
+    const list = snapSubmitted.docs.map((d) => d.data() as TitleProposal);
+
+    const qMember = query(collection(db, COLLECTION), where('memberIds', 'array-contains', studentUid));
+    const snapMember = await getDocs(qMember);
+    const memberList = snapMember.docs.map((d) => d.data() as TitleProposal);
+
+    const map = new Map<string, TitleProposal>();
+    [...list, ...memberList].forEach((p) => map.set(p.id, p));
+    const merged = Array.from(map.values());
+
+    return merged.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
+  },
+
+  /**
+   * Add a student member to an existing proposal
+   */
+  async addMemberToProposal(
+    proposalId: string,
+    member: { uid: string; fullName: string; email?: string; studentNumber?: string }
+  ): Promise<void> {
+    const ref = doc(db, COLLECTION, proposalId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const data = snap.data() as TitleProposal;
+    const currentMemberIds = Array.isArray(data.memberIds) ? data.memberIds : [data.submittedByUid];
+    if (currentMemberIds.includes(member.uid)) return;
+
+    const updatedMemberIds = [...currentMemberIds, member.uid];
+    const currentMembers = Array.isArray(data.members) ? data.members : [];
+    const updatedMembers = [...currentMembers.filter((m: any) => m.uid !== member.uid), member];
+
+    await updateDoc(ref, {
+      memberIds: updatedMemberIds,
+      members: updatedMembers,
+      updatedAt: new Date().toISOString()
+    });
+  },
+
+  /**
+   * Remove a student member from a proposal
+   */
+  async removeMemberFromProposal(proposalId: string, memberUid: string): Promise<void> {
+    const ref = doc(db, COLLECTION, proposalId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const data = snap.data() as TitleProposal;
+    const currentMemberIds = Array.isArray(data.memberIds) ? data.memberIds : [];
+    const currentMembers = Array.isArray(data.members) ? data.members : [];
+
+    await updateDoc(ref, {
+      memberIds: currentMemberIds.filter((id) => id !== memberUid),
+      members: currentMembers.filter((m: any) => m.uid !== memberUid),
+      updatedAt: new Date().toISOString()
+    });
   },
 
   /**

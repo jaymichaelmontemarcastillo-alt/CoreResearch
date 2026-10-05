@@ -98,17 +98,46 @@ class AdviserRequestService {
   }
 
   /**
-   * Fetch all requests for a specific student/group.
+   * Fetch all requests for a specific student/group with automatic leader linkage.
    */
-  async getRequestsForStudentOrGroup(studentId: string, groupId?: string): Promise<AdviserRequest[]> {
-    const conditions = [];
+  async getRequestsForStudentOrGroup(studentId: string, groupId?: string, leaderId?: string): Promise<AdviserRequest[]> {
     if (groupId) {
-      conditions.push(where('groupId', '==', groupId));
-    } else {
-      conditions.push(where('studentId', '==', studentId));
+      const q = query(collection(db, COLLECTION), where('groupId', '==', groupId));
+      const snap = await getDocs(q);
+      let requests = snap.docs.map(d => d.data() as AdviserRequest);
+
+      if (requests.length === 0) {
+        let resolvedLeaderId = leaderId;
+        try {
+          const gSnap = await getDoc(doc(db, 'research_groups', groupId));
+          if (gSnap.exists()) {
+            const gData = gSnap.data();
+            if (!resolvedLeaderId) {
+              resolvedLeaderId = gData.memberIds?.[0] || gData.members?.[0]?.uid;
+            }
+          }
+        } catch (e) {}
+
+        if (resolvedLeaderId) {
+          const leaderQ = query(collection(db, COLLECTION), where('studentId', '==', resolvedLeaderId));
+          const leaderSnap = await getDocs(leaderQ);
+          if (!leaderSnap.empty) {
+            requests = leaderSnap.docs.map(d => d.data() as AdviserRequest);
+            // Backfill groupId on leader's request doc
+            for (const d of leaderSnap.docs) {
+              updateDoc(d.ref, {
+                groupId: groupId,
+                updatedAt: new Date().toISOString(),
+              }).catch(() => {});
+            }
+          }
+        }
+      }
+
+      return requests;
     }
 
-    const q = query(collection(db, COLLECTION), ...conditions);
+    const q = query(collection(db, COLLECTION), where('studentId', '==', studentId));
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as AdviserRequest);
   }
@@ -212,7 +241,12 @@ class AdviserRequestService {
   /**
    * Real-time subscription to requests for a specific student/group.
    */
-  subscribeToStudentRequests(studentId: string, callback: (requests: AdviserRequest[]) => void, groupId?: string): () => void {
+  subscribeToStudentRequests(
+    studentId: string,
+    callback: (requests: AdviserRequest[]) => void,
+    groupId?: string,
+    leaderId?: string
+  ): () => void {
     const conditions = [];
     if (groupId) {
       conditions.push(where('groupId', '==', groupId));
@@ -221,8 +255,31 @@ class AdviserRequestService {
     }
 
     const q = query(collection(db, COLLECTION), ...conditions);
-    return onSnapshot(q, (snap) => {
-      const requests = snap.docs.map(d => d.data() as AdviserRequest);
+    return onSnapshot(q, async (snap) => {
+      let requests = snap.docs.map(d => d.data() as AdviserRequest);
+      if (requests.length === 0 && groupId) {
+        let resolvedLeaderId = leaderId;
+        if (!resolvedLeaderId) {
+          try {
+            const gSnap = await getDoc(doc(db, 'research_groups', groupId));
+            if (gSnap.exists()) {
+              resolvedLeaderId = gSnap.data().memberIds?.[0];
+            }
+          } catch (e) {}
+        }
+        if (resolvedLeaderId && resolvedLeaderId !== studentId) {
+          try {
+            const leaderQ = query(collection(db, COLLECTION), where('studentId', '==', resolvedLeaderId));
+            const leaderSnap = await getDocs(leaderQ);
+            if (!leaderSnap.empty) {
+              requests = leaderSnap.docs.map(d => d.data() as AdviserRequest);
+              for (const d of leaderSnap.docs) {
+                updateDoc(d.ref, { groupId, updatedAt: new Date().toISOString() }).catch(() => {});
+              }
+            }
+          } catch (e) {}
+        }
+      }
       callback(requests);
     });
   }

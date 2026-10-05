@@ -32,40 +32,7 @@ const defaultDraftContentHtml = `<h1 style="text-align: center; color: #1e293b;"
 
 const seedMockManuscriptsIfEmpty = () => {
   if (!mockFirestoreDb.has('manuscripts')) {
-    const initialManuscripts = [
-      {
-        id: 'ms-v1.0',
-        projectId: 'proj-501',
-        projectTitle: 'Smart IoT Moisture & Nutrient Sensing System for Urban Farming',
-        versionNumber: 'v1.0',
-        fileName: 'CoreResearch_Draft_v1.0.pdf',
-        fileSize: 4829100, // ~4.8 MB
-        fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        uploadedBy: 'dev-student-01',
-        uploaderName: 'Alex Rivera',
-        notes: 'Initial Chapter 1 to 3 manuscript draft submission.',
-        status: 'revisions_requested',
-        createdAt: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString()
-      },
-      {
-        id: 'ms-v1.1',
-        projectId: 'proj-501',
-        projectTitle: 'Smart IoT Moisture & Nutrient Sensing System for Urban Farming',
-        versionNumber: 'v1.1',
-        fileName: 'CoreResearch_Revision_v1.1.pdf',
-        fileSize: 5210400, // ~5.2 MB
-        fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        uploadedBy: 'dev-student-01',
-        uploaderName: 'Alex Rivera',
-        notes: 'Revised methodology diagram and expanded related work literature review.',
-        status: 'under_review',
-        createdAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
-      }
-    ];
-
-    const map = new Map();
-    initialManuscripts.forEach(m => map.set(m.id, m));
-    mockFirestoreDb.set('manuscripts', map);
+    mockFirestoreDb.set('manuscripts', new Map());
   }
 
   // Seed live draft storage if empty
@@ -776,3 +743,437 @@ export const updateManuscriptComment = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Get all manuscripts for Admin & Research Coordinators
+ */
+export const getAllAdminManuscripts = async (req, res) => {
+  try {
+    seedMockManuscriptsIfEmpty();
+    let list = [];
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      list = Array.from(map.values());
+    } else {
+      try {
+        const snapshot = await db.collection('manuscript_versions').get();
+        if (!snapshot.empty) {
+          list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
+
+        // Also retrieve active student manuscript workspaces
+        const wsSnap = await db.collection('manuscript_workspaces').get();
+        if (!wsSnap.empty) {
+          const wsList = wsSnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              projectId: data.projectId || data.proposalId || doc.id,
+              projectTitle: data.title,
+              title: data.title,
+              authors: data.members?.map(m => m.fullName) || (data.studentName ? [data.studentName] : []),
+              uploaderName: data.studentName,
+              uploadedBy: data.studentId,
+              adviserName: data.adviserName,
+              adviserId: data.adviserId,
+              department: data.department || 'Computer Studies',
+              versionNumber: 'v1.0',
+              abstract: data.abstract || '',
+              keywords: data.keywords || [],
+              status: data.status || 'under_review',
+              isArchived: Boolean(data.isArchived),
+              isBestThesis: Boolean(data.isBestThesis),
+              bestThesisNotes: data.bestThesisNotes || '',
+              grade: null,
+              sections: data.sections || [],
+              createdAt: data.createdAt || new Date().toISOString(),
+              updatedAt: data.updatedAt || new Date().toISOString()
+            };
+          });
+
+          // Merge without duplicate IDs
+          const existingIds = new Set(list.map(m => m.id));
+          wsList.forEach(wsItem => {
+            if (!existingIds.has(wsItem.id)) {
+              list.push(wsItem);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[ManuscriptController] Firestore read fallback to mock:', err.message);
+        const map = mockFirestoreDb.get('manuscripts') || new Map();
+        list = Array.from(map.values());
+      }
+    }
+
+    // Strictly filter out any mock/dummy IDs
+    list = list.filter(m => !m.id?.startsWith('ms-10') && !m.projectId?.startsWith('proj-50'));
+
+    list.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+    return res.status(200).json({
+      success: true,
+      count: list.length,
+      data: list
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] getAllAdminManuscripts error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Admin update manuscript metadata (Title, Abstract, Authors, Status, etc.)
+ */
+export const adminUpdateManuscript = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    seedMockManuscriptsIfEmpty();
+
+    let updated = null;
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      const item = map.get(id);
+      if (!item) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      updated = {
+        ...item,
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+      map.set(id, updated);
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        // Fallback to mock map
+        const map = mockFirestoreDb.get('manuscripts');
+        const item = map?.get(id);
+        if (item) {
+          updated = { ...item, ...updates, updatedAt: new Date().toISOString() };
+          map.set(id, updated);
+        } else {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+      } else {
+        await ref.update({
+          ...updates,
+          updatedAt: new Date().toISOString()
+        });
+        const refreshed = await ref.get();
+        updated = { id: refreshed.id, ...refreshed.data() };
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Manuscript updated successfully.',
+      data: updated
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] adminUpdateManuscript error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Admin edit or give grade for a manuscript
+ */
+export const updateManuscriptGrade = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { score, letter, remarks, criteria } = req.body;
+    seedMockManuscriptsIfEmpty();
+
+    const numericScore = Number(score) || 0;
+    let computedLetter = letter;
+    if (!computedLetter) {
+      if (numericScore >= 95) computedLetter = '1.00 (Excellence)';
+      else if (numericScore >= 90) computedLetter = '1.25 (Very Superior)';
+      else if (numericScore >= 85) computedLetter = '1.50 (Superior)';
+      else if (numericScore >= 80) computedLetter = '1.75 (High Average)';
+      else if (numericScore >= 75) computedLetter = '2.00 (Average)';
+      else computedLetter = 'Conditional Re-defense';
+    }
+
+    const gradeObj = {
+      score: numericScore,
+      letter: computedLetter,
+      remarks: remarks || '',
+      criteria: criteria || { presentation: 0, methodology: 0, results: 0, manuscriptQuality: 0 },
+      updatedAt: new Date().toISOString()
+    };
+
+    let updated = null;
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      const item = map.get(id);
+      if (!item) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      item.grade = gradeObj;
+      item.updatedAt = new Date().toISOString();
+      map.set(id, item);
+      updated = item;
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      await ref.update({
+        grade: gradeObj,
+        updatedAt: new Date().toISOString()
+      });
+      const doc = await ref.get();
+      updated = { id: doc.id, ...doc.data() };
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Manuscript grade updated to ${numericScore} (${computedLetter}).`,
+      data: updated
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] updateManuscriptGrade error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Toggle archive status for manuscript
+ */
+export const toggleArchiveManuscript = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isArchived } = req.body;
+    seedMockManuscriptsIfEmpty();
+
+    let updated = null;
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      const item = map.get(id);
+      if (!item) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      const nextArchive = isArchived !== undefined ? Boolean(isArchived) : !item.isArchived;
+      item.isArchived = nextArchive;
+      if (nextArchive) {
+        item.status = 'archived';
+      } else if (item.status === 'archived') {
+        item.status = 'approved';
+      }
+      item.updatedAt = new Date().toISOString();
+      map.set(id, item);
+      updated = item;
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      const current = doc.data() || {};
+      const nextArchive = isArchived !== undefined ? Boolean(isArchived) : !current.isArchived;
+      const patch = {
+        isArchived: nextArchive,
+        status: nextArchive ? 'archived' : (current.status === 'archived' ? 'approved' : current.status),
+        updatedAt: new Date().toISOString()
+      };
+      await ref.update(patch);
+      const refreshed = await ref.get();
+      updated = { id: refreshed.id, ...refreshed.data() };
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: updated.isArchived ? 'Manuscript moved to archive.' : 'Manuscript restored from archive.',
+      data: updated
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] toggleArchiveManuscript error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Toggle Best Thesis designation
+ */
+export const toggleBestThesis = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isBestThesis, notes } = req.body;
+    seedMockManuscriptsIfEmpty();
+
+    let updated = null;
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      const item = map.get(id);
+      if (!item) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      const nextBest = isBestThesis !== undefined ? Boolean(isBestThesis) : !item.isBestThesis;
+      item.isBestThesis = nextBest;
+      item.bestThesisNotes = nextBest ? (notes || item.bestThesisNotes || 'Nominated and selected as Best Thesis.') : '';
+      item.updatedAt = new Date().toISOString();
+      map.set(id, item);
+      updated = item;
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      const current = doc.data() || {};
+      const nextBest = isBestThesis !== undefined ? Boolean(isBestThesis) : !current.isBestThesis;
+      const patch = {
+        isBestThesis: nextBest,
+        bestThesisNotes: nextBest ? (notes || current.bestThesisNotes || 'Nominated and selected as Best Thesis.') : '',
+        updatedAt: new Date().toISOString()
+      };
+      await ref.update(patch);
+      const refreshed = await ref.get();
+      updated = { id: refreshed.id, ...refreshed.data() };
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: updated.isBestThesis ? 'Manuscript designated as Best Thesis!' : 'Best Thesis designation removed.',
+      data: updated
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] toggleBestThesis error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Add feedback comment directly to manuscript
+ */
+export const addManuscriptFeedback = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text, section } = req.body;
+    const user = req.user;
+    seedMockManuscriptsIfEmpty();
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Feedback text is required' });
+    }
+
+    const newComment = {
+      id: `comm-${Date.now()}`,
+      authorName: user.fullName || user.email.split('@')[0],
+      authorRole: user.role || 'admin',
+      text: text.trim(),
+      section: section || 'General',
+      createdAt: new Date().toISOString()
+    };
+
+    let updated = null;
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      const item = map.get(id);
+      if (!item) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      item.comments = item.comments || [];
+      item.comments.push(newComment);
+      item.commentsCount = item.comments.length;
+      item.updatedAt = new Date().toISOString();
+      map.set(id, item);
+      updated = item;
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      const current = doc.data() || {};
+      const comments = current.comments || [];
+      comments.push(newComment);
+      await ref.update({
+        comments,
+        commentsCount: comments.length,
+        updatedAt: new Date().toISOString()
+      });
+      const refreshed = await ref.get();
+      updated = { id: refreshed.id, ...refreshed.data() };
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Feedback posted successfully.',
+      comment: newComment,
+      data: updated
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] addManuscriptFeedback error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Publish manuscript directly to Institutional Repository
+ */
+export const publishManuscriptToRepository = async (req, res) => {
+  try {
+    const { id } = req.params;
+    seedMockManuscriptsIfEmpty();
+    seedMockRepositoryIfEmpty();
+
+    let manuscript = null;
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      manuscript = map.get(id);
+      if (!manuscript) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      manuscript.status = 'published';
+      manuscript.updatedAt = new Date().toISOString();
+      map.set(id, manuscript);
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      await ref.update({ status: 'published', updatedAt: new Date().toISOString() });
+      manuscript = { id: doc.id, ...doc.data(), status: 'published' };
+    }
+
+    // Insert into repository publications
+    const repoPub = {
+      id: `repo-${Date.now()}`,
+      projectId: manuscript.projectId || 'proj-501',
+      manuscriptId: manuscript.id,
+      title: manuscript.title || manuscript.projectTitle,
+      authors: manuscript.authors || [manuscript.uploaderName || 'Student Researcher'],
+      adviserName: manuscript.adviserName || 'Adviser',
+      department: manuscript.department || 'Computer Science',
+      publicationYear: new Date().getFullYear(),
+      abstract: manuscript.abstract || 'Institutional Research Publication',
+      keywords: manuscript.keywords || ['Research'],
+      pdfUrl: manuscript.fileUrl || '',
+      fileName: manuscript.fileName || 'manuscript.pdf',
+      viewsCount: 1,
+      downloadsCount: 0,
+      versionNumber: manuscript.versionNumber || 'v1.0',
+      isBestThesis: Boolean(manuscript.isBestThesis),
+      publishedAt: new Date().toISOString()
+    };
+
+    if (isDevMockMode) {
+      const repoMap = mockFirestoreDb.get('repository');
+      repoMap.set(repoPub.id, repoPub);
+    } else {
+      await db.collection('repository_publications').doc(repoPub.id).set(repoPub);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Manuscript published to Institutional Repository successfully.',
+      publication: repoPub,
+      data: manuscript
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] publishManuscriptToRepository error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+

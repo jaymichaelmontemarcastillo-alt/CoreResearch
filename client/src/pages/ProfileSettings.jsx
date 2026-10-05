@@ -462,6 +462,95 @@ export const ProfileSettings = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-fade-in">
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleAvatarFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Mobile View: Profile Picture Section (Always at the very top of Account Settings) */}
+      {activeTab === "profile" && (
+        <div className="block md:hidden bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl p-6 shadow-sm">
+          {/* Feedback Alert for Mobile */}
+          {profileFeedback && (
+            <div
+              className={`mb-5 p-4 rounded-xl flex items-center gap-3 text-sm animate-fade-in ${
+                profileFeedback.type === "success"
+                  ? "bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                  : "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400"
+              }`}
+            >
+              {profileFeedback.type === "success" ? (
+                <HiCheckCircle className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <HiExclamationCircle className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
+              )}
+              <span>{profileFeedback.message}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col items-center text-center gap-4">
+            {/* Circular Avatar with Camera Badge */}
+            <div className="relative group shrink-0">
+              <div className="w-24 h-24 rounded-full ring-4 ring-gray-100 dark:ring-[#222433] overflow-hidden bg-gray-100 dark:bg-[#1c1d28] flex items-center justify-center shadow-inner">
+                {avatarPreview && !avatarError ? (
+                  <img
+                    src={avatarPreview}
+                    alt=""
+                    onError={() => setAvatarError(true)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-medium text-3xl flex items-center justify-center tracking-wider select-none">
+                    {getInitials()}
+                  </div>
+                )}
+              </div>
+
+              {/* Camera overlay trigger */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white dark:border-[#15161e] transition transform hover:scale-105"
+                title="Change picture"
+              >
+                <HiCamera className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Upload & Delete Avatar Action Buttons */}
+            <div className="flex flex-col items-center gap-2.5">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-xs flex items-center gap-2"
+                >
+                  <HiArrowUpTray className="w-4 h-4" />
+                  Upload New
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteAvatar}
+                  disabled={!avatarPreview || avatarError}
+                  className="px-4 py-2 bg-gray-100 dark:bg-[#1c1d28] hover:bg-gray-200 dark:hover:bg-[#252839] border border-transparent dark:border-[#222433] text-gray-700 dark:text-[#9396a8] font-medium text-sm rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <HiTrash className="w-4 h-4 text-gray-500 dark:text-[#6b6f84]" />
+                  Delete avatar
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-[#9396a8]">
+                JPG, PNG, or WebP. Choose a picture to pan and zoom before applying.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Settings Layout Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar Tabs */}
@@ -554,20 +643,6 @@ export const ProfileSettings = () => {
             )}
 
           </div>
-
-          {/* Institutional Badge Card */}
-          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-[#1c1d28] dark:to-[#15161e] border border-blue-100/80 dark:border-[#222433]">
-            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-semibold text-xs uppercase tracking-wider">
-              <HiSparkles className="w-3.5 h-3.5" />
-              Institutional Account
-            </div>
-            <p className="text-xs text-gray-700 dark:text-[#f3f4f8] mt-1.5 font-semibold">
-              {roleLabel}
-            </p>
-            <p className="text-[11px] text-gray-500 dark:text-[#9396a8] mt-0.5 truncate">
-              {email}
-            </p>
-          </div>
         </div>
 
         {/* Right Column: Main Form Card */}
@@ -592,8 +667,8 @@ export const ProfileSettings = () => {
                 </div>
               )}
 
-              {/* Avatar Upload Section (Matches Reference Image) */}
-              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-6 pb-6 border-b border-gray-100 dark:border-[#222433]">
+              {/* Avatar Upload Section (Desktop View) */}
+              <div className="hidden md:flex flex-col sm:flex-row items-center sm:items-center gap-6 pb-6 border-b border-gray-100 dark:border-[#222433]">
                 {/* Circular Avatar with Camera Badge */}
                 <div className="relative group shrink-0">
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full ring-4 ring-gray-100 dark:ring-[#222433] overflow-hidden bg-gray-100 dark:bg-[#1c1d28] flex items-center justify-center shadow-inner">
@@ -622,14 +697,7 @@ export const ProfileSettings = () => {
                   </button>
                 </div>
 
-                {/* Hidden File Input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleAvatarFileChange}
-                  accept="image/*"
-                  className="hidden"
-                />
+                {/* Hidden File Input handled globally */}
 
                 {/* Upload & Delete Avatar Action Buttons */}
                 <div className="flex flex-col items-center sm:items-start gap-2.5">

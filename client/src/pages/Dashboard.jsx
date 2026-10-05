@@ -106,29 +106,42 @@ export const Dashboard = () => {
           }
 
           // Fetch student proposals, workspace, and documents
+          const leaderUid = group?.memberIds?.[0] || group?.members?.[0]?.uid;
           let proposals = [];
           if (group?.id) {
-            proposals = await titleProposalService.getProposalsByGroup(group.id);
+            proposals = await titleProposalService.getProposalsByGroup(group.id, leaderUid);
           }
           if (proposals.length === 0 && studentUid) {
             proposals = await titleProposalService.getProposalsByStudentId(studentUid);
           }
 
-          const workspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
+          let workspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
             studentUid,
-            group?.id
+            group?.id,
+            leaderUid
           );
+
+          if (!workspace && group) {
+            try {
+              workspace = await researchWorkspaceService.getOrCreateWorkspaceForGroup(group, userProfile, leaderUid);
+            } catch (e) {}
+          }
 
           let userDocs = [];
           try {
             const docs = await documentStore.fetchDocuments(userProfile);
             userDocs = (docs || []).filter(
-              (d) => d.ownerId === studentUid || (group?.id && d.groupId === group.id)
+              (d) =>
+                d.ownerId === studentUid ||
+                (leaderUid && d.ownerId === leaderUid) ||
+                (group?.id && d.groupId === group.id) ||
+                (group?.memberIds && group.memberIds.includes(d.ownerId)) ||
+                (workspace?.documentId && d.id === workspace.documentId)
             );
           } catch (e) { }
 
           if (isMounted) {
-            if (workspace) setHasActiveResearch(true);
+            setHasActiveResearch(Boolean(workspace));
             setAcademicInfo({ course, sectionName, group });
             setStudentResearch({
               workspace,
@@ -150,16 +163,16 @@ export const Dashboard = () => {
   const showGreetingCard = !isStudent || (!hasActiveResearch && !studentResearch.workspace && !studentResearch.loading);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {toastMessage && (
         <Toast message={toastMessage} variant="success" onClose={() => setToastMessage("")} />
       )}
 
       {/* Page Header / Welcome Card — hidden for students with an active research */}
       {showGreetingCard && (
-        <div className="px-6 py-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/80 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
+        <div className="p-4 sm:px-6 sm:py-5 rounded-2xl bg-white dark:bg-[#15161e] border border-gray-200/80 dark:border-[#222433] flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="space-y-0.5 sm:space-y-1">
+            <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
               {getGreeting()}, {displayName}
             </h1>
             {role === 'faculty' && (
@@ -247,40 +260,76 @@ export const Dashboard = () => {
 
           {/* ====== ADMIN CONTENT ====== */}
           {effectiveRole === "admin" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 flex flex-col justify-between gap-4 hover:border-gray-300 dark:hover:border-gray-600 transition">
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Access</span>
-                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
-                    User Directory
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Research Hub</span>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Manuscript Management & Workflow
                   </h3>
-                  <p className="text-[13px] text-gray-500 dark:text-[#9396a8] leading-relaxed">
-                    Manage institutional accounts, assign roles, and handle department assignments.
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
+                    Review new uploads, ongoing revisions, approve camera-ready copies, award Best Thesis, and edit defense grades.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/manuscripts"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                >
+                  Manage Manuscripts →
+                </Link>
+              </div>
+
+              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Intelligence</span>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Data Analytics & Flow
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
+                    Track the institutional research lifecycle flow, completion funnel, program comparisons, and adviser workloads.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/analytics"
+                  className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1"
+                >
+                  View Analytics Flow →
+                </Link>
+              </div>
+
+              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Faculty</span>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Adviser & Faculty Profiles
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
+                    Supervise adviser research specializations, active advisee quotas, and assigned research cohorts.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/advisers"
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                >
+                  Manage Advisers →
+                </Link>
+              </div>
+
+              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Access</span>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    User & Student Accounts
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
+                    Manage institutional accounts, assign roles, approve registrations, and handle department affiliations.
                   </p>
                 </div>
                 <Link
                   to="/admin/users"
-                  className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
                 >
                   Manage Users →
-                </Link>
-              </div>
-
-              <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 flex flex-col justify-between gap-4 hover:border-gray-300 dark:hover:border-gray-600 transition">
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Repository</span>
-                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
-                    Repository Overview
-                  </h3>
-                  <p className="text-[13px] text-gray-500 dark:text-[#9396a8] leading-relaxed">
-                    Monitor published papers and institutional research output.
-                  </p>
-                </div>
-                <Link
-                  to="/repository"
-                  className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  View Repository →
                 </Link>
               </div>
             </div>
@@ -322,7 +371,7 @@ const AdviserDashboardMetrics = () => {
   }, [currentUser?.uid]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
       <StatCard
         label="Active Advisees"
         value={metrics.groups}
@@ -351,6 +400,7 @@ const AdviserDashboardMetrics = () => {
         subtitle="Schedules"
         trend="Oral Examinations"
         trendType="positive"
+        className="col-span-3 sm:col-span-1"
       />
     </div>
   );
@@ -379,7 +429,7 @@ const PanelistDashboardMetrics = () => {
   }, [currentUser?.uid]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
       <StatCard
         label="Assigned Defenses"
         value={metrics.defenses}
@@ -407,6 +457,7 @@ const PanelistDashboardMetrics = () => {
         subtitle="Available"
         trend="Pre-Defense Manuscripts"
         trendType="positive"
+        className="col-span-3 sm:col-span-1"
       />
     </div>
   );
@@ -452,7 +503,7 @@ const AdminDashboardMetrics = () => {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
       <StatCard
         label="Total Users"
         value={metrics.loading ? "..." : metrics.totalUsers.toString()}
@@ -477,6 +528,7 @@ const AdminDashboardMetrics = () => {
         value="Operational"
         trend="All Services Operational"
         trendType="positive"
+        className="col-span-3 sm:col-span-1"
       />
     </div>
   );

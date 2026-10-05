@@ -18,11 +18,19 @@ import {
   HiDocumentDuplicate,
   HiXCircle,
   HiTrash,
+  HiUser,
+  HiPencilSquare,
+  HiBuildingOffice2,
+  HiUserGroup,
+  HiDocumentText,
 } from "react-icons/hi2";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
 import { enrollmentService } from "../services/enrollment.service";
+import { userService } from "../services/user.service";
+import { groupService } from "../services/group.service";
+import { researchWorkspaceService } from "../services/researchWorkspace.service";
 import { useAuth } from "../context/AuthContext";
 
 export const StudentDirectory = () => {
@@ -52,11 +60,93 @@ export const StudentDirectory = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [inviteToDelete, setInviteToDelete] = useState(null);
   
-  // --- Manual Assign Form State (Legacy/Maintained functionality) ---
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [assignUid, setAssignUid] = useState("");
   const [enrollmentStatus, setEnrollmentStatus] = useState("enrolled");
   const [assigning, setAssigning] = useState(false);
+
+  // --- Student Profile Modal State ---
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentForm, setStudentForm] = useState({
+    fullName: "",
+    studentIdOrEmployeeId: "",
+    email: "",
+    courseId: "",
+    specializationId: "",
+    sectionId: "",
+    enrollmentStatus: "enrolled",
+  });
+  const [studentSections, setStudentSections] = useState([]);
+  const [studentResearchInfo, setStudentResearchInfo] = useState({
+    group: null,
+    workspace: null,
+    loading: false,
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const handleOpenStudentProfile = async (u) => {
+    setSelectedStudent(u);
+    setStudentForm({
+      fullName: u.fullName || "",
+      studentIdOrEmployeeId: u.studentIdOrEmployeeId || "",
+      email: u.email || "",
+      courseId: u.courseId || "",
+      specializationId: u.specializationId || "",
+      sectionId: u.sectionId || "",
+      enrollmentStatus: u.enrollmentStatus || "enrolled",
+    });
+
+    if (u.courseId) {
+      setStudentSections(allSectionsByCourse[u.courseId] || []);
+    } else {
+      setStudentSections([]);
+    }
+
+    setStudentResearchInfo({ group: null, workspace: null, loading: true });
+    setProfileModalOpen(true);
+
+    try {
+      const [grp, ws] = await Promise.all([
+        groupService.getGroupByStudentId(u.uid).catch(() => null),
+        researchWorkspaceService.getWorkspaceByStudentOrGroup(u.uid).catch(() => null),
+      ]);
+      setStudentResearchInfo({ group: grp, workspace: ws, loading: false });
+    } catch (e) {
+      setStudentResearchInfo({ group: null, workspace: null, loading: false });
+    }
+  };
+
+  const handleSaveStudentProfile = async (e) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+    setSavingProfile(true);
+    try {
+      const academicPayload = {
+        courseId: studentForm.courseId,
+        specializationId: studentForm.specializationId,
+        sectionId: studentForm.sectionId,
+        enrollmentStatus: studentForm.enrollmentStatus,
+      };
+
+      await Promise.all([
+        studentService.updateStudentAcademicInfo(selectedStudent.uid, academicPayload),
+        userService.updateUser(selectedStudent.uid, {
+          fullName: studentForm.fullName,
+          studentIdOrEmployeeId: studentForm.studentIdOrEmployeeId,
+        }),
+      ]);
+
+      showToast(`Student profile for "${studentForm.fullName}" updated successfully!`);
+      setProfileModalOpen(false);
+      await fetchInitialData();
+    } catch (err) {
+      console.error('[StudentDirectory] profile save error:', err);
+      showToast(err.message || 'Failed to save student profile.', 'error');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // 1. Data Fetching Effects
@@ -342,7 +432,8 @@ export const StudentDirectory = () => {
     { label: "Program", className: "min-w-[100px]" },
     { label: "Specialization", className: "min-w-[130px]" },
     { label: "Section", className: "min-w-[90px]" },
-    { label: "Status", className: "min-w-[110px] text-right" },
+    { label: "Status", className: "min-w-[110px]" },
+    { label: "Actions", className: "min-w-[100px] text-right" },
   ];
 
   return (
@@ -624,24 +715,203 @@ export const StudentDirectory = () => {
                 {u.courseId && u.sectionId ? getSectionName(u.courseId, u.sectionId) : "—"}
               </TableCell>
 
-              <TableCell className="text-right max-w-[120px]">
+              <TableCell className="max-w-[120px]">
                 {u.enrollmentStatus ? (
-                  <div className="flex justify-end truncate">
-                    <Badge 
-                      variant={u.enrollmentStatus === "enrolled" ? "emerald" : "orange"}
-                      className="text-[11px] px-2 py-0.5 uppercase tracking-wide truncate max-w-full"
-                    >
-                      {u.enrollmentStatus}
-                    </Badge>
-                  </div>
+                  <Badge 
+                    variant={u.enrollmentStatus === "enrolled" ? "emerald" : "orange"}
+                    className="text-[11px] px-2 py-0.5 uppercase tracking-wide truncate max-w-full"
+                  >
+                    {u.enrollmentStatus}
+                  </Badge>
                 ) : (
                   <span className="text-gray-400 dark:text-gray-500 font-semibold text-xs truncate">—</span>
                 )}
+              </TableCell>
+
+              <TableCell className="text-right max-w-[110px]">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleOpenStudentProfile(u)}
+                  title="Manage Student Profile"
+                >
+                  <HiPencilSquare className="w-3.5 h-3.5 mr-1 text-blue-500" />
+                  Manage
+                </Button>
               </TableCell>
             </TableRow>
           ))
         )}
       </DataTable>
+
+      {/* Student Profile Management Modal */}
+      <Modal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        title="Manage Student Profile & Academic Record"
+        icon={HiAcademicCap}
+        maxWidth="max-w-2xl"
+      >
+        {selectedStudent && (
+          <form onSubmit={handleSaveStudentProfile} className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433]">
+              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold flex items-center justify-center text-sm shrink-0">
+                {selectedStudent.fullName ? selectedStudent.fullName.charAt(0) : "S"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {selectedStudent.fullName || "Student Profile"}
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-[#9396a8] truncate">
+                  {selectedStudent.email || "No email"} • UID: {selectedStudent.uid?.slice(0, 8)}
+                </p>
+              </div>
+              <Badge variant={studentForm.enrollmentStatus === "enrolled" ? "emerald" : "orange"}>
+                {studentForm.enrollmentStatus}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                <Input
+                  value={studentForm.fullName}
+                  onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Student ID Number</label>
+                <Input
+                  value={studentForm.studentIdOrEmployeeId}
+                  onChange={(e) => setStudentForm({ ...studentForm, studentIdOrEmployeeId: e.target.value })}
+                  placeholder="e.g. 2022-10492"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Degree Program</label>
+                <select
+                  value={studentForm.courseId}
+                  onChange={(e) => {
+                    const cId = e.target.value;
+                    setStudentForm({ ...studentForm, courseId: cId, specializationId: "", sectionId: "" });
+                    setStudentSections(allSectionsByCourse[cId] || []);
+                  }}
+                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                >
+                  <option value="">No Program Assigned</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Specialization</label>
+                <select
+                  value={studentForm.specializationId}
+                  onChange={(e) => setStudentForm({ ...studentForm, specializationId: e.target.value })}
+                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                  disabled={!studentForm.courseId}
+                >
+                  <option value="">None / General</option>
+                  {(courses.find((c) => c.id === studentForm.courseId)?.specializations || []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Section Assignment</label>
+                <select
+                  value={studentForm.sectionId}
+                  onChange={(e) => setStudentForm({ ...studentForm, sectionId: e.target.value })}
+                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                  disabled={!studentForm.courseId}
+                >
+                  <option value="">No Section Assigned</option>
+                  {studentSections.map((sec) => (
+                    <option key={sec.id} value={sec.id}>
+                      {sec.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Enrollment Status</label>
+                <select
+                  value={studentForm.enrollmentStatus}
+                  onChange={(e) => setStudentForm({ ...studentForm, enrollmentStatus: e.target.value })}
+                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                >
+                  <option value="enrolled">Enrolled - Regular</option>
+                  <option value="irregular">Enrolled - Irregular</option>
+                  <option value="leave">Leave of Absence</option>
+                  <option value="graduated">Graduated</option>
+                  <option value="withdrawn">Withdrawn</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Research Group & Manuscript Info */}
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433] space-y-2">
+              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Research Project & Group Affiliation
+              </div>
+              {studentResearchInfo.loading ? (
+                <div className="text-xs text-gray-400">Loading research records...</div>
+              ) : studentResearchInfo.workspace || studentResearchInfo.group ? (
+                <div className="space-y-1 text-xs">
+                  <div>
+                    <span className="text-gray-500">Thesis Title: </span>
+                    <strong className="text-gray-900 dark:text-white">
+                      {studentResearchInfo.workspace?.title || 'Title Proposal in Progress'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Group Name: </span>
+                    <strong className="text-gray-900 dark:text-white">
+                      {studentResearchInfo.group?.name || studentResearchInfo.workspace?.groupName || 'Research Group'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Assigned Adviser: </span>
+                    <strong className="text-gray-900 dark:text-white">
+                      {studentResearchInfo.workspace?.adviserName || studentResearchInfo.group?.adviserName || 'Not Assigned'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Research Phase: </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                      {studentResearchInfo.workspace?.researchPhase || 'Proposal Stage'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 italic">
+                  Student is not yet enrolled in an active research group or manuscript workspace.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
+              <Button variant="outline" size="sm" type="button" onClick={() => setProfileModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" type="submit" isLoading={savingProfile}>
+                Save Student Profile
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal

@@ -7,7 +7,8 @@ export type ManuscriptWorkspaceStatus =
   | 'revision_required'
   | 'under_review'
   | 'approved'
-  | 'completed';
+  | 'completed'
+  | 'archived';
 
 export type ResearchPhase =
   | 'CHAPTERS_1_3'
@@ -82,10 +83,17 @@ export interface ManuscriptWorkspace {
   courseId?: string;
   academicYear?: string;
   semester?: string;
+  memberIds?: string[];
+  members?: Array<{ uid: string; fullName: string; email?: string; studentNumber?: string }>;
   status: ManuscriptWorkspaceStatus;
   researchPhase: ResearchPhase;
   sections: ManuscriptSection[];
   overallProgress: number; // 0 - 100
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+  archivedByName?: string;
+  archiveReason?: string;
   createdAt: string;
   updatedAt: string;
 }

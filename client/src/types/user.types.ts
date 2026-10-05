@@ -20,6 +20,12 @@ export interface UserProfile {
   programSpecialization?: string;
   sectionId?: string;
   sectionName?: string;
+  groupId?: string;
+  groupName?: string;
+  projectTitle?: string;
+  researchTitle?: string;
+  adviserId?: string;
+  adviserName?: string;
   yearLevel?: number; // Deprecated - replaced by Program + Major + Section
   status: UserStatus;
   is_approved: boolean;
