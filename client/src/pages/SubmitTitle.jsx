@@ -40,6 +40,7 @@ export const SubmitTitle = () => {
   const [toastVariant, setToastVariant] = useState('success');
   const [loading, setLoading] = useState(true);
   const [existingWorkspace, setExistingWorkspace] = useState(null);
+  const [existingGroupTitle, setExistingGroupTitle] = useState(null);
   const [isMatchingModalOpen, setIsMatchingModalOpen] = useState(false);
   const [pendingRequest, setPendingRequest] = useState(null);
   const [declinedAdviserIds, setDeclinedAdviserIds] = useState([]);
@@ -59,10 +60,31 @@ export const SubmitTitle = () => {
         const group = await groupService.getGroupByStudentId(currentUser.uid);
         
         // 1. Check Workspace
-        const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(currentUser.uid, group?.id);
+        let ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(currentUser.uid, group?.id);
+        if (!ws && group && (group.title || group.adviserId)) {
+          try {
+            ws = await researchWorkspaceService.getOrCreateWorkspaceForGroup(group, userProfile);
+          } catch (e) {
+            console.warn('[SubmitTitle] Auto workspace create error:', e);
+          }
+        }
+
         if (ws) {
           if (isMounted) {
             setExistingWorkspace(ws);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 1b. Check if the group already has an assigned project title or proposal
+        if (group && group.title) {
+          if (isMounted) {
+            setExistingGroupTitle({
+              title: group.title,
+              groupName: group.name,
+              adviserName: group.adviserName || '',
+            });
             setLoading(false);
           }
           return;
@@ -287,6 +309,41 @@ export const SubmitTitle = () => {
             </Button>
             <Button variant="outline" className="text-red-600 hover:bg-red-50" onClick={handleResetWorkspace}>
               Abandon Workspace & Restart (Dev Only)
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (existingGroupTitle) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 mt-8">
+        <Card className="p-8 text-center border-t-4 border-t-blue-500">
+          <BookOpen className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Group Project Already Assigned
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4 max-w-lg mx-auto text-sm leading-relaxed">
+            Your research group (<strong>{existingGroupTitle.groupName}</strong>) is already working on an assigned project:
+          </p>
+          <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 max-w-lg mx-auto mb-6 text-left">
+            <span className="text-xs uppercase font-bold text-blue-600 dark:text-blue-400 tracking-wider">Research Title</span>
+            <p className="font-semibold text-gray-900 dark:text-white mt-1 text-sm sm:text-base">
+              {existingGroupTitle.title}
+            </p>
+            {existingGroupTitle.adviserName && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Adviser: <strong className="text-gray-800 dark:text-gray-200">{existingGroupTitle.adviserName}</strong>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <Button variant="primary" onClick={() => navigate('/research/workspace')}>
+              Go to Group Workspace
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/my-group')}>
+              View Research Group
             </Button>
           </div>
         </Card>

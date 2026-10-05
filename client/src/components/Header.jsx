@@ -111,6 +111,9 @@ export const Header = ({ onOpenMobileMenu }) => {
     if (path.startsWith("/research-groups") || path.startsWith("/groups") || path.startsWith("/admin/groups")) return "Research Groups";
     if (path.startsWith("/admin/users")) return "User Directory";
     if (path.startsWith("/admin/courses")) return "Courses & Sections";
+    if (path.startsWith("/admin/manuscripts") || path.startsWith("/manuscripts")) return "Manuscript Management";
+    if (path.startsWith("/admin/analytics")) return "Data Analytics Flow";
+    if (path.startsWith("/admin/advisers")) return "Adviser & Faculty Directory";
     if (path === "/research-documents") return "Research Documents";
     if (path === "/adviser-requests") return "Adviser Requests";
     if (path === "/onboarding") return "Profile Setup";

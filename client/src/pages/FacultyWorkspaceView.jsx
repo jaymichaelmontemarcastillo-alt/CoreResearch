@@ -15,13 +15,17 @@ import {
   HiArrowLeft,
   HiCalendar,
   HiExclamationCircle,
-  HiPlusCircle
+  HiPlusCircle,
+  HiArchiveBox,
+  HiArrowPath,
+  HiShieldCheck,
 } from 'react-icons/hi2';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
 import researchFeedbackService from '../services/researchFeedback.service';
 import progressService from '../services/progress.service';
 import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
+import { groupService } from '../services/group.service';
 import { ResearchProgressCircle } from '../components/research/ResearchProgressCircle';
 import { MilestonesTracker } from '../components/research/MilestonesTracker';
 import { TaskCard } from '../components/research/TaskCard';
@@ -275,25 +279,141 @@ export const FacultyWorkspaceView = () => {
     }
   };
 
+  const handleArchiveAdvisee = async () => {
+    if (!workspace) return;
+    const isAssigned = workspace.adviserId === currentUser.uid;
+    const isPrivileged = role === 'admin' || role === 'research_coordinator';
+    if (!isAssigned && !isPrivileged) {
+      setToast('Permission Denied: Only the assigned research adviser can archive this advisee group.');
+      return;
+    }
+
+    const reason = window.prompt(
+      `Archive "${workspace.groupName || workspace.title}" upon completion?\n\nEnter completion reason / milestone (e.g. Final Defense Passed & Manuscript Approved):`,
+      'Final Defense Passed & Manuscript Approved'
+    );
+    if (reason === null) return; // cancelled
+
+    try {
+      await groupService.archiveAdviseeGroup(
+        workspace.groupId || workspace.id,
+        currentUser.uid,
+        currentUser.displayName || userProfile?.fullName || 'Faculty Adviser',
+        reason.trim() || 'Research completed and signed off.',
+        role
+      );
+      setToast('Advisee group archived successfully upon completion.');
+    } catch (err) {
+      console.error('[FacultyWorkspaceView] Archive error:', err);
+      setToast('Failed to archive advisee group: ' + err.message);
+    }
+  };
+
+  const handleRestoreAdvisee = async () => {
+    if (!workspace) return;
+    const isAssigned = workspace.adviserId === currentUser.uid;
+    const isPrivileged = role === 'admin' || role === 'research_coordinator';
+    if (!isAssigned && !isPrivileged) {
+      setToast('Permission Denied: Only the assigned research adviser can restore this advisee group.');
+      return;
+    }
+
+    if (!window.confirm(`Restore "${workspace.groupName || workspace.title}" back to active advisees?`)) {
+      return;
+    }
+
+    try {
+      await groupService.unarchiveAdviseeGroup(
+        workspace.groupId || workspace.id,
+        currentUser.uid,
+        currentUser.displayName || userProfile?.fullName || 'Faculty Adviser',
+        role
+      );
+      setToast('Advisee group restored to active status.');
+    } catch (err) {
+      console.error('[FacultyWorkspaceView] Restore error:', err);
+      setToast('Failed to restore advisee group: ' + err.message);
+    }
+  };
+
+  const isArchived = Boolean(workspace?.isArchived || workspace?.status === 'archived');
+  const canManageArchive = workspace && (workspace.adviserId === currentUser.uid || role === 'admin' || role === 'research_coordinator');
+
   return (
     <div className="space-y-6">
       {toast && <Toast message={toast} variant="error" onClose={() => setToast('')} />}
 
       {/* Breadcrumb Navigation */}
-      <button 
-        onClick={() => navigate(-1)}
-        className="flex items-center text-sm font-semibold text-gray-500 hover:text-gray-700"
-      >
-        <HiArrowLeft className="w-4 h-4 mr-1" />
-        Back to Dashboard
-      </button>
+      <div className="flex items-center justify-between">
+        <button 
+          onClick={() => navigate(-1)}
+          className="flex items-center text-sm font-semibold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+        >
+          <HiArrowLeft className="w-4 h-4 mr-1" />
+          Back to Advisees
+        </button>
+
+        {/* Top-Right Archive / Restore Quick Action */}
+        {canManageArchive && (
+          <div>
+            {!isArchived ? (
+              <button
+                type="button"
+                onClick={handleArchiveAdvisee}
+                className="px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs"
+                title="Archive advisee group upon completion"
+              >
+                <HiArchiveBox className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>Archive Advisee</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRestoreAdvisee}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs"
+                title="Restore advisee group to active list"
+              >
+                <HiArrowPath className="w-4 h-4 text-gray-500" />
+                <span>Restore Advisee</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Archived Advisee Notice Banner */}
+      {isArchived && (
+        <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-200 dark:border-purple-800/40 text-xs text-purple-900 dark:text-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <HiArchiveBox className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />
+            <div>
+              <p className="font-bold text-sm">Archived Research Advisee Group</p>
+              <p className="text-purple-700 dark:text-purple-300 text-xs mt-0.5">
+                {workspace.archiveReason
+                  ? `Reason: ${workspace.archiveReason}`
+                  : 'This advisee group has completed their research and has been archived.'}
+                {workspace.archivedAt && ` • Archived on ${new Date(workspace.archivedAt).toLocaleDateString()}`}
+              </p>
+            </div>
+          </div>
+          {canManageArchive && (
+            <button
+              type="button"
+              onClick={handleRestoreAdvisee}
+              className="px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-200 hover:bg-purple-50 dark:hover:bg-slate-700 font-semibold transition text-xs shrink-0 self-start sm:self-auto"
+            >
+              Restore to Active
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Header Info */}
       <div className="p-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 flex flex-col md:flex-row gap-6 justify-between items-start">
         <div className="flex-1 space-y-4">
           <div className="flex items-center gap-3">
-            <Badge variant="blue" className="uppercase">
-              {workspace.status?.replace(/_/g, ' ')}
+            <Badge variant={isArchived ? "purple" : "blue"} className="uppercase">
+              {isArchived ? "ARCHIVED / COMPLETED" : workspace.status?.replace(/_/g, ' ')}
             </Badge>
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest flex items-center gap-1">
               <HiCalendar className="w-3.5 h-3.5" />

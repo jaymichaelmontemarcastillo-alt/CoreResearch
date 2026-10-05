@@ -4,7 +4,7 @@ import adminAnalyticsService from '../../../services/adminAnalytics.service';
 import { AdminSummaryCards } from './AdminSummaryCards';
 import { AdminAnalyticsFilters } from './AdminAnalyticsFilters';
 import { ResearchStatusDistributionChart } from './ResearchStatusDistributionChart';
-import { ResearchProgressTrendChart } from './ResearchProgressTrendChart';
+import { ResearchTopicsTrendChart } from './ResearchTopicsTrendChart';
 import { AdviserWorkloadChart } from './AdviserWorkloadChart';
 import { StudentsByProgramChart } from './StudentsByProgramChart';
 import { ProposalStatusOverviewChart } from './ProposalStatusOverviewChart';
@@ -79,14 +79,14 @@ export const AdminAnalyticsSection = () => {
         totalActiveFilters={activeFiltersCount}
       />
 
-      {/* 3. Analytics Section - Row 1: Status Distribution & Progress Trend */}
+      {/* 3. Analytics Section - Row 1: Status Distribution & Topics Trend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         <ResearchStatusDistributionChart
           data={processed.statusDistribution}
           loading={loading}
         />
-        <ResearchProgressTrendChart
-          data={processed.progressTrend}
+        <ResearchTopicsTrendChart
+          data={processed.topicalTrends}
           loading={loading}
         />
       </div>

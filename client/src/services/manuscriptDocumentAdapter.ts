@@ -37,6 +37,41 @@ export const manuscriptDocumentAdapter = {
       }
     }
 
+    // 1b. Check if an existing document was already created for this group or workspace leader
+    try {
+      const allDocs = await documentStore.fetchDocuments(userProfile);
+      const matchedDoc = (allDocs || []).find((d: any) =>
+        (workspace.groupId && d.groupId === workspace.groupId) ||
+        (d.projectId && (d.projectId === workspace.id || d.projectId === workspace.proposalId)) ||
+        (workspace.studentId && d.ownerId === workspace.studentId && d.title?.toLowerCase() === (workspace.title || 'Research Manuscript').toLowerCase())
+      );
+
+      if (matchedDoc && matchedDoc.id) {
+        try {
+          const { doc, updateDoc } = await import('firebase/firestore');
+          const { db } = await import('../firebase/firebase');
+          await updateDoc(doc(db, 'manuscript_workspaces', workspace.id), {
+            documentId: matchedDoc.id,
+            updatedAt: new Date().toISOString(),
+          });
+          workspace.documentId = matchedDoc.id;
+          if (workspace.groupId && !matchedDoc.groupId) {
+            await updateDoc(doc(db, 'documents', matchedDoc.id), {
+              groupId: workspace.groupId,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (e) {}
+
+        return {
+          documentId: matchedDoc.id,
+          editorUrl: `/documents/${matchedDoc.id}`,
+        };
+      }
+    } catch (err) {
+      console.warn('[ManuscriptAdapter] Search for existing document fallback:', err);
+    }
+
     // 2. Provision new collaborative manuscript document via documentStore
     const documentTitle = workspace.title || 'Research Manuscript';
     const store = documentStore as any;
@@ -45,6 +80,19 @@ export const manuscriptDocumentAdapter = {
       projectId: workspace.projectId || workspace.proposalId || workspace.id,
       sourceType: 'native',
     });
+
+    // 2b. Stamp documentId directly onto the workspace in Firestore so all members share it immediately
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('../firebase/firebase');
+      await updateDoc(doc(db, 'manuscript_workspaces', workspace.id), {
+        documentId: newDoc.id,
+        updatedAt: new Date().toISOString(),
+      });
+      workspace.documentId = newDoc.id;
+    } catch (e) {
+      console.warn('[ManuscriptAdapter] Failed to update workspace documentId:', e);
+    }
 
     // 3. Initialize ONLYOFFICE Document in MongoDB
     try {

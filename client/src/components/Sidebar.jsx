@@ -23,6 +23,7 @@ import {
   HiBell,
   HiChevronRight,
   HiChevronLeft,
+  HiChartBar,
 } from "react-icons/hi2";
 
 export const Sidebar = ({
@@ -238,6 +239,12 @@ export const Sidebar = ({
           roles: ["admin"],
         },
         {
+          label: "Advisers & Faculty",
+          path: "/admin/advisers",
+          icon: HiAcademicCap,
+          roles: ["admin"],
+        },
+        {
           label: "Programs & Sections",
           path: "/admin/courses",
           icon: HiSquares2X2,
@@ -256,6 +263,18 @@ export const Sidebar = ({
           roles: ["admin", "research_coordinator"],
         },
         {
+          label: "Manuscripts",
+          path: "/admin/manuscripts",
+          icon: HiDocumentText,
+          roles: ["admin", "research_coordinator"],
+        },
+        {
+          label: "Data Analytics",
+          path: "/admin/analytics",
+          icon: HiChartBar,
+          roles: ["admin", "research_coordinator"],
+        },
+        {
           label: "Scheduling",
           path: "/admin/scheduling",
           icon: HiCalendarDays,
@@ -269,7 +288,10 @@ export const Sidebar = ({
     const currentPath = location.pathname;
     if (path === "/proposals") return currentPath.startsWith("/proposals");
     if (path === "/admin/users") return currentPath.startsWith("/admin/users");
+    if (path === "/admin/advisers") return currentPath.startsWith("/admin/advisers");
     if (path === "/admin/courses") return currentPath.startsWith("/admin/courses");
+    if (path === "/admin/manuscripts") return currentPath.startsWith("/admin/manuscripts") || currentPath.startsWith("/manuscripts");
+    if (path === "/admin/analytics") return currentPath.startsWith("/admin/analytics");
     if (path === "/admin/calendar") return currentPath.startsWith("/admin/calendar") || currentPath.startsWith("/admin/master-calendar");
     if (path === "/calendar") return currentPath === "/calendar";
     return currentPath === path;

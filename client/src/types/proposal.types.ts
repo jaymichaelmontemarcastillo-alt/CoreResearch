@@ -48,6 +48,8 @@ export interface TitleProposal {
   studentName?: string;
   groupId: string;                // research_groups/{id}
   groupName: string;              // denormalized for display (e.g. "Group 01")
+  memberIds?: string[];
+  members?: Array<{ uid: string; fullName: string; email?: string; studentNumber?: string }>;
 
   // ── Academic context (denormalized for coordinator filtering) ──
   courseId: string;

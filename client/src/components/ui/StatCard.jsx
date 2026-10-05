@@ -22,29 +22,29 @@ export const StatCard = ({
 
   return (
     <div
-      className={`bg-white dark:bg-[#15161e] rounded-[20px] border border-gray-100 dark:border-[#222433] p-6 flex flex-col transition-all duration-200 hover:shadow-sm ${className}`}
+      className={`bg-white dark:bg-[#15161e] rounded-2xl sm:rounded-[20px] border border-gray-100 dark:border-[#222433] p-3 sm:p-5 lg:p-6 flex flex-col transition-all duration-200 hover:shadow-sm ${className}`}
     >
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-3 mb-2 sm:mb-4">
         {showIcon && Icon && (
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${getIconColor()}`}>
-            <Icon className="w-5 h-5" />
+          <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${getIconColor()}`}>
+            <Icon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
           </div>
         )}
-        <span className="text-[13px] font-semibold text-gray-500 dark:text-[#9396a8]">
+        <span className="text-[11px] sm:text-[13px] font-semibold text-gray-500 dark:text-[#9396a8] leading-tight line-clamp-2">
           {label}
         </span>
       </div>
 
       <div className="mt-auto">
-        <div className={`text-3xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
+        <div className={`text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
           {value}
         </div>
 
         {(subtitle || trend) && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
+          <div className="mt-1 sm:mt-2 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs leading-tight">
             {trend && (
               <span
-                className={`font-medium ${
+                className={`font-semibold sm:font-medium truncate ${
                   trendType === "positive"
                     ? "text-emerald-600 dark:text-emerald-400"
                     : trendType === "negative"

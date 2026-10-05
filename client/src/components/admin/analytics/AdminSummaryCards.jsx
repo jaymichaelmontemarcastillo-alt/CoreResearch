@@ -13,7 +13,7 @@ export const AdminSummaryCards = ({
   loading = false,
 }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+    <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
       <StatCard
         icon={HiUsers}
         showIcon
@@ -52,6 +52,7 @@ export const AdminSummaryCards = ({
         trendType="positive"
         valueColor="text-emerald-500 dark:text-emerald-400"
         subtitle="Institutional Repository"
+        className="col-span-3 sm:col-span-1"
       />
     </div>
   );

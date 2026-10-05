@@ -83,7 +83,7 @@ export const courseService = {
   async createCourse(input: CreateCourseInput): Promise<Course> {
     const id = input.code.toLowerCase().replace(/[^a-z0-9]/g, '');
     const courseRef = doc(db, COLLECTION_NAME, id);
-    
+
     const docSnap = await getDoc(courseRef);
     if (docSnap.exists()) {
       throw new Error(`Course with code ${input.code} already exists.`);
@@ -96,7 +96,7 @@ export const courseService = {
       createdAt: now,
       updatedAt: now,
     };
-    
+
     await setDoc(courseRef, newCourse);
     coursesCache = null; // Invalidate cache
     return enrichCourseWithMajors(newCourse);

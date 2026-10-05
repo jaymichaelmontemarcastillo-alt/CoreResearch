@@ -1,8 +1,8 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { AdminManuscripts } from "./AdminManuscripts";
 
 export const Manuscripts = () => {
-  return <Navigate to="/dashboard" replace />;
+  return <AdminManuscripts />;
 };
 
 export default Manuscripts;

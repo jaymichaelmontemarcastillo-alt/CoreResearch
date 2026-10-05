@@ -41,6 +41,9 @@ import { AdvisersList } from './pages/AdvisersList';
 import { ResearchDocumentsPage } from './pages/ResearchDocumentsPage';
 import { AdminMasterCalendar } from './pages/AdminMasterCalendar';
 import { AdviserRequests } from './pages/AdviserRequests';
+import { AdminManuscripts } from './pages/AdminManuscripts';
+import { AdminAnalyticsPage } from './pages/AdminAnalyticsPage';
+import { AdminAdvisers } from './pages/AdminAdvisers';
 
 export default function App() {
   return (
@@ -127,6 +130,11 @@ export default function App() {
                     <Route path="/admin/users" element={<UserDirectory />} />
                     <Route path="/admin/courses" element={<Courses />} />
                     <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
+                    <Route path="/admin/advisers" element={<AdminAdvisers />} />
+                    <Route path="/admin/manuscripts" element={<AdminManuscripts />} />
+                    <Route path="/manuscripts" element={<AdminManuscripts />} />
+                    <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+                    <Route path="/admin/profile" element={<ProfileSettings />} />
                   </Route>
                 </Route>
               </Route>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   HiDocumentText, 
@@ -26,6 +27,8 @@ import manuscriptDocumentAdapter from '../../services/manuscriptDocumentAdapter'
 import { documentStore } from '../../services/documentStore';
 import { courseService } from '../../services/course.service';
 import { sectionService } from '../../services/section.service';
+import adviserRequestService from '../../services/adviserRequest.service';
+import titleProposalService from '../../services/titleProposal.service';
 
 /* ─── Dashboard Card Shell ─── */
 const DashboardCard = ({ children, className = '' }) => (
@@ -45,6 +48,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
   const [workspace, setWorkspace] = useState(null);
   const [documentId, setDocumentId] = useState(null);
   const [programInfo, setProgramInfo] = useState({ course: null, sectionName: '' });
+  const [groupProjectInfo, setGroupProjectInfo] = useState(null);
 
   // Real-time Data
   const [revisions, setRevisions] = useState([]);
@@ -64,15 +68,73 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
         const studentGroup = await groupService.getGroupByStudentId(studentUid);
         if (isMounted) setGroup(studentGroup);
 
-        // 2. Fetch Workspace
-        const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
+        const leaderUid = studentGroup?.memberIds?.[0] || studentGroup?.members?.[0]?.uid;
+
+        // Auto-sync student to group project in Firestore
+        if (studentGroup) {
+          groupService.syncMemberToGroupProject(studentGroup.id, studentUid, userProfile).catch((err) => {
+            console.warn('[StudentDashboardView] Group project sync error:', err);
+          });
+        }
+
+        // 2. Fetch Workspace (passing leaderUid fallback)
+        let ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
           studentUid,
-          studentGroup?.id
+          studentGroup?.id,
+          leaderUid
         );
+
+        // Auto-resolve / provision workspace if group or leader already has title or accepted request or approved proposal
+        if (!ws && studentGroup) {
+          try {
+            ws = await researchWorkspaceService.getOrCreateWorkspaceForGroup(studentGroup, userProfile, leaderUid);
+          } catch (e) {
+            console.warn('[StudentDashboardView] Auto workspace create fallback:', e);
+          }
+        }
+
         if (isMounted) {
           setWorkspace(ws);
           if (onActiveResearchChange) {
             onActiveResearchChange(Boolean(ws));
+          }
+        }
+
+        // 2b. If still no workspace, resolve group project status (pending request / proposal / title)
+        if (!ws && studentGroup) {
+          try {
+            let sharedTitle = studentGroup.title || '';
+            let sharedAdviser = studentGroup.adviserName || '';
+            let sharedStatus = 'Group Formed';
+
+            const reqs = await adviserRequestService.getRequestsForStudentOrGroup(studentUid, studentGroup.id, leaderUid);
+            const activeReq = reqs.find((r) => r.status === 'pending' || r.status === 'accepted');
+            if (activeReq) {
+              if (!sharedTitle) sharedTitle = activeReq.researchTitle;
+              if (!sharedAdviser) sharedAdviser = activeReq.adviserName;
+              sharedStatus = activeReq.status === 'accepted' ? 'Adviser Accepted' : 'Adviser Request Pending';
+            }
+
+            const props = await titleProposalService.getProposalsByGroup(studentGroup.id, leaderUid);
+            if (props && props.length > 0) {
+              const latestProp = props[0];
+              if (!sharedTitle) sharedTitle = latestProp.title;
+              if (latestProp.status === 'approved') sharedStatus = 'Title Approved';
+              else if (latestProp.status === 'needs_revision') sharedStatus = 'Revision Required';
+              else if (latestProp.status === 'submitted') sharedStatus = 'Proposal Under Review';
+            }
+
+            if (isMounted && (sharedTitle || studentGroup.name)) {
+              setGroupProjectInfo({
+                title: sharedTitle || 'Research Project in Progress',
+                adviserName: sharedAdviser,
+                status: sharedStatus,
+                groupName: studentGroup.name,
+                members: studentGroup.members || [],
+              });
+            }
+          } catch (e) {
+            console.warn('[StudentDashboardView] Group project info fallback:', e);
           }
         }
 
@@ -111,13 +173,35 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
           console.warn('[StudentDashboardView] Schedules fetch error:', e);
         }
 
-        // 6. Fetch Documents owned by group or student
+        // 6. Fetch Documents owned by group, leader, or student
         try {
           const docs = await documentStore.fetchDocuments(userProfile);
           const filtered = (docs || []).filter(
-            (d) => d.ownerId === studentUid || (studentGroup?.id && d.groupId === studentGroup.id)
+            (d) =>
+              d.ownerId === studentUid ||
+              (leaderUid && d.ownerId === leaderUid) ||
+              (studentGroup?.id && d.groupId === studentGroup.id) ||
+              (studentGroup?.memberIds && studentGroup.memberIds.includes(d.ownerId)) ||
+              (ws?.documentId && d.id === ws.documentId)
           );
           if (isMounted) setGroupDocuments(filtered);
+
+          // If workspace documentId was not populated yet, link the matched doc
+          if (!resolvedDocId && filtered.length > 0) {
+            resolvedDocId = filtered[0].id;
+            if (isMounted) setDocumentId(resolvedDocId);
+            if (ws && !ws.documentId) {
+              try {
+                const { doc, updateDoc } = await import('firebase/firestore');
+                const { db } = await import('../../firebase/firebase');
+                await updateDoc(doc(db, 'manuscript_workspaces', ws.id), {
+                  documentId: resolvedDocId,
+                  updatedAt: new Date().toISOString(),
+                });
+                ws.documentId = resolvedDocId;
+              } catch (e) {}
+            }
+          }
         } catch (e) {}
       } catch (err) {
         console.error('[StudentDashboardView] Init error:', err);
@@ -161,18 +245,27 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
   // Compute Filtered Upcoming Deadlines
   const upcomingDeadlines = useMemo(() => {
+    if (!workspace) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const list = [];
 
+    const leaderUid = group?.memberIds?.[0] || group?.members?.[0]?.uid;
+    const leaderName = group?.members?.[0]?.fullName;
+
     // 1. Group / Student Defense Schedules
     schedules.forEach((sch) => {
       const matchesGroup = group?.id && (sch.projectId === group.id || sch.groupId === group.id);
       const matchesStudent = sch.studentId === studentUid || sch.studentName === userProfile?.fullName;
-      const matchesTitle = workspace?.title && sch.projectTitle === workspace.title;
+      const matchesLeader = leaderUid && (sch.studentId === leaderUid || (leaderName && sch.studentName === leaderName));
+      const matchesMember = group?.memberIds && group.memberIds.includes(sch.studentId);
+      const matchesTitle =
+        workspace?.title &&
+        (sch.projectTitle?.toLowerCase() === workspace.title.toLowerCase() ||
+          sch.title?.toLowerCase() === workspace.title.toLowerCase());
 
-      if (matchesGroup || matchesStudent || matchesTitle) {
+      if (matchesGroup || matchesStudent || matchesLeader || matchesMember || matchesTitle) {
         const schDate = new Date(sch.date);
         if (!isNaN(schDate.getTime()) && schDate >= today) {
           list.push({
@@ -212,6 +305,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
   // Compute 7-Day Recent Research Activity
   const dailyActivity = useMemo(() => {
+    if (!workspace) return [];
     const days = [];
     const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -274,6 +368,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
   // Compute Discrete Group Activity Records by Member
   const activityRecords = useMemo(() => {
+    if (!workspace) return [];
     const records = [];
 
     // Task actions
@@ -313,6 +408,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
   // Compute Chronological Recent Activity Feed for this Group
   const recentActivities = useMemo(() => {
+    if (!workspace) return [];
     const feed = [];
 
     // Revisions
@@ -415,36 +511,147 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
   }, [revisions, tasks, groupDocuments, upcomingDeadlines, documentId, studentUid]);
 
   // Helper booleans for layout conditional rendering
-  const hasDeadlines = !loading && upcomingDeadlines.length > 0;
-  const hasRevisions = !loading && revisions.length > 0;
+  const hasWorkspace = Boolean(workspace);
+  const hasDeadlines = !loading && hasWorkspace && upcomingDeadlines.length > 0;
+  const hasRevisions = !loading && hasWorkspace && revisions.length > 0;
   
   const total7DayActions = dailyActivity.reduce((acc, curr) => acc + (curr.count || 0), 0);
-  const hasActivityChart = !loading && total7DayActions > 1;
-  const hasFeed = !loading && recentActivities.length > 0;
-  const hasGroupActivity = !loading && group?.members?.length > 0 && activityRecords.length > 0;
+  const hasActivityChart = !loading && hasWorkspace && total7DayActions > 1;
+  const hasFeed = !loading && hasWorkspace && recentActivities.length > 0;
+  const hasGroupActivity = !loading && hasWorkspace && group?.members?.length > 0 && activityRecords.length > 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3.5 sm:space-y-5">
+      {/* ─────────────────────────────────────────────── */}
+      {/* SHARED GROUP RESEARCH IN PROGRESS               */}
+      {/* ─────────────────────────────────────────────── */}
+      {!loading && !workspace && groupProjectInfo && (
+        <DashboardCard className="p-5 sm:p-7 border-blue-200 dark:border-blue-900/40 bg-gradient-to-br from-blue-50/40 via-white to-indigo-50/20 dark:from-blue-950/20 dark:via-[#15161e] dark:to-indigo-950/10 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+            <div className="space-y-2.5 min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-blue-600 dark:text-blue-400">
+                  Shared Group Project • {groupProjectInfo.groupName}
+                </span>
+                <Badge variant="blue" size="sm" className="font-semibold text-[11px]">
+                  {groupProjectInfo.status}
+                </Badge>
+              </div>
+
+              <h2
+                className="text-base sm:text-xl lg:text-[22px] font-bold text-gray-900 dark:text-white leading-snug break-words"
+                title={groupProjectInfo.title}
+              >
+                {groupProjectInfo.title}
+              </h2>
+
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                {programInfo.course && (
+                  <span>
+                    Program: <strong className="text-gray-800 dark:text-gray-200">{programInfo.course.code || programInfo.course.name}</strong>
+                  </span>
+                )}
+                {programInfo.sectionName && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span>
+                      Section: <strong className="text-gray-800 dark:text-gray-200">{programInfo.sectionName}</strong>
+                    </span>
+                  </>
+                )}
+                {groupProjectInfo.adviserName && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span>
+                      Adviser: <strong className="text-gray-800 dark:text-gray-200">{groupProjectInfo.adviserName}</strong>
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {groupProjectInfo.members && groupProjectInfo.members.length > 0 && (
+                <div className="pt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-gray-400 font-medium mr-1">Team:</span>
+                  {groupProjectInfo.members.map((m) => (
+                    <span
+                      key={m.uid}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 dark:bg-[#1f202e] text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-[#2b2d42]"
+                    >
+                      {m.fullName}
+                      {m.uid === studentUid && (
+                        <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">(You)</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0 pt-1">
+              <Link to="/research/workspace">
+                <Button variant="primary" size="sm" className="font-semibold shadow-xs">
+                  Go to Workspace
+                </Button>
+              </Link>
+              <Link to="/my-group">
+                <Button variant="outline" size="sm" className="font-medium">
+                  View Group
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </DashboardCard>
+      )}
+
+      {/* ─────────────────────────────────────────────── */}
+      {/* EMPTY STATE: No Active Research Workspace       */}
+      {/* ─────────────────────────────────────────────── */}
+      {!loading && !workspace && !groupProjectInfo && (
+        <DashboardCard className="p-6 sm:p-12 text-center flex flex-col items-center justify-center space-y-3 sm:space-y-4">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
+            <HiOutlineBookOpen className="w-6 h-6 sm:w-7 sm:h-7" />
+          </div>
+          <div className="space-y-1 max-w-md">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+              No Active Research Workspace
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-[#9396a8] leading-relaxed">
+              Submit a research title proposal to get started. Once approved and an adviser is assigned, your research workspace, manuscript, and activities will appear here.
+            </p>
+          </div>
+          <div className="pt-1 sm:pt-2 flex items-center gap-3">
+            <Link to="/submit-title">
+              <button
+                type="button"
+                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs sm:text-sm transition shadow-xs flex items-center gap-2"
+              >
+                Submit Title Proposal
+              </button>
+            </Link>
+          </div>
+        </DashboardCard>
+      )}
+
       {/* ─────────────────────────────────────────────── */}
       {/* SECTION 1: Active Research Card (Full Width)    */}
       {/* ─────────────────────────────────────────────── */}
       {workspace && (
-        <DashboardCard className="p-6 sm:p-7">
-          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-            <div className="space-y-3 min-w-0 flex-1">
-              <span className="text-[11px] uppercase font-bold tracking-widest text-blue-600 dark:text-blue-400">
+        <DashboardCard className="p-4 sm:p-6 lg:p-7">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 sm:gap-6">
+            <div className="space-y-2 sm:space-y-3 min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-blue-600 dark:text-blue-400">
                 Active Research
               </span>
 
               <h2
-                className="text-xl sm:text-[22px] font-bold text-gray-900 dark:text-white leading-snug break-words"
+                className="text-base sm:text-xl lg:text-[22px] font-bold text-gray-900 dark:text-white leading-snug break-words"
                 title={workspace.title}
               >
                 {workspace.title || 'Untitled Research'}
               </h2>
 
               {/* Metadata line — dot-separated, no pills */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                 {programInfo.course && (
                   <span>
                     Program: <strong className="text-gray-800 dark:text-gray-200">{programInfo.course.code || programInfo.course.name}</strong>
@@ -470,12 +677,12 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-3 shrink-0 pt-1">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 pt-0.5 sm:pt-1">
               {documentId && (
                 <button
                   type="button"
                   onClick={() => navigate(`/documents/${documentId}`)}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-blue-600 text-white text-xs sm:text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-1.5 sm:gap-2 shadow-xs"
                 >
                   Open Manuscript
                 </button>
@@ -483,7 +690,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
               <Link to="/research/workspace">
                 <button
                   type="button"
-                  className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1d28] text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-[#222433] transition"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1d28] text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold hover:bg-gray-50 dark:hover:bg-[#222433] transition"
                 >
                   Workspace
                 </button>
@@ -495,7 +702,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
       {/* Loading State */}
       {loading && (
-        <div className="py-16 flex flex-col items-center justify-center space-y-3 text-gray-400">
+        <div className="py-12 sm:py-16 flex flex-col items-center justify-center space-y-3 text-gray-400">
           <div className="w-7 h-7 border-[3px] border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
           <span className="text-sm font-medium">Loading research data...</span>
         </div>
@@ -505,17 +712,17 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
       {/* SECTION 2: Recent Activity (LEFT) + Chart (RIGHT) */}
       {/* ─────────────────────────────────────────────── */}
       {(hasFeed || hasActivityChart) && (
-        <div className={`grid grid-cols-1 gap-5 ${hasFeed && hasActivityChart ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''} items-stretch`}>
+        <div className={`grid grid-cols-1 gap-3.5 sm:gap-5 ${hasFeed && hasActivityChart ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''} items-stretch`}>
           {/* LEFT: Recent Activity Feed */}
           {hasFeed && (
-            <DashboardCard className="p-5 flex flex-col justify-between">
+            <DashboardCard className="p-3.5 sm:p-5 flex flex-col justify-between">
               <StudentRecentActivityFeed activities={recentActivities} currentUserId={studentUid} loading={loading} />
             </DashboardCard>
           )}
 
           {/* RIGHT: Research Activity Chart */}
           {hasActivityChart && (
-            <DashboardCard className="p-5 flex flex-col justify-between">
+            <DashboardCard className="p-3.5 sm:p-5 flex flex-col justify-between">
               <ResearchActivityChart dailyActivity={dailyActivity} loading={loading} />
             </DashboardCard>
           )}
@@ -526,14 +733,14 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
       {/* SECTION 3: Deadlines (LEFT) + Revisions (RIGHT) */}
       {/* ─────────────────────────────────────────────── */}
       {(hasDeadlines || hasRevisions) && (
-        <div className={`grid grid-cols-1 gap-5 ${hasDeadlines && hasRevisions ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''}`}>
+        <div className={`grid grid-cols-1 gap-3.5 sm:gap-5 ${hasDeadlines && hasRevisions ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''}`}>
           {hasDeadlines && (
-            <DashboardCard className="p-6">
+            <DashboardCard className="p-4 sm:p-6">
               <UpcomingDeadlinesCard deadlines={upcomingDeadlines} loading={loading} />
             </DashboardCard>
           )}
           {hasRevisions && (
-            <DashboardCard className="p-6">
+            <DashboardCard className="p-4 sm:p-6">
               <ManuscriptRevisionsCard revisions={revisions} workspace={workspace} documentId={documentId} loading={loading} />
             </DashboardCard>
           )}
@@ -544,7 +751,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
       {/* SECTION 4: Group Activity (Full Width)          */}
       {/* ─────────────────────────────────────────────── */}
       {hasGroupActivity && (
-        <DashboardCard className="p-6">
+        <DashboardCard className="p-4 sm:p-6">
           <GroupActivityCard members={group.members} activityRecords={activityRecords} currentUserId={studentUid} loading={loading} />
         </DashboardCard>
       )}
