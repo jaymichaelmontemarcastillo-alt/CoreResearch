@@ -16,6 +16,7 @@ import {
   HiAcademicCap,
   HiArrowTopRightOnSquare,
 } from 'react-icons/hi2';
+import { PdfViewer } from '../ui/PdfViewer';
 
 export const PublicationDetailModal = ({
   isOpen,
@@ -244,7 +245,7 @@ export const PublicationDetailModal = ({
                 <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-300">
                   <span>Interactive Document Reader for <strong>{publication.title}</strong></span>
                   <a
-                    href={documentUrl}
+                    href={`/pdf-viewer?url=${encodeURIComponent(documentUrl)}&title=${encodeURIComponent(publication.title)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline"
@@ -254,11 +255,7 @@ export const PublicationDetailModal = ({
                 </div>
 
                 <div className="w-full h-[55vh] rounded-xl overflow-hidden border border-gray-200 dark:border-[#222433] bg-gray-100 dark:bg-[#0e0f15]">
-                  <iframe
-                    src={documentUrl}
-                    title={publication.title}
-                    className="w-full h-full"
-                  />
+                  <PdfViewer url={documentUrl} title={publication.title} />
                 </div>
               </div>
             ) : (

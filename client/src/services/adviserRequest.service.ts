@@ -32,6 +32,7 @@ export interface AdviserRequest {
   adviserName: string;
   compatibilityScore: number;
   status: AdviserRequestStatus;
+  isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -236,6 +237,17 @@ class AdviserRequestService {
   async deleteRequest(requestId: string): Promise<void> {
     const ref = doc(db, COLLECTION, requestId);
     await deleteDoc(ref);
+  }
+
+  /**
+   * Archive or Unarchive a request
+   */
+  async toggleArchiveRequest(requestId: string, isArchived: boolean): Promise<void> {
+    const ref = doc(db, COLLECTION, requestId);
+    await updateDoc(ref, {
+      isArchived,
+      updatedAt: new Date().toISOString()
+    });
   }
 
   /**

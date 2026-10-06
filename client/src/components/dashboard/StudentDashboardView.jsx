@@ -411,20 +411,9 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     if (!workspace) return [];
     const feed = [];
 
-    // Revisions
+    // Revisions (Only show student actions like addressing a revision)
     revisions.forEach((r) => {
-      if (r.status === 'resolved') {
-        feed.push({
-          id: `rev-res-${r.id}`,
-          category: 'revision',
-          title: 'Manuscript Revision Resolved',
-          description: `Revision note on ${r.sectionId ? r.sectionId.replace('_', ' ') : 'manuscript'} verified and signed off.`,
-          actorName: r.authorName || 'Faculty Adviser',
-          actorId: r.authorId,
-          timestamp: r.updatedAt || r.createdAt,
-          link: documentId ? `/documents/${documentId}` : '/research/workspace',
-        });
-      } else if (r.status === 'addressed') {
+      if (r.status === 'addressed') {
         feed.push({
           id: `rev-add-${r.id}`,
           category: 'revision',
@@ -435,21 +424,10 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
           timestamp: r.updatedAt,
           link: documentId ? `/documents/${documentId}` : '/research/workspace',
         });
-      } else {
-        feed.push({
-          id: `rev-new-${r.id}`,
-          category: 'revision',
-          title: 'Adviser Added Revision',
-          description: `New comment on ${r.sectionId ? r.sectionId.replace('_', ' ') : 'manuscript'}.`,
-          actorName: r.authorName || 'Faculty Adviser',
-          actorId: r.authorId,
-          timestamp: r.createdAt,
-          link: documentId ? `/documents/${documentId}` : '/research/workspace',
-        });
       }
     });
 
-    // Tasks
+    // Tasks (Only show student actions like completing or submitting)
     tasks.forEach((t) => {
       if (t.status === 'completed') {
         feed.push({
@@ -490,19 +468,6 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
           link: `/documents/${doc.id}`,
         });
       }
-    });
-
-    // Schedules
-    upcomingDeadlines.forEach((sch) => {
-      feed.push({
-        id: `feed-sch-${sch.id}`,
-        category: 'schedule',
-        title: `Upcoming: ${sch.title}`,
-        description: `Scheduled on ${new Date(sch.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}.`,
-        actorName: 'Academic Schedule',
-        timestamp: sch.date,
-        link: sch.link || '/schedules',
-      });
     });
 
     // Sort descending by timestamp
@@ -730,30 +695,21 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
       )}
 
       {/* ─────────────────────────────────────────────── */}
-      {/* SECTION 3: Deadlines (LEFT) + Revisions (RIGHT) */}
+      {/* SECTION 3: Group Activity (LEFT) + Revisions (RIGHT) */}
       {/* ─────────────────────────────────────────────── */}
-      {(hasDeadlines || hasRevisions) && (
-        <div className={`grid grid-cols-1 gap-3.5 sm:gap-5 ${hasDeadlines && hasRevisions ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''}`}>
-          {hasDeadlines && (
-            <DashboardCard className="p-4 sm:p-6">
-              <UpcomingDeadlinesCard deadlines={upcomingDeadlines} loading={loading} />
+      {(hasGroupActivity || hasRevisions) && (
+        <div className={`grid grid-cols-1 gap-3.5 sm:gap-5 ${(hasGroupActivity && hasRevisions) ? 'lg:grid-cols-[1.15fr_0.85fr]' : ''} items-stretch`}>
+          {hasGroupActivity && (
+            <DashboardCard className="p-4 sm:p-6 flex flex-col justify-between">
+              <GroupActivityCard members={group.members} activityRecords={activityRecords} currentUserId={studentUid} loading={loading} />
             </DashboardCard>
           )}
           {hasRevisions && (
-            <DashboardCard className="p-4 sm:p-6">
+            <DashboardCard className="p-4 sm:p-6 flex flex-col justify-between">
               <ManuscriptRevisionsCard revisions={revisions} workspace={workspace} documentId={documentId} loading={loading} />
             </DashboardCard>
           )}
         </div>
-      )}
-
-      {/* ─────────────────────────────────────────────── */}
-      {/* SECTION 4: Group Activity (Full Width)          */}
-      {/* ─────────────────────────────────────────────── */}
-      {hasGroupActivity && (
-        <DashboardCard className="p-4 sm:p-6">
-          <GroupActivityCard members={group.members} activityRecords={activityRecords} currentUserId={studentUid} loading={loading} />
-        </DashboardCard>
       )}
     </div>
   );

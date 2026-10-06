@@ -24,6 +24,8 @@ import {
   HiChevronRight,
   HiChevronLeft,
   HiChartBar,
+  HiPlus,
+  HiMinus,
 } from "react-icons/hi2";
 
 export const Sidebar = ({
@@ -101,15 +103,60 @@ export const Sidebar = ({
     }
   };
 
-  const navigationCategories = [
+  const [openDropdowns, setOpenDropdowns] = useState({});
+
+  const toggleDropdown = (category) => {
+    if (!isExpanded) {
+      if (onToggle) {
+        onToggle();
+      } else {
+        setInternalExpanded(true);
+      }
+      setOpenDropdowns((prev) => ({ ...prev, [category]: true }));
+    } else {
+      setOpenDropdowns((prev) => ({
+        ...prev,
+        [category]: !prev[category],
+      }));
+    }
+  };
+
+  const navItems = [
     {
-      category: "RESEARCH",
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: HiSquares2X2,
+      roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
+    },
+    {
+      category: "Research Management",
+      icon: HiDocumentText,
       items: [
         {
-          label: "Dashboard",
-          path: "/dashboard",
-          icon: HiSquares2X2,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
+          label: "Research Groups",
+          path: "/admin/groups",
+          icon: HiUserGroup,
+          roles: ["admin", "research_coordinator"],
+        },
+        ...(effectiveRole === "student" ? [
+          {
+            label: "My Group",
+            path: "/my-group",
+            icon: HiUserGroup,
+            roles: ["student"],
+          },
+          {
+            label: "Masterlist",
+            path: "/masterlist",
+            icon: HiClipboardDocumentList,
+            roles: ["student"],
+          },
+        ] : []),
+        {
+          label: "Manuscripts",
+          path: "/admin/manuscripts",
+          icon: HiDocumentText,
+          roles: ["admin", "research_coordinator"],
         },
         {
           label: "Research Documents",
@@ -117,77 +164,23 @@ export const Sidebar = ({
           icon: HiDocumentText,
           roles: ["adviser", "research_coordinator", "faculty", "admin"],
         },
-        {
-          label: "Adviser Requests",
-          path: "/adviser-requests",
-          icon: HiClipboardDocumentList,
-          roles: ["adviser", "faculty", "research_coordinator", "admin"],
-        },
-        ...(effectiveRole === "student"
+        ...(!hasWorkspace && effectiveRole === "student"
           ? [
               {
-                label: "My Group",
-                path: "/my-group",
-                icon: HiUserGroup,
+                label: "Submit Title",
+                path: "/submit-title",
+                icon: HiDocumentText,
                 roles: ["student"],
-              },
-              {
-                label: "Masterlist",
-                path: "/masterlist",
-                icon: HiClipboardDocumentList,
-                roles: ["student"],
-              },
-              {
-                label: "Faculty Advisers",
-                path: "/advisers",
-                icon: HiAcademicCap,
-                roles: ["student"],
-              },
-              ...(!hasWorkspace
-                ? [
-                    {
-                      label: "Submit Title",
-                      path: "/submit-title",
-                      icon: HiDocumentText,
-                      roles: ["student"],
-                    },
-                  ]
-                : [
-                    {
-                      label: "Research Workspace",
-                      path: "/research/workspace",
-                      icon: HiBookOpen,
-                      roles: ["student"],
-                    },
-                  ]),
-            ]
-          : []),
-        ...(effectiveRole === "adviser" ||
-        effectiveRole === "research_coordinator" ||
-        effectiveRole === "admin" ||
-        effectiveRole === "faculty"
-          ? [
-              {
-                label: "My Advisees",
-                path: "/advisees",
-                icon: HiUsers,
-                roles: ["adviser", "research_coordinator", "admin", "faculty"],
-              },
-              {
-                label: "Panelists",
-                path: "/panelists",
-                icon: HiUserGroup,
-                roles: ["adviser", "research_coordinator", "admin", "faculty", "panelist"],
               },
             ]
           : []),
-        ...(effectiveRole === "panelist"
+        ...(hasWorkspace && effectiveRole === "student"
           ? [
               {
-                label: "Panelists",
-                path: "/panelists",
-                icon: HiUserGroup,
-                roles: ["panelist"],
+                label: "Research Workspace",
+                path: "/research/workspace",
+                icon: HiBookOpen,
+                roles: ["student"],
               },
             ]
           : []),
@@ -207,7 +200,70 @@ export const Sidebar = ({
       ],
     },
     {
-      category: "ACADEMIC",
+      category: "People & Directory",
+      icon: HiUsers,
+      items: [
+        {
+          label: "User Directory",
+          path: "/admin/users",
+          icon: HiUsers,
+          roles: ["admin", "research_coordinator"],
+        },
+        {
+          label: "Students",
+          path: "/admin/students",
+          icon: HiAcademicCap,
+          roles: ["admin", "research_coordinator"],
+        },
+        {
+          label: "Advisers & Faculty",
+          path: "/admin/advisers",
+          icon: HiAcademicCap,
+          roles: ["admin"],
+        },
+        ...(effectiveRole === "student" ? [
+          {
+            label: "Faculty Advisers",
+            path: "/advisers",
+            icon: HiAcademicCap,
+            roles: ["student"],
+          }
+        ] : []),
+        {
+          label: "Programs & Sections",
+          path: "/admin/courses",
+          icon: HiSquares2X2,
+          roles: ["admin", "research_coordinator"],
+        },
+      ],
+    },
+    {
+      category: "Advising & Defenses",
+      icon: HiAcademicCap,
+      items: [
+        {
+          label: "My Advisees",
+          path: "/advisees",
+          icon: HiUsers,
+          roles: ["adviser", "research_coordinator", "admin", "faculty"],
+        },
+        {
+          label: "Adviser Requests",
+          path: "/adviser-requests",
+          icon: HiClipboardDocumentList,
+          roles: ["adviser", "faculty", "research_coordinator", "admin"],
+        },
+        {
+          label: "Defense Schedules",
+          path: "/panelists",
+          icon: HiUserGroup,
+          roles: ["adviser", "research_coordinator", "admin", "faculty", "panelist"],
+        },
+      ],
+    },
+    {
+      category: "Academic Schedules",
+      icon: HiCalendarDays,
       items: [
         {
           label: "Calendar",
@@ -222,65 +278,18 @@ export const Sidebar = ({
           roles: ["student", "adviser", "panelist", "faculty"],
         },
         {
-          label: "Notifications",
-          path: "/notifications",
-          icon: HiBell,
-          roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
-        },
-      ],
-    },
-    {
-      category: "ADMIN",
-      items: [
-        {
-          label: "User Directory",
-          path: "/admin/users",
-          icon: HiUsers,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
-          label: "Advisers & Faculty",
-          path: "/admin/advisers",
-          icon: HiAcademicCap,
-          roles: ["admin"],
-        },
-        {
-          label: "Programs & Sections",
-          path: "/admin/courses",
-          icon: HiSquares2X2,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
-          label: "Students",
-          path: "/admin/students",
-          icon: HiAcademicCap,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
-          label: "Research Groups",
-          path: "/admin/groups",
-          icon: HiUserGroup,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
-          label: "Manuscripts",
-          path: "/admin/manuscripts",
-          icon: HiDocumentText,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
-          label: "Data Analytics",
-          path: "/admin/analytics",
-          icon: HiChartBar,
-          roles: ["admin", "research_coordinator"],
-        },
-        {
           label: "Scheduling",
           path: "/admin/scheduling",
           icon: HiCalendarDays,
           roles: ["admin", "research_coordinator"],
         },
-      ],
+      ]
+    },
+    {
+      label: "Notifications",
+      path: "/notifications",
+      icon: HiBell,
+      roles: ["student", "adviser", "panelist", "admin", "research_coordinator", "faculty"],
     },
   ];
 
@@ -369,52 +378,123 @@ export const Sidebar = ({
 
       {/* CATEGORIZED NAVIGATION */}
       <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar ${isMobile ? 'py-1 space-y-1 px-2' : `py-3 space-y-1.5 ${expanded ? "px-3" : "px-2"}`}`}>
-        {navigationCategories.map((sec) => {
-          const visibleItems = sec.items.filter((item) =>
-            item.roles.includes(role || "student")
-          );
-          if (visibleItems.length === 0) return null;
+        {navItems.map((nav) => {
+          if (nav.category) {
+            const visibleItems = nav.items.filter((item) =>
+              item.roles.includes(role || "student")
+            );
+            if (visibleItems.length === 0) return null;
 
-          return (
-            <React.Fragment key={sec.category}>
-              {visibleItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = isItemActive(item.path);
+            const isOpen = openDropdowns[nav.category];
+            const DropdownIcon = nav.icon;
+            
+            const isAnyChildActive = visibleItems.some(item => isItemActive(item.path));
 
-                  return (
-                    <Link
-                      key={item.label}
-                      to={item.path}
-                      onClick={isMobile ? onCloseMobile : undefined}
-                      className={`relative flex items-center rounded-r-lg font-medium transition-all duration-150 border-l-[3px] ${
-                        expanded
-                          ? `gap-3 ${isMobile ? 'h-9 px-3 text-[13px]' : 'h-10 px-3 text-sm'}`
-                          : "justify-center h-10 w-10 mx-auto"
-                      } ${
-                        active
-                          ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-bold border-blue-600 dark:border-blue-500"
-                          : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26] border-transparent"
+            return (
+              <div key={nav.category} className="space-y-1">
+                <button
+                  onClick={() => toggleDropdown(nav.category)}
+                  className={`relative flex items-center justify-between w-full rounded-r-lg font-medium transition-all duration-150 border-l-[3px] group ${
+                    expanded
+                      ? `h-10 px-3 text-[12px]`
+                      : "justify-center h-10 w-10 mx-auto"
+                  } ${
+                    isAnyChildActive && !isOpen
+                      ? "bg-blue-50/50 dark:bg-blue-500/5 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/30"
+                      : "text-gray-600 dark:text-[#a0a5ba] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26] border-transparent"
+                  }`}
+                  title={!expanded ? nav.category : undefined}
+                >
+                  <div className={`flex items-center flex-1 min-w-0 ${expanded ? "gap-3" : "justify-center"}`}>
+                    <DropdownIcon
+                      className={`w-5 h-5 shrink-0 transition-colors duration-150 ${
+                        isAnyChildActive && !isOpen
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-gray-500 dark:text-[#888ca3] group-hover:text-gray-800 dark:group-hover:text-white"
                       }`}
-                      title={!expanded ? item.label : undefined}
-                    >
-                      <Icon
-                        className={`w-5 h-5 shrink-0 transition-colors duration-150 ${
-                          active
-                            ? "text-blue-600 dark:text-blue-400"
-                            : "text-gray-500 dark:text-[#888ca3] group-hover:text-gray-800 dark:group-hover:text-white"
-                        }`}
-                      />
+                    />
+                    {expanded && (
+                      <span className="whitespace-nowrap truncate">{nav.category}</span>
+                    )}
+                  </div>
+                  {expanded && (
+                    isOpen ? (
+                      <HiMinus className="w-4 h-4 shrink-0 text-gray-600 dark:text-gray-300 transition-transform duration-200" />
+                    ) : (
+                      <HiPlus className="w-4 h-4 shrink-0 text-gray-400 transition-transform duration-200" />
+                    )
+                  )}
+                </button>
 
-                      {expanded && (
-                        <span className="whitespace-nowrap text-[13px]">
-                          {item.label}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-            </React.Fragment>
-          );
+                {isOpen && expanded && (
+                  <div className="pl-4 space-y-1 mt-1">
+                    {visibleItems.map((item) => {
+                      const Icon = item.icon;
+                      const active = isItemActive(item.path);
+
+                      return (
+                        <Link
+                          key={item.label}
+                          to={item.path}
+                          onClick={isMobile ? onCloseMobile : undefined}
+                          className={`relative w-full flex items-center rounded-r-lg font-medium transition-all duration-150 border-l-[3px] ${
+                            isMobile ? "h-9 px-3 text-[12px]" : "h-10 px-3 text-[12px]"
+                          } gap-3 ${
+                            active
+                              ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-bold border-blue-600 dark:border-blue-500"
+                              : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26] border-transparent"
+                          }`}
+                        >
+                          <Icon
+                            className={`w-4 h-4 shrink-0 transition-colors duration-150 ${
+                              active
+                                ? "text-blue-600 dark:text-blue-400"
+                                : "text-gray-400 dark:text-[#6a6d85]"
+                            }`}
+                          />
+                          <span className="whitespace-nowrap">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          } else {
+            if (!nav.roles.includes(role || "student")) return null;
+
+            const Icon = nav.icon;
+            const active = isItemActive(nav.path);
+
+            return (
+              <Link
+                key={nav.label}
+                to={nav.path}
+                onClick={isMobile ? onCloseMobile : undefined}
+                className={`relative w-full flex items-center rounded-r-lg font-medium transition-all duration-150 border-l-[3px] ${
+                  expanded
+                    ? `gap-3 ${isMobile ? "h-9 px-3 text-[12px]" : "h-10 px-3 text-[12px]"}`
+                    : "justify-center h-10 w-10 mx-auto"
+                } ${
+                  active
+                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-bold border-blue-600 dark:border-blue-500"
+                    : "text-gray-500 dark:text-[#888ca3] hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1a1c26] border-transparent"
+                }`}
+                title={!expanded ? nav.label : undefined}
+              >
+                <Icon
+                  className={`w-5 h-5 shrink-0 transition-colors duration-150 ${
+                    active
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-gray-500 dark:text-[#888ca3] group-hover:text-gray-800 dark:group-hover:text-white"
+                  }`}
+                />
+                {expanded && (
+                  <span className="whitespace-nowrap">{nav.label}</span>
+                )}
+              </Link>
+            );
+          }
         })}
       </div>
 

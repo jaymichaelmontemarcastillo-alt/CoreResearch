@@ -497,20 +497,22 @@ export const AdviserDashboardView = () => {
       </div>
 
       {/* ==================================================== */}
-      {/* MAIN TWO-COLUMN CONTENT GRID */}
+      {/* MAIN TWO-ROW CONTENT GRID */}
       {/* ==================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT COLUMN (2 COLS): Action Required, Progress, Groups List */}
-        <div className="lg:col-span-2 space-y-6">
-
+      <div className="flex flex-col gap-6">
+        
+        {/* ROW 1: Pending Items & Upcoming Defenses */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          
           {/* -------------------------------------------------- */}
           {/* 2. ACTION REQUIRED SECTION */}
           {/* -------------------------------------------------- */}
-          <Card className="p-5 sm:p-6 space-y-5 border-0 shadow-sm ring-1 ring-gray-100 dark:ring-[#222433]">
-            <div className="flex items-center justify-between pb-3">
+          <div className="lg:col-span-2 flex flex-col">
+            <Card className="p-5 sm:p-6 space-y-5 border-0 shadow-sm ring-1 ring-gray-100 dark:ring-[#222433] h-full flex flex-col">
+              <div className="flex items-start justify-between gap-3 mb-3.5">
               <div className="flex items-center gap-2.5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 tracking-tight">
+                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white flex items-center gap-2 leading-tight">
                     Pending Items
                     {totalActionCount > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white uppercase tracking-wider">
@@ -655,15 +657,105 @@ export const AdviserDashboardView = () => {
                 ))}
               </div>
             )}
-          </Card>
+            </Card>
+          </div>
 
+          {/* -------------------------------------------------- */}
+          {/* 5. UPCOMING DEFENSES SECTION */}
+          {/* -------------------------------------------------- */}
+          <div className="flex flex-col">
+            <Card className="p-5 sm:p-6 space-y-4 h-full flex flex-col">
+              <div className="flex items-start justify-between gap-3 mb-3.5">
+                <div>
+                  <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white leading-tight">
+                    Upcoming Defenses
+                  </h3>
+                  <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
+                    Scheduled hearings for your advisees
+                  </p>
+                </div>
+                <Link
+                  to="/schedules"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  All Schedules →
+                </Link>
+              </div>
+
+              {loading ? (
+                <div className="py-8 text-center text-xs text-gray-400 flex-1">
+                  Loading schedules...
+                </div>
+              ) : upcomingDefenses.length === 0 ? (
+                /* Honest Empty State for Defenses */
+                <div className="py-8 px-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] text-center space-y-1.5 flex-1 flex flex-col justify-center">
+                  <HiCalendarDays className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto" />
+                  <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                    No Upcoming Defenses
+                  </h4>
+                  <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
+                    There are currently no upcoming defense schedules for your research groups.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-1 flex-1">
+                  {upcomingDefenses.slice(0, 4).map((sch) => (
+                    <div
+                      key={sch.id}
+                      className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] hover:shadow-md transition-all space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant={sch.defenseType === 'final_defense' ? 'emerald' : 'blue'}>
+                          {sch.defenseType === 'final_defense'
+                            ? 'Final Defense'
+                            : 'Proposal Defense'}
+                        </Badge>
+                        <span className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                          <HiClock className="w-3.5 h-3.5 text-blue-500" />
+                          {sch.startTime || 'TBA'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1">
+                          {sch.projectTitle || 'Oral Examination'}
+                        </h4>
+                        <p className="text-[11px] text-gray-500 dark:text-[#9396a8] mt-0.5">
+                          Date: {formatDefenseDate(sch.date)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-[#9396a8] pt-1 border-t border-gray-100 dark:border-[#222433]">
+                        <span className="flex items-center gap-1 truncate max-w-[160px]">
+                          <HiMapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          {sch.venue || sch.location || 'Room TBA'}
+                        </span>
+                        <Link
+                          to="/schedules"
+                          className="text-blue-600 dark:text-blue-400 font-semibold hover:underline shrink-0"
+                        >
+                          View Details →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
+
+        {/* ROW 2: Research Progress Overview & Recent System Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          
           {/* -------------------------------------------------- */}
           {/* 3. RESEARCH PROGRESS OVERVIEW */}
           {/* -------------------------------------------------- */}
-          <Card className="p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3">
+          <div className="lg:col-span-2 flex flex-col">
+            <Card className="p-5 sm:p-6 space-y-4 h-full flex flex-col">
+              <div className="flex items-start justify-between gap-3 mb-3.5">
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+                <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white leading-tight">
                   Research Progress Overview
                 </h3>
                 <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
@@ -784,103 +876,17 @@ export const AdviserDashboardView = () => {
                 </Link>
               </div>
             )}
-          </Card>
-
-
-        </div>
-
-        {/* RIGHT COLUMN (1 COL): Upcoming Defenses & Recent Activity */}
-        <div className="space-y-6">
-
-          {/* -------------------------------------------------- */}
-          {/* 5. UPCOMING DEFENSES SECTION */}
-          {/* -------------------------------------------------- */}
-          <Card className="p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
-                  Upcoming Defenses
-                </h3>
-                <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
-                  Scheduled hearings for your advisees
-                </p>
-              </div>
-              <Link
-                to="/schedules"
-                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                All Schedules →
-              </Link>
-            </div>
-
-            {loading ? (
-              <div className="py-8 text-center text-xs text-gray-400">
-                Loading schedules...
-              </div>
-            ) : upcomingDefenses.length === 0 ? (
-              /* Honest Empty State for Defenses */
-              <div className="py-8 px-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] text-center space-y-1.5">
-                <HiCalendarDays className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto" />
-                <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                  No Upcoming Defenses
-                </h4>
-                <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
-                  There are currently no upcoming defense schedules for your research groups.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3 pt-1">
-                {upcomingDefenses.slice(0, 4).map((sch) => (
-                  <div
-                    key={sch.id}
-                    className="p-4 rounded-2xl border border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] hover:shadow-md transition-all space-y-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge variant={sch.defenseType === 'final_defense' ? 'emerald' : 'blue'}>
-                        {sch.defenseType === 'final_defense'
-                          ? 'Final Defense'
-                          : 'Proposal Defense'}
-                      </Badge>
-                      <span className="text-[11px] font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                        <HiClock className="w-3.5 h-3.5 text-blue-500" />
-                        {sch.startTime || 'TBA'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1">
-                        {sch.projectTitle || 'Oral Examination'}
-                      </h4>
-                      <p className="text-[11px] text-gray-500 dark:text-[#9396a8] mt-0.5">
-                        Date: {formatDefenseDate(sch.date)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-[#9396a8] pt-1 border-t border-gray-100 dark:border-[#222433]">
-                      <span className="flex items-center gap-1 truncate max-w-[160px]">
-                        <HiMapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        {sch.venue || sch.location || 'Room TBA'}
-                      </span>
-                      <Link
-                        to="/schedules"
-                        className="text-blue-600 dark:text-blue-400 font-semibold hover:underline shrink-0"
-                      >
-                        View Details →
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+            </Card>
+          </div>
 
           {/* -------------------------------------------------- */}
           {/* 6. RECENT SYSTEM ACTIVITY WIDGET */}
           {/* -------------------------------------------------- */}
-          <Card className="p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-3">
+          <div className="flex flex-col">
+            <Card className="p-5 sm:p-6 space-y-4 h-full flex flex-col">
+              <div className="flex items-start justify-between gap-3 mb-3.5">
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+                <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white leading-tight">
                   Recent System Activity
                 </h3>
                 <p className="text-[13px] text-gray-500 dark:text-[#9396a8] mt-0.5">
@@ -909,7 +915,7 @@ export const AdviserDashboardView = () => {
               </div>
             ) : (
               <div className="space-y-3 text-xs">
-                {activities.slice(0, 6).map((item) => {
+                {activities.slice(0, 3).map((item) => {
                   const dotColor =
                     item.category === 'task'
                       ? 'bg-emerald-500'
@@ -947,16 +953,17 @@ export const AdviserDashboardView = () => {
               </div>
             )}
 
-            {activities.length > 6 && (
+            {activities.length > 3 && (
               <button
                 type="button"
                 onClick={() => setIsActivityModalOpen(true)}
-                className="w-full mt-3 pt-2 text-center text-xs font-medium text-gray-500 dark:text-[#9396a8] hover:text-blue-600 dark:hover:text-blue-400 border-t border-gray-100 dark:border-[#222433] transition-colors"
+                className="w-full mt-auto pt-2 text-center text-xs font-medium text-gray-500 dark:text-[#9396a8] hover:text-blue-600 dark:hover:text-blue-400 border-t border-gray-100 dark:border-[#222433] transition-colors"
               >
                 View all {activities.length} activities →
               </button>
             )}
-          </Card>
+            </Card>
+          </div>
         </div>
       </div>
 

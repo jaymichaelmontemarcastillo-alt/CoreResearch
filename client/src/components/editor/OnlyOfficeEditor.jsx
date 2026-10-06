@@ -50,6 +50,7 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
           if (data.success && isMounted) {
             const finalConfig = {
               ...data.config,
+              type: window.innerWidth < 768 ? 'mobile' : 'desktop',
               token: data.token
             };
             setConfig(finalConfig);

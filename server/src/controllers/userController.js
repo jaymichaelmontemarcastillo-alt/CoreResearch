@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
-import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
+import { db, isDevMockMode, mockUsersDb, auth } from '../config/firebaseAdmin.js';
 
 // Seed initial mock users into mock storage if empty
 export const seedMockUsersIfEmpty = () => {
@@ -346,3 +346,53 @@ export const changeMyPassword = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Delete a user account (Admin only)
+ */
+export const deleteUser = async (req, res) => {
+  try {
+    const { uid } = req.params;
+    if (!uid) {
+      return res.status(400).json({ success: false, error: 'User ID is required' });
+    }
+
+    // 1. Delete from Firebase Auth if not in mock mode
+    if (!isDevMockMode && auth) {
+      try {
+        await auth.deleteUser(uid);
+      } catch (authErr) {
+        if (authErr.code !== 'auth/user-not-found') {
+          console.error('[UserController] Auth delete error:', authErr);
+          throw authErr;
+        }
+      }
+    }
+
+    // 2. Delete from MongoDB
+    if (mongoose.connection.readyState === 1) {
+      try {
+        await User.findOneAndDelete({ uid });
+      } catch (mongoErr) {
+        console.error('[UserController] MongoDB delete error:', mongoErr);
+      }
+    }
+
+    // 3. Delete from Firestore
+    if (isDevMockMode) {
+      mockUsersDb.delete(uid);
+    } else if (db) {
+      try {
+        await db.collection('users').doc(uid).delete();
+      } catch (fsErr) {
+        console.error('[UserController] Firestore delete error:', fsErr);
+      }
+    }
+
+    return res.status(200).json({ success: true, message: 'User deleted successfully.' });
+  } catch (error) {
+    console.error('[UserController] deleteUser error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+

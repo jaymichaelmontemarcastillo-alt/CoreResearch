@@ -45,8 +45,8 @@ const ResearchDocumentsPage = React.lazy(() => import('./pages/ResearchDocuments
 const AdminMasterCalendar = React.lazy(() => import('./pages/AdminMasterCalendar').then(m => ({ default: m.AdminMasterCalendar })));
 const AdviserRequests = React.lazy(() => import('./pages/AdviserRequests').then(m => ({ default: m.AdviserRequests })));
 const AdminManuscripts = React.lazy(() => import('./pages/AdminManuscripts').then(m => ({ default: m.AdminManuscripts })));
-const AdminAnalyticsPage = React.lazy(() => import('./pages/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })));
 const AdminAdvisers = React.lazy(() => import('./pages/AdminAdvisers').then(m => ({ default: m.AdminAdvisers })));
+const PdfViewerPage = React.lazy(() => import('./pages/PdfViewerPage').then(m => ({ default: m.PdfViewerPage })));
 
 
 export default function App() {
@@ -76,6 +76,7 @@ export default function App() {
                 {/* Protected Main Workspace Routes */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="/onboarding" element={<Onboarding />} />
+                  <Route path="/pdf-viewer" element={<PdfViewerPage />} />
 
                   <Route element={<Layout />}>
                     <Route path="/dashboard" element={<Dashboard />} />
@@ -140,7 +141,6 @@ export default function App() {
                       <Route path="/admin/advisers" element={<AdminAdvisers />} />
                       <Route path="/admin/manuscripts" element={<AdminManuscripts />} />
                       <Route path="/manuscripts" element={<AdminManuscripts />} />
-                      <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
                       <Route path="/admin/profile" element={<ProfileSettings />} />
                     </Route>
                   </Route>

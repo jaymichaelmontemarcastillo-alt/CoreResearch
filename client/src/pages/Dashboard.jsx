@@ -327,7 +327,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Right Col: Recent Activity */}
-        <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6">
+        <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 h-full">
           <RecentActivityWidget currentUser={currentUser} />
         </div>
       </div>
@@ -627,7 +627,7 @@ const RecentActivityWidget = () => {
           </div>
         ) : activities && activities.length > 0 ? (
           <div className="flex-1 divide-y divide-gray-100 dark:divide-[#222433]/70">
-            {activities.slice(0, 6).map((item) => (
+            {activities.slice(0, 3).map((item) => (
               <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-start gap-3">
                 <span className={`w-2 h-2 rounded-full mt-2 shrink-0 ${getDotColor(item.category)}`} />
                 <div className="flex-1 min-w-0">
@@ -664,13 +664,13 @@ const RecentActivityWidget = () => {
         )}
       </div>
 
-      {activities && activities.length > 6 && (
+      {activities && activities.length > 3 && (
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
           className="w-full mt-3 pt-2 text-center text-xs font-medium text-gray-500 dark:text-[#9396a8] hover:text-blue-600 dark:hover:text-blue-400 border-t border-gray-100 dark:border-[#222433] transition-colors"
         >
-          View all {activities.length} activities →
+          See all
         </button>
       )}
 

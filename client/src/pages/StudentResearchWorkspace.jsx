@@ -433,10 +433,13 @@ export const StudentResearchWorkspace = () => {
   const currentFocusArea = progressService.getCurrentFocusArea(workspace, tasks, feedbackList);
 
   const handleSubmitChapter = async (chapterId, chapterName) => {
-    const confirmSubmit = window.confirm(
-      `Are you ready to submit ${chapterName} to your adviser for review?`
-    );
-    if (!confirmSubmit) return;
+    const isConfirmed = await confirm({
+      title: "Submit Chapter",
+      message: `Are you ready to submit ${chapterName} to your adviser for review?`,
+      confirmText: "Submit",
+      variant: "primary"
+    });
+    if (!isConfirmed) return;
 
     try {
       await researchWorkspaceService.submitChapter(
@@ -662,14 +665,8 @@ export const StudentResearchWorkspace = () => {
           )}
 
 
-          {/* 2-Column Grid: Research Milestones (Left) & Manuscript Chapters (Right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-stretch">
-            {/* Left Card: Milestones Tracker */}
-            <Card padding={false} className="p-4 sm:p-5 flex flex-col justify-between bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
-              <MilestonesTracker milestones={milestones} orientation="vertical" />
-            </Card>
-
-            {/* Right Card: Manuscript Sections Progress Table */}
+          {/* Manuscript Chapters */}
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 items-stretch">
             <Card padding={false} className="p-4 sm:p-5 flex flex-col justify-between space-y-3 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
               <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5 shrink-0">
                 <div>
@@ -697,35 +694,9 @@ export const StudentResearchWorkspace = () => {
                     >
                       <div className="space-y-1 flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                          <span className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
                             {sec.name}
                           </span>
-                          
-                          <Badge
-                            variant={
-                              isCompleted
-                                ? 'emerald'
-                                : isSubmitted
-                                ? 'blue'
-                                : isRevision
-                                ? 'rose'
-                                : isInProgress
-                                ? 'amber'
-                                : 'gray'
-                            }
-                            size="sm"
-                            className="text-[9px] py-0 px-1.5"
-                          >
-                            {isCompleted
-                              ? 'Approved'
-                              : isSubmitted
-                              ? 'Submitted'
-                              : isRevision
-                              ? 'Revision'
-                              : isInProgress
-                              ? 'In Progress'
-                              : 'Not Started'}
-                          </Badge>
                         </div>
 
                         {/* Feedback comment if revision required */}
@@ -748,17 +719,48 @@ export const StudentResearchWorkspace = () => {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {isStudent && (
+                      <div className="flex items-center shrink-0">
+                        {/* Status Badge Column */}
+                        <div className="w-[110px] flex justify-end mr-4 shrink-0">
+                          <Badge
+                            variant={
+                              isCompleted
+                                ? 'emerald'
+                                : isSubmitted
+                                ? 'blue'
+                                : isRevision
+                                ? 'rose'
+                                : isInProgress
+                                ? 'amber'
+                                : 'gray'
+                            }
+                            size="sm"
+                            className="text-[10px] py-0.5 px-2.5 whitespace-nowrap"
+                          >
+                            {isCompleted
+                              ? 'Approved'
+                              : isSubmitted
+                              ? 'Submitted'
+                              : isRevision
+                              ? 'Revision'
+                              : isInProgress
+                              ? 'In Progress'
+                              : 'Not Started'}
+                          </Badge>
+                        </div>
+                        
+                        {/* Action Buttons Column */}
+                        <div className="w-[125px] flex justify-end shrink-0">
+                          {isStudent && (
                           <>
                             {isNotStarted && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/60 dark:hover:bg-blue-500/15 transition-all shadow-xs gap-1 py-1 px-2.5 h-auto"
+                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/60 dark:hover:bg-blue-500/15 transition-all shadow-xs gap-1 py-1 px-2.5 h-auto w-full justify-center whitespace-nowrap"
                                 onClick={() => handleStartChapter(sec.id, sec.name)}
                               >
-                                <HiPlay className="w-3 h-3 fill-current" />
+                                <HiPlay className="w-3 h-3 fill-current shrink-0" />
                                 Start Working
                               </Button>
                             )}
@@ -766,21 +768,21 @@ export const StudentResearchWorkspace = () => {
                               <Button
                                 variant="primary"
                                 size="sm"
-                                className="text-[11px] font-semibold shadow-xs gap-1 py-1 px-2.5 h-auto"
+                                className="text-[11px] font-semibold shadow-xs gap-1 py-1 px-2.5 h-auto w-full justify-center whitespace-nowrap"
                                 onClick={() => handleSubmitChapter(sec.id, sec.name)}
                               >
-                                <HiPaperAirplane className="w-3 h-3" />
+                                <HiPaperAirplane className="w-3 h-3 shrink-0" />
                                 Submit
                               </Button>
                             )}
                             {isSubmitted && (
-                              <span className="text-[10px] text-blue-500 font-medium px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 flex items-center gap-1">
-                                <HiClock className="w-3 h-3 animate-pulse" /> Awaiting Review
+                              <span className="text-[10px] text-blue-500 font-medium px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 flex items-center justify-center gap-1 w-full whitespace-nowrap">
+                                <HiClock className="w-3 h-3 animate-pulse shrink-0" /> Awaiting Review
                               </span>
                             )}
                             {isCompleted && (
-                              <span className="text-[10px] text-emerald-500 font-medium px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 flex items-center gap-1">
-                                <HiCheckCircle className="w-3 h-3" /> Approved
+                              <span className="text-[10px] text-emerald-500 font-medium px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 flex items-center justify-center gap-1 w-full whitespace-nowrap">
+                                <HiCheckCircle className="w-3 h-3 shrink-0" /> Approved
                               </span>
                             )}
                           </>
@@ -800,6 +802,7 @@ export const StudentResearchWorkspace = () => {
                             <option value="completed">Completed / Approved</option>
                           </select>
                         )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -808,100 +811,7 @@ export const StudentResearchWorkspace = () => {
             </Card>
           </div>
 
-          {/* Grid Layout: Assigned Research Tasks (Left) & Advisory Feedback (Right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Task Management Panel */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider flex items-center gap-2">
-                    <HiCheckCircle className="w-4 h-4 text-blue-500" />
-                    Research Tasks ({tasks.length})
-                  </h3>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center rounded-lg bg-gray-100 dark:bg-[#1c1d28] p-0.5 text-xs border border-transparent dark:border-[#222433]">
-                    <button
-                      className={`px-2 py-1 rounded-md font-semibold transition-all ${
-                        taskFilter === 'all'
-                          ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
-                          : 'text-gray-500 dark:text-[#9396a8]'
-                      }`}
-                      onClick={() => setTaskFilter('all')}
-                    >
-                      All
-                    </button>
-                    <button
-                      className={`px-2 py-1 rounded-md font-semibold transition-all ${
-                        taskFilter === 'active'
-                          ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
-                          : 'text-gray-500 dark:text-[#9396a8]'
-                      }`}
-                      onClick={() => setTaskFilter('active')}
-                    >
-                      Active
-                    </button>
-                    <button
-                      className={`px-2 py-1 rounded-md font-semibold transition-all ${
-                        taskFilter === 'completed'
-                          ? 'bg-white dark:bg-[#15161e] text-blue-600 dark:text-blue-400 shadow-xs border border-gray-200 dark:border-[#222433]'
-                          : 'text-gray-500 dark:text-[#9396a8]'
-                      }`}
-                      onClick={() => setTaskFilter('completed')}
-                    >
-                      Done
-                    </button>
-                  </div>
-
-                  {isAdviser && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => setIsTaskModalOpen(true)}
-                    >
-                      <HiPlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {filteredTasks.length === 0 ? (
-                <Card className="p-8 text-center text-xs text-gray-400 dark:text-gray-500 border-dashed">
-                  No tasks found under the selected filter.
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {filteredTasks.map((t) => (
-                    <TaskCard
-                      key={t.id}
-                      task={t}
-                      isStudent={isStudent}
-                      isAdviser={isAdviser}
-                      onStatusChange={handleTaskStatusChange}
-                      onReview={handleTaskReview}
-                      onDelete={handleTaskDelete}
-                      onOpenInEditor={handleOpenTaskInEditor}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Research Advisory Feedback Panel */}
-            <div>
-              <ResearchFeedbackSection
-                feedbackList={feedbackList}
-                workspace={workspace}
-                currentUser={currentUser}
-                userProfile={userProfile}
-                isStudent={isStudent}
-                isAdviser={isAdviser}
-                onAddFeedback={handleAddFeedback}
-                onUpdateStatus={handleUpdateFeedbackStatus}
-              />
-            </div>
-          </div>
         </div>
       )}
 

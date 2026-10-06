@@ -26,6 +26,9 @@ import researchFeedbackService from '../services/researchFeedback.service';
 import progressService from '../services/progress.service';
 import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
 import { groupService } from '../services/group.service';
+import gradingService from '../services/grading.service';
+import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
+import { FinalGradingModal } from '../components/editor/FinalGradingModal';
 import { ResearchProgressCircle } from '../components/research/ResearchProgressCircle';
 import { MilestonesTracker } from '../components/research/MilestonesTracker';
 import { TaskCard } from '../components/research/TaskCard';
@@ -45,6 +48,10 @@ export const FacultyWorkspaceView = () => {
   const [toast, setToast] = useState('');
   const [taskFilter, setTaskFilter] = useState('all');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [proposalEvals, setProposalEvals] = useState([]);
+  const [finalEvals, setFinalEvals] = useState([]);
+  const [selectedEval, setSelectedEval] = useState(null);
+  const [gradingModalType, setGradingModalType] = useState(null);
 
   const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
   const isAdviser = effectiveRole === 'adviser';
@@ -54,6 +61,8 @@ export const FacultyWorkspaceView = () => {
     let unsubscribeWs = () => {};
     let unsubscribeTasks = () => {};
     let unsubscribeFb = () => {};
+    let unsubscribePEvals = () => {};
+    let unsubscribeFEvals = () => {};
 
     const loadWorkspace = async () => {
       setLoading(true);
@@ -88,6 +97,13 @@ export const FacultyWorkspaceView = () => {
             targetWorkspace.id,
             (updatedFb) => setFeedbackList(updatedFb)
           );
+
+          unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
+             setProposalEvals(evals);
+          });
+          unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
+             setFinalEvals(evals);
+          });
         } else {
           setToast("Research workspace not found.");
         }
@@ -107,6 +123,8 @@ export const FacultyWorkspaceView = () => {
       unsubscribeWs();
       unsubscribeTasks();
       unsubscribeFb();
+      unsubscribePEvals();
+      unsubscribeFEvals();
     };
   }, [currentUser, workspaceId]);
 
@@ -451,6 +469,53 @@ export const FacultyWorkspaceView = () => {
         </div>
       </div>
 
+      {/* Defense Ratings Section */}
+      {(proposalEvals.length > 0 || finalEvals.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6">
+          {proposalEvals.length > 0 && (
+            <Card className="p-5 flex flex-col justify-between bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-3 mb-4">
+                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Proposal Defense Ratings</h3>
+              </div>
+              <div className="space-y-3">
+                {proposalEvals.map(ev => (
+                  <div key={ev.id} className="p-3 border border-gray-100 dark:border-slate-800 rounded-lg bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{ev.panelistName}</p>
+                      <p className="text-xs text-gray-500">Verdict: {ev.verdict.replace(/_/g, ' ')}</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSelectedEval(ev); setGradingModalType('proposal'); }}>
+                      View Rubrics
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {finalEvals.length > 0 && (
+            <Card className="p-5 flex flex-col justify-between bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-3 mb-4">
+                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Final Defense Ratings</h3>
+              </div>
+              <div className="space-y-3">
+                {finalEvals.map(ev => (
+                  <div key={ev.id} className="p-3 border border-gray-100 dark:border-slate-800 rounded-lg bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{ev.panelistName}</p>
+                      <p className="text-xs text-gray-500">Verdict: {ev.verdict.replace(/_/g, ' ')}</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSelectedEval(ev); setGradingModalType('final'); }}>
+                      View Rubrics
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Full Width Milestones Tracker (Chapters 1–5) */}
       <Card className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm">
         <MilestonesTracker milestones={milestones} />
@@ -715,6 +780,38 @@ export const FacultyWorkspaceView = () => {
           onClose={() => setIsTaskModalOpen(false)}
           workspace={workspace}
           onTaskCreated={handleTaskCreated}
+        />
+      )}
+
+      {/* Read-Only Modal for Advisers - Proposal */}
+      {selectedEval && gradingModalType === 'proposal' && (
+        <ProposalGradingModal
+          isOpen={!!selectedEval}
+          onClose={() => setSelectedEval(null)}
+          onSubmit={() => {}}
+          defenseType="proposal_defense"
+          defenseId={selectedEval.defenseId}
+          panelistId={selectedEval.panelistId}
+          panelistName={selectedEval.panelistName}
+          groupDetails={workspace}
+          existingEval={selectedEval}
+          readOnly={true}
+        />
+      )}
+
+      {/* Read-Only Modal for Advisers - Final */}
+      {selectedEval && gradingModalType === 'final' && (
+        <FinalGradingModal
+          isOpen={!!selectedEval}
+          onClose={() => setSelectedEval(null)}
+          onSubmit={() => {}}
+          defenseType="final_defense"
+          defenseId={selectedEval.defenseId}
+          panelistId={selectedEval.panelistId}
+          panelistName={selectedEval.panelistName}
+          groupDetails={workspace}
+          existingEval={selectedEval}
+          readOnly={true}
         />
       )}
     </div>

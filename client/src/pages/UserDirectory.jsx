@@ -25,6 +25,8 @@ import {
   HiClock,
 } from "react-icons/hi2";
 import { userService } from "../services/user.service";
+import { groupService } from "../services/group.service";
+import { researchWorkspaceService } from "../services/researchWorkspace.service";
 
 export const UserDirectory = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -130,6 +132,26 @@ export const UserDirectory = () => {
     if (!confirmed) return;
 
     try {
+      if (u.role === 'student') {
+        try {
+          const group = await groupService.getGroupByStudentId(u.uid);
+          if (group) {
+            if (group.memberIds && group.memberIds.length === 1 && group.memberIds[0] === u.uid) {
+              // Delete the workspace/progress if they are the only member
+              const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(u.uid).catch(() => null);
+              if (ws) {
+                await researchWorkspaceService.deleteWorkspace(ws.id).catch(() => {});
+              }
+              await groupService.deleteGroup(group.id);
+            } else {
+              await groupService.removeMemberFromGroup(group.id, u.uid);
+            }
+          }
+        } catch (e) {
+          console.warn("[UserDirectory] Failed to process group deletion logic before deleting user", e);
+        }
+      }
+
       await userService.deleteUser(u.uid);
       showToast("User deleted successfully.");
       setUsers((prev) => prev.filter((user) => user.uid !== u.uid));

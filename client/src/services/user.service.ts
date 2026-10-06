@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { UserProfile, CreateUserInput, UpdateUserInput, UserRole } from '../types/user.types';
+import api from './api';
 
 const COLLECTION_NAME = 'users';
 
@@ -161,6 +162,13 @@ export const userService = {
       rejectionReason: reason || 'Registration application was not approved.',
       updated_at: now,
     });
+  },
+
+  /**
+   * Delete a user by UID.
+   */
+  async deleteUser(uid: string): Promise<void> {
+    await api.delete(`/users/${uid}`);
   },
 };
 

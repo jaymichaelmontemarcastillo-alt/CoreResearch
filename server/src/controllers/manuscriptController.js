@@ -1213,8 +1213,14 @@ export const deleteAdminManuscripts = async (req, res) => {
     } else {
       const batch = db.batch();
       ids.forEach(id => {
-        const ref = db.collection('manuscript_versions').doc(id);
-        batch.delete(ref);
+        // Since getAllAdminManuscripts fetches from both collections,
+        // we must ensure the ID is deleted from wherever it came from.
+        // Batch deleting non-existent docs is fine in Firestore, it's a no-op.
+        const refVersions = db.collection('manuscript_versions').doc(id);
+        const refWorkspaces = db.collection('manuscript_workspaces').doc(id);
+        
+        batch.delete(refVersions);
+        batch.delete(refWorkspaces);
       });
       await batch.commit();
     }

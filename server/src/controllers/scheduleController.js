@@ -166,23 +166,10 @@ export const getSchedules = async (req, res) => {
             status: doc.status,
             createdAt: doc.createdAt
           }));
-          fetchedFromMongo = true;
         }
       }
     } catch (mongoErr) {
       console.warn('[ScheduleController] MongoDB get schedules warning:', mongoErr.message);
-    }
-
-    if (!fetchedFromMongo) {
-      // [TEMPORARY MIGRATION COMPATIBILITY]
-      if (isDevMockMode) {
-        seedMockSchedulesIfEmpty();
-        const map = mockFirestoreDb.get('schedules');
-        list = Array.from(map.values());
-      } else {
-        const snapshot = await db.collection('schedules').get();
-        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      }
     }
 
     list.sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));

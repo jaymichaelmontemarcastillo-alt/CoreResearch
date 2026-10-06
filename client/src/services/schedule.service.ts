@@ -37,7 +37,7 @@ export const scheduleService = {
   },
 
   /**
-   * Fetch all defense schedules with Firestore fallback.
+   * Fetch all defense schedules.
    */
   async getAllSchedules(): Promise<DefenseSchedule[]> {
     try {
@@ -45,15 +45,9 @@ export const scheduleService = {
       if (Array.isArray(data?.data)) {
         return data.data;
       }
+      return [];
     } catch (apiErr) {
-      console.warn('[scheduleService] API error, falling back to Firestore:', apiErr);
-    }
-
-    try {
-      const snap = await getDocs(collection(db, COLLECTION_NAME));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as DefenseSchedule));
-    } catch (fsErr) {
-      console.error('[scheduleService] Firestore fetch error:', fsErr);
+      console.warn('[scheduleService] API error fetching schedules:', apiErr);
       return [];
     }
   },
@@ -63,19 +57,10 @@ export const scheduleService = {
    */
   async getSchedulesByProject(projectId: string): Promise<DefenseSchedule[]> {
     try {
-      const snap = await getDocs(query(collection(db, COLLECTION_NAME), where('projectId', '==', projectId)));
-      const schedules = snap.docs.map(d => ({ id: d.id, ...d.data() } as DefenseSchedule));
-      
-      // Fallback for older records using groupId
-      const snapGroup = await getDocs(query(collection(db, COLLECTION_NAME), where('groupId', '==', projectId)));
-      snapGroup.docs.forEach(d => {
-        if (!schedules.find(s => s.id === d.id)) {
-          schedules.push({ id: d.id, ...d.data() } as DefenseSchedule);
-        }
-      });
-      return schedules;
-    } catch (fsErr) {
-      console.error('[scheduleService] getSchedulesByProject error:', fsErr);
+      const allSchedules = await this.getAllSchedules();
+      return allSchedules.filter(s => s.projectId === projectId || s.groupId === projectId);
+    } catch (err) {
+      console.error('[scheduleService] getSchedulesByProject error:', err);
       return [];
     }
   },
@@ -90,35 +75,16 @@ export const scheduleService = {
     projectTitle?: string | null
   ): Promise<DefenseSchedule[]> {
     try {
-      const schedulesRef = collection(db, COLLECTION_NAME);
-      const queries = [];
-      
-      if (studentId) {
-        queries.push(getDocs(query(schedulesRef, where('studentId', '==', studentId))));
-      }
-      if (groupId) {
-        queries.push(getDocs(query(schedulesRef, where('projectId', '==', groupId))));
-        queries.push(getDocs(query(schedulesRef, where('groupId', '==', groupId))));
-      }
-      if (studentName) {
-        queries.push(getDocs(query(schedulesRef, where('studentName', '==', studentName))));
-      }
-      if (projectTitle) {
-        queries.push(getDocs(query(schedulesRef, where('projectTitle', '==', projectTitle))));
-      }
-
-      const snapshots = await Promise.all(queries);
-      const uniqueSchedules = new Map<string, DefenseSchedule>();
-      
-      snapshots.forEach(snap => {
-        snap.docs.forEach(docSnap => {
-          uniqueSchedules.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as DefenseSchedule);
-        });
+      const allSchedules = await this.getAllSchedules();
+      return allSchedules.filter(s => {
+        if (studentId && s.studentId === studentId) return true;
+        if (groupId && (s.projectId === groupId || s.groupId === groupId)) return true;
+        if (studentName && s.studentName === studentName) return true;
+        if (projectTitle && s.projectTitle === projectTitle) return true;
+        return false;
       });
-
-      return Array.from(uniqueSchedules.values());
-    } catch (fsErr) {
-      console.error('[scheduleService] getSchedulesForStudent error:', fsErr);
+    } catch (err) {
+      console.error('[scheduleService] getSchedulesForStudent error:', err);
       return [];
     }
   },
@@ -128,35 +94,16 @@ export const scheduleService = {
    */
   async getSchedulesForAdviser(adviserId: string, groupIds: string[] = []): Promise<DefenseSchedule[]> {
     try {
-      const schedulesRef = collection(db, COLLECTION_NAME);
-      const queries = [];
-      
-      if (adviserId) {
-        queries.push(getDocs(query(schedulesRef, where('adviserId', '==', adviserId))));
-      }
-      
-      // Firestore 'in' query supports max 10 items. Chunk groupIds if any.
-      if (groupIds && groupIds.length > 0) {
-        const uniqueGroupIds = Array.from(new Set(groupIds));
-        for (let i = 0; i < uniqueGroupIds.length; i += 10) {
-          const chunk = uniqueGroupIds.slice(i, i + 10);
-          queries.push(getDocs(query(schedulesRef, where('projectId', 'in', chunk))));
-          queries.push(getDocs(query(schedulesRef, where('groupId', 'in', chunk))));
+      const allSchedules = await this.getAllSchedules();
+      return allSchedules.filter(s => {
+        if (adviserId && s.adviserId === adviserId) return true;
+        if (groupIds && groupIds.length > 0) {
+          if (groupIds.includes(s.projectId) || groupIds.includes(s.groupId)) return true;
         }
-      }
-
-      const snapshots = await Promise.all(queries);
-      const uniqueSchedules = new Map<string, DefenseSchedule>();
-      
-      snapshots.forEach(snap => {
-        snap.docs.forEach(docSnap => {
-          uniqueSchedules.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as DefenseSchedule);
-        });
+        return false;
       });
-
-      return Array.from(uniqueSchedules.values());
-    } catch (fsErr) {
-      console.error('[scheduleService] getSchedulesForAdviser error:', fsErr);
+    } catch (err) {
+      console.error('[scheduleService] getSchedulesForAdviser error:', err);
       return [];
     }
   },

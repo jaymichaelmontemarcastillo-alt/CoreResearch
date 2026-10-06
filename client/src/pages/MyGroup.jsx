@@ -20,6 +20,7 @@ import {
   HiClock,
   HiMapPin,
   HiUser,
+  HiPlus,
 } from "react-icons/hi2";
 import { groupService } from "../services/group.service";
 import { courseService } from "../services/course.service";
@@ -195,10 +196,10 @@ export const MyGroup = () => {
     }
   };
 
-  const handleAddClassmate = async () => {
-    if (!selectedClassmateId || !group) return;
+  const handleAddClassmate = async (uid) => {
+    if (!uid || !group) return;
 
-    const candidate = availableClassmates.find((s) => s.uid === selectedClassmateId);
+    const candidate = availableClassmates.find((s) => s.uid === uid);
     if (!candidate) return;
 
     setAddingMember(true);
@@ -392,7 +393,7 @@ export const MyGroup = () => {
 
   // 3. ACTIVE GROUP VIEW
   return (
-    <div className="space-y-6 font-inter">
+    <div className="space-y-4 w-full" style={{ fontFamily: 'Poppins, sans-serif' }}>
       {toast.message && (
         <Toast
           message={toast.message}
@@ -401,201 +402,140 @@ export const MyGroup = () => {
         />
       )}
 
-      <PageHeader
-        icon={HiUsers}
-        title="My Research Group"
-        description="View your research group members, assigned adviser, and oral defense schedule."
-      />
-
       {/* Main Group Card */}
-      <Card className="overflow-hidden border border-gray-200/90 dark:border-[#222433] shadow-sm bg-white dark:bg-[#15161e] rounded-2xl">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-50/70 to-transparent dark:from-blue-950/20 p-4 sm:p-6 md:p-8 border-b border-gray-100 dark:border-[#222433]">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 sm:gap-4">
-            <div className="space-y-1 sm:space-y-1.5">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                  {group.name}
-                </h2>
-                <Badge variant="blue" className="text-[10px] sm:text-xs font-mono px-1.5 py-0 sm:px-2 sm:py-0.5">
-                  ID: {group.id.slice(0, 8)}
-                </Badge>
-              </div>
-              <p className="text-gray-500 dark:text-[#9396a8] font-medium text-[11px] sm:text-sm">
-                {course?.code || userProfile?.programCode || "BSIT"} • {userProfile?.majorCode || (userProfile?.programSpecialization?.includes("WMAD") ? "WMAD" : userProfile?.programSpecialization?.includes("AMG") ? "AMG" : userProfile?.programSpecialization?.includes("SMP") ? "SMP" : userProfile?.programSpecialization) || "Major"} • Section {section?.name || userProfile?.sectionName || group.sectionName || "A"}
+      <Card className="p-5 md:p-6 bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/50 dark:border-[#222433] shadow-sm">
+        {/* Top: Group Info */}
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-5">
+          <div className="space-y-2">
+            <span className="text-[10px] md:text-[11px] font-medium tracking-widest text-gray-400 uppercase">
+              Group
+            </span>
+            <h2 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-gray-100">
+              {group.name}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-[#9396a8] font-medium">
+              {course?.code || userProfile?.programCode || "BSIT"} · {(userProfile?.majorCode || (userProfile?.programSpecialization?.includes("WMAD") ? "WMAD" : userProfile?.programSpecialization?.includes("AMG") ? "AMG" : userProfile?.programSpecialization?.includes("SMP") ? "SMP" : userProfile?.programSpecialization) || "Major")} · Section {section?.name || userProfile?.sectionName || group.sectionName || "A"}
+            </p>
+            {group.title && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mt-2">
+                {group.title}
               </p>
-              {group.title && (
-                <p className="text-[13px] sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5 sm:mt-1 leading-snug">
-                  Title: {group.title}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col items-start md:items-end gap-1.5 sm:gap-2">
-              <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84]">
-                Group Status
-              </span>
-              {group.status === "ready" ? (
-                <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-emerald-100 dark:border-emerald-500/20">
-                  <HiCheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="font-semibold text-[11px] sm:text-xs">Ready for Defense</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 sm:gap-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-amber-100 dark:border-amber-500/20">
-                  <HiExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="font-semibold text-[11px] sm:text-xs">Incomplete ({group.members.length}/3)</span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
-        </div>
-
-        {/* Assigned Adviser Banner (if assigned) */}
-        <div className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 bg-gray-50/60 dark:bg-[#1a1b26]/60 border-b border-gray-100 dark:border-[#222433] flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-2.5 text-[13px] sm:text-sm">
-            <HiAcademicCap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 shrink-0" />
-            <span className="text-gray-500 dark:text-[#9396a8] hidden sm:inline">Assigned Research Adviser:</span>
-            <span className="text-gray-500 dark:text-[#9396a8] sm:hidden">Adviser:</span>
-            <span className="font-semibold text-gray-900 dark:text-white truncate">
-              {group.adviserName || "Pending Assignment"}
+          <div className="flex flex-col md:items-end gap-1.5 text-right">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${group.status === "ready" ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {group.status === "ready" ? "Ready" : "Incomplete"}
+              </span>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {group.members.length} of 3 members
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLeaveGroup}
-            className="text-[11px] sm:text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 px-2 sm:px-3"
-          >
-            <HiArrowRightOnRectangle className="w-3.5 h-3.5 mr-1" />
-            Leave
-          </Button>
         </div>
 
-        {/* Defense Schedule Banner (if scheduled) */}
-        {defenseSchedule && (
-          <div className="p-4 sm:p-6 md:p-8 bg-blue-50/30 dark:bg-blue-950/10 border-b border-gray-100 dark:border-[#222433]">
-            <div className="flex items-center justify-between sm:justify-start gap-2 mb-2 sm:mb-3">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <HiCalendarDays className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                <h3 className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white">
-                  Defense Schedule
-                </h3>
+        <div className="w-full h-px bg-gray-100 dark:bg-[#222433] my-5"></div>
+
+        {/* Middle: Adviser Info */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <span className="text-[10px] md:text-[11px] font-medium tracking-widest text-gray-400 uppercase">
+                Adviser
+              </span>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  {group.adviserName ? group.adviserName.charAt(0) : "?"}
+                </div>
+                <span className="text-base font-medium text-gray-800 dark:text-gray-100">
+                  {group.adviserName || "Pending Assignment"}
+                </span>
               </div>
-              <Badge variant="emerald" className="capitalize text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
-                {defenseSchedule.status || "Scheduled"}
+            </div>
+            <div>
+              <Badge variant={group.adviserName ? "blue" : "gray"} className="text-xs font-medium px-3 py-1">
+                {group.adviserName ? "Assigned" : "Pending"}
               </Badge>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 bg-white dark:bg-[#111218] rounded-xl border border-gray-200/80 dark:border-[#222433]">
-              <div>
-                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Type</span>
-                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white capitalize truncate">
-                  {(defenseSchedule.defenseType || "Proposal").replace("_", " ")}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Date</span>
-                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white">
-                  {defenseSchedule.date}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Time</span>
-                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                  <HiClock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 shrink-0" />
-                  <span className="truncate">{defenseSchedule.startTime} – {defenseSchedule.endTime}</span>
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] sm:text-[11px] text-gray-400 uppercase font-semibold block">Venue</span>
-                <span className="text-[13px] sm:text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                  <HiMapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 shrink-0" />
-                  <span className="truncate">{defenseSchedule.venue || defenseSchedule.location || "TBA"}</span>
-                </span>
-              </div>
-            </div>
           </div>
-        )}
+        </div>
 
-        {/* Members Section */}
-        <div className="p-4 sm:p-6 md:p-8">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84] flex items-center gap-1.5 sm:gap-2">
-              <HiUsers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
-              Members ({group.members.length}/3)
-            </h3>
+        <div className="w-full h-px bg-gray-100 dark:bg-[#222433] my-5"></div>
 
+        {/* Bottom: Members */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <span className="text-[10px] md:text-[11px] font-medium tracking-widest text-gray-400 uppercase block mb-1">
+                Members
+              </span>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {group.members.length} of 3
+              </span>
+            </div>
             {group.members.length < 5 && (
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={openAddClassmateModal}
-                className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-semibold px-2 sm:px-3 py-1 sm:py-1.5"
+                className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 transition"
               >
-                <HiUserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Add Classmate</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
+                <HiPlus className="w-4 h-4" />
+                Add Classmate
+              </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
             {group.members.map((member) => (
               <div
                 key={member.uid}
-                className={`flex items-start p-3 sm:p-4 rounded-xl border transition-all ${
-                  member.uid === userProfile.uid
-                    ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40"
-                    : "bg-gray-50/70 dark:bg-[#1c1d28] border-gray-100 dark:border-[#222433]"
-                }`}
+                className="flex flex-col p-4 rounded-2xl border border-gray-200/60 dark:border-[#222433] bg-transparent"
               >
                 <div
-                  className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-bold text-sm sm:text-base mr-3 sm:mr-3.5 shrink-0 ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium mb-3 ${
                     member.uid === userProfile.uid
-                      ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
-                      : "bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8]"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      : "bg-gray-100 text-gray-600 dark:bg-[#1c1d28] dark:text-gray-400"
                   }`}
                 >
                   {member.fullName.charAt(0)}
                 </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <h4 className="font-semibold text-gray-900 dark:text-white truncate text-[13px] sm:text-sm">
-                      {member.fullName}
-                    </h4>
-                    {member.uid === userProfile.uid && (
-                      <Badge variant="blue" className="text-[9px] sm:text-[10px] px-1 py-0 sm:px-1.5">
-                        YOU
-                      </Badge>
-                    )}
+                
+                <h4 className="text-[15px] font-medium text-gray-800 dark:text-gray-100 mb-0.5">
+                  {member.fullName}
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-3">
+                  Group Member
+                </p>
+                
+                {member.uid === userProfile.uid && (
+                  <div className="mt-auto">
+                    <span className="inline-block text-[10px] font-medium tracking-wider text-blue-600 dark:text-blue-400 uppercase bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                      You
+                    </span>
                   </div>
-                  <p className="text-[11px] sm:text-xs font-mono text-gray-500 dark:text-[#9396a8] mt-0.5 truncate">
-                    ID: {member.studentNumber || member.studentIdOrEmployeeId || "Not Set"}
-                  </p>
-                  <p className="text-[11px] sm:text-xs text-gray-400 dark:text-[#6b6f84] truncate mt-0.5">
-                    {member.email}
-                  </p>
-                </div>
+                )}
               </div>
             ))}
 
-            {/* Render empty slots if less than 3 members */}
+            {/* Empty Slots */}
             {group.members.length < 3 &&
               Array.from({ length: 3 - group.members.length }).map((_, idx) => (
                 <div
                   key={`empty-${idx}`}
                   onClick={openAddClassmateModal}
-                  className="flex items-center p-3 sm:p-4 rounded-xl border border-dashed border-gray-200 dark:border-[#222433] bg-transparent hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/30 transition cursor-pointer"
+                  className="flex flex-col p-4 rounded-2xl border border-dashed border-gray-300 dark:border-[#333649] bg-transparent hover:bg-gray-50 dark:hover:bg-[#1a1b26] transition cursor-pointer"
                 >
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 border-dashed border-gray-200 dark:border-[#333649] flex items-center justify-center mr-3 sm:mr-3.5 shrink-0 text-gray-400">
-                    <HiUserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 border border-dashed border-gray-300 dark:border-[#42455e] mb-3">
+                    <HiPlus className="w-4 h-4" />
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-400 dark:text-gray-500 text-[13px] sm:text-sm">
-                      Empty Slot ({group.members.length + idx + 1}/3)
-                    </h4>
-                    <p className="text-[11px] sm:text-xs text-blue-500 hover:underline">Click to invite classmate</p>
-                  </div>
+                  
+                  <h4 className="text-[15px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">
+                    Invite
+                  </h4>
+                  <p className="text-sm text-gray-400 font-medium">
+                    Classmate
+                  </p>
                 </div>
               ))}
           </div>
@@ -627,38 +567,30 @@ export const MyGroup = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar" style={{ fontFamily: 'Poppins, sans-serif' }}>
               {availableClassmates.map((student) => (
-                <label
+                <div
                   key={student.uid}
-                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
-                    selectedClassmateId === student.uid
-                      ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500"
-                      : "bg-white dark:bg-[#0e0f15] border-gray-200 dark:border-[#222433] hover:border-gray-300"
-                  }`}
+                  className="flex items-center justify-between p-3 rounded-xl border bg-white dark:bg-[#0e0f15] border-gray-200 dark:border-[#222433] transition hover:border-gray-300"
                 >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="selectedClassmate"
-                      value={student.uid}
-                      checked={selectedClassmateId === student.uid}
-                      onChange={() => setSelectedClassmateId(student.uid)}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {student.fullName || `${student.first_name || ""} ${student.last_name || ""}`}
-                      </div>
-                      <div className="text-xs font-mono text-gray-400">
-                        {student.studentIdOrEmployeeId || "No Student Number"} • {student.email}
-                      </div>
+                  <div className="min-w-0 pr-3">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {student.fullName || `${student.first_name || ""} ${student.last_name || ""}`}
+                    </div>
+                    <div className="text-[11px] sm:text-xs text-gray-500 mt-0.5 truncate font-medium">
+                      {student.studentIdOrEmployeeId || "No Student Number"} • {student.email}
                     </div>
                   </div>
-                  <Badge variant="blue" className="text-[10px]">
-                    Available
-                  </Badge>
-                </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddClassmate(student.uid)}
+                    disabled={addingMember}
+                    className="bg-green-500/10 hover:bg-green-500/20 text-green-700 dark:text-green-400 border-green-600 dark:border-green-500/70 hover:text-green-800 dark:hover:text-green-300 shrink-0 shadow-sm font-semibold"
+                  >
+                    Invite
+                  </Button>
+                </div>
               ))}
             </div>
           )}
@@ -669,14 +601,7 @@ export const MyGroup = () => {
               onClick={() => setIsAddModalOpen(false)}
               disabled={addingMember}
             >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleAddClassmate}
-              disabled={!selectedClassmateId || addingMember}
-            >
-              {addingMember ? "Adding..." : "Add to Group"}
+              Close
             </Button>
           </div>
         </div>

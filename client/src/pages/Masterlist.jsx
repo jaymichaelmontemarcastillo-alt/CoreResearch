@@ -291,7 +291,7 @@ export const Masterlist = () => {
                 >
                   {/* 1. Student ID */}
                   <TableCell>
-                    <span className="font-mono text-xs font-bold text-gray-800 dark:text-gray-200">
+                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200" style={{ fontFamily: 'Poppins, sans-serif' }}>
                       {studentNumber}
                     </span>
                   </TableCell>
@@ -427,7 +427,7 @@ export const Masterlist = () => {
                     <span className="text-xs text-gray-400 block truncate">{student.email}</span>
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="font-mono text-[11px] text-gray-500 block">{studentNumber}</span>
+                    <span className="text-[11px] font-semibold text-gray-500 block" style={{ fontFamily: 'Poppins, sans-serif' }}>{studentNumber}</span>
                     {groupInfo.inGroup ? (
                       <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">In Group</span>
                     ) : (

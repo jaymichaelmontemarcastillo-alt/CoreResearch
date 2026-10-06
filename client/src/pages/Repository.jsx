@@ -420,11 +420,12 @@ export const Repository = () => {
                   {/* Right side PDF Link */}
                   {pub.pdfUrl && (
                     <div className="w-full md:w-36 flex flex-col md:items-end shrink-0 mt-2 md:mt-0 pt-1">
-                      <a 
-                        href={pub.pdfUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="group flex flex-col md:items-end"
+                      <button
+                        onClick={() => {
+                          const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(pub.pdfUrl)}&title=${encodeURIComponent(pub.title)}`;
+                          window.open(viewerUrl, '_blank');
+                        }}
+                        className="group flex flex-col md:items-end text-left"
                       >
                         <span className="text-[13px] text-[#1a0dab] dark:text-[#8ab4f8] group-hover:underline inline-flex items-center gap-1">
                           [PDF] coreresearch.edu
@@ -432,7 +433,7 @@ export const Repository = () => {
                         <span className="inline-flex items-center gap-1 mt-0.5 text-[#70757a] dark:text-[#9aa0a6] text-[12px]">
                           <HiOutlineSparkles className="w-3.5 h-3.5 text-[#1a0dab] dark:text-[#8ab4f8]" /> Quick read
                         </span>
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>

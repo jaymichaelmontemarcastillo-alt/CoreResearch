@@ -36,7 +36,7 @@ export const StatCard = ({
       </div>
 
       <div className="mt-auto">
-        <div className={`text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
+        <div className={`text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight ${valueColor || "text-gray-900 dark:text-white"}`}>
           {value}
         </div>
 

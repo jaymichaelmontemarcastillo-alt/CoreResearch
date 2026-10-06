@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllUsers, updateUserRole, updateUserProfile, updateMyProfile, changeMyPassword } from '../controllers/userController.js';
+import { getAllUsers, updateUserRole, updateUserProfile, updateMyProfile, changeMyPassword, deleteUser } from '../controllers/userController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -13,5 +13,6 @@ router.post('/me/password', verifyToken, changeMyPassword);
 router.get('/', verifyToken, requireRole(['admin']), getAllUsers);
 router.patch('/:uid/role', verifyToken, requireRole(['admin']), updateUserRole);
 router.patch('/:uid', verifyToken, requireRole(['admin']), updateUserProfile);
+router.delete('/:uid', verifyToken, requireRole(['admin']), deleteUser);
 
 export default router;

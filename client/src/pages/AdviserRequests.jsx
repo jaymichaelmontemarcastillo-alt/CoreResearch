@@ -1,5 +1,5 @@
 // src/pages/AdviserRequests.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Toast } from '../components/ui/Toast';
@@ -12,6 +12,19 @@ export const AdviserRequests = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [tabFilter, setTabFilter] = useState('active');
+
+  const activeCount = useMemo(() => requests.filter((r) => !r.isArchived).length, [requests]);
+  const archivedCount = useMemo(() => requests.filter((r) => r.isArchived).length, [requests]);
+  const totalCount = requests.length;
+
+  const filteredRequests = useMemo(() => {
+    return requests.filter((r) => {
+      if (tabFilter === 'active' && r.isArchived) return false;
+      if (tabFilter === 'archived' && !r.isArchived) return false;
+      return true;
+    });
+  }, [requests, tabFilter]);
 
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -48,6 +61,16 @@ export const AdviserRequests = () => {
     }
   };
 
+  const handleArchiveToggle = async (id, isArchived) => {
+    try {
+      await adviserRequestService.toggleArchiveRequest(id, isArchived);
+      setToast(`Request ${isArchived ? 'archived' : 'restored'} successfully.`);
+    } catch (err) {
+      console.error(err);
+      setToast(`Failed to ${isArchived ? 'archive' : 'restore'} request.`);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
       {toast && <Toast message={toast} onClose={() => setToast('')} />}
@@ -69,6 +92,47 @@ export const AdviserRequests = () => {
         </div>
       ) : (
         <>
+          {/* Tabs */}
+          <div className="flex items-center space-x-1 sm:space-x-4 border-b border-gray-100 dark:border-slate-800 pb-0 mb-4 px-1">
+            <button
+              onClick={() => setTabFilter('active')}
+              className={`pb-3 border-b-2 text-xs sm:text-sm font-semibold transition-colors ${
+                tabFilter === 'active'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Active ({activeCount})
+            </button>
+            <button
+              onClick={() => setTabFilter('archived')}
+              className={`pb-3 border-b-2 text-xs sm:text-sm font-semibold transition-colors ${
+                tabFilter === 'archived'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Archived ({archivedCount})
+            </button>
+            <button
+              onClick={() => setTabFilter('all')}
+              className={`pb-3 border-b-2 text-xs sm:text-sm font-semibold transition-colors ${
+                tabFilter === 'all'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              All ({totalCount})
+            </button>
+          </div>
+
+          {filteredRequests.length === 0 ? (
+            <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl overflow-hidden shadow-sm p-8 text-center text-gray-500">
+              <HiClipboardDocumentList className="w-10 h-10 mx-auto mb-2 text-gray-300 dark:text-[#6b6f84]" />
+              <p className="text-sm font-medium">No requests found in this view.</p>
+            </div>
+          ) : (
+          <>
           {/* Desktop Table */}
           <div className="hidden md:block bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
@@ -86,7 +150,7 @@ export const AdviserRequests = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#222433]">
-                  {requests.map(req => (
+                  {filteredRequests.map(req => (
                     <tr key={req.id} className="hover:bg-gray-50/50 dark:hover:bg-[#1c1d28]/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900 dark:text-white">{req.groupName || 'Individual'}</div>
@@ -123,7 +187,7 @@ export const AdviserRequests = () => {
                         {req.status !== 'pending' && req.updatedAt ? new Date(req.updatedAt).toLocaleDateString() : '-'}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {req.status === 'pending' && (
+                        {req.status === 'pending' ? (
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleAccept(req.id)}
@@ -138,6 +202,15 @@ export const AdviserRequests = () => {
                               Reject
                             </button>
                           </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleArchiveToggle(req.id, !req.isArchived)}
+                              className="px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                              {req.isArchived ? 'Restore' : 'Archive'}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -149,7 +222,7 @@ export const AdviserRequests = () => {
 
           {/* Mobile Card List */}
           <div className="md:hidden flex flex-col space-y-3">
-            {requests.map(req => (
+            {filteredRequests.map(req => (
               <div key={req.id} className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-xl overflow-hidden shadow-sm p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>
@@ -173,7 +246,7 @@ export const AdviserRequests = () => {
                     View Details
                   </button>
                   
-                  {req.status === 'pending' && (
+                  {req.status === 'pending' ? (
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleReject(req.id)}
@@ -188,11 +261,22 @@ export const AdviserRequests = () => {
                         Accept
                       </button>
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleArchiveToggle(req.id, !req.isArchived)}
+                        className="px-3 py-1.5 text-[11px] font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg"
+                      >
+                        {req.isArchived ? 'Restore' : 'Archive'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
             ))}
           </div>
+          </>
+          )}
         </>
       )}
 

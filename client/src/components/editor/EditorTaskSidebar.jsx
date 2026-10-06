@@ -249,7 +249,7 @@ export const EditorTaskSidebar = ({
 
   if (isPanelist) {
     return (
-      <div className="w-[340px] min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-30 shadow-xl">
+      <div className="absolute md:static inset-y-0 right-0 w-full md:w-[340px] md:min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-40 md:z-30 shadow-2xl md:shadow-xl">
         <div className="px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-[#12131b] shrink-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">Panelist Review</h3>
@@ -422,7 +422,7 @@ export const EditorTaskSidebar = ({
   }
 
   return (
-    <div className="w-[340px] min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-30 shadow-xl">
+    <div className="absolute md:static inset-y-0 right-0 w-full md:w-[340px] md:min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-40 md:z-30 shadow-2xl md:shadow-xl">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-[#1c1d28] flex items-center justify-between bg-gray-50 dark:bg-[#12131b] shrink-0">
         <div className="flex items-center gap-2">
@@ -652,7 +652,7 @@ export const EditorTaskSidebar = ({
         </div>
       ) : studentTab === 'rating_rubrics' ? (
         <div className="flex-1 overflow-y-auto flex flex-col p-4 bg-gray-50/50 dark:bg-[#0e0f15]">
-              {isStudent ? (
+              {(isStudent || isAdviser) ? (
                 <div className="space-y-4">
                   {studentProposalEvals?.map((ev, idx) => (
                     <div key={'p_'+idx} className="space-y-2 mb-4">
