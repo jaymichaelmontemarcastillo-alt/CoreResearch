@@ -1,8 +1,8 @@
 // src/components/admin/analytics/ResearchTopicsTrendChart.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -228,9 +228,9 @@ export const ResearchTopicsTrendChart = ({ data, loading = false }) => {
         {/* Bar Graph: X-Axis represents research topics */}
         <div className="w-full h-[260px]">
           <ResponsiveContainer width="100%" height="100%" debounce={150}>
-            <BarChart
-              data={displayData}
-              margin={{ top: 15, right: 15, left: -20, bottom: displayData.length > 5 ? 20 : 5 }}
+            <LineChart
+              data={data?.monthly || []}
+              margin={{ top: 15, right: 15, left: -20, bottom: 5 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -239,13 +239,10 @@ export const ResearchTopicsTrendChart = ({ data, loading = false }) => {
                 vertical={false}
               />
               <XAxis
-                dataKey="shortLabel"
+                dataKey="period"
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
                 axisLine={{ stroke: '#e5e7eb' }}
                 tickLine={false}
-                interval={0}
-                angle={displayData.length > 5 ? -18 : 0}
-                textAnchor={displayData.length > 5 ? 'end' : 'middle'}
               />
               <YAxis
                 allowDecimals={false}
@@ -253,18 +250,20 @@ export const ResearchTopicsTrendChart = ({ data, loading = false }) => {
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip content={<CustomTopicBarTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.06)' }} />
-              <Bar
-                dataKey="count"
-                name="Projects"
-                radius={[6, 6, 0, 0]}
-                maxBarSize={44}
-              >
-                {displayData.map((entry) => (
-                  <Cell key={entry.id} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
+              <Tooltip cursor={{ stroke: 'rgba(59, 130, 246, 0.2)', strokeWidth: 1 }} />
+              {displayData.map((topic) => (
+                <Line
+                  key={topic.id}
+                  type="monotone"
+                  dataKey={topic.id}
+                  name={topic.shortLabel || topic.name}
+                  stroke={topic.color}
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: topic.color, strokeWidth: 0 }}
+                  activeDot={{ r: 5, strokeWidth: 0 }}
+                />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </div>
 

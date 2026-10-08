@@ -20,6 +20,7 @@ import {
 } from '../types/researchWorkspace.types';
 import { AdviserRequest } from './adviserRequest.service';
 import { UserProfile } from '../types/user.types';
+import { TitleProposal } from '../types/proposal.types';
 import progressService from './progress.service';
 import { systemActivityService } from './systemActivity.service';
 import { researchFeedbackService } from './researchFeedback.service';
@@ -195,8 +196,8 @@ export const researchWorkspaceService = {
       memberIds,
       members,
       courseId: proposal.courseId || userProfile.courseId || '',
-      adviserId: adviserInfo?.id || proposal.adviserId || '',
-      adviserName: adviserInfo?.name || proposal.adviserName || 'Pending Adviser',
+      adviserId: adviserInfo?.id || '',
+      adviserName: adviserInfo?.name || 'Pending Adviser',
       department: userProfile.department || 'Computer Studies',
       academicYear,
       semester,

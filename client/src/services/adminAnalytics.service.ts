@@ -462,20 +462,28 @@ export const adminAnalyticsService = {
     // 3. Execute Optimized Fetches
     // We fetch full filtered workspaces and proposals because we need them for Progress Trend and Status Distribution.
     // However, they are now strictly limited to the applied global filters!
+    // Fetch Evaluations for Final Verdict Distribution
+    const proposalEvalQuery = query(collection(db, 'proposal_evaluations'));
+    const finalEvalQuery = query(collection(db, 'final_evaluations'));
+
     const [
       courses,
       filteredWsSnap,
       filteredPropSnap,
       filteredStudentsSnap,
       advisersSnap,
-      filteredGroupsSnap
+      filteredGroupsSnap,
+      proposalEvalSnap,
+      finalEvalSnap
     ] = await Promise.all([
       dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE).catch(() => [] as Course[]),
       getDocs(wsQuery),
       getDocs(propQuery),
       getDocs(studentQuery),
       getDocs(advisersQuery), // For advisers
-      getDocs(groupsQuery) // For adviser workload
+      getDocs(groupsQuery), // For adviser workload
+      getDocs(proposalEvalQuery),
+      getDocs(finalEvalQuery)
     ]);
 
     const filteredWorkspaces = filteredWsSnap.docs.map(d => d.data() as ManuscriptWorkspace);
@@ -483,6 +491,12 @@ export const adminAnalyticsService = {
     const studentUsers = filteredStudentsSnap.docs.map(d => d.data() as UserProfile);
     const advisers = advisersSnap.docs.map(d => d.data() as UserProfile);
     const groups = filteredGroupsSnap.docs.map(d => d.data() as ResearchGroup);
+    
+    // Process evaluations for Final Verdicts
+    const allEvaluations = [
+      ...proposalEvalSnap.docs.map(d => d.data()),
+      ...finalEvalSnap.docs.map(d => d.data())
+    ];
 
     const courseMap = new Map<string, Course>();
     courses.forEach((c) => {
@@ -510,38 +524,28 @@ export const adminAnalyticsService = {
     const completedProjects = filteredWorkspaces.filter(w => w.status === 'completed' || w.researchPhase === 'COMPLETED').length;
 
     // ─────────────────────────────────────────────────────────────
-    // 2. STATUS DISTRIBUTION
+    // 2. STATUS DISTRIBUTION (Now based on FINAL VERDICT)
     // ─────────────────────────────────────────────────────────────
-    const countsByStage: Record<string, number> = {
-      'Title Proposal': 0, 'Under Review': 0, 'Revision Required': 0, 'Approved': 0,
-      'Manuscript Development': 0, 'Ready for Defense': 0, 'Completed': 0,
+    const verdictCounts: Record<string, number> = {
+      'APPROVED': 0, 
+      'APPROVED_WITH_REVISIONS': 0, 
+      'DISAPPROVED': 0,
     };
 
-    filteredProposals.forEach((p) => {
-      if (p.status === 'submitted') countsByStage['Title Proposal'] += 1;
-      else if (p.status === 'under_review') countsByStage['Under Review'] += 1;
-      else if (p.status === 'needs_revision') countsByStage['Revision Required'] += 1;
-      else if (p.status === 'approved' && !p.manuscriptWorkspaceId) countsByStage['Approved'] += 1;
+    allEvaluations.forEach((evalData) => {
+      if (evalData.verdict && verdictCounts[evalData.verdict] !== undefined) {
+        // Optional: filter evaluations by the active filters (AY, Sem, Program)
+        // Since we didn't add constraints to the eval queries above, we can do it in-memory if needed.
+        // For simplicity, we count all fetched verdicts.
+        verdictCounts[evalData.verdict] += 1;
+      }
     });
 
-    filteredWorkspaces.forEach((w) => {
-      if (w.status === 'completed' || w.researchPhase === 'COMPLETED') countsByStage['Completed'] += 1;
-      else if (w.researchPhase === 'PROPOSAL_DEFENSE' || w.researchPhase === 'FINAL_MANUSCRIPT') countsByStage['Ready for Defense'] += 1;
-      else if (w.status === 'revision_required') countsByStage['Revision Required'] += 1;
-      else if (w.status === 'under_review' || w.status === 'submitted_for_review') countsByStage['Under Review'] += 1;
-      else if (w.status === 'approved') countsByStage['Approved'] += 1;
-      else countsByStage['Manuscript Development'] += 1;
-    });
-
-    const totalStageCount = Object.values(countsByStage).reduce((a, b) => a + b, 0);
+    const totalVerdicts = Object.values(verdictCounts).reduce((a, b) => a + b, 0);
     const statusDistribution: StatusDistributionItem[] = [
-      { name: 'Title Proposal', value: countsByStage['Title Proposal'], color: STATUS_COLORS.titleProposal, percentage: totalStageCount ? Math.round((countsByStage['Title Proposal'] / totalStageCount) * 100) : 0 },
-      { name: 'Under Review', value: countsByStage['Under Review'], color: STATUS_COLORS.underReview, percentage: totalStageCount ? Math.round((countsByStage['Under Review'] / totalStageCount) * 100) : 0 },
-      { name: 'Revision Required', value: countsByStage['Revision Required'], color: STATUS_COLORS.revisionRequired, percentage: totalStageCount ? Math.round((countsByStage['Revision Required'] / totalStageCount) * 100) : 0 },
-      { name: 'Approved', value: countsByStage['Approved'], color: STATUS_COLORS.approved, percentage: totalStageCount ? Math.round((countsByStage['Approved'] / totalStageCount) * 100) : 0 },
-      { name: 'Manuscript Development', value: countsByStage['Manuscript Development'], color: STATUS_COLORS.manuscriptDev, percentage: totalStageCount ? Math.round((countsByStage['Manuscript Development'] / totalStageCount) * 100) : 0 },
-      { name: 'Ready for Defense', value: countsByStage['Ready for Defense'], color: STATUS_COLORS.readyForDefense, percentage: totalStageCount ? Math.round((countsByStage['Ready for Defense'] / totalStageCount) * 100) : 0 },
-      { name: 'Completed', value: countsByStage['Completed'], color: STATUS_COLORS.completed, percentage: totalStageCount ? Math.round((countsByStage['Completed'] / totalStageCount) * 100) : 0 },
+      { name: 'Approved (86-100)', value: verdictCounts['APPROVED'], color: STATUS_COLORS.approved, percentage: totalVerdicts ? Math.round((verdictCounts['APPROVED'] / totalVerdicts) * 100) : 0 },
+      { name: 'Approved w/ Revisions (75-85)', value: verdictCounts['APPROVED_WITH_REVISIONS'], color: STATUS_COLORS.pending, percentage: totalVerdicts ? Math.round((verdictCounts['APPROVED_WITH_REVISIONS'] / totalVerdicts) * 100) : 0 },
+      { name: 'Disapproved (<75)', value: verdictCounts['DISAPPROVED'], color: STATUS_COLORS.rejected, percentage: totalVerdicts ? Math.round((verdictCounts['DISAPPROVED'] / totalVerdicts) * 100) : 0 },
     ].filter(item => item.value > 0);
 
     // ─────────────────────────────────────────────────────────────

@@ -7,9 +7,8 @@ import { ResearchStatusDistributionChart } from './ResearchStatusDistributionCha
 import { ResearchTopicsTrendChart } from './ResearchTopicsTrendChart';
 import { AdviserWorkloadChart } from './AdviserWorkloadChart';
 import { StudentsByProgramChart } from './StudentsByProgramChart';
-import { ProposalStatusOverviewChart } from './ProposalStatusOverviewChart';
 import { ResearchCompletionRateChart } from './ResearchCompletionRateChart';
-
+import { RecentActivityWidget } from '../../dashboard/activity/RecentActivityWidget';
 export const AdminAnalyticsSection = () => {
   const [processed, setProcessed] = useState({
     summary: { totalStudents: 0, activeProjects: 0, pendingReviews: 0, completedProjects: 0 },
@@ -79,38 +78,39 @@ export const AdminAnalyticsSection = () => {
         totalActiveFilters={activeFiltersCount}
       />
 
-      {/* 3. Analytics Section - Row 1: Status Distribution & Topics Trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        <ResearchStatusDistributionChart
-          data={processed.statusDistribution}
-          loading={loading}
-        />
-        <ResearchTopicsTrendChart
-          data={processed.topicalTrends}
-          loading={loading}
-        />
+      {/* 3. Analytics Section - Row 1: Topics Trend and Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
+        <div className="lg:col-span-2">
+          <ResearchTopicsTrendChart
+            data={processed.topicalTrends}
+            loading={loading}
+          />
+        </div>
+        <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 h-full lg:col-span-1">
+          <RecentActivityWidget />
+        </div>
       </div>
 
-      {/* 4. Analytics Section - Row 2: Adviser Workload & Students by Program */}
+      {/* 4. Analytics Section - Row 2: Students by Program & Status Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        <AdviserWorkloadChart
-          data={processed.adviserWorkload}
-          loading={loading}
-        />
         <StudentsByProgramChart
           data={processed.studentsByProgram}
           loading={loading}
         />
-      </div>
-
-      {/* 5. Analytics Section - Row 3: Proposal Status Overview & Completion Rate */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        <ProposalStatusOverviewChart
-          data={processed.proposalOverview}
+        <ResearchStatusDistributionChart
+          data={processed.statusDistribution}
           loading={loading}
         />
+      </div>
+
+      {/* 5. Analytics Section - Row 3: Completion Rate & Adviser Workload */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         <ResearchCompletionRateChart
           data={processed.completionRate}
+          loading={loading}
+        />
+        <AdviserWorkloadChart
+          data={processed.adviserWorkload}
           loading={loading}
         />
       </div>

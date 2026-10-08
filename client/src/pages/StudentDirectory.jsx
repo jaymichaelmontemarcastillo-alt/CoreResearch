@@ -402,7 +402,18 @@ export const StudentDirectory = () => {
     const fromCurrent = sections.find((s) => s.id === sId)?.name;
     if (fromCurrent) return fromCurrent;
     const fromCache = (allSectionsByCourse[cId] || []).find((s) => s.id === sId)?.name;
-    return fromCache || sId;
+    const name = fromCache || sId || "—";
+    
+    // Normalize to just the letter if it's an ID like bscs-sec-a
+    if (typeof name === 'string') {
+      const match = name.match(/-sec-([a-z])$/i);
+      if (match) return `Section ${match[1].toUpperCase()}`;
+      
+      const letterMatch = name.trim().toUpperCase().match(/^[1-5]?([A-Z])$/);
+      if (letterMatch) return `Section ${letterMatch[1]}`;
+    }
+    
+    return name;
   };
 
   const handleCourseSelect = (courseId, specId, sectionId) => {

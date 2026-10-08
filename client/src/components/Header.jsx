@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useNotifications } from "../hooks/useNotifications";
 import { useConfirm } from "../context/ConfirmContext";
+import api from "../services/api";
 import { Avatar } from "./ui/Avatar";
 import {
   HiBars3,
@@ -74,6 +75,30 @@ export const Header = ({ onOpenMobileMenu }) => {
 
   const handleLogout = async () => {
     setProfileDropdownOpen(false);
+    
+    if (['adviser', 'faculty', 'research_coordinator', 'admin'].includes(userProfile?.role)) {
+       try {
+         const res = await api.get('/adviser-research/me');
+         if (res.data.success) {
+           const activeTasks = res.data.data.filter(d => ['UPLOADED', 'PROCESSING'].includes(d.processingStatus));
+           if (activeTasks.length > 0) {
+             const isConfirmed = await confirm({
+               title: "Active Document Extraction",
+               message: "There are research documents currently being analyzed by the NLP. Are you sure you want to log out now? (The extraction will continue in the background)",
+               confirmText: "Logout Anyway",
+               cancelText: "Cancel",
+               variant: "danger"
+             });
+             if (!isConfirmed) return;
+             await logout();
+             navigate("/login");
+             return;
+           }
+         }
+       } catch (err) {
+         // Proceed to normal logout
+       }
+    }
     
     const isConfirmed = await confirm({
       title: "Confirm Logout",

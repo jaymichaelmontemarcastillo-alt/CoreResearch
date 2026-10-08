@@ -1,50 +1,11 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
+import { getStorageProvider } from '../services/storage/storageManager.js';
+import { RepositoryPublication } from '../models/RepositoryPublication.js';
 
 // Pre-seed mock repository publications if empty
 export const seedMockRepositoryIfEmpty = () => {
-  if (!mockFirestoreDb.has('repository')) {
-    const initialRepo = [
-      {
-        id: 'repo-1001',
-        projectId: 'proj-500',
-        title: 'Autonomous Drone Navigation Using Computer Vision & Edge AI',
-        authors: ['David Tan', 'Samantha Cruz'],
-        adviserName: 'Dr. Eleanor Vance',
-        department: 'Computer Science',
-        publicationYear: 2025,
-        abstract: 'This thesis implements an onboard stereo-vision localization pipeline running on an NVIDIA Jetson Orin Nano, enabling GPS-denied indoor quadcopter trajectory tracking.',
-        keywords: ['Computer Vision', 'Drones', 'Edge AI', 'Robotics'],
-        pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        citation: 'Tan, D., & Cruz, S. (2025). Autonomous Drone Navigation Using Computer Vision & Edge AI. CoreResearch Academic Press.',
-        viewsCount: 142,
-        downloadsCount: 38,
-        publishedAt: new Date(Date.now() - 180 * 24 * 3600 * 1000).toISOString()
-      },
-      {
-        id: 'repo-1002',
-        projectId: 'proj-499',
-        title: 'Predictive Student Retention Analytics via Machine Learning Ensembles',
-        authors: ['Kenneth Sy', 'Lia Ocampo'],
-        adviserName: 'Prof. Marcus Chen',
-        department: 'Information Technology',
-        publicationYear: 2025,
-        abstract: 'An empirical comparison of XGBoost and Random Forest classifiers predicting first-year college dropout risks using LMS engagement telemetry.',
-        keywords: ['Machine Learning', 'Educational Data Mining', 'XGBoost', 'Predictive Analytics'],
-        pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-        citation: 'Sy, K., & Ocampo, L. (2025). Predictive Student Retention Analytics via Machine Learning Ensembles. CoreResearch Academic Press.',
-        viewsCount: 219,
-        downloadsCount: 64,
-        publishedAt: new Date(Date.now() - 210 * 24 * 3600 * 1000).toISOString()
-      }
-    ];
-
-    const map = new Map();
-    initialRepo.forEach(r => map.set(r.id, r));
-    mockFirestoreDb.set('repository', map);
-  }
+  // Not used for MongoDB, keeping for legacy compatibility if needed
 };
-
-import { getStorageProvider } from '../services/storage/storageManager.js';
 
 /**
  * Publish approved research project to Public Repository (Admin only)
@@ -74,7 +35,7 @@ export const publishToRepository = async (req, res) => {
       finalPdfUrl = pdfUrl;
     }
 
-    const newPublication = {
+    const newDoc = {
       id: `repo-${Date.now()}`,
       projectId: projectId || 'proj-501',
       title,
@@ -88,16 +49,10 @@ export const publishToRepository = async (req, res) => {
       citation: citation || `${title}. (${new Date().getFullYear()}). Institutional Repository.`,
       viewsCount: 1,
       downloadsCount: 0,
-      publishedAt: new Date().toISOString()
+      publishedAt: new Date()
     };
 
-    if (isDevMockMode) {
-      seedMockRepositoryIfEmpty();
-      const map = mockFirestoreDb.get('repository');
-      map.set(newPublication.id, newPublication);
-    } else {
-      await db.collection('repository_publications').doc(newPublication.id).set(newPublication);
-    }
+    const newPublication = await RepositoryPublication.create(newDoc);
 
     return res.status(201).json({
       success: true,
@@ -116,47 +71,30 @@ export const publishToRepository = async (req, res) => {
 export const getRepositoryPublications = async (req, res) => {
   try {
     const { search, department, year } = req.query;
-    let list = [];
-
-    if (isDevMockMode) {
-      seedMockRepositoryIfEmpty();
-      const map = mockFirestoreDb.get('repository');
-      list = Array.from(map.values());
-    } else {
-      try {
-        const snapshot = await db.collection('repository_publications').get();
-        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (err) {
-        console.warn('[RepositoryController] Firestore read fallback to mock mode:', err.message);
-        seedMockRepositoryIfEmpty();
-        const map = mockFirestoreDb.get('repository');
-        list = Array.from(map.values());
-      }
-    }
-
+    
+    let filter = {};
+    
     if (department && department !== 'all') {
-      list = list.filter(r => r.department === department);
+      filter.department = department;
     }
-
+    
     if (year) {
-      list = list.filter(r => String(r.publicationYear) === String(year));
+      filter.publicationYear = Number(year);
     }
-
+    
     if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(r =>
-        r.title.toLowerCase().includes(q) ||
-        r.abstract.toLowerCase().includes(q) ||
-        (r.keywords && r.keywords.some(k => k.toLowerCase().includes(q))) ||
-        (r.authors && r.authors.some(a => a.toLowerCase().includes(q)))
-      );
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { authors: { $regex: search, $options: 'i' } },
+        { abstract: { $regex: search, $options: 'i' } },
+        { keywords: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    list.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    const list = await RepositoryPublication.find(filter).sort({ publishedAt: -1 }).lean();
 
     return res.status(200).json({
       success: true,
-      count: list.length,
       data: list
     });
   } catch (error) {
@@ -164,21 +102,13 @@ export const getRepositoryPublications = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 export const updateRepositoryPublication = async (req, res) => {
   try {
     const { id } = req.params;
     const { department } = req.body;
     
-    if (isDevMockMode) {
-      seedMockRepositoryIfEmpty();
-      const map = mockFirestoreDb.get('repository');
-      const pub = map.get(id);
-      if (!pub) return res.status(404).json({ success: false, message: 'Publication not found' });
-      pub.department = department || pub.department;
-      map.set(id, pub);
-    } else {
-      await db.collection('repository_publications').doc(id).update({ department });
-    }
+    await RepositoryPublication.findOneAndUpdate({ id }, { department });
     
     return res.status(200).json({ success: true, message: 'Updated successfully' });
   } catch (error) {
@@ -189,13 +119,7 @@ export const updateRepositoryPublication = async (req, res) => {
 export const deleteRepositoryPublication = async (req, res) => {
   try {
     const { id } = req.params;
-    if (isDevMockMode) {
-      seedMockRepositoryIfEmpty();
-      const map = mockFirestoreDb.get('repository');
-      map.delete(id);
-    } else {
-      await db.collection('repository_publications').doc(id).delete();
-    }
+    await RepositoryPublication.deleteOne({ id });
     return res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

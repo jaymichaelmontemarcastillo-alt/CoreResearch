@@ -93,26 +93,60 @@ export const userService = {
   async checkStudentIdExists(studentId: string): Promise<boolean> {
     const trimmed = studentId.trim();
     if (!trimmed) return false;
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('studentIdOrEmployeeId', '==', trimmed)
-    );
-    const snap = await getDocs(q);
-    return !snap.empty;
+
+    // 1. Try secure backend endpoint first (bypasses unauthenticated Firestore rule restrictions)
+    try {
+      const res = await api.get(`/auth/check-id?id=${encodeURIComponent(trimmed)}`);
+      if (res?.data && typeof res.data.exists === 'boolean') {
+        return res.data.exists;
+      }
+    } catch (apiErr) {
+      console.warn('[userService] Backend check-id check warning:', apiErr?.message);
+    }
+
+    // 2. Fallback to direct Firestore query
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('studentIdOrEmployeeId', '==', trimmed)
+      );
+      const snap = await getDocs(q);
+      return !snap.empty;
+    } catch (fsErr) {
+      console.warn('[userService] checkStudentIdExists Firestore check warning (suppressed):', fsErr?.message);
+      return false;
+    }
   },
 
   /**
-   * Check if an email address is already registered in Firestore.
+   * Check if an email address is already registered.
    */
   async checkEmailExists(email: string): Promise<boolean> {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) return false;
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('email', '==', trimmed)
-    );
-    const snap = await getDocs(q);
-    return !snap.empty;
+
+    // 1. Try secure backend endpoint first
+    try {
+      const res = await api.get(`/auth/check-email?email=${encodeURIComponent(trimmed)}`);
+      if (res?.data && typeof res.data.exists === 'boolean') {
+        return res.data.exists;
+      }
+    } catch (apiErr) {
+      console.warn('[userService] Backend check-email check warning:', apiErr?.message);
+    }
+
+    // 2. Fallback to direct Firestore query (Firebase Auth will natively enforce email uniqueness on create)
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('email', '==', trimmed)
+      );
+      const snap = await getDocs(q);
+      return !snap.empty;
+    } catch (fsErr) {
+      console.warn('[userService] checkEmailExists Firestore check warning (suppressed):', fsErr?.message);
+      return false;
+    }
   },
 
   /**

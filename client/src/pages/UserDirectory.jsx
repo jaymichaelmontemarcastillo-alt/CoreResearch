@@ -391,7 +391,7 @@ export const UserDirectory = () => {
             filteredUsers.map((u) => (
               <TableRow key={u.uid}>
                 {/* Student ID */}
-                <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                <TableCell className="text-xs font-bold text-blue-600 dark:text-blue-400">
                   {u.studentIdOrEmployeeId || "—"}
                 </TableCell>
 
@@ -401,7 +401,7 @@ export const UserDirectory = () => {
                 </TableCell>
 
                 {/* Gmail / Email */}
-                <TableCell className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                <TableCell className="text-xs text-gray-500 dark:text-gray-400">
                   {u.email}
                 </TableCell>
 

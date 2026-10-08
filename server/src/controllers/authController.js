@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
-import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
+import { auth, db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 
 /**
  * Helper to build a sanitized, complete user profile document with sensible defaults
@@ -230,3 +230,77 @@ export const seedDatabaseEndpoint = async (req, res) => {
     });
   }
 };
+
+/**
+ * Check if a student ID, employee ID, or email is already registered
+ */
+export const checkIdentifierAvailability = async (req, res) => {
+  try {
+    const { id, email } = req.query;
+
+    if (id) {
+      const trimmedId = String(id).trim();
+      let exists = false;
+
+      // Check MongoDB
+      if (mongoose.connection.readyState === 1) {
+        const found = await User.findOne({
+          $or: [
+            { studentIdOrEmployeeId: trimmedId },
+            { studentId: trimmedId }
+          ]
+        }).lean();
+        if (found) exists = true;
+      }
+
+      // Check Firestore if not found in MongoDB
+      if (!exists && db) {
+        try {
+          const snap = await db.collection('users')
+            .where('studentIdOrEmployeeId', '==', trimmedId)
+            .limit(1)
+            .get();
+          if (!snap.empty) exists = true;
+        } catch (fsErr) {
+          console.warn('[AuthController] Firestore id check warning:', fsErr.message);
+        }
+      }
+
+      return res.status(200).json({ success: true, exists });
+    }
+
+    if (email) {
+      const trimmedEmail = String(email).trim().toLowerCase();
+      let exists = false;
+
+      if (auth) {
+        try {
+          const userRecord = await auth.getUserByEmail(trimmedEmail);
+          if (userRecord) exists = true;
+        } catch (authErr) {
+          // 'auth/user-not-found' means it does not exist
+        }
+      }
+
+      if (!exists && mongoose.connection.readyState === 1) {
+        const found = await User.findOne({ email: trimmedEmail }).lean();
+        if (found) exists = true;
+      }
+
+      return res.status(200).json({ success: true, exists });
+    }
+
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide either ?id= or ?email= query parameter.'
+    });
+  } catch (error) {
+    console.error('[AuthController] checkIdentifierAvailability error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+};
+

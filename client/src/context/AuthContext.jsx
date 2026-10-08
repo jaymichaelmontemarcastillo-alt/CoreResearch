@@ -257,9 +257,32 @@ export const AuthProvider = ({ children }) => {
         updated_at: new Date().toISOString()
       };
 
-      // 4. Save directly into Firestore users collection
+      // 4. Save directly into Firestore users collection with retry mechanism
+      // This handles the race condition where Auth token hasn't propagated to Firestore SDK yet
       const userRef = doc(db, 'users', result.user.uid);
-      await setDoc(userRef, userProfileData);
+      let setDocSuccess = false;
+      let lastError = null;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await setDoc(userRef, userProfileData);
+          setDocSuccess = true;
+          break;
+        } catch (err) {
+          lastError = err;
+          if (err.code === 'permission-denied' || err.message?.includes('permissions')) {
+            // Wait 500ms and retry to allow Auth token to propagate
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            break;
+          }
+        }
+      }
+      
+      if (!setDocSuccess) {
+        // Clean up the created auth user if we couldn't save their profile
+        try { await result.user.delete(); } catch(e) {}
+        throw new Error(`Registration failed while saving profile. Please try again. (Error: ${lastError?.message || 'Unknown'})`);
+      }
 
       // 5. Notify all system administrators
       await notificationService.notifyAdminsNewStudentRegistration({
@@ -343,8 +366,29 @@ export const AuthProvider = ({ children }) => {
         updated_at: new Date().toISOString()
       };
 
+      // Save with retry mechanism for Auth token propagation
       const userRef = doc(db, 'users', result.user.uid);
-      await setDoc(userRef, userProfileData);
+      let setDocSuccess = false;
+      let lastError = null;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await setDoc(userRef, userProfileData);
+          setDocSuccess = true;
+          break;
+        } catch (err) {
+          lastError = err;
+          if (err.code === 'permission-denied' || err.message?.includes('permissions')) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (!setDocSuccess) {
+        try { await result.user.delete(); } catch(e) {}
+        throw new Error(`Registration failed while saving profile. Please try again. (Error: ${lastError?.message || 'Unknown'})`);
+      }
 
       await syncProfileWithBackend(result.user, role || 'adviser');
       return result;

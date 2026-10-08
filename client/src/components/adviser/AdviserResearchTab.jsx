@@ -28,9 +28,9 @@ export const AdviserResearchTab = () => {
     fetchDocuments();
   }, []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const res = await api.get('/adviser-research/me');
       if (res.data.success) {
         setDocuments(res.data.data);
@@ -42,6 +42,17 @@ export const AdviserResearchTab = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // If any document is still processing, poll every 5 seconds
+    const hasProcessingDocs = documents.some(d => ['UPLOADED', 'PROCESSING'].includes(d.processingStatus));
+    if (hasProcessingDocs) {
+      const interval = setInterval(() => {
+        fetchDocuments(true);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [documents]);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];

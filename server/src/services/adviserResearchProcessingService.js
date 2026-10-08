@@ -2,6 +2,7 @@ import { getStorageProvider } from './storage/storageManager.js';
 import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 import mongoose from 'mongoose';
 import { documentAnalysisService } from './DocumentAnalysisService.js';
+import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 
 class AdviserResearchProcessingService {
   constructor() {
@@ -165,6 +166,32 @@ class AdviserResearchProcessingService {
       });
 
       console.log(`[AdviserResearchProcessingService] Successfully processed document ${documentId}`);
+
+      // Send In-App Notification to Adviser
+      try {
+        const updatedDoc = await AdviserResearchDocument.findOne({ id: documentId });
+        if (updatedDoc && updatedDoc.adviserId) {
+          const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2,6)}`;
+          const notif = {
+            id: notifId,
+            userId: updatedDoc.adviserId,
+            title: 'Document Analysis Complete',
+            message: `The NLP extraction and semantic analysis for "${updatedDoc.title || updatedDoc.originalFilename}" has finished successfully.`,
+            read: false,
+            createdAt: new Date().toISOString()
+          };
+
+          if (isDevMockMode) {
+             if (!mockFirestoreDb.has('notifications')) mockFirestoreDb.set('notifications', new Map());
+             mockFirestoreDb.get('notifications').set(notifId, notif);
+          } else {
+             await db.collection('notifications').doc(notifId).set(notif);
+          }
+          console.log(`[AdviserResearchProcessingService] Created in-app notification for ${updatedDoc.adviserId}`);
+        }
+      } catch (notifyErr) {
+        console.error(`[AdviserResearchProcessingService] Failed to send in-app completion notification for ${documentId}:`, notifyErr);
+      }
 
     } catch (error) {
       console.error(`[AdviserResearchProcessingService] Error processing document ${documentId}:`, error);

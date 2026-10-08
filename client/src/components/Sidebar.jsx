@@ -7,6 +7,7 @@ import logoImg from "../assets/logo.png";
 import { adviserRequestService } from "../services/adviserRequest.service";
 import researchWorkspaceService from "../services/researchWorkspace.service";
 import groupService from "../services/group.service";
+import api from "../services/api";
 import {
   HiSquares2X2,
   HiDocumentText,
@@ -90,6 +91,30 @@ export const Sidebar = ({
   }, [effectiveRole, currentUser]);
 
   const handleLogout = async () => {
+    if (['adviser', 'faculty', 'research_coordinator', 'admin'].includes(role)) {
+       try {
+         const res = await api.get('/adviser-research/me');
+         if (res.data.success) {
+           const activeTasks = res.data.data.filter(d => ['UPLOADED', 'PROCESSING'].includes(d.processingStatus));
+           if (activeTasks.length > 0) {
+             const isConfirmed = await confirm({
+               title: "Active Document Extraction",
+               message: "There are research documents currently being analyzed by the NLP. Are you sure you want to log out now? (The extraction will continue in the background)",
+               confirmText: "Logout Anyway",
+               cancelText: "Cancel",
+               variant: "danger"
+             });
+             if (!isConfirmed) return;
+             await logout();
+             navigate("/login");
+             return;
+           }
+         }
+       } catch (err) {
+         // Proceed to normal logout
+       }
+    }
+
     const isConfirmed = await confirm({
       title: "Confirm Logout",
       message: "Are you sure you want to log out of your account?",
