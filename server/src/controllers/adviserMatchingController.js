@@ -305,9 +305,7 @@ export const extractDocument = async (req, res) => {
 
     const { buffer, mimetype, size, originalname } = req.file;
 
-    if (size > 10 * 1024 * 1024) {
-      return res.status(400).json({ success: false, message: 'File size exceeds the 10MB limit.' });
-    }
+
 
     console.log(`[AdviserMatching] Extracting document: ${originalname} (${mimetype})`);
 

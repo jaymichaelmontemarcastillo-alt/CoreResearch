@@ -37,6 +37,7 @@ export const AuthLayout = ({
   subtitle,
   quoteTitle,
   quoteSubtitle,
+  centered = false,
   cardWidthClass = "lg:w-[48%] xl:w-[46%] 2xl:w-[44%] max-w-[650px] xl:max-w-[720px]",
 }) => {
   const [activeSlide, setActiveSlide] = useState(0);
@@ -192,86 +193,98 @@ export const AuthLayout = ({
       </div>
 
       {/* Main Container Layout */}
-      <div className="relative z-10 w-full flex-1 flex flex-col lg:flex-row justify-center lg:justify-between items-center lg:items-stretch gap-8 lg:gap-12 xl:gap-16 py-6 lg:py-0">
-        {/* LEFT COLUMN: Top-Left Logo & Lower-Left Dialogues Slideshow */}
-        <div className="w-full lg:flex-1 flex flex-col lg:justify-between z-10 max-w-[650px] lg:max-w-none pb-6 lg:pb-0">
-          {/* Top-Left Logo */}
-          <header className="flex items-center justify-center lg:justify-start mb-6 lg:mb-0 pr-8 sm:pr-10 lg:pr-0">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-3.5 group cursor-pointer"
-            >
-              <img
-                src={logoImg}
-                alt="CoreResearch Logo"
-                className="w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.6)] transition-transform duration-300 group-hover:scale-105"
-              />
-              <span className="font-brand text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white flex items-center">
-                <span>Core</span>
-                <span className="text-blue-500">Research</span>
-              </span>
-            </Link>
-          </header>
-
-          {/* Lower-Left Quotes & Dialogues Slideshow */}
-          <div
-            className="hidden lg:block space-y-5 max-w-xl pb-4 xl:pb-8"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
-          >
-            {/* Sliding Track Viewport */}
-            <div className="overflow-hidden w-full min-h-[175px] flex items-end">
-              <div
-                className="flex w-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
-                style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+      <div
+        className={`relative z-10 w-full flex-1 flex ${
+          centered
+            ? "justify-center items-center py-6 sm:py-10 my-auto"
+            : "flex-col lg:flex-row justify-center lg:justify-between items-center lg:items-stretch gap-8 lg:gap-12 xl:gap-16 py-6 lg:py-0"
+        }`}
+      >
+        {!centered && (
+          /* LEFT COLUMN: Top-Left Logo & Lower-Left Dialogues Slideshow */
+          <div className="w-full lg:flex-1 flex flex-col lg:justify-between z-10 max-w-[650px] lg:max-w-none pb-6 lg:pb-0">
+            {/* Top-Left Logo */}
+            <header className="flex items-center justify-center lg:justify-start mb-6 lg:mb-0 pr-8 sm:pr-10 lg:pr-0">
+              <Link
+                to="/"
+                className="inline-flex items-center gap-3.5 group cursor-pointer"
               >
-                {slides.map((slide, index) => (
-                  <div
+                <img
+                  src={logoImg}
+                  alt="CoreResearch Logo"
+                  className="w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.6)] transition-transform duration-300 group-hover:scale-105"
+                />
+                <span className="font-brand text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white flex items-center">
+                  <span>Core</span>
+                  <span className="text-blue-500">Research</span>
+                </span>
+              </Link>
+            </header>
+
+            {/* Lower-Left Quotes & Dialogues Slideshow */}
+            <div
+              className="hidden lg:block space-y-5 max-w-xl pb-4 xl:pb-8"
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
+            >
+              {/* Sliding Track Viewport */}
+              <div className="overflow-hidden w-full min-h-[175px] flex items-end">
+                <div
+                  className="flex w-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
+                  style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+                >
+                  {slides.map((slide, index) => (
+                    <div
+                      key={index}
+                      className={`w-full flex-shrink-0 space-y-3 transition-opacity duration-700 ${
+                        index === activeSlide ? "opacity-100" : "opacity-0 pointer-events-none"
+                      }`}
+                    >
+                      <h1 className="text-3xl sm:text-4xl xl:text-5xl font-medium text-white tracking-tight leading-[1.15]">
+                        {slide.title}
+                      </h1>
+                      <p className="text-sm xl:text-base text-[#9396a8] font-normal leading-relaxed max-w-lg">
+                        {slide.subtitle}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Interactive Slide / Carousel Indicator Pills */}
+              <div className="flex items-center gap-2 pt-2">
+                {slides.map((_, index) => (
+                  <button
                     key={index}
-                    className={`w-full flex-shrink-0 space-y-3 transition-opacity duration-700 ${
-                      index === activeSlide ? "opacity-100" : "opacity-0 pointer-events-none"
+                    type="button"
+                    onClick={() => setActiveSlide(index)}
+                    aria-label={`Go to slide ${index + 1}`}
+                    className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer ${
+                      index === activeSlide
+                        ? "w-8 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"
+                        : "w-2 bg-white/20 hover:bg-white/40 hover:w-3"
                     }`}
-                  >
-                    <h1 className="text-3xl sm:text-4xl xl:text-5xl font-medium text-white tracking-tight leading-[1.15]">
-                      {slide.title}
-                    </h1>
-                    <p className="text-sm xl:text-base text-[#9396a8] font-normal leading-relaxed max-w-lg">
-                      {slide.subtitle}
-                    </p>
-                  </div>
+                  />
                 ))}
               </div>
             </div>
-
-            {/* Interactive Slide / Carousel Indicator Pills */}
-            <div className="flex items-center gap-2 pt-2">
-              {slides.map((_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => setActiveSlide(index)}
-                  aria-label={`Go to slide ${index + 1}`}
-                  className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer ${
-                    index === activeSlide
-                      ? "w-8 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"
-                      : "w-2 bg-white/20 hover:bg-white/40 hover:w-3"
-                  }`}
-                />
-              ))}
-            </div>
           </div>
-        </div>
+        )}
 
-        {/* RIGHT COLUMN: Floating Card with Crisp Outlines */}
+        {/* Floating Card with Crisp Outlines */}
         <div
-          className={`w-full ${cardWidthClass} bg-white dark:bg-[#15161e] rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.9)] border border-gray-200 dark:border-[#222433] z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 flex flex-col`}
+          className={`w-full ${
+            centered
+              ? (cardWidthClass || "max-w-[760px]") + " mx-auto"
+              : cardWidthClass
+          } bg-white dark:bg-[#15161e] rounded-2xl shadow-[0_25px_80px_-15px_rgba(0,0,0,0.9)] border border-gray-200 dark:border-[#222433] z-20 shrink-0 overflow-hidden text-gray-900 dark:text-gray-100 flex flex-col`}
         >
           {/* Scrollable Inner Container with Clean Inset Scrollbar */}
           <div className="w-full h-full overflow-y-auto p-6 sm:p-8 lg:p-10 flex flex-col justify-between custom-scrollbar">
             {/* Card Top & Body Container */}
             <div className="w-full flex-1 flex flex-col justify-center py-2">
               {/* Header inside floating card */}
-              <div className="flex flex-col items-start text-left mb-6 xl:mb-7">
+              <div className={`flex flex-col ${centered ? "items-center text-center" : "items-start text-left"} mb-6 xl:mb-7`}>
                 {title && (
                   <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 dark:text-white tracking-tight">
                     {title}

@@ -151,6 +151,50 @@ export const notificationService = {
       console.error('Failed to notify admins of new student registration:', error);
     }
   },
+
+  /**
+   * Notify all system administrators about a new faculty/adviser registration event.
+   */
+  async notifyAdminsNewFacultyRegistration(facultyData: {
+    uid: string;
+    fullName: string;
+    email: string;
+    department?: string;
+    role?: string;
+  }): Promise<void> {
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('role', '==', 'admin')
+      );
+      const querySnap = await getDocs(q);
+      const adminUsers = querySnap.docs.map((docSnap) => docSnap.data());
+
+      const now = new Date().toISOString();
+      const deptDisplay = facultyData.department || 'College of Computer Studies';
+
+      const notificationPromises = adminUsers.map((admin) => {
+        const docRef = doc(collection(db, COLLECTION_NAME));
+        const notification: AppNotification = {
+          id: docRef.id,
+          userId: admin.uid,
+          title: 'New Faculty Registration',
+          message: `${facultyData.fullName} has registered a new Faculty/Adviser account. Email: ${facultyData.email} | Department: ${deptDisplay} | Status: Pending Approval`,
+          type: 'system',
+          read: false,
+          relatedId: facultyData.uid,
+          link: '/admin/user-requests?tab=pending',
+          linkUrl: '/admin/user-requests?tab=pending',
+          createdAt: now,
+        };
+        return setDoc(docRef, notification);
+      });
+
+      await Promise.all(notificationPromises);
+    } catch (error) {
+      console.error('Failed to notify admins of new faculty registration:', error);
+    }
+  },
 };
 
 export default notificationService;

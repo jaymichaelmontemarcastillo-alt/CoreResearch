@@ -13,11 +13,15 @@ export interface UserProfile {
   department: string;
   department_id: string;
   studentIdOrEmployeeId?: string;
+  studentId?: string;
   courseId?: string;
   program?: string;
   programCode?: string;
   specializationId?: string;
   programSpecialization?: string;
+  major?: string;
+  majorCode?: string;
+  section?: string;
   sectionId?: string;
   sectionName?: string;
   groupId?: string;

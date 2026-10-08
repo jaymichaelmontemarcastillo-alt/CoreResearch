@@ -57,18 +57,28 @@ export const UserRequests = () => {
 
   const fetchTabCounts = async () => {
     try {
-      const all = await userService.getAllUsers();
-      const pending = all.filter(
-        (u) =>
-          u.status !== "approved" &&
-          u.status !== "rejected" &&
-          (u.status === "pending" || u.is_approved === false)
-      );
-      const rejected = all.filter((u) => u.status === "rejected");
-      setPendingCount(pending.length);
-      setRejectedCount(rejected.length);
+      const [pendingRes, rejectedRes] = await Promise.all([
+        userService.getPaginatedUsers({ status: "pending", limit: 1 }),
+        userService.getPaginatedUsers({ status: "rejected", limit: 1 }),
+      ]);
+      setPendingCount(pendingRes.total ?? 0);
+      setRejectedCount(rejectedRes.total ?? 0);
     } catch (e) {
-      console.warn("[UserRequests] Failed to load request counts:", e);
+      console.warn("[UserRequests] Failed to load request counts from API:", e);
+      try {
+        const all = await userService.getAllUsers();
+        const pending = all.filter(
+          (u) =>
+            u.status !== "approved" &&
+            u.status !== "rejected" &&
+            (u.status === "pending" || u.is_approved === false)
+        );
+        const rejected = all.filter((u) => u.status === "rejected");
+        setPendingCount(pending.length);
+        setRejectedCount(rejected.length);
+      } catch (err) {
+        console.warn("[UserRequests] Failed to load request counts fallback:", err);
+      }
     }
   };
 
@@ -87,6 +97,13 @@ export const UserRequests = () => {
       setRequests(result.users);
       setTotalRequests(result.total);
       setTotalPages(result.totalPages);
+
+      // Keep active tab badge perfectly aligned with the returned count
+      if (selectedTab === "rejected") {
+        setRejectedCount(result.total);
+      } else if (selectedTab === "pending") {
+        setPendingCount(result.total);
+      }
     } catch (err) {
       console.error("[UserRequests] fetchRequests error:", err);
       showToast("Error loading user requests.", "error");
@@ -156,9 +173,10 @@ export const UserRequests = () => {
   };
 
   const handleApprove = async (u) => {
+    const idText = u.studentIdOrEmployeeId ? ` (${u.studentIdOrEmployeeId})` : "";
     const confirmed = await confirm({
       title: "Approve User Registration",
-      message: `Are you sure you want to approve registration for ${u.fullName || u.email} (${u.studentIdOrEmployeeId})? This will grant them access to CoreResearch.`,
+      message: `Are you sure you want to approve registration for ${u.fullName || u.email}${idText}? This will grant them access to CoreResearch.`,
       confirmText: "Approve",
       variant: "primary",
     });

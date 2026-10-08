@@ -13,7 +13,6 @@ import {
   HiUser,
   HiIdentification,
   HiCheckCircle,
-  HiBuildingOffice2,
 } from "react-icons/hi2";
 import { courseService, BSIT_SPECIALIZATIONS, BSCS_SPECIALIZATIONS } from "../services/course.service";
 import { sectionService } from "../services/section.service";
@@ -35,16 +34,14 @@ export const Register = ({ portal: initialPortal }) => {
   const [lastName, setLastName] = useState("");
   const [programs, setPrograms] = useState([]);
   const [selectedProgramId, setSelectedProgramId] = useState("bsit");
-  const [availableMajors, setAvailableMajors] = useState(BSIT_SPECIALIZATIONS);
   const [selectedMajorCode, setSelectedMajorCode] = useState("WMAD");
   const [availableSections, setAvailableSections] = useState([]);
   const [selectedSectionName, setSelectedSectionName] = useState("A");
 
   // Faculty Form State
-  const [facultyName, setFacultyName] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [facultyFirstName, setFacultyFirstName] = useState("");
+  const [facultyLastName, setFacultyLastName] = useState("");
   const [facultyEmail, setFacultyEmail] = useState("");
-  const [department, setDepartment] = useState("Information Technology");
 
   // Password & Security State
   const [password, setPassword] = useState("");
@@ -57,7 +54,34 @@ export const Register = ({ portal: initialPortal }) => {
   const [loading, setLoading] = useState(false);
   const [registrationSubmitted, setRegistrationSubmitted] = useState(false);
 
-  // Load programs from DB
+  // Helper to get specializations per program with preferred ordering
+  const getProgramSpecializations = (prog) => {
+    let specs = prog?.specializations && prog.specializations.length > 0 ? prog.specializations : [];
+    if (specs.length === 0) {
+      if (prog?.code?.toUpperCase() === "BSIT" || prog?.id?.toLowerCase() === "bsit") {
+        specs = BSIT_SPECIALIZATIONS;
+      } else if (prog?.code?.toUpperCase() === "BSCS" || prog?.id?.toLowerCase() === "bscs") {
+        specs = BSCS_SPECIALIZATIONS;
+      }
+    }
+    // Preferred ordering: WMAD, SMP, AMG
+    if (prog?.code?.toUpperCase() === "BSIT" || prog?.id?.toLowerCase() === "bsit") {
+      const order = ["WMAD", "SMP", "AMG"];
+      specs = [...specs].sort((a, b) => {
+        const codeA = (a.code || a.id || "").toUpperCase();
+        const codeB = (b.code || b.id || "").toUpperCase();
+        const idxA = order.indexOf(codeA);
+        const idxB = order.indexOf(codeB);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+    }
+    return specs;
+  };
+
+  // Load programs from DB / Admin settings
   useEffect(() => {
     const loadAcademicData = async () => {
       try {
@@ -66,6 +90,12 @@ export const Register = ({ portal: initialPortal }) => {
           setPrograms(courses);
           const defaultProg = courses.find((c) => c.code?.toUpperCase() === "BSIT" || c.id === "bsit") || courses[0];
           setSelectedProgramId(defaultProg.id);
+          const specs = getProgramSpecializations(defaultProg);
+          if (specs.length > 0) {
+            setSelectedMajorCode(specs[0].code || specs[0].id);
+          } else {
+            setSelectedMajorCode("");
+          }
         }
       } catch (err) {
         console.warn("[Register] Failed to load courses:", err);
@@ -74,28 +104,10 @@ export const Register = ({ portal: initialPortal }) => {
     loadAcademicData();
   }, []);
 
-  // Update Majors & Sections when Program changes
+  // Update Sections when Program changes
   useEffect(() => {
     if (!selectedProgramId) return;
 
-    const prog = programs.find((p) => p.id === selectedProgramId || p.code?.toLowerCase() === selectedProgramId.toLowerCase());
-    
-    // Majors dependency
-    if (prog?.specializations && prog.specializations.length > 0) {
-      setAvailableMajors(prog.specializations);
-      setSelectedMajorCode(prog.specializations[0].code || prog.specializations[0].id);
-    } else if (selectedProgramId === "bsit" || prog?.code?.toUpperCase() === "BSIT") {
-      setAvailableMajors(BSIT_SPECIALIZATIONS);
-      setSelectedMajorCode("WMAD");
-    } else if (selectedProgramId === "bscs" || prog?.code?.toUpperCase() === "BSCS") {
-      setAvailableMajors(BSCS_SPECIALIZATIONS);
-      setSelectedMajorCode("IS");
-    } else {
-      setAvailableMajors([]);
-      setSelectedMajorCode("");
-    }
-
-    // Sections dependency: fetch Admin-controlled sections from DB
     const loadSections = async () => {
       try {
         const sectionsData = await sectionService.getSectionsByCourseId(selectedProgramId, true);
@@ -121,7 +133,14 @@ export const Register = ({ portal: initialPortal }) => {
       }
     };
     loadSections();
-  }, [selectedProgramId, programs]);
+  }, [selectedProgramId]);
+
+  const handleProgramMajorChange = (e) => {
+    const val = e.target.value;
+    const [progId, majorCode] = val.split(":::");
+    setSelectedProgramId(progId);
+    setSelectedMajorCode(majorCode || "");
+  };
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
@@ -142,8 +161,15 @@ export const Register = ({ portal: initialPortal }) => {
       return;
     }
 
-    if (availableMajors.length > 0 && !selectedMajorCode) {
-      setError("Please select your major.");
+    const selectedProg = programs.find((p) => p.id === selectedProgramId || p.code?.toLowerCase() === selectedProgramId?.toLowerCase()) || {
+      id: "bsit",
+      code: "BSIT",
+      name: "Bachelor of Science in Information Technology",
+    };
+
+    const progSpecs = getProgramSpecializations(selectedProg);
+    if (progSpecs.length > 0 && !selectedMajorCode) {
+      setError("Please select your program and major.");
       return;
     }
 
@@ -165,22 +191,17 @@ export const Register = ({ portal: initialPortal }) => {
     setLoading(true);
 
     try {
-      const selectedProg = programs.find((p) => p.id === selectedProgramId) || {
-        id: "bsit",
-        code: "BSIT",
-        name: "Bachelor of Science in Information Technology",
-      };
-
-      const selectedMajorObj = availableMajors.find(
-        (m) => (m.code || m.id) === selectedMajorCode
+      const selectedMajorObj = progSpecs.find(
+        (m) => (m.code || m.id)?.toUpperCase() === selectedMajorCode?.toUpperCase()
       );
       const majorDisplay = selectedMajorObj
-        ? `${selectedMajorObj.name} (${selectedMajorObj.code})`
-        : "";
+        ? `${selectedMajorObj.name} (${selectedMajorObj.code || selectedMajorObj.id})`
+        : (selectedMajorCode || "");
 
       const courseId = selectedProg.id?.toLowerCase() || selectedProg.code?.toLowerCase() || "bsit";
       const specId = selectedMajorObj?.id?.toLowerCase() || selectedMajorCode?.toLowerCase() || "wmad";
       const secName = selectedSectionName || "A";
+      const selectedSecObj = availableSections.find((s) => s.name === secName || s.id === secName);
       const secId = selectedSecObj?.id || `${courseId}-sec-${secName.toLowerCase()}`;
 
       await registerStudent({
@@ -238,13 +259,13 @@ export const Register = ({ portal: initialPortal }) => {
     e.preventDefault();
     setError("");
 
-    if (!facultyName.trim()) {
-      setError("Complete Name is required.");
+    if (!facultyFirstName.trim()) {
+      setError("First Name is required.");
       return;
     }
 
-    if (!employeeId.trim()) {
-      setError("Employee ID Number is required.");
+    if (!facultyLastName.trim()) {
+      setError("Last Name is required.");
       return;
     }
 
@@ -269,17 +290,28 @@ export const Register = ({ portal: initialPortal }) => {
       await registerFaculty({
         email: facultyEmail.trim().toLowerCase(),
         password,
-        fullName: facultyName.trim(),
-        employeeId: employeeId.trim(),
-        department,
+        firstName: facultyFirstName.trim(),
+        lastName: facultyLastName.trim(),
+        fullName: `${facultyFirstName.trim()} ${facultyLastName.trim()}`,
+        department: "College of Computer Studies",
+        department_id: "ccs",
         role: "adviser",
       });
 
-      navigate("/dashboard");
+      navigate("/pending-approval", {
+        replace: true,
+        state: {
+          firstName: facultyFirstName.trim(),
+          lastName: facultyLastName.trim(),
+          fullName: `${facultyFirstName.trim()} ${facultyLastName.trim()}`,
+          email: facultyEmail.trim().toLowerCase(),
+          department: "College of Computer Studies",
+          role: "adviser",
+          submittedAt: new Date().toISOString(),
+        },
+      });
     } catch (err) {
-      if (err.message?.includes("Employee ID Already Registered")) {
-        setError("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
-      } else if (err.message?.includes("Email Already Registered") || err.code === "auth/email-already-in-use") {
+      if (err.message?.includes("Email Already Registered") || err.code === "auth/email-already-in-use") {
         setError("Email Already Registered\nAn account with this email address already exists.");
       } else {
         setError(err.message || "Failed to register faculty account.");
@@ -295,6 +327,8 @@ export const Register = ({ portal: initialPortal }) => {
       <AuthLayout
         title="REGISTRATION SUBMITTED"
         subtitle="Your student account has been created successfully"
+        centered={true}
+        cardWidthClass="w-full max-w-[640px]"
       >
         <div className="text-center py-6 space-y-4">
           <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
@@ -315,7 +349,7 @@ export const Register = ({ portal: initialPortal }) => {
             <div><span className="font-semibold text-gray-700 dark:text-gray-200">Student ID:</span> {studentId}</div>
             <div><span className="font-semibold text-gray-700 dark:text-gray-200">Name:</span> {firstName} {lastName}</div>
             <div><span className="font-semibold text-gray-700 dark:text-gray-200">Email:</span> {studentEmail}</div>
-            <div><span className="font-semibold text-gray-700 dark:text-gray-200">Academic:</span> BSIT • {selectedMajorCode || "N/A"} • Section {selectedSectionName}</div>
+            <div><span className="font-semibold text-gray-700 dark:text-gray-200">Academic:</span> {(programs.find(p => p.id === selectedProgramId)?.code || "BSIT")} • {selectedMajorCode || "N/A"} • Section {selectedSectionName}</div>
             <div><span className="font-semibold text-amber-600 dark:text-amber-400">Status:</span> Pending Review</div>
           </div>
 
@@ -359,7 +393,7 @@ export const Register = ({ portal: initialPortal }) => {
               <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type="text"
-                placeholder="e.g. 0423-4197"
+                placeholder="0000-0000"
                 className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition font-mono"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
@@ -378,7 +412,7 @@ export const Register = ({ portal: initialPortal }) => {
                 <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
                 <input
                   type="text"
-                  placeholder="John Paul"
+                  placeholder="Juan"
                   className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
@@ -392,7 +426,7 @@ export const Register = ({ portal: initialPortal }) => {
               </label>
               <input
                 type="text"
-                placeholder="Empalmado"
+                placeholder="Dela Cruz"
                 className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm px-3.5 transition"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -419,61 +453,53 @@ export const Register = ({ portal: initialPortal }) => {
             </div>
           </div>
 
-          {/* Program Dropdown */}
+          {/* Program & Major Dropdown (Unified - Grouped by Program based on Admin Settings) */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
-              Program
+              Program & Major
             </label>
             <div className="relative">
               <HiAcademicCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <select
                 className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition appearance-none cursor-pointer"
-                value={selectedProgramId}
-                onChange={(e) => setSelectedProgramId(e.target.value)}
+                value={`${selectedProgramId}:::${selectedMajorCode}`}
+                onChange={handleProgramMajorChange}
                 required
               >
-                {programs.length > 0 ? (
-                  programs.map((prog) => (
-                    <option key={prog.id} value={prog.id}>
-                      {prog.name} ({prog.code || prog.id.toUpperCase()})
-                    </option>
-                  ))
-                ) : (
-                  <option value="bsit">Bachelor of Science in Information Technology (BSIT)</option>
-                )}
-              </select>
-            </div>
-          </div>
+                <option value="" disabled>Select Program & Major</option>
+                {(programs.length > 0 ? programs : [
+                  { id: "bsit", code: "BSIT", name: "Bachelor of Science in Information Technology", specializations: BSIT_SPECIALIZATIONS },
+                  { id: "bscs", code: "BSCS", name: "Bachelor of Science in Computer Science", specializations: BSCS_SPECIALIZATIONS }
+                ]).map((prog) => {
+                  const specs = getProgramSpecializations(prog);
+                  const progCode = prog.code || prog.id.toUpperCase();
+                  const optgroupLabel = `${progCode} - ${prog.name}`;
 
-          {/* Major Dropdown (Dependent on Program) */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
-              Major {availableMajors.length > 0 && <span className="text-red-500">*</span>}
-            </label>
-            <div className="relative">
-              <HiBriefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
-              {availableMajors.length > 0 ? (
-                <select
-                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition appearance-none cursor-pointer"
-                  value={selectedMajorCode}
-                  onChange={(e) => setSelectedMajorCode(e.target.value)}
-                  required
-                >
-                  <option value="" disabled>Select Major</option>
-                  {availableMajors.map((major) => (
-                    <option key={major.code || major.id} value={major.code || major.id}>
-                      {major.name} ({major.code})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  disabled
-                  value="Not Applicable"
-                  className="w-full h-11 sm:h-12 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-[#222433] text-gray-400 dark:text-gray-500 rounded-xl text-sm pl-10 pr-3.5 cursor-not-allowed"
-                />
-              )}
+                  if (specs && specs.length > 0) {
+                    return (
+                      <optgroup key={prog.id} label={optgroupLabel}>
+                        {specs.map((spec) => {
+                          const specCode = spec.code || spec.id;
+                          const valueKey = `${prog.id}:::${specCode}`;
+                          return (
+                            <option key={valueKey} value={valueKey}>
+                              {specCode ? `${specCode} - ${spec.name}` : spec.name}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    );
+                  }
+
+                  return (
+                    <optgroup key={prog.id} label={optgroupLabel}>
+                      <option value={`${prog.id}:::`}>
+                        {prog.name} ({progCode})
+                      </option>
+                    </optgroup>
+                  );
+                })}
+              </select>
             </div>
           </div>
 
@@ -572,37 +598,34 @@ export const Register = ({ portal: initialPortal }) => {
       ) : (
         // ── FACULTY REGISTRATION FORM ──
         <form onSubmit={handleFacultySubmit} className="space-y-4">
-          {/* Full Name */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
-              Complete Name
-            </label>
-            <div className="relative">
-              <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
-              <input
-                type="text"
-                placeholder="Dr. Maria Santos"
-                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
-                value={facultyName}
-                onChange={(e) => setFacultyName(e.target.value)}
-                required
-              />
+          {/* Name (First Name & Last Name) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                First Name
+              </label>
+              <div className="relative">
+                <HiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+                <input
+                  type="text"
+                  placeholder="Juan"
+                  className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
+                  value={facultyFirstName}
+                  onChange={(e) => setFacultyFirstName(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-          </div>
-
-          {/* Employee ID */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
-              Employee ID Number
-            </label>
-            <div className="relative">
-              <HiIdentification className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
+                Last Name
+              </label>
               <input
                 type="text"
-                placeholder="EMP-8821"
-                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition font-mono"
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                placeholder="Dela Cruz"
+                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm px-3.5 transition"
+                value={facultyLastName}
+                onChange={(e) => setFacultyLastName(e.target.value)}
                 required
               />
             </div>
@@ -617,32 +640,12 @@ export const Register = ({ portal: initialPortal }) => {
               <HiEnvelope className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
               <input
                 type="email"
-                placeholder="faculty@university.edu"
+                placeholder="example@gmail.com"
                 className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition"
                 value={facultyEmail}
                 onChange={(e) => setFacultyEmail(e.target.value)}
                 required
               />
-            </div>
-          </div>
-
-          {/* Department */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-[#9396a8]">
-              Department
-            </label>
-            <div className="relative">
-              <HiBuildingOffice2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#6b6f84]" />
-              <select
-                className="w-full h-11 sm:h-12 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl text-sm pl-10 pr-3.5 transition appearance-none cursor-pointer"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                required
-              >
-                <option value="Information Technology">Department of Information Technology</option>
-                <option value="Computer Science">Department of Computer Science</option>
-                <option value="Information Systems">Department of Information Systems</option>
-              </select>
             </div>
           </div>
 

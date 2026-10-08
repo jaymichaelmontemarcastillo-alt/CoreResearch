@@ -70,9 +70,7 @@ class AdviserResearchProcessingService {
       throw new Error('No file data received.');
     }
 
-    if (fileSize > 10 * 1024 * 1024) {
-      throw new Error('File size exceeds the 10MB limit.');
-    }
+
 
     if (mimeType !== 'application/pdf' && !mimeType.includes('wordprocessingml') && !mimeType.includes('docx')) {
       throw new Error('Unsupported file format. Only PDF and DOCX are allowed.');

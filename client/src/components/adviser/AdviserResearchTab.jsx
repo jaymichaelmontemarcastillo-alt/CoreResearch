@@ -63,10 +63,7 @@ export const AdviserResearchTab = () => {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'File size must be under 10MB.' });
-      return;
-    }
+
 
     try {
       setIsUploading(true);

@@ -16,8 +16,8 @@ const COLLECTION_NAME = 'courses';
 
 export const BSIT_SPECIALIZATIONS: Specialization[] = [
   { id: 'wmad', code: 'WMAD', name: 'Web and Mobile Application Development' },
-  { id: 'amg', code: 'AMG', name: 'Animation and Motion Graphics' },
   { id: 'smp', code: 'SMP', name: 'Service Management Program' },
+  { id: 'amg', code: 'AMG', name: 'Animation and Motion Graphics' },
 ];
 
 export const BSCS_SPECIALIZATIONS: Specialization[] = [

@@ -61,8 +61,8 @@ export const PendingApproval = () => {
   const fullName = checkResult?.data?.fullName || regData?.fullName || "";
   const program = checkResult?.data?.program || regData?.program || "";
   const major = checkResult?.data?.major || regData?.major || "";
-  const section = checkResult?.data?.section || regData?.section || "";
   const role = checkResult?.data?.role || regData?.role || "student";
+  const department = checkResult?.data?.department || regData?.department || "";
   const submittedAt = checkResult?.data?.submittedAt || regData?.submittedAt;
 
   // Format date helper
@@ -144,9 +144,8 @@ export const PendingApproval = () => {
     <AuthLayout
       title="REGISTRATION SUBMITTED"
       subtitle="Your account is undergoing institutional verification"
-      quoteTitle="Institutional integrity starts with verified academic credentials."
-      quoteSubtitle="Every research submission, adviser matching, and manuscript archive is safeguarded through authorized registration review."
-      cardWidthClass="lg:w-[50%] xl:w-[48%] 2xl:w-[45%] max-w-[680px] xl:max-w-[720px]"
+      centered={true}
+      cardWidthClass="w-full max-w-[760px] xl:max-w-[800px]"
     >
       <div className="space-y-6">
         {/* Dynamic Status Notification Alert */}
@@ -322,7 +321,9 @@ export const PendingApproval = () => {
                 <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900/60 border border-gray-200/70 dark:border-slate-800 flex items-start gap-2.5">
                   <HiUser className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                   <div className="truncate">
-                    <span className="block text-[10px] text-gray-400 uppercase font-semibold">Student Name</span>
+                    <span className="block text-[10px] text-gray-400 uppercase font-semibold">
+                      {role === "adviser" || role === "faculty" ? "Faculty Name" : "Student Name"}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100 truncate block">{fullName}</span>
                   </div>
                 </div>
@@ -338,11 +339,23 @@ export const PendingApproval = () => {
                 </div>
               )}
 
+              {department && (
+                <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900/60 border border-gray-200/70 dark:border-slate-800 flex items-start gap-2.5">
+                  <HiBuildingOffice2 className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                  <div className="truncate">
+                    <span className="block text-[10px] text-gray-400 uppercase font-semibold">Department</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100 truncate block">{department}</span>
+                  </div>
+                </div>
+              )}
+
               {email && (
                 <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900/60 border border-gray-200/70 dark:border-slate-800 flex items-start gap-2.5">
                   <HiEnvelope className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                   <div className="truncate">
-                    <span className="block text-[10px] text-gray-400 uppercase font-semibold">Institutional Email</span>
+                    <span className="block text-[10px] text-gray-400 uppercase font-semibold">
+                      {role === "adviser" || role === "faculty" ? "Faculty Email" : "Institutional Email"}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100 truncate block">{email}</span>
                   </div>
                 </div>

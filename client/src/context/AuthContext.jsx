@@ -368,12 +368,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const normalizedEmployeeId = employeeId.trim();
+      const normalizedEmployeeId = employeeId ? employeeId.trim() : '';
 
-      // Check unique employee id
-      const empExists = await userService.checkStudentIdExists(normalizedEmployeeId);
-      if (empExists) {
-        throw new Error("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
+      // Check unique employee id if provided
+      if (normalizedEmployeeId) {
+        const empExists = await userService.checkStudentIdExists(normalizedEmployeeId);
+        if (empExists) {
+          throw new Error("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
+        }
       }
 
       // Check unique email
@@ -399,10 +401,11 @@ export const AuthProvider = ({ children }) => {
         studentIdOrEmployeeId: normalizedEmployeeId,
         role: role || 'adviser',
         role_id: role || 'adviser',
-        department: department || 'Information Technology',
-        department_id: department || 'it',
-        status: 'active',
-        is_approved: true,
+        department: department || 'College of Computer Studies',
+        department_id: department ? (department.toLowerCase().includes('computer studies') ? 'ccs' : 'it') : 'ccs',
+        college: 'College of Computer Studies',
+        status: 'pending',
+        is_approved: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -425,9 +428,27 @@ export const AuthProvider = ({ children }) => {
         console.warn('[registerFaculty] Client setDoc warning:', fsErr?.message);
       }
 
-      setUserProfile(userProfileData);
-      setCurrentUser(result.user);
-      return result;
+      // Notify system administrators asynchronously
+      notificationService.notifyAdminsNewFacultyRegistration({
+        uid: result.user.uid,
+        fullName: completeName,
+        email: normalizedEmail,
+        department: userProfileData.department,
+        role: userProfileData.role,
+      }).catch((notifErr) => {
+        console.warn('[registerFaculty] Admin notification warning:', notifErr?.message);
+      });
+
+      // Sign out cleanly so pending faculty account cannot access the dashboard before approval
+      try {
+        await signOut(auth);
+      } catch (signOutErr) {
+        console.warn('[registerFaculty] SignOut warning:', signOutErr?.message);
+      }
+      setCurrentUser(null);
+      setUserProfile(null);
+
+      return { success: true, pendingApproval: true, facultyData: userProfileData };
     } catch (error) {
       throw error;
     } finally {

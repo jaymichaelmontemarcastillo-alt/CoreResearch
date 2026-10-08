@@ -8,9 +8,6 @@ const router = express.Router();
 // Memory storage for fast processing without temp files on disk
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 30 * 1024 * 1024, // 30MB max
-  },
   fileFilter: (req, file, cb) => {
     const ext = file.originalname.split('.').pop()?.toLowerCase();
     if (ext === 'docx' || ext === 'pdf') {
