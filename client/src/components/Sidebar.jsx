@@ -27,6 +27,7 @@ import {
   HiChartBar,
   HiPlus,
   HiMinus,
+  HiUserPlus,
 } from "react-icons/hi2";
 
 export const Sidebar = ({
@@ -235,9 +236,9 @@ export const Sidebar = ({
           roles: ["admin", "research_coordinator"],
         },
         {
-          label: "Students",
-          path: "/admin/students",
-          icon: HiAcademicCap,
+          label: "User Requests",
+          path: "/admin/user-requests",
+          icon: HiUserPlus,
           roles: ["admin", "research_coordinator"],
         },
         {

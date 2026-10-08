@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from "react";
 
 const sizeVariants = {
-  xs: "w-6 h-6 text-[10px]",
-  sm: "w-8 h-8 text-xs",
-  md: "w-10 h-10 text-sm",
-  lg: "w-12 h-12 text-base",
-  xl: "w-16 h-16 text-xl",
+  xs: "w-6 h-6 min-w-[24px] min-h-[24px] text-[10px]",
+  sm: "w-8 h-8 min-w-[32px] min-h-[32px] text-xs",
+  md: "w-10 h-10 min-w-[40px] min-h-[40px] text-sm",
+  lg: "w-12 h-12 min-w-[48px] min-h-[48px] text-base",
+  xl: "w-16 h-16 min-w-[64px] min-h-[64px] text-xl",
 };
 
 const colorVariants = {
@@ -49,7 +49,7 @@ export const Avatar = ({
         src={src}
         alt={name || "Avatar"}
         onError={() => setImgError(true)}
-        className={`rounded-full object-cover ${sizeVariants[size]} ${className}`}
+        className={`rounded-full shrink-0 aspect-square object-cover ${sizeVariants[size]} ${className}`}
         {...props}
       />
     );
@@ -57,10 +57,10 @@ export const Avatar = ({
 
   return (
     <div
-      className={`rounded-full flex items-center justify-center font-semibold select-none ${sizeVariants[size]} ${colorVariants[color]} ${className}`}
+      className={`rounded-full shrink-0 aspect-square flex items-center justify-center font-semibold select-none overflow-hidden ${sizeVariants[size]} ${colorVariants[color]} ${className}`}
       {...props}
     >
-      {initials}
+      <span className="leading-none text-center">{initials}</span>
     </div>
   );
 };

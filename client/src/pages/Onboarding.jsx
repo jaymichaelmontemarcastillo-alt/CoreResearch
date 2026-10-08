@@ -20,6 +20,7 @@ import { auth, db } from "../services/firebase";
 import { notificationService } from "../services/notification.service";
 import { userService } from "../services/user.service";
 import { sectionService } from "../services/section.service";
+import api from "../services/api";
 
 const ROLE_OPTIONS = [
   { value: "student", label: "Student" },
@@ -136,31 +137,51 @@ export const Onboarding = () => {
         const userRef = doc(db, "users", currentUser.uid);
         const isStudentRole = role === "student";
 
-        const profileData = {
-          uid: currentUser.uid,
-          email: currentUser.email,
-          first_name,
-          last_name,
-          fullName,
-          role: role || "student",
-          role_id: role || "student",
-          department,
-          department_id: department === "Computer Science" ? "cs" : "it",
-          program,
-          programCode,
-          programSpecialization: program === "Bachelor of Science in Information Technology" ? programSpecialization : "",
-          majorCode: programSpecialization?.includes("WMAD") ? "WMAD" : programSpecialization?.includes("AMG") ? "AMG" : programSpecialization?.includes("SMP") ? "SMP" : "",
-          sectionName: isStudentRole ? section : "",
-          studentIdOrEmployeeId: studentIdOrEmployeeId.trim(),
-          status: "pending",
-          is_approved: false,
-          profile_image: currentUser.photoURL || "",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          needsOnboarding: false,
-        };
+          const courseId = isStudentRole ? (programCode === "BSCS" ? "bscs" : "bsit") : "";
+          const specId = isStudentRole
+            ? (programSpecialization?.includes("WMAD") ? "wmad" : programSpecialization?.includes("AMG") ? "amg" : programSpecialization?.includes("SMP") ? "smp" : programSpecialization?.includes("IS") ? "is" : "")
+            : "";
+          const secName = isStudentRole ? (section || "A") : "";
+          const secId = isStudentRole ? `${courseId}-sec-${secName.toLowerCase()}` : "";
 
-        await setDoc(userRef, profileData, { merge: true });
+          const profileData = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            first_name,
+            last_name,
+            fullName,
+            role: role || "student",
+            role_id: role || "student",
+            department,
+            department_id: department === "Computer Science" ? "cs" : "it",
+            courseId,
+            program_id: courseId,
+            program,
+            programCode,
+            specializationId: specId,
+            programSpecialization: program === "Bachelor of Science in Information Technology" ? programSpecialization : "",
+            major: programSpecialization || "",
+            majorCode: programSpecialization?.includes("WMAD") ? "WMAD" : programSpecialization?.includes("AMG") ? "AMG" : programSpecialization?.includes("SMP") ? "SMP" : "",
+            section: secName,
+            sectionName: secName,
+            sectionId: secId,
+            enrollmentStatus: isStudentRole ? "enrolled" : undefined,
+            studentIdOrEmployeeId: studentIdOrEmployeeId.trim(),
+            studentId: studentIdOrEmployeeId.trim(),
+            status: "pending",
+            is_approved: false,
+            profile_image: currentUser.photoURL || "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            needsOnboarding: false,
+          };
+
+          await setDoc(userRef, profileData, { merge: true });
+          try {
+            await api.post('/auth/register', profileData);
+          } catch (syncErr) {
+            console.warn('[Onboarding] Backend sync warning:', syncErr?.message);
+          }
 
         // Trigger admin notification and sign out pending approval
         if (isStudentRole) {
@@ -170,7 +191,18 @@ export const Onboarding = () => {
           // await notificationService.notifyAdminsNewFacultyRegistration(profileData);
         }
         await signOut(auth);
-        navigate("/login?pending=1");
+        navigate("/pending-approval", {
+          replace: true,
+          state: {
+            studentId: studentIdOrEmployeeId.trim(),
+            fullName,
+            email: currentUser.email,
+            program,
+            section: isStudentRole ? section : "",
+            role: role || "student",
+            submittedAt: new Date().toISOString(),
+          },
+        });
         return;
 
         if (updateProfileLocal) {

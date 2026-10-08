@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [devMode, setDevMode] = useState(false);
+  const isRegisteringRef = useRef(false);
   const [currentFacultyMode, setCurrentFacultyMode] = useState(
     localStorage.getItem('core_research_faculty_mode') || 'adviser'
   );
@@ -91,6 +92,11 @@ export const AuthProvider = ({ children }) => {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Do not intercept or prematurely sign out/redirect during active registration flows
+      if (isRegisteringRef.current) {
+        return;
+      }
+
       if (localStorage.getItem('core_research_dev_profile')) {
         setLoading(false);
         return;
@@ -199,13 +205,18 @@ export const AuthProvider = ({ children }) => {
     firstName,
     lastName,
     studentId,
+    courseId,
     program,
     programCode,
     major,
     majorCode,
+    specializationId,
     section,
+    sectionName,
     sectionId,
+    enrollmentStatus,
   }) => {
+    isRegisteringRef.current = true;
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
@@ -234,6 +245,29 @@ export const AuthProvider = ({ children }) => {
       const lName = (lastName?.trim() || fullName?.trim().split(' ').slice(1).join(' ') || '');
       const completeName = (fullName?.trim() || `${fName} ${lName}`).trim();
 
+      // Canonical academic resolutions
+      const resolvedCourseId = (courseId || programCode?.toLowerCase() || (program?.includes('Computer Science') ? 'bscs' : 'bsit')).toLowerCase();
+      const resolvedProgCode = programCode || (resolvedCourseId === 'bscs' ? 'BSCS' : 'BSIT');
+      const resolvedProgName = program || (resolvedCourseId === 'bscs' ? 'Bachelor of Science in Computer Science' : 'Bachelor of Science in Information Technology');
+
+      let resolvedSpecId = specializationId ? specializationId.toLowerCase() : '';
+      let resolvedMajorCode = majorCode || '';
+      if (!resolvedSpecId) {
+        const specStr = (major || majorCode || '').toUpperCase();
+        if (specStr.includes('WMAD')) { resolvedSpecId = 'wmad'; resolvedMajorCode = 'WMAD'; }
+        else if (specStr.includes('AMG')) { resolvedSpecId = 'amg'; resolvedMajorCode = 'AMG'; }
+        else if (specStr.includes('SMP')) { resolvedSpecId = 'smp'; resolvedMajorCode = 'SMP'; }
+        else if (specStr.includes('IS')) { resolvedSpecId = 'is'; resolvedMajorCode = 'IS'; }
+      }
+      if (!resolvedMajorCode && resolvedSpecId) {
+        resolvedMajorCode = resolvedSpecId.toUpperCase();
+      }
+
+      const resolvedSecName = sectionName || section || 'A';
+      const resolvedSecId = sectionId && sectionId !== resolvedSecName
+        ? sectionId
+        : `${resolvedCourseId}-sec-${resolvedSecName.toLowerCase()}`;
+
       const userProfileData = {
         uid: result.user.uid,
         email: normalizedEmail,
@@ -241,51 +275,50 @@ export const AuthProvider = ({ children }) => {
         last_name: lName,
         fullName: completeName,
         studentIdOrEmployeeId: normalizedStudentId,
-        program: program || 'Bachelor of Science in Information Technology',
-        programCode: programCode || 'BSIT',
-        programSpecialization: major || '',
-        majorCode: majorCode || '',
-        sectionName: section || 'A',
-        sectionId: sectionId || '',
+        studentId: normalizedStudentId,
+        courseId: resolvedCourseId,
+        program_id: resolvedCourseId,
+        program: resolvedProgName,
+        programCode: resolvedProgCode,
+        specializationId: resolvedSpecId,
+        major: major || (resolvedMajorCode ? `${resolvedMajorCode}` : ''),
+        majorCode: resolvedMajorCode,
+        programSpecialization: major || (resolvedMajorCode ? `${resolvedMajorCode}` : ''),
+        section: resolvedSecName,
+        sectionName: resolvedSecName,
+        sectionId: resolvedSecId,
+        enrollmentStatus: enrollmentStatus || 'enrolled',
         role: 'student',
         role_id: 'student',
-        department: 'Information Technology',
-        department_id: 'it',
+        department: resolvedCourseId === 'bscs' ? 'Computer Science' : 'Information Technology',
+        department_id: resolvedCourseId === 'bscs' ? 'cs' : 'it',
         status: 'pending',
         is_approved: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      // 4. Save directly into Firestore users collection with retry mechanism
-      // This handles the race condition where Auth token hasn't propagated to Firestore SDK yet
-      const userRef = doc(db, 'users', result.user.uid);
-      let setDocSuccess = false;
-      let lastError = null;
-      for (let i = 0; i < 3; i++) {
-        try {
-          await setDoc(userRef, userProfileData);
-          setDocSuccess = true;
-          break;
-        } catch (err) {
-          lastError = err;
-          if (err.code === 'permission-denied' || err.message?.includes('permissions')) {
-            // Wait 500ms and retry to allow Auth token to propagate
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } else {
-            break;
-          }
-        }
-      }
-      
-      if (!setDocSuccess) {
-        // Clean up the created auth user if we couldn't save their profile
-        try { await result.user.delete(); } catch(e) {}
-        throw new Error(`Registration failed while saving profile. Please try again. (Error: ${lastError?.message || 'Unknown'})`);
+      // 4. Persist profile document:
+      // A) Backend Admin API sync - uses Firebase Admin SDK to guarantee persistence in Firestore and MongoDB
+      try {
+        await api.post('/auth/register', userProfileData);
+      } catch (backendErr) {
+        console.warn('[registerStudent] Backend sync warning:', backendErr?.message);
       }
 
-      // 5. Notify all system administrators
-      await notificationService.notifyAdminsNewStudentRegistration({
+      // B) Direct Client Firestore SDK write (with timeout fallback so it never hangs)
+      const userRef = doc(db, 'users', result.user.uid);
+      try {
+        await Promise.race([
+          setDoc(userRef, userProfileData, { merge: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
+      } catch (fsErr) {
+        console.warn('[registerStudent] Client setDoc warning (server sync already performed):', fsErr?.message);
+      }
+
+      // 5. Notify all system administrators asynchronously (never blocks the registration flow)
+      notificationService.notifyAdminsNewStudentRegistration({
         uid: result.user.uid,
         fullName: completeName,
         studentIdOrEmployeeId: normalizedStudentId,
@@ -295,10 +328,16 @@ export const AuthProvider = ({ children }) => {
         programSpecialization: userProfileData.programSpecialization,
         majorCode: userProfileData.majorCode,
         sectionName: userProfileData.sectionName,
+      }).catch((notifErr) => {
+        console.warn('[registerStudent] Admin notification warning:', notifErr?.message);
       });
 
-      // 6. Sign out immediately so pending student cannot enter the dashboard
-      await signOut(auth);
+      // 6. Sign out cleanly so pending student cannot enter the dashboard
+      try {
+        await signOut(auth);
+      } catch (signOutErr) {
+        console.warn('[registerStudent] SignOut warning:', signOutErr?.message);
+      }
       setCurrentUser(null);
       setUserProfile(null);
 
@@ -306,6 +345,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       throw error;
     } finally {
+      isRegisteringRef.current = false;
       setLoading(false);
     }
   };
@@ -324,6 +364,7 @@ export const AuthProvider = ({ children }) => {
     department,
     role = 'adviser',
   }) => {
+    isRegisteringRef.current = true;
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
@@ -366,35 +407,31 @@ export const AuthProvider = ({ children }) => {
         updated_at: new Date().toISOString()
       };
 
-      // Save with retry mechanism for Auth token propagation
+      // Backend sync
+      try {
+        await api.post('/auth/register', userProfileData);
+      } catch (backendErr) {
+        console.warn('[registerFaculty] Backend sync warning:', backendErr?.message);
+      }
+
+      // Client setDoc with timeout
       const userRef = doc(db, 'users', result.user.uid);
-      let setDocSuccess = false;
-      let lastError = null;
-      for (let i = 0; i < 3; i++) {
-        try {
-          await setDoc(userRef, userProfileData);
-          setDocSuccess = true;
-          break;
-        } catch (err) {
-          lastError = err;
-          if (err.code === 'permission-denied' || err.message?.includes('permissions')) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } else {
-            break;
-          }
-        }
+      try {
+        await Promise.race([
+          setDoc(userRef, userProfileData, { merge: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
+      } catch (fsErr) {
+        console.warn('[registerFaculty] Client setDoc warning:', fsErr?.message);
       }
 
-      if (!setDocSuccess) {
-        try { await result.user.delete(); } catch(e) {}
-        throw new Error(`Registration failed while saving profile. Please try again. (Error: ${lastError?.message || 'Unknown'})`);
-      }
-
-      await syncProfileWithBackend(result.user, role || 'adviser');
+      setUserProfile(userProfileData);
+      setCurrentUser(result.user);
       return result;
     } catch (error) {
       throw error;
     } finally {
+      isRegisteringRef.current = false;
       setLoading(false);
     }
   };

@@ -13,11 +13,13 @@ const Login = React.lazy(() => import('./pages/Login').then(m => ({ default: m.L
 const Register = React.lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
 const Unauthorized = React.lazy(() => import('./pages/Unauthorized').then(m => ({ default: m.Unauthorized })));
+const PendingApproval = React.lazy(() => import('./pages/PendingApproval').then(m => ({ default: m.PendingApproval })));
 const Onboarding = React.lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
 const Dashboard = React.lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const JoinSection = React.lazy(() => import('./pages/JoinSection').then(m => ({ default: m.JoinSection })));
 
 const UserDirectory = React.lazy(() => import('./pages/UserDirectory').then(m => ({ default: m.UserDirectory })));
+const UserRequests = React.lazy(() => import('./pages/UserRequests').then(m => ({ default: m.UserRequests || m.default })));
 const StudentDirectory = React.lazy(() => import('./pages/StudentDirectory').then(m => ({ default: m.StudentDirectory })));
 const ResearchGroups = React.lazy(() => import('./pages/ResearchGroups').then(m => ({ default: m.ResearchGroups })));
 const MyGroup = React.lazy(() => import('./pages/MyGroup').then(m => ({ default: m.MyGroup })));
@@ -69,6 +71,8 @@ export default function App() {
                 <Route path="/admin-login" element={<Login portal="admin" />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
+                <Route path="/pending-approval" element={<PendingApproval />} />
+                <Route path="/approval-pending" element={<PendingApproval />} />
 
                 {/* Public/Shared Routes */}
                 <Route path="/join/:inviteId" element={<JoinSection />} />
@@ -123,8 +127,8 @@ export default function App() {
 
                     {/* Student & Groups Management */}
                     <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator', 'adviser']} />}>
-                      <Route path="/students" element={<StudentDirectory />} />
-                      <Route path="/admin/students" element={<StudentDirectory />} />
+                      <Route path="/students" element={<Navigate to="/admin/users" replace />} />
+                      <Route path="/admin/students" element={<Navigate to="/admin/users" replace />} />
                       <Route path="/research-groups" element={<ResearchGroups />} />
                       <Route path="/groups" element={<ResearchGroups />} />
                       <Route path="/admin/groups" element={<ResearchGroups />} />
@@ -134,6 +138,8 @@ export default function App() {
 
                     <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator']} />}>
                       <Route path="/admin/users" element={<UserDirectory />} />
+                      <Route path="/admin/user-requests" element={<UserRequests />} />
+                      <Route path="/user-requests" element={<Navigate to="/admin/user-requests" replace />} />
                       <Route path="/admin/courses" element={<Courses />} />
                       <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
                     </Route>

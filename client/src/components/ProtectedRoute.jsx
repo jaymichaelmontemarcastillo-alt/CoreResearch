@@ -17,7 +17,7 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
 
   // Pending or rejected accounts are prevented from accessing any protected routes
   if (userProfile?.role !== 'admin' && (userProfile?.status === 'pending' || userProfile?.status === 'rejected' || userProfile?.is_approved === false)) {
-    return <Navigate to="/login?pending=1" replace />;
+    return <Navigate to="/pending-approval" replace />;
   }
 
   // Kung ang profile ay naka-flag for onboarding pero wala sila sa /onboarding page, redirect sila dun.

@@ -53,6 +53,128 @@ export const userService = {
   },
 
   /**
+   * Fetch paginated users from backend API with fallback to Firestore.
+   */
+  async getPaginatedUsers(params: {
+    page?: number;
+    limit?: number;
+    role?: string;
+    status?: string;
+    search?: string;
+    program?: string;
+    specialization?: string;
+  } = {}): Promise<{
+    users: UserProfile[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.page) queryParams.set('page', String(params.page));
+      if (params.limit) queryParams.set('limit', String(params.limit));
+      if (params.role && params.role !== 'all') queryParams.set('role', params.role);
+      if (params.status && params.status !== 'all') queryParams.set('status', params.status);
+      if (params.search) queryParams.set('search', params.search);
+      if (params.program && params.program !== 'all') queryParams.set('program', params.program);
+      if (params.specialization && params.specialization !== 'all') queryParams.set('specialization', params.specialization);
+
+      const res = await api.get(`/users?${queryParams.toString()}`);
+      if (res.data && res.data.success) {
+        return {
+          users: res.data.data || [],
+          total: res.data.total ?? res.data.count ?? res.data.data?.length ?? 0,
+          page: res.data.page ?? params.page ?? 1,
+          limit: res.data.limit ?? params.limit ?? 10,
+          totalPages: res.data.totalPages ?? 1,
+        };
+      }
+    } catch (err: any) {
+      console.warn('[userService] Backend paginated users query warning (using local fallback):', err?.message);
+    }
+
+    // Fallback: in-memory query against Firestore
+    const allUsers = await this.getAllUsers();
+    let filtered = allUsers;
+
+    if (params.role && params.role !== 'all') {
+      if (params.role === 'faculty') {
+        const facultyRoles = ['adviser', 'research_coordinator', 'panelist'];
+        filtered = filtered.filter((u: any) => facultyRoles.includes(u.role));
+      } else {
+        filtered = filtered.filter((u: any) => u.role === params.role);
+      }
+    }
+
+    if (params.status && params.status !== 'all') {
+      if (params.status === 'pending') {
+        filtered = filtered.filter(
+          (u: any) =>
+            u.status !== 'approved' &&
+            u.status !== 'rejected' &&
+            (u.status === 'pending' || u.is_approved === false)
+        );
+      } else if (params.status === 'rejected') {
+        filtered = filtered.filter((u: any) => u.status === 'rejected');
+      } else if (params.status === 'approved') {
+        filtered = filtered.filter((u: any) => u.status === 'approved' || u.is_approved === true);
+      }
+    }
+
+    if (params.program && params.program !== 'all') {
+      const p = params.program.toUpperCase().trim();
+      filtered = filtered.filter((u: any) => {
+        const uProg = (u.programCode || u.courseId || '').toUpperCase();
+        if (p === 'BSIT') return uProg === 'BSIT' || u.program?.toUpperCase().includes('INFORMATION TECHNOLOGY');
+        if (p === 'BSCS') return uProg === 'BSCS' || u.program?.toUpperCase().includes('COMPUTER SCIENCE');
+        return uProg.includes(p) || u.program?.toUpperCase().includes(p);
+      });
+    }
+
+    if (params.specialization && params.specialization !== 'all') {
+      const s = params.specialization.toUpperCase().trim();
+      filtered = filtered.filter((u: any) => {
+        const uMajorCode = (u.majorCode || '').toUpperCase();
+        const uSpec = (u.programSpecialization || u.major || '').toUpperCase();
+        if (s === 'WMAD') return uMajorCode === 'WMAD' || uSpec.includes('WMAD') || uSpec.includes('WEB AND MOBILE');
+        if (s === 'SMP') return uMajorCode === 'SMP' || uSpec.includes('SMP') || uSpec.includes('SERVICE MANAGEMENT');
+        if (s === 'AMG') return uMajorCode === 'AMG' || uSpec.includes('AMG') || uSpec.includes('ANIMATION');
+        if (s === 'IS') return uMajorCode === 'IS' || uSpec.includes('IS') || uSpec.includes('INTELLIGENT SYSTEMS');
+        return uMajorCode === s || uSpec.includes(s);
+      });
+    }
+
+    if (params.search?.trim()) {
+      const q = params.search.toLowerCase().trim();
+      filtered = filtered.filter((u: any) =>
+        u.fullName?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.studentIdOrEmployeeId?.toLowerCase().includes(q) ||
+        u.programCode?.toLowerCase().includes(q) ||
+        u.program?.toLowerCase().includes(q) ||
+        u.majorCode?.toLowerCase().includes(q) ||
+        u.programSpecialization?.toLowerCase().includes(q) ||
+        u.sectionName?.toLowerCase().includes(q)
+      );
+    }
+
+    const total = filtered.length;
+    const page = params.page || 1;
+    const limit = params.limit || 10;
+    const startIndex = (page - 1) * limit;
+    const users = filtered.slice(startIndex, startIndex + limit);
+
+    return {
+      users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  },
+
+  /**
    * Fetch all users matching a specific role (e.g. 'student', 'adviser', 'panelist', 'admin').
    */
   async getUsersByRole(role: UserRole): Promise<UserProfile[]> {
@@ -150,12 +272,48 @@ export const userService = {
   },
 
   /**
+   * Check live approval status by email or student ID without requiring authentication.
+   */
+  async checkRegistrationStatus(identifier: { email?: string; id?: string }): Promise<{
+    success: boolean;
+    status: 'pending' | 'approved' | 'rejected';
+    is_approved: boolean;
+    fullName?: string;
+    email?: string;
+    studentId?: string;
+    program?: string;
+    programCode?: string;
+    major?: string;
+    section?: string;
+    role?: string;
+    rejectionReason?: string;
+    submittedAt?: string;
+  } | null> {
+    const params = new URLSearchParams();
+    if (identifier.email) params.append('email', identifier.email.trim().toLowerCase());
+    if (identifier.id) params.append('id', identifier.id.trim());
+
+    try {
+      const res = await api.get(`/auth/status?${params.toString()}`);
+      return res.data;
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        return null;
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Fetch all pending user registrations awaiting admin approval.
    */
   async getPendingUsers(): Promise<UserProfile[]> {
     const allUsers = await this.getAllUsers();
     return allUsers.filter(
-      (u) => u.status === 'pending' || u.is_approved === false
+      (u) =>
+        u.status !== 'approved' &&
+        u.status !== 'rejected' &&
+        (u.status === 'pending' || u.is_approved === false)
     );
   },
 
@@ -169,13 +327,20 @@ export const userService = {
     }
     const userRef = doc(db, COLLECTION_NAME, uid);
     const now = new Date().toISOString();
-    await updateDoc(userRef, {
+    const updatePayload = {
       status: 'approved',
       is_approved: true,
       approvedAt: now,
       approvedBy: adminUid,
       updated_at: now,
-    });
+    };
+    await updateDoc(userRef, updatePayload);
+
+    try {
+      await api.patch(`/users/${uid}`, updatePayload);
+    } catch (e: any) {
+      console.warn('[userService] Backend approveUser sync warning:', e?.message);
+    }
   },
 
   /**
@@ -188,14 +353,21 @@ export const userService = {
     }
     const userRef = doc(db, COLLECTION_NAME, uid);
     const now = new Date().toISOString();
-    await updateDoc(userRef, {
+    const updatePayload = {
       status: 'rejected',
       is_approved: false,
       rejectedAt: now,
       rejectedBy: adminUid,
       rejectionReason: reason || 'Registration application was not approved.',
       updated_at: now,
-    });
+    };
+    await updateDoc(userRef, updatePayload);
+
+    try {
+      await api.patch(`/users/${uid}`, updatePayload);
+    } catch (e: any) {
+      console.warn('[userService] Backend rejectUser sync warning:', e?.message);
+    }
   },
 
   /**

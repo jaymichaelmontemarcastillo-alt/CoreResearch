@@ -178,7 +178,10 @@ export const Register = ({ portal: initialPortal }) => {
         ? `${selectedMajorObj.name} (${selectedMajorObj.code})`
         : "";
 
-      const selectedSecObj = availableSections.find((s) => s.name === selectedSectionName);
+      const courseId = selectedProg.id?.toLowerCase() || selectedProg.code?.toLowerCase() || "bsit";
+      const specId = selectedMajorObj?.id?.toLowerCase() || selectedMajorCode?.toLowerCase() || "wmad";
+      const secName = selectedSectionName || "A";
+      const secId = selectedSecObj?.id || `${courseId}-sec-${secName.toLowerCase()}`;
 
       await registerStudent({
         email: studentEmail.trim().toLowerCase(),
@@ -187,15 +190,37 @@ export const Register = ({ portal: initialPortal }) => {
         lastName: lastName.trim(),
         fullName: `${firstName.trim()} ${lastName.trim()}`,
         studentId: studentId.trim(),
+        courseId,
         program: selectedProg.name,
         programCode: selectedProg.code || "BSIT",
         major: majorDisplay,
         majorCode: selectedMajorCode,
-        section: selectedSectionName,
-        sectionId: selectedSecObj?.id || "",
+        specializationId: specId,
+        section: secName,
+        sectionName: secName,
+        sectionId: secId,
+        enrollmentStatus: "enrolled",
       });
 
-      setRegistrationSubmitted(true);
+      navigate("/pending-approval", {
+        replace: true,
+        state: {
+          studentId: studentId.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          fullName: `${firstName.trim()} ${lastName.trim()}`,
+          email: studentEmail.trim().toLowerCase(),
+          courseId,
+          program: selectedProg.name,
+          programCode: selectedProg.code || "BSIT",
+          major: majorDisplay,
+          majorCode: selectedMajorCode,
+          specializationId: specId,
+          section: secName,
+          role: "student",
+          submittedAt: new Date().toISOString(),
+        },
+      });
     } catch (err) {
       if (err.message?.includes("Student ID Already Registered") || err.code === "auth/student-id-exists") {
         setError("Student ID Already Registered\nThis Student ID Number is already associated with an account.");
@@ -296,10 +321,10 @@ export const Register = ({ portal: initialPortal }) => {
 
           <div className="pt-4">
             <Link
-              to="/student/login?pending=1"
+              to="/pending-approval"
               className="inline-flex items-center justify-center px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-full transition shadow-md shadow-blue-500/20"
             >
-              Go to Student Sign In
+              View Approval Status
             </Link>
           </div>
         </div>

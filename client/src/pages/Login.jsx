@@ -30,11 +30,9 @@ export const Login = ({ portal: initialPortal }) => {
 
   React.useEffect(() => {
     if (queryParams.get("pending") === "1") {
-      setNotice(
-        "Account Pending Approval: Your account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account."
-      );
+      navigate("/pending-approval", { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,7 +45,14 @@ export const Login = ({ portal: initialPortal }) => {
       navigate(returnTo);
     } catch (err) {
       if (err.code === "auth/account-pending" || err.message?.includes("Account Pending Approval")) {
-        setError("Account Pending Approval: Your account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.");
+        navigate("/pending-approval", {
+          state: {
+            email: email.trim(),
+            portal,
+            fromLoginAttempt: true,
+          },
+        });
+        return;
       } else if (err.code === "auth/account-rejected" || err.message?.includes("Registration Not Approved")) {
         setError("Registration Not Approved: Your registration was not approved by the administrator.");
       } else if (
@@ -85,7 +90,13 @@ export const Login = ({ portal: initialPortal }) => {
       }
     } catch (err) {
       if (err.code === "auth/account-pending" || err.message?.includes("Account Pending Approval")) {
-        setError("Account Pending Approval: Your account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.");
+        navigate("/pending-approval", {
+          state: {
+            portal,
+            fromLoginAttempt: true,
+          },
+        });
+        return;
       } else if (err.code === "auth/account-rejected" || err.message?.includes("Registration Not Approved")) {
         setError("Registration Not Approved: Your registration was not approved by the administrator.");
       } else if (err.code !== "auth/popup-closed-by-user") {

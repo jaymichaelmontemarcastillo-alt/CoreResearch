@@ -83,6 +83,12 @@ export interface AdviserWorkloadItem {
   exceedsLimit: boolean;
 }
 
+export interface SpecializationDistributionItem {
+  code: string;
+  name: string;
+  count: number;
+}
+
 export interface ProgramDistributionItem {
   courseId: string;
   courseCode: string;
@@ -90,6 +96,7 @@ export interface ProgramDistributionItem {
   studentCount: number;
   percentage: number;
   color: string;
+  specializations?: SpecializationDistributionItem[];
 }
 
 export interface ProposalStatusItem {
@@ -932,29 +939,137 @@ export const adminAnalyticsService = {
       .sort((a, b) => b.assignedProjects - a.assignedProjects || b.assignedGroups - a.assignedGroups);
 
     // ─────────────────────────────────────────────────────────────
-    // 5. STUDENTS BY PROGRAM
+    // 5. STUDENTS BY PROGRAM (Exclusively BSIT & BSCS with Specializations)
     // ─────────────────────────────────────────────────────────────
-    const programStudentCounts = new Map<string, number>();
-    studentUsers.forEach((stu) => {
-      const code = stu.courseId ? stu.courseId.trim().toUpperCase() : 'UNASSIGNED';
-      programStudentCounts.set(code, (programStudentCounts.get(code) || 0) + 1);
+    // 1. Strictly isolate active student accounts enrolled in degree programs
+    // Strictly exclude faculty and admin accounts
+    const facultyOrAdminRoles = ['admin', 'adviser', 'panelist', 'research_coordinator', 'faculty'];
+
+    // If studentUsers is empty (e.g. constraints didn't match), fallback to userService.getAllUsers()
+    let allStudentCandidates = studentUsers;
+    if (allStudentCandidates.length === 0) {
+      try {
+        const fetched = await userService.getAllUsers();
+        allStudentCandidates = fetched;
+      } catch (err) {
+        console.warn('[adminAnalytics] Fallback user fetch warning:', err);
+      }
+    }
+
+    const activeEnrolledStudents = allStudentCandidates.filter((u) => {
+      // Must not be faculty or admin
+      if (u.role && facultyOrAdminRoles.includes(u.role)) return false;
+      if (u.role !== 'student') return false;
+
+      // Must be an active/approved account (exclude rejected or pending)
+      if (u.status === 'rejected') return false;
+      if (u.status === 'pending' || u.is_approved === false) return false;
+
+      // Must belong to one of the two main undergraduate degree programs (BSIT or BSCS)
+      const progCode = (u.programCode || u.courseId || '').toUpperCase().trim();
+      const progName = (u.program || '').toUpperCase().trim();
+      const isBSIT = progCode === 'BSIT' || progCode === 'IT' || progName.includes('INFORMATION TECHNOLOGY');
+      const isBSCS = progCode === 'BSCS' || progCode === 'CS' || progName.includes('COMPUTER SCIENCE');
+
+      return isBSIT || isBSCS;
     });
 
-    const studentsByProgram: ProgramDistributionItem[] = [];
-    let colorIdx = 0;
-    programStudentCounts.forEach((count, code) => {
-      const matchedCourse = courseMap.get(code.toLowerCase());
-      studentsByProgram.push({
-        courseId: matchedCourse?.id || code.toLowerCase(),
-        courseCode: matchedCourse?.code || code,
-        courseName: matchedCourse?.name || (code === 'UNASSIGNED' ? 'Unassigned Course' : code),
-        studentCount: count,
-        percentage: totalStudents > 0 ? Math.round((count / totalStudents) * 100) : 0,
-        color: PROGRAM_PALETTE[colorIdx % PROGRAM_PALETTE.length],
-      });
-      colorIdx++;
+    const bsitStudents: UserProfile[] = [];
+    const bscsStudents: UserProfile[] = [];
+
+    activeEnrolledStudents.forEach((stu) => {
+      const progCode = (stu.programCode || stu.courseId || '').toUpperCase().trim();
+      const progName = (stu.program || '').toUpperCase().trim();
+
+      if (progCode === 'BSCS' || progCode === 'CS' || progName.includes('COMPUTER SCIENCE')) {
+        bscsStudents.push(stu);
+      } else {
+        // Enrolled in BSIT
+        bsitStudents.push(stu);
+      }
     });
-    studentsByProgram.sort((a, b) => b.studentCount - a.studentCount);
+
+    // BSIT Specialization Breakdown: WMAD, AMG, SMP
+    const bsitSpecializationCounts = {
+      WMAD: 0,
+      AMG: 0,
+      SMP: 0,
+    };
+    let bsitOtherSpec = 0;
+
+    bsitStudents.forEach((stu) => {
+      const specCode = (stu.majorCode || stu.specializationId || '').toUpperCase().trim();
+      const specStr = (stu.programSpecialization || stu.major || '').toUpperCase();
+
+      if (specCode.includes('WMAD') || specStr.includes('WMAD') || specStr.includes('WEB AND MOBILE')) {
+        bsitSpecializationCounts.WMAD += 1;
+      } else if (specCode.includes('AMG') || specStr.includes('AMG') || specStr.includes('ANIMATION')) {
+        bsitSpecializationCounts.AMG += 1;
+      } else if (specCode.includes('SMP') || specStr.includes('SMP') || specStr.includes('SERVICE MANAGEMENT')) {
+        bsitSpecializationCounts.SMP += 1;
+      } else {
+        bsitOtherSpec += 1;
+      }
+    });
+
+    const bsitSpecializations: SpecializationDistributionItem[] = [
+      { code: 'WMAD', name: 'Web & Mobile Applications', count: bsitSpecializationCounts.WMAD },
+      { code: 'AMG', name: 'Animation & Motion Graphics', count: bsitSpecializationCounts.AMG },
+      { code: 'SMP', name: 'Service Management Program', count: bsitSpecializationCounts.SMP },
+    ];
+    if (bsitOtherSpec > 0) {
+      bsitSpecializations.push({ code: 'General', name: 'General Track / Unspecified', count: bsitOtherSpec });
+    }
+
+    // BSCS Specialization Breakdown: IS (Intelligent Systems)
+    const bscsSpecializationCounts = {
+      IS: 0,
+    };
+    let bscsOtherSpec = 0;
+
+    bscsStudents.forEach((stu) => {
+      const specCode = (stu.majorCode || stu.specializationId || '').toUpperCase().trim();
+      const specStr = (stu.programSpecialization || stu.major || '').toUpperCase();
+
+      if (specCode.includes('IS') || specStr.includes('IS') || specStr.includes('INTELLIGENT')) {
+        bscsSpecializationCounts.IS += 1;
+      } else {
+        bscsOtherSpec += 1;
+      }
+    });
+
+    const bscsSpecializations: SpecializationDistributionItem[] = [
+      { code: 'IS', name: 'Intelligent Systems', count: bscsSpecializationCounts.IS },
+    ];
+    if (bscsOtherSpec > 0) {
+      bscsSpecializations.push({ code: 'General', name: 'General Track / Unspecified', count: bscsOtherSpec });
+    }
+
+    const totalEnrolledProgramStudents = bsitStudents.length + bscsStudents.length;
+
+    const matchedBSIT = courseMap.get('bsit');
+    const matchedBSCS = courseMap.get('bscs');
+
+    const studentsByProgram: ProgramDistributionItem[] = [
+      {
+        courseId: 'bsit',
+        courseCode: 'BSIT',
+        courseName: matchedBSIT?.name || 'Bachelor of Science in Information Technology',
+        studentCount: bsitStudents.length,
+        percentage: totalEnrolledProgramStudents > 0 ? Math.round((bsitStudents.length / totalEnrolledProgramStudents) * 100) : 0,
+        color: '#3b82f6',
+        specializations: bsitSpecializations,
+      },
+      {
+        courseId: 'bscs',
+        courseCode: 'BSCS',
+        courseName: matchedBSCS?.name || 'Bachelor of Science in Computer Science',
+        studentCount: bscsStudents.length,
+        percentage: totalEnrolledProgramStudents > 0 ? Math.round((bscsStudents.length / totalEnrolledProgramStudents) * 100) : 0,
+        color: '#8b5cf6',
+        specializations: bscsSpecializations,
+      },
+    ].sort((a, b) => b.studentCount - a.studentCount);
 
     // ─────────────────────────────────────────────────────────────
     // 6. PROPOSAL STATUS OVERVIEW

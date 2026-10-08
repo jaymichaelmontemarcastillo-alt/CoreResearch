@@ -18,6 +18,44 @@ const buildUserProfileDoc = (data) => {
 
   const now = new Date().toISOString();
 
+  // Academic normalization
+  const program = data.program || data.courseName || '';
+  let programCode = data.programCode || '';
+  if (!programCode) {
+    if (program.includes('Computer Science') || data.courseId === 'bscs') programCode = 'BSCS';
+    else if (program.includes('Information Technology') || data.courseId === 'bsit') programCode = 'BSIT';
+    else if (role === 'student') programCode = 'BSIT';
+  }
+
+  let courseId = data.courseId || '';
+  if (!courseId || courseId.length > 10) {
+    courseId = programCode ? programCode.toLowerCase() : 'bsit';
+  } else {
+    courseId = courseId.toLowerCase();
+  }
+
+  const major = data.major || data.programSpecialization || '';
+  let majorCode = data.majorCode || '';
+  let specializationId = data.specializationId || '';
+  if (!specializationId || specializationId.length > 10) {
+    const specStr = (major || majorCode || '').toUpperCase();
+    if (specStr.includes('WMAD')) { specializationId = 'wmad'; majorCode = 'WMAD'; }
+    else if (specStr.includes('AMG')) { specializationId = 'amg'; majorCode = 'AMG'; }
+    else if (specStr.includes('SMP')) { specializationId = 'smp'; majorCode = 'SMP'; }
+    else if (specStr.includes('IS')) { specializationId = 'is'; majorCode = 'IS'; }
+  } else {
+    specializationId = specializationId.toLowerCase();
+    if (!majorCode) majorCode = specializationId.toUpperCase();
+  }
+
+  const sectionName = data.sectionName || data.section || 'A';
+  let sectionId = data.sectionId || '';
+  if (!sectionId || sectionId === sectionName) {
+    sectionId = `${courseId}-sec-${sectionName.toLowerCase()}`;
+  }
+
+  const enrollmentStatus = data.enrollmentStatus || (role === 'student' ? 'enrolled' : undefined);
+
   return {
     uid: data.uid,
     email,
@@ -30,13 +68,18 @@ const buildUserProfileDoc = (data) => {
     department_id: department,
     studentIdOrEmployeeId: data.studentIdOrEmployeeId || data.studentId || '',
     studentId: data.studentId || data.studentIdOrEmployeeId || '',
-    program: data.program || data.courseId || '',
-    program_id: data.program || data.courseId || '',
-    courseId: data.courseId || data.program || '',
-    major: data.major || data.specializationId || '',
-    specializationId: data.specializationId || data.major || '',
-    section: data.section || data.sectionId || '',
-    sectionId: data.sectionId || data.section || '',
+    program: program || (courseId === 'bscs' ? 'Bachelor of Science in Computer Science' : 'Bachelor of Science in Information Technology'),
+    programCode,
+    program_id: courseId,
+    courseId,
+    major: major || (majorCode ? `${majorCode}` : ''),
+    majorCode,
+    programSpecialization: major || (majorCode ? `${majorCode}` : ''),
+    specializationId,
+    section: sectionName,
+    sectionName,
+    sectionId,
+    enrollmentStatus,
     status: data.status || (role === 'student' ? 'pending' : 'active'),
     is_approved: data.is_approved !== undefined ? Boolean(data.is_approved) : (role !== 'student'),
     profile_image: data.profile_image || data.photoURL || data.picture || '',
@@ -89,13 +132,13 @@ export const registerUserSync = async (req, res) => {
       console.warn(`[AuthController] MongoDB write warning: ${mongoErr.message}`);
     }
 
-    // Persist to Firestore ONLY if MongoDB save failed or is unavailable
-    if (!savedToMongo && db) {
+    // ALWAYS persist to Firestore so client SDK direct queries find the profile
+    if (db) {
       try {
         await db.collection('users').doc(uid).set(userProfile, { merge: true });
         console.log(`[AuthController] Synchronized user document in Firestore for UID: ${uid}`);
       } catch (dbErr) {
-        console.warn(`[AuthController] Firestore write warning (cached locally): ${dbErr.message}`);
+        console.warn(`[AuthController] Firestore write warning: ${dbErr.message}`);
       }
     }
 
@@ -296,6 +339,95 @@ export const checkIdentifierAvailability = async (req, res) => {
     });
   } catch (error) {
     console.error('[AuthController] checkIdentifierAvailability error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Check approval status of a registered account by identifier (email or student/employee ID)
+ */
+export const checkRegistrationStatus = async (req, res) => {
+  try {
+    const { id, email } = req.query;
+    if (!id && !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide either ?id= or ?email= query parameter.'
+      });
+    }
+
+    const trimmedId = id ? String(id).trim() : null;
+    const trimmedEmail = email ? String(email).trim().toLowerCase() : null;
+
+    let userDoc = null;
+
+    // Check MongoDB
+    if (mongoose.connection.readyState === 1) {
+      const orConditions = [];
+      if (trimmedId) {
+        orConditions.push({ studentIdOrEmployeeId: trimmedId });
+        orConditions.push({ studentId: trimmedId });
+      }
+      if (trimmedEmail) {
+        orConditions.push({ email: trimmedEmail });
+      }
+      if (orConditions.length > 0) {
+        userDoc = await User.findOne({ $or: orConditions }).lean();
+      }
+    }
+
+    // Check Firestore if not found in MongoDB
+    if (!userDoc && db) {
+      try {
+        if (trimmedEmail) {
+          const snap = await db.collection('users').where('email', '==', trimmedEmail).limit(1).get();
+          if (!snap.empty) {
+            userDoc = snap.docs[0].data();
+          }
+        }
+        if (!userDoc && trimmedId) {
+          const snap = await db.collection('users').where('studentIdOrEmployeeId', '==', trimmedId).limit(1).get();
+          if (!snap.empty) {
+            userDoc = snap.docs[0].data();
+          }
+        }
+      } catch (fsErr) {
+        console.warn('[AuthController] Firestore status check warning:', fsErr.message);
+      }
+    }
+
+    if (!userDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account record found for the provided identifier.'
+      });
+    }
+
+    const isApproved = userDoc.is_approved === true || userDoc.status === 'approved';
+    const isRejected = userDoc.status === 'rejected';
+    const status = isApproved ? 'approved' : isRejected ? 'rejected' : 'pending';
+
+    return res.status(200).json({
+      success: true,
+      status,
+      is_approved: isApproved,
+      fullName: userDoc.fullName || `${userDoc.first_name || ''} ${userDoc.last_name || ''}`.trim() || 'Student Researcher',
+      email: userDoc.email,
+      studentId: userDoc.studentIdOrEmployeeId || userDoc.studentId || '',
+      program: userDoc.program || '',
+      programCode: userDoc.programCode || '',
+      major: userDoc.major || userDoc.programSpecialization || '',
+      section: userDoc.sectionName || userDoc.section || '',
+      role: userDoc.role || 'student',
+      rejectionReason: userDoc.rejectionReason || null,
+      submittedAt: userDoc.created_at || userDoc.createdAt || null
+    });
+  } catch (error) {
+    console.error('[AuthController] checkRegistrationStatus error:', error);
     return res.status(500).json({
       success: false,
       error: 'Internal Server Error',

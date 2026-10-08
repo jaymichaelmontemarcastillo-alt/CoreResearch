@@ -49,7 +49,6 @@ export const AdminAnalyticsSection = () => {
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.academicYear && filters.academicYear !== 'all') count++;
-    if (filters.semester && filters.semester !== 'all') count++;
     if (filters.program && filters.program !== 'all') count++;
     return count;
   }, [filters]);
@@ -73,7 +72,6 @@ export const AdminAnalyticsSection = () => {
         onChange={setFilters}
         onReset={handleResetFilters}
         availableAcademicYears={processed.availableAcademicYears}
-        availableSemesters={processed.availableSemesters}
         availablePrograms={processed.availablePrograms}
         totalActiveFilters={activeFiltersCount}
       />

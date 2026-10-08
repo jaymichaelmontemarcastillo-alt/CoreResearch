@@ -74,7 +74,7 @@ export const seedMockUsersIfEmpty = () => {
  */
 export const getAllUsers = async (req, res) => {
   try {
-    const { role, search } = req.query;
+    const { role, status, search, page, limit, program, courseId, specialization, major } = req.query;
     let usersList = [];
     let fetchedFromMongo = false;
 
@@ -97,23 +97,141 @@ export const getAllUsers = async (req, res) => {
       }
     }
 
+    // Academic field normalization for consistent display across all user types
+    usersList = usersList.map(u => {
+      let programCode = u.programCode;
+      let courseId = u.courseId;
+      if (!programCode) {
+        if (u.program?.includes('Computer Science') || courseId === 'bscs') programCode = 'BSCS';
+        else if (u.program?.includes('Information Technology') || courseId === 'bsit' || u.role === 'student') programCode = 'BSIT';
+        else programCode = '';
+      }
+
+      let majorCode = u.majorCode;
+      let specStr = (u.major || u.programSpecialization || '').toUpperCase();
+      if (!majorCode && specStr) {
+        if (specStr.includes('WMAD')) majorCode = 'WMAD';
+        else if (specStr.includes('AMG')) majorCode = 'AMG';
+        else if (specStr.includes('SMP')) majorCode = 'SMP';
+        else if (specStr.includes('IS')) majorCode = 'IS';
+      }
+
+      let sectionName = u.sectionName || u.section || (u.role === 'student' ? 'A' : '');
+
+      return {
+        ...u,
+        programCode: programCode || (u.role === 'student' ? 'BSIT' : ''),
+        program: u.program || (programCode === 'BSCS' ? 'Bachelor of Science in Computer Science' : programCode === 'BSIT' ? 'Bachelor of Science in Information Technology' : ''),
+        majorCode: majorCode || (programCode === 'BSIT' && u.role === 'student' ? 'WMAD' : ''),
+        programSpecialization: u.programSpecialization || u.major || (majorCode ? `${majorCode}` : ''),
+        sectionName: sectionName || (u.role === 'student' ? 'A' : ''),
+        section: sectionName || (u.role === 'student' ? 'A' : ''),
+      };
+    });
+
+    // 1. Role Filter
     if (role && role !== 'all') {
-      usersList = usersList.filter(u => u.role === role);
+      if (role === 'faculty') {
+        const facultyRoles = ['adviser', 'research_coordinator', 'panelist'];
+        usersList = usersList.filter(u => facultyRoles.includes(u.role));
+      } else {
+        usersList = usersList.filter(u => u.role === role);
+      }
     }
 
-    if (search) {
-      const q = search.toLowerCase();
+    // 2. Status Filter
+    if (status && status !== 'all') {
+      if (status === 'pending') {
+        usersList = usersList.filter(
+          u =>
+            u.status !== 'approved' &&
+            u.status !== 'rejected' &&
+            (u.status === 'pending' || u.is_approved === false)
+        );
+      } else if (status === 'rejected') {
+        usersList = usersList.filter(u => u.status === 'rejected');
+      } else if (status === 'approved') {
+        usersList = usersList.filter(
+          u => u.status === 'approved' || u.is_approved === true
+        );
+      }
+    }
+
+    // 3. Program / Course Filter (BSIT / BSCS)
+    const targetProgram = (program || courseId || '').toUpperCase().trim();
+    if (targetProgram && targetProgram !== 'ALL') {
+      usersList = usersList.filter(u => {
+        const uProg = (u.programCode || u.courseId || '').toUpperCase();
+        if (targetProgram === 'BSIT') {
+          return uProg === 'BSIT' || u.program?.toUpperCase().includes('INFORMATION TECHNOLOGY');
+        }
+        if (targetProgram === 'BSCS') {
+          return uProg === 'BSCS' || u.program?.toUpperCase().includes('COMPUTER SCIENCE');
+        }
+        return uProg.includes(targetProgram) || u.program?.toUpperCase().includes(targetProgram);
+      });
+    }
+
+    // 4. Specialization / Major Filter (BSIT: WMAD, SMP, AMG | BSCS: IS)
+    const targetSpec = (specialization || major || '').toUpperCase().trim();
+    if (targetSpec && targetSpec !== 'ALL') {
+      usersList = usersList.filter(u => {
+        const uMajorCode = (u.majorCode || '').toUpperCase();
+        const uSpec = (u.programSpecialization || u.major || '').toUpperCase();
+        if (targetSpec === 'WMAD') {
+          return uMajorCode === 'WMAD' || uSpec.includes('WMAD') || uSpec.includes('WEB AND MOBILE');
+        }
+        if (targetSpec === 'SMP') {
+          return uMajorCode === 'SMP' || uSpec.includes('SMP') || uSpec.includes('SERVICE MANAGEMENT');
+        }
+        if (targetSpec === 'AMG') {
+          return uMajorCode === 'AMG' || uSpec.includes('AMG') || uSpec.includes('ANIMATION');
+        }
+        if (targetSpec === 'IS') {
+          return uMajorCode === 'IS' || uSpec.includes('IS') || uSpec.includes('INTELLIGENT SYSTEMS');
+        }
+        return uMajorCode === targetSpec || uSpec.includes(targetSpec);
+      });
+    }
+
+    // 3. Search Filter
+    if (search && search.trim()) {
+      const q = search.toLowerCase().trim();
       usersList = usersList.filter(u => 
         (u.fullName && u.fullName.toLowerCase().includes(q)) || 
         (u.email && u.email.toLowerCase().includes(q)) ||
-        (u.studentIdOrEmployeeId && u.studentIdOrEmployeeId.toLowerCase().includes(q))
+        (u.studentIdOrEmployeeId && u.studentIdOrEmployeeId.toLowerCase().includes(q)) ||
+        (u.programCode && u.programCode.toLowerCase().includes(q)) ||
+        (u.program && u.program.toLowerCase().includes(q)) ||
+        (u.majorCode && u.majorCode.toLowerCase().includes(q)) ||
+        (u.programSpecialization && u.programSpecialization.toLowerCase().includes(q)) ||
+        (u.sectionName && u.sectionName.toLowerCase().includes(q))
       );
     }
 
+    const total = usersList.length;
+    let paginatedList = usersList;
+    let pageNum = page ? parseInt(page, 10) : 1;
+    let limitNum = limit ? parseInt(limit, 10) : (page ? 10 : total);
+
+    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
+    if (isNaN(limitNum) || limitNum < 1) limitNum = 10;
+
+    if (page || limit) {
+      const startIndex = (pageNum - 1) * limitNum;
+      paginatedList = usersList.slice(startIndex, startIndex + limitNum);
+    }
+
+    const totalPages = Math.ceil(total / (limitNum || 1)) || 1;
+
     return res.status(200).json({
       success: true,
-      count: usersList.length,
-      data: usersList
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+      count: paginatedList.length,
+      data: paginatedList
     });
   } catch (error) {
     console.error('[UserController] getAllUsers error:', error);

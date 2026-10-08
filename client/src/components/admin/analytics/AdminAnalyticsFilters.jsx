@@ -52,24 +52,6 @@ export const AdminAnalyticsFilters = ({
             </select>
           </div>
 
-          {/* Semester */}
-          <div className="flex-1 sm:flex-initial min-w-[140px]">
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#6b6f84] mb-1">
-              Semester
-            </label>
-            <select
-              value={filters.semester || 'all'}
-              onChange={(e) => onChange({ ...filters, semester: e.target.value })}
-              className="w-full h-9 px-3 rounded-xl text-xs font-medium bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-800 dark:text-gray-200 hover:border-blue-400 dark:hover:border-[#333649] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
-            >
-              <option value="all">All Semesters</option>
-              {availableSemesters.map((sem) => (
-                <option key={sem.id} value={sem.id}>
-                  {sem.label}
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* Program */}
           <div className="flex-1 sm:flex-initial min-w-[160px]">

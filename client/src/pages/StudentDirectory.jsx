@@ -87,18 +87,55 @@ export const StudentDirectory = () => {
 
   const handleOpenStudentProfile = async (u) => {
     setSelectedStudent(u);
+
+    // Resolve courseId
+    let cId = u.courseId;
+    if (!cId || !courses.some((c) => c.id === cId)) {
+      if (u.programCode?.toUpperCase() === "BSCS" || u.program?.includes("Computer Science")) {
+        cId = "bscs";
+      } else {
+        cId = "bsit";
+      }
+    }
+
+    // Resolve specializationId
+    let sId = u.specializationId;
+    if (!sId) {
+      const text = (u.majorCode || u.programSpecialization || u.major || "").toUpperCase();
+      if (text.includes("WMAD")) sId = "wmad";
+      else if (text.includes("AMG")) sId = "amg";
+      else if (text.includes("SMP")) sId = "smp";
+      else if (text.includes("IS")) sId = "is";
+    }
+
+    // Resolve sectionId
+    let secId = u.sectionId;
+    const secName = u.sectionName || u.section || "A";
+    if (!secId || secId === secName) {
+      secId = `${cId}-sec-${secName.toLowerCase()}`;
+    }
+
     setStudentForm({
       fullName: u.fullName || "",
       studentIdOrEmployeeId: u.studentIdOrEmployeeId || "",
       email: u.email || "",
-      courseId: u.courseId || "",
-      specializationId: u.specializationId || "",
-      sectionId: u.sectionId || "",
+      courseId: cId || "",
+      specializationId: sId || "",
+      sectionId: secId || "",
       enrollmentStatus: u.enrollmentStatus || "enrolled",
     });
 
-    if (u.courseId) {
-      setStudentSections(allSectionsByCourse[u.courseId] || []);
+    if (cId) {
+      const existingSecs = allSectionsByCourse[cId];
+      if (existingSecs && existingSecs.length > 0) {
+        setStudentSections(existingSecs);
+      } else {
+        setStudentSections([
+          { id: `${cId}-sec-a`, name: "A" },
+          { id: `${cId}-sec-b`, name: "B" },
+          { id: `${cId}-sec-c`, name: "C" },
+        ]);
+      }
     } else {
       setStudentSections([]);
     }
@@ -122,10 +159,43 @@ export const StudentDirectory = () => {
     if (!selectedStudent) return;
     setSavingProfile(true);
     try {
+      const courseObj = courses.find((c) => c.id === studentForm.courseId);
+      const specObj = courseObj?.specializations?.find(
+        (s) => s.id === studentForm.specializationId
+      );
+      const secObj = (allSectionsByCourse[studentForm.courseId] || []).find(
+        (s) => s.id === studentForm.sectionId
+      );
+      const secName =
+        secObj?.name ||
+        (studentForm.sectionId?.match(/-sec-([a-z0-9])$/i)?.[1]?.toUpperCase()) ||
+        studentForm.sectionId ||
+        "A";
+
+      const programName =
+        courseObj?.name ||
+        (studentForm.courseId === "bscs"
+          ? "Bachelor of Science in Computer Science"
+          : "Bachelor of Science in Information Technology");
+      const progCode =
+        courseObj?.code || (studentForm.courseId === "bscs" ? "BSCS" : "BSIT");
+      const majorName = specObj
+        ? `${specObj.name} (${specObj.code})`
+        : specObj?.name || "";
+      const majCode = specObj?.code || studentForm.specializationId?.toUpperCase() || "";
+
       const academicPayload = {
         courseId: studentForm.courseId,
+        program_id: studentForm.courseId,
+        program: programName,
+        programCode: progCode,
         specializationId: studentForm.specializationId,
+        majorCode: majCode,
+        programSpecialization: majorName,
+        major: majorName,
         sectionId: studentForm.sectionId,
+        sectionName: secName,
+        section: secName,
         enrollmentStatus: studentForm.enrollmentStatus,
       };
 
@@ -134,6 +204,7 @@ export const StudentDirectory = () => {
         userService.updateUser(selectedStudent.uid, {
           fullName: studentForm.fullName,
           studentIdOrEmployeeId: studentForm.studentIdOrEmployeeId,
+          ...academicPayload,
         }),
       ]);
 
@@ -268,27 +339,66 @@ export const StudentDirectory = () => {
   // Apply filters to student list
   const filteredStudents = students.filter((s) => {
     // Course Match
-    if (selectedCourse && s.courseId !== selectedCourse) return false;
+    if (selectedCourse) {
+      const courseMatch =
+        s.courseId === selectedCourse ||
+        s.programCode?.toLowerCase() === selectedCourse.toLowerCase() ||
+        (selectedCourse === "bsit" && s.program?.toLowerCase().includes("information technology")) ||
+        (selectedCourse === "bscs" && s.program?.toLowerCase().includes("computer science"));
+      if (!courseMatch) return false;
+    }
     
     // Specialization Match
-    if (selectedSpecialization && s.specializationId !== selectedSpecialization) return false;
+    if (selectedSpecialization) {
+      const specMatch =
+        s.specializationId === selectedSpecialization ||
+        s.majorCode?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+        s.programSpecialization?.toLowerCase().includes(selectedSpecialization.toLowerCase()) ||
+        s.major?.toLowerCase().includes(selectedSpecialization.toLowerCase());
+      if (!specMatch) return false;
+    }
     
     // Section Match
-    if (selectedSection && s.sectionId !== selectedSection) return false;
+    if (selectedSection) {
+      const secMatch =
+        s.sectionId === selectedSection ||
+        s.sectionId?.endsWith(`-sec-${selectedSection.toLowerCase()}`) ||
+        s.sectionName?.toLowerCase() === selectedSection.toLowerCase() ||
+        selectedSection.toLowerCase().endsWith(`-sec-${s.sectionName?.toLowerCase()}`);
+      if (!secMatch) return false;
+    }
     
-    // Search Query Match (Name, ID, Email)
-    const q = searchQuery.toLowerCase();
+    // Search Query Match (Name, ID, Email, Program, Major, Section)
+    const q = searchQuery.toLowerCase().trim();
     if (q) {
       const matchName = s.fullName?.toLowerCase().includes(q);
       const matchId = s.studentIdOrEmployeeId?.toLowerCase().includes(q);
       const matchEmail = s.email?.toLowerCase().includes(q);
-      if (!matchName && !matchId && !matchEmail) return false;
+      const matchProgram =
+        s.programCode?.toLowerCase().includes(q) ||
+        s.program?.toLowerCase().includes(q);
+      const matchMajor =
+        s.majorCode?.toLowerCase().includes(q) ||
+        s.programSpecialization?.toLowerCase().includes(q);
+      const matchSection = s.sectionName?.toLowerCase().includes(q);
+      if (
+        !matchName &&
+        !matchId &&
+        !matchEmail &&
+        !matchProgram &&
+        !matchMajor &&
+        !matchSection
+      ) {
+        return false;
+      }
     }
     
     return true;
   });
 
-  const unassignedStudents = students.filter((s) => !s.courseId || !s.sectionId);
+  const unassignedStudents = students.filter(
+    (s) => !s.courseId && !s.programCode
+  );
 
   // ---------------------------------------------------------------------------
   // 3. Handlers (Invite Link & Manual Assign)
@@ -395,25 +505,30 @@ export const StudentDirectory = () => {
   // ---------------------------------------------------------------------------
   // 4. Render Helpers
   // ---------------------------------------------------------------------------
-  const getCourseCode = (id) => courses.find((c) => c.id === id)?.code || "N/A";
+  const getCourseCode = (id, student) => {
+    const found = courses.find((c) => c.id === id)?.code;
+    if (found) return found;
+    if (student?.programCode) return student.programCode;
+    if (student?.program?.includes("Computer Science")) return "BSCS";
+    if (student?.program?.includes("Information Technology")) return "BSIT";
+    return id ? id.toUpperCase() : "BSIT";
+  };
   
-  const getSectionName = (cId, sId) => {
-    // Try current course sections first, then fall back to allSectionsByCourse cache
-    const fromCurrent = sections.find((s) => s.id === sId)?.name;
-    if (fromCurrent) return fromCurrent;
-    const fromCache = (allSectionsByCourse[cId] || []).find((s) => s.id === sId)?.name;
-    const name = fromCache || sId || "—";
-    
-    // Normalize to just the letter if it's an ID like bscs-sec-a
-    if (typeof name === 'string') {
-      const match = name.match(/-sec-([a-z])$/i);
-      if (match) return `Section ${match[1].toUpperCase()}`;
-      
-      const letterMatch = name.trim().toUpperCase().match(/^[1-5]?([A-Z])$/);
-      if (letterMatch) return `Section ${letterMatch[1]}`;
+  const getSectionName = (cId, sId, student) => {
+    if (student?.sectionName) {
+      const clean = student.sectionName.trim();
+      return clean.length <= 2 ? `Section ${clean.toUpperCase()}` : clean;
     }
-    
-    return name;
+    const fromCurrent = sections.find((s) => s.id === sId)?.name;
+    if (fromCurrent) return `Section ${fromCurrent.toUpperCase()}`;
+    const fromCache = (allSectionsByCourse[cId] || []).find((s) => s.id === sId)?.name;
+    if (fromCache) return `Section ${fromCache.toUpperCase()}`;
+    if (sId) {
+      const match = sId.match(/-sec-([a-z0-9])$/i);
+      if (match) return `Section ${match[1].toUpperCase()}`;
+      return `Section ${sId.toUpperCase()}`;
+    }
+    return "—";
   };
 
   const handleCourseSelect = (courseId, specId, sectionId) => {
@@ -428,12 +543,23 @@ export const StudentDirectory = () => {
     }
   };
 
-  const getSpecializationName = (cId, specId) => {
-    if (!specId) return "—";
-    const c = courses.find((x) => x.id === cId);
-    if (!c) return "—";
-    const s = c.specializations?.find((x) => x.id === specId);
-    return s ? (s.code || s.name) : "—";
+  const getSpecializationName = (cId, specId, student) => {
+    if (specId) {
+      const c = courses.find((x) => x.id === cId);
+      const s = c?.specializations?.find(
+        (x) =>
+          x.id === specId ||
+          x.code?.toLowerCase() === specId?.toLowerCase()
+      );
+      if (s) return s.code || s.name;
+    }
+    if (student?.majorCode) return student.majorCode;
+    const specStr = (student?.programSpecialization || student?.major || "").toUpperCase();
+    if (specStr.includes("WMAD")) return "WMAD";
+    if (specStr.includes("AMG")) return "AMG";
+    if (specStr.includes("SMP")) return "SMP";
+    if (specStr.includes("IS")) return "IS";
+    return specId ? specId.toUpperCase() : "—";
   };
 
   // Table structure
@@ -715,28 +841,30 @@ export const StudentDirectory = () => {
               </TableCell>
 
               <TableCell className="max-w-[120px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                {u.courseId ? getCourseCode(u.courseId) : "—"}
+                {getCourseCode(u.courseId, u)}
               </TableCell>
 
               <TableCell className="max-w-[140px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                {u.courseId ? getSpecializationName(u.courseId, u.specializationId) : "—"}
+                {getSpecializationName(u.courseId, u.specializationId, u)}
               </TableCell>
 
               <TableCell className="max-w-[100px] font-semibold text-gray-700 dark:text-gray-300 truncate">
-                {u.courseId && u.sectionId ? getSectionName(u.courseId, u.sectionId) : "—"}
+                {getSectionName(u.courseId, u.sectionId, u)}
               </TableCell>
 
               <TableCell className="max-w-[120px]">
-                {u.enrollmentStatus ? (
-                  <Badge 
-                    variant={u.enrollmentStatus === "enrolled" ? "emerald" : "orange"}
-                    className="text-[11px] px-2 py-0.5 uppercase tracking-wide truncate max-w-full"
-                  >
-                    {u.enrollmentStatus}
-                  </Badge>
-                ) : (
-                  <span className="text-gray-400 dark:text-gray-500 font-semibold text-xs truncate">—</span>
-                )}
+                <Badge 
+                  variant={
+                    (u.enrollmentStatus === "enrolled" || u.status === "approved" || !u.enrollmentStatus)
+                      ? "emerald" 
+                      : (u.enrollmentStatus === "leave" || u.status === "rejected")
+                      ? "red"
+                      : "orange"
+                  }
+                  className="text-[11px] px-2 py-0.5 uppercase tracking-wide truncate max-w-full"
+                >
+                  {u.enrollmentStatus || (u.status === "approved" ? "enrolled" : u.status || "enrolled")}
+                </Badge>
               </TableCell>
 
               <TableCell className="text-right max-w-[110px]">
