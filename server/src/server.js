@@ -61,8 +61,8 @@ app.use(cors({
     'Origin',
   ],
 }));
-app.use(express.json({ limit: '250mb' }));
-app.use(express.urlencoded({ extended: true, limit: '250mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {

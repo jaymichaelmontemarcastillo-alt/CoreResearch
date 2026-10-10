@@ -55,7 +55,10 @@ export const ResearchDocumentsPage = () => {
       return;
     }
 
-
+    if (file.size > 10 * 1024 * 1024) {
+      setToast({ variant: 'error', message: 'File size must be under 10MB.' });
+      return;
+    }
 
     try {
       setIsUploading(true);

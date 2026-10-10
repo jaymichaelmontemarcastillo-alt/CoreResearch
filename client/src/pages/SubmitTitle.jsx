@@ -171,7 +171,11 @@ export const SubmitTitle = () => {
       return;
     }
 
-
+    if (file.size > 10 * 1024 * 1024) {
+      setToast('File size exceeds the 10MB limit.');
+      setToastVariant('error');
+      return;
+    }
 
     setToast('');
     setProcessingStage('uploading');
@@ -502,7 +506,7 @@ export const SubmitTitle = () => {
                       <input id="file-upload" name="file-upload" type="file" className="sr-only" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" ref={fileInputRef} onChange={handleFileUpload} />
                       <p className="pl-1">or drag and drop</p>
                     </div>
-                    <p className="text-xs leading-5 text-gray-500 dark:text-gray-500 mt-1">PDF or DOCX</p>
+                    <p className="text-xs leading-5 text-gray-500 dark:text-gray-500 mt-1">PDF or DOCX up to 10MB</p>
                   </div>
                 </div>
               ) : (
