@@ -6,7 +6,17 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
 import { CourseFilterDropdown } from "../components/ui/CourseFilterDropdown";
 import { DataTable, TableRow, TableCell } from "../components/ui/DataTable";
-import { HiCalendarDays, HiMagnifyingGlass, HiFunnel, HiPlus, HiPencilSquare, HiTrash } from "react-icons/hi2";
+import {
+  HiCalendarDays,
+  HiMagnifyingGlass,
+  HiFunnel,
+  HiPlus,
+  HiPencilSquare,
+  HiTrash,
+  HiArrowPath,
+  HiSparkles,
+} from "react-icons/hi2";
+import { CalendarPlus } from "lucide-react";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { groupService } from "../services/group.service";
@@ -16,6 +26,7 @@ import { useAuth } from "../context/AuthContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { GenerateScheduleModal } from "../components/scheduling/GenerateScheduleModal";
 import EditScheduleModal from "../components/scheduling/EditScheduleModal";
+import { ScheduleDefenseModal } from "../components/scheduling/ScheduleDefenseModal";
 
 const formatTime12Hour = (time) => {
   if (!time) return '';
@@ -51,6 +62,9 @@ export const Scheduling = () => {
   const [toastMessage, setToastMessage] = useState("");
   const [toastVariant, setToastVariant] = useState("success");
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isScheduleDefenseModalOpen, setIsScheduleDefenseModalOpen] = useState(false);
+  const [selectedGroupForScheduling, setSelectedGroupForScheduling] = useState(null);
+  const [isRedefenseMode, setIsRedefenseMode] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [editingSchedule, setEditingSchedule] = useState(null);
 
@@ -87,6 +101,10 @@ export const Scheduling = () => {
           try {
             const secs = await sectionService.getSectionsByCourseId(course.id);
             sectionMap[course.id] = secs;
+            if (course.id) {
+              sectionMap[course.id.toLowerCase()] = secs;
+              sectionMap[course.id.toUpperCase()] = secs;
+            }
           } catch (e) {
             sectionMap[course.id] = [];
           }
@@ -125,18 +143,33 @@ export const Scheduling = () => {
     try {
       const sectionsData = await sectionService.getSectionsByCourseId(courseId);
       setSections(sectionsData);
+      if (courseId) {
+        setAllSectionsByCourse((prev) => ({
+          ...prev,
+          [courseId]: sectionsData,
+          [courseId.toLowerCase()]: sectionsData,
+          [courseId.toUpperCase()]: sectionsData,
+        }));
+      }
     } catch (error) {
       console.error("Failed to load sections:", error);
     }
   };
 
-  const courseObj = courses.find((c) => c.id === selectedCourse);
+  const courseObj = courses.find(
+    (c) =>
+      c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
+      c.code?.toLowerCase() === selectedCourse?.toLowerCase()
+  );
   const specializations = courseObj?.specializations || [];
   const hasSpecializations = specializations.length > 0;
 
   const relevantSections = sections.filter((s) => {
     if (hasSpecializations && selectedSpecialization) {
-      return s.specializationId === selectedSpecialization;
+      return (
+        s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+        (!s.specializationId && s.courseId?.toLowerCase() === selectedCourse?.toLowerCase())
+      );
     }
     return true;
   });
@@ -145,47 +178,66 @@ export const Scheduling = () => {
 
   const showSectionFilter =
     (!hasSpecializations && selectedCourse) || 
-    (hasSpecializations && selectedSpecialization && specHasSections);
-
-
+    (hasSpecializations && (selectedSpecialization ? specHasSections : sections.length > 0));
 
   const showToast = (msg, variant = "success") => {
     setToastMessage(msg);
     setToastVariant(variant);
   };
 
-  const handleCourseSelect = (courseId, specId, sectionId) => {
+  const handleCourseSelect = async (courseId, specId, sectionId) => {
     setSelectedCourse(courseId || "");
     setSelectedSpecialization(specId || "");
     setSelectedSection(sectionId || "");
     if (courseId) {
-      setSections(allSectionsByCourse[courseId] || []);
+      let found =
+        allSectionsByCourse[courseId] ||
+        allSectionsByCourse[courseId?.toLowerCase()] ||
+        allSectionsByCourse[courseId?.toUpperCase()];
+
+      if (!found || found.length === 0) {
+        try {
+          found = await sectionService.getSectionsByCourseId(courseId);
+          setAllSectionsByCourse((prev) => ({
+            ...prev,
+            [courseId]: found,
+            [courseId.toLowerCase()]: found,
+            [courseId.toUpperCase()]: found,
+          }));
+        } catch (e) {
+          found = [];
+        }
+      }
+      setSections(found || []);
     } else {
       setSections([]);
     }
   };
 
   const getProposalForGroup = (groupId) => proposals.find(p => p.groupId === groupId);
+
+  const getAllSchedulesForGroup = (groupId) => {
+    return schedules.filter(
+      (s) => s.projectId === groupId || s.groupId === groupId
+    );
+  };
+
   const getScheduleForGroup = (groupId) => {
-    // Current date formatted as YYYY-MM-DD
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    // Filter active schedules: exclude archived schedules and past schedules (< today)
-    const groupSchedules = schedules.filter(s => {
-      if (s.projectId !== groupId) return false;
-      if (s.status === 'archived') return false;
-      if (s.date && s.date < todayStr) return false;
-      return true;
-    });
-
+    const groupSchedules = getAllSchedulesForGroup(groupId);
     if (groupSchedules.length === 0) return null;
-    
-    // If a group has multiple schedules (e.g. proposal and final defense),
-    // prefer the one that actually has a time set to avoid showing 'Not set'
-    // when a valid schedule exists.
-    const validSchedule = groupSchedules.find(s => s.startTime && s.startTime.trim() !== '');
-    return validSchedule || groupSchedules[groupSchedules.length - 1]; // fallback to the most recent one
+
+    // Prefer schedule that is currently active or scheduled with a valid time
+    const activeScheduled = groupSchedules.find(
+      (s) => (s.status === 'scheduled' || s.status === 'for_redefense') && s.startTime && s.startTime.trim() !== ''
+    );
+    if (activeScheduled) return activeScheduled;
+
+    // Next prefer any scheduled entry
+    const anyScheduled = groupSchedules.find((s) => s.status === 'scheduled');
+    if (anyScheduled) return anyScheduled;
+
+    // Fallback to the latest chronological schedule
+    return groupSchedules[groupSchedules.length - 1];
   };
 
   const handleClearAllTimes = async () => {
@@ -242,14 +294,14 @@ export const Scheduling = () => {
   };
 
   const tableColumns = [
-    { label: "Time", className: "w-[110px]" },
+    { label: "Time", className: "w-[120px]" },
     { label: "Name of Students", className: "min-w-[150px]" },
-    { label: "Title", className: "min-w-[200px]" },
-    { label: "Adviser", className: "min-w-[150px]" },
-    { label: "Subject Specialist", className: "min-w-[150px]" },
-    { label: "Stat", className: "min-w-[120px]" },
-    { label: "Technical", className: "min-w-[150px]" },
-    { label: "Actions", className: "w-[80px] text-center" },
+    { label: "Title & Defense Stage", className: "min-w-[230px]" },
+    { label: "Adviser", className: "min-w-[140px]" },
+    { label: "Subject Specialist", className: "min-w-[140px]" },
+    { label: "Stat", className: "min-w-[110px]" },
+    { label: "Technical", className: "min-w-[140px]" },
+    { label: "Actions", className: "w-[140px] text-center" },
   ];
 
   return (
@@ -332,18 +384,21 @@ export const Scheduling = () => {
                 onChange={(e) => setSelectedSection(e.target.value)}
               >
                 <option value="">Select Section...</option>
-                {relevantSections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+                {relevantSections.map((s) => {
+                  const cleanName = s.name.replace(/^section\s+/i, '');
+                  return (
+                    <option key={s.id} value={s.id}>
+                      Section {cleanName}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           )}
         </div>
 
-        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex gap-2">
-          {/* The Clear All Times button logic needs a specific section scope to be safe, so we only show it if a specific section is selected. */}
+        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex flex-wrap items-center gap-2">
+          {/* The Clear All Times button logic needs a specific section scope to be safe */}
           {selectedCourse && selectedSection && groups.filter(g => g.sectionId === selectedSection).some(g => {
             const s = getScheduleForGroup(g.id);
             return s && (s.startTime || s.date);
@@ -358,12 +413,37 @@ export const Scheduling = () => {
               Clear All Times
             </Button>
           )}
+
+          {/* Create Defense presentation manually for a group */}
+          <Button
+            variant="outline"
+            size="md"
+            className="w-full md:w-auto h-10 shadow-sm border-gray-200 dark:border-[#2b2d3b] hover:bg-gray-50 dark:hover:bg-[#1a1b26]"
+            onClick={() => {
+              setSelectedGroupForScheduling(null);
+              setIsRedefenseMode(false);
+              setIsScheduleDefenseModalOpen(true);
+            }}
+            title="Create or customize a defense schedule for a group"
+          >
+            <CalendarPlus className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" />
+            Schedule Defense
+          </Button>
+
+          {/* Create Schedule automatically creates schedule for the whole section */}
           <Button
             variant="primary"
             size="md"
             className="w-full md:w-auto h-10 shadow-sm"
-            onClick={() => setIsScheduleModalOpen(true)}
+            onClick={() => {
+              if (!selectedCourse || !selectedSection) {
+                showToast("Please select a Program and Section first to create section schedules.", "error");
+                return;
+              }
+              setIsScheduleModalOpen(true);
+            }}
             disabled={!selectedCourse || !selectedSection}
+            title={!selectedSection ? "Select a program and section to create schedules" : "Automatically create schedule for this section"}
           >
             <HiPlus className="w-4 h-4 mr-2" />
             Create Schedule
@@ -379,12 +459,25 @@ export const Scheduling = () => {
       ) : (
         <div className="mt-6 space-y-10">
           {courses
-            .filter((c) => (selectedCourse ? c.id === selectedCourse : true))
+            .filter((c) =>
+              selectedCourse
+                ? c.id?.toLowerCase() === selectedCourse.toLowerCase() ||
+                  c.code?.toLowerCase() === selectedCourse.toLowerCase()
+                : true
+            )
             .map((course) => {
-              const courseSections = allSectionsByCourse[course.id] || [];
+              const courseSections =
+                allSectionsByCourse[course.id] ||
+                allSectionsByCourse[course.id?.toLowerCase()] ||
+                [];
               const displaySections = courseSections.filter((s) => {
-                if (selectedSpecialization) return s.specializationId === selectedSpecialization;
-                if (selectedSection) return s.id === selectedSection;
+                if (selectedSpecialization) {
+                  const matchSpec =
+                    s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+                    (!s.specializationId && s.courseId?.toLowerCase() === course.id?.toLowerCase());
+                  if (!matchSpec) return false;
+                }
+                if (selectedSection && s.id !== selectedSection) return false;
                 return true;
               });
 
@@ -406,9 +499,14 @@ export const Scheduling = () => {
                       return matchName || matchMember || matchTitle;
                     });
 
-                    const specialization = course.specializations?.find(s => s.id === section.specializationId);
+                    const specialization = course.specializations?.find(
+                      (s) =>
+                        s.id?.toLowerCase() === section.specializationId?.toLowerCase() ||
+                        s.code?.toLowerCase() === section.specializationId?.toLowerCase()
+                    );
                     const specName = specialization?.name || section.specializationName || '';
                     const specCode = specialization?.code || '';
+                    const cleanSecName = (section.name || '').replace(/^section\s+/i, '');
 
                     return (
                       <div key={section.id} className="bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-card overflow-hidden">
@@ -429,7 +527,7 @@ export const Scheduling = () => {
                             )}
                           </div>
                           <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-widest text-right shrink-0">
-                            Section <span className="text-gray-900 dark:text-white">{section.name}</span>
+                            Section <span className="text-gray-900 dark:text-white">{cleanSecName}</span>
                           </h3>
                         </div>
 
@@ -464,6 +562,7 @@ export const Scheduling = () => {
                             }).map((group) => {
                               const proposal = getProposalForGroup(group.id);
                               const schedule = getScheduleForGroup(group.id);
+                              const groupAllSchedules = getAllSchedulesForGroup(group.id);
                               const activePanelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (group.panelists || []);
                               const activeAdviserName = schedule?.adviserName || group.adviserName;
                               
@@ -479,6 +578,11 @@ export const Scheduling = () => {
                                         <span className="text-[10px] text-gray-500 font-medium">
                                           {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
                                         </span>
+                                        {schedule.venue && (
+                                          <span className="text-[10px] text-gray-400 truncate max-w-[110px]" title={schedule.venue}>
+                                            {schedule.venue}
+                                          </span>
+                                        )}
                                       </div>
                                     ) : (
                                       <span className="text-gray-400 italic text-sm">Not set</span>
@@ -498,15 +602,41 @@ export const Scheduling = () => {
                                     </div>
                                   </TableCell>
 
-                                  {/* Title */}
+                                  {/* Title & Defense Stage */}
                                   <TableCell>
-                                    {proposal ? (
-                                      <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
-                                        {proposal.title}
+                                    <div className="flex flex-col gap-1.5">
+                                      {proposal ? (
+                                        <div className="font-semibold text-gray-900 dark:text-white line-clamp-2" title={proposal.title}>
+                                          {proposal.title}
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-gray-400 italic">No approved title yet</span>
+                                      )}
+
+                                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                        {schedule?.status === 'for_redefense' ? (
+                                          <Badge variant="amber" className="text-[10px] font-bold">
+                                            For Re-defense
+                                          </Badge>
+                                        ) : schedule && (schedule.defenseStage?.toLowerCase().includes('re-defense') || schedule.defenseType?.includes('redefense')) ? (
+                                          <Badge variant="amber" className="text-[10px] font-bold">
+                                            {schedule.defenseStage || (schedule.defenseType === 'final_defense' ? 'Final Re-defense' : 'Proposal Re-defense')}
+                                          </Badge>
+                                        ) : schedule && (schedule.defenseType === 'final_defense' || schedule.defenseStage?.toLowerCase().includes('final')) ? (
+                                          <Badge variant="purple" className="text-[10px] font-medium">
+                                            Final Defense
+                                          </Badge>
+                                        ) : schedule && (schedule.startTime || schedule.date || schedule.defenseType === 'proposal_defense') ? (
+                                          <Badge variant="blue" className="text-[10px] font-medium">
+                                            Proposal Defense
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="gray" className="text-[10px]">
+                                            Unscheduled
+                                          </Badge>
+                                        )}
                                       </div>
-                                    ) : (
-                                      <span className="text-sm text-gray-400 italic">No approved title yet</span>
-                                    )}
+                                    </div>
                                   </TableCell>
 
                                   {/* Adviser */}
@@ -545,9 +675,33 @@ export const Scheduling = () => {
 
                                   {/* Actions */}
                                   <TableCell className="align-middle">
-                                    <div className="flex items-center justify-center gap-3 h-full">
+                                    <div className="flex items-center justify-center gap-1.5 h-full">
+                                      {/* Quick Action: Schedule Defense / Re-defense button */}
                                       <button 
-                                        className="text-primary hover:text-blue-600 transition-colors" 
+                                        className={`p-1.5 rounded-lg transition-colors ${
+                                          schedule?.status === 'for_redefense'
+                                            ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40'
+                                            : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40'
+                                        }`}
+                                        title={
+                                          schedule?.status === 'for_redefense'
+                                            ? 'Schedule Re-defense'
+                                            : schedule && (schedule.startTime || schedule.date)
+                                            ? 'Schedule Re-defense / Next Stage'
+                                            : 'Schedule Defense Presentation'
+                                        } 
+                                        onClick={() => {
+                                          setSelectedGroupForScheduling(group);
+                                          setIsRedefenseMode(schedule?.status === 'for_redefense');
+                                          setIsScheduleDefenseModalOpen(true);
+                                        }}
+                                      >
+                                        <CalendarPlus className="w-4 h-4" />
+                                      </button>
+
+                                      {/* Edit Schedule */}
+                                      <button 
+                                        className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 transition-colors" 
                                         title="Edit Schedule" 
                                         onClick={() => {
                                           setEditingGroup(group);
@@ -556,7 +710,9 @@ export const Scheduling = () => {
                                       >
                                         <HiPencilSquare className="w-4 h-4" />
                                       </button>
+
                                       
+                                      {/* Clear Time button */}
                                       {schedule && (schedule.startTime || schedule.date) && (
                                         <button
                                           onClick={async () => {
@@ -567,7 +723,6 @@ export const Scheduling = () => {
                                               variant: "danger"
                                             });
                                             if (isConfirmed) {
-                                              // Optimistically clear locally first
                                               setSchedules(prev => prev.map(s => s.id === schedule.id ? { ...s, date: '', startTime: '', endTime: '' } : s));
                                               try {
                                                 await scheduleService.updateSchedule(schedule.id, { date: '', startTime: '', endTime: '' });
@@ -575,12 +730,11 @@ export const Scheduling = () => {
                                                 refreshData(false);
                                               } catch (e) {
                                                 showToast("Failed to clear time.", "error");
-                                                // Revert optimistic update by refetching
                                                 refreshData(false);
                                               }
                                             }
                                           }}
-                                          className="text-red-500 hover:text-red-600 transition-colors"
+                                          className="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                           title="Clear Time"
                                         >
                                           <HiTrash className="w-4 h-4" />
@@ -602,32 +756,74 @@ export const Scheduling = () => {
         </div>
       )}
 
+      {/* 1. Schedule Defense / Re-defense Modal (Group Selector & Auto-populate) */}
+      {isScheduleDefenseModalOpen && (
+        <ScheduleDefenseModal
+          isOpen={isScheduleDefenseModalOpen}
+          onClose={() => {
+            setIsScheduleDefenseModalOpen(false);
+            setSelectedGroupForScheduling(null);
+            setIsRedefenseMode(false);
+          }}
+          groups={
+            selectedSection
+              ? groups.filter((g) => g.sectionId === selectedSection)
+              : groups
+          }
+          proposals={proposals}
+          schedules={schedules}
+          preselectedGroup={selectedGroupForScheduling}
+          isRedefenseMode={isRedefenseMode}
+          onScheduleSaved={() => {
+            setIsScheduleDefenseModalOpen(false);
+            setSelectedGroupForScheduling(null);
+            setIsRedefenseMode(false);
+            showToast(
+              isRedefenseMode
+                ? "Re-defense schedule confirmed successfully!"
+                : "Defense schedule created successfully!"
+            );
+            refreshData(false);
+          }}
+        />
+      )}
+
+
+
+      {/* 3. Batch Auto-Generate Modal */}
       {isScheduleModalOpen && (
         <GenerateScheduleModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
           groups={groups
             .filter((g) => g.sectionId === selectedSection)
-            .map(g => {
-            const schedule = getScheduleForGroup(g.id);
-            const panelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (g.panelists || []);
-            return {
-              ...g,
-              title: getProposalForGroup(g.id)?.title || 'No approved title yet',
-              adviserId: schedule?.adviserId || g.adviserId,
-              adviserName: schedule?.adviserName || g.adviserName,
-              panelists: panelists,
-              panelistIds: panelists.map(p => p.id || p.uid).filter(Boolean)
-            };
-          })}
+            .map((g) => {
+              const schedule = getScheduleForGroup(g.id);
+              const panelists =
+                schedule?.panelists?.length > 0
+                  ? schedule.panelists
+                  : g.panelists || [];
+              return {
+                ...g,
+                title:
+                  getProposalForGroup(g.id)?.title || 'No approved title yet',
+                adviserId: schedule?.adviserId || g.adviserId,
+                adviserName: schedule?.adviserName || g.adviserName,
+                panelists: panelists,
+                panelistIds: panelists
+                  .map((p) => p.id || p.uid)
+                  .filter(Boolean),
+              };
+            })}
           onSchedulesCreated={() => {
             setIsScheduleModalOpen(false);
             showToast("Schedules created successfully!");
-            refreshData(); // Refresh
+            refreshData();
           }}
         />
       )}
 
+      {/* 4. Edit Schedule Modal */}
       {editingGroup && (
         <EditScheduleModal
           isOpen={!!editingGroup}
@@ -638,7 +834,9 @@ export const Scheduling = () => {
           schedule={editingSchedule}
           group={{
             ...editingGroup,
-            title: getProposalForGroup(editingGroup.id)?.title || 'No approved title yet'
+            title:
+              getProposalForGroup(editingGroup.id)?.title ||
+              'No approved title yet',
           }}
           onSaved={() => {
             setEditingGroup(null);

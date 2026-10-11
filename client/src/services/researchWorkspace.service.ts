@@ -865,7 +865,7 @@ export const researchWorkspaceService = {
         return {
           ...s,
           status: 'in_progress' as SectionStatus,
-          progress: Math.max(25, s.progress || 25),
+          progress: s.progress || 0,
           updatedAt: now,
         };
       }

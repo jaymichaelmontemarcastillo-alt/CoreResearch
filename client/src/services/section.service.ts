@@ -35,11 +35,36 @@ export const sectionService = {
   },
 
   /**
+   * Helper to normalize a section object so it has a clean name and valid specialization mapping
+   */
+  normalizeSection(id: string, s: any): Section {
+    const rawName = s.name || '';
+    const cleanName = rawName.replace(/^Section\s+/i, '').trim() || rawName;
+    const courseId = (s.courseId || '').toLowerCase();
+    let specializationId = s.specializationId ? s.specializationId.toLowerCase() : undefined;
+
+    // For BSCS, if no specializationId is explicitly set, map to 'is' (Intelligent Systems)
+    if (courseId === 'bscs' && !specializationId) {
+      specializationId = 'is';
+    }
+
+    return {
+      ...s,
+      id: id || s.id,
+      name: cleanName,
+      courseId,
+      specializationId,
+      active: s.active !== false,
+      createdAt: s.createdAt || new Date().toISOString(),
+    };
+  },
+
+  /**
    * Helper to normalize section name removing any old year level prefix (e.g. "3A" -> "A")
    */
   normalizeSectionName(name: string): string {
     if (!name) return '';
-    const trimmed = name.trim().toUpperCase();
+    const trimmed = name.replace(/^Section\s+/i, '').trim().toUpperCase();
     const match = trimmed.match(/^[1-5]?([A-Z])$/);
     if (match) return match[1];
     return trimmed;
@@ -52,7 +77,9 @@ export const sectionService = {
     try {
       const q = query(collection(db, COLLECTION_NAME));
       const querySnap = await getDocs(q);
-      const sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
+      const sections = querySnap.docs.map((docSnap) =>
+        this.normalizeSection(docSnap.id, docSnap.data())
+      );
       return sections.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err) {
       console.warn('[sectionService] getAllSections error:', err);
@@ -62,39 +89,50 @@ export const sectionService = {
 
   /**
    * Fetch sections by course ID.
-   * If none are configured in Firestore yet, returns default section letters (A, B, C).
+   * Seamlessly resolves case-insensitivity and ensures fallback data is aligned.
    */
   async getSectionsByCourseId(courseId: string, activeOnly = false): Promise<Section[]> {
+    if (!courseId) return [];
+    const targetCourse = courseId.toLowerCase().trim();
+
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('courseId', '==', courseId)
+      const all = await this.getAllSections();
+      let sections = all.filter(
+        (s) => s.courseId?.toLowerCase() === targetCourse
       );
-      const querySnap = await getDocs(q);
-      let sections = querySnap.docs.map((docSnap) => docSnap.data() as Section);
 
       if (activeOnly) {
-        sections = sections.filter(s => s.active !== false);
+        sections = sections.filter((s) => s.active !== false);
       }
 
       if (sections.length > 0) {
         return sections.sort((a, b) => a.name.localeCompare(b.name));
       }
 
-      // Default baseline admin sections (A, B, C) if database has not been seeded yet
+      // Default baseline admin sections (A, B) if database has not been seeded yet
       return [
-        { id: `${courseId}-sec-a`, courseId, name: 'A', active: true, createdAt: new Date().toISOString() },
-        { id: `${courseId}-sec-b`, courseId, name: 'B', active: true, createdAt: new Date().toISOString() },
-        { id: `${courseId}-sec-c`, courseId, name: 'C', active: true, createdAt: new Date().toISOString() },
+        { id: `${targetCourse}-sec-a`, courseId: targetCourse, name: 'A', specializationId: targetCourse === 'bscs' ? 'is' : 'wmad', active: true, createdAt: new Date().toISOString() },
+        { id: `${targetCourse}-sec-b`, courseId: targetCourse, name: 'B', specializationId: targetCourse === 'bscs' ? 'is' : 'wmad', active: true, createdAt: new Date().toISOString() },
       ];
     } catch (err) {
       console.warn('[sectionService] getSectionsByCourseId error:', err);
       return [
-        { id: `${courseId}-sec-a`, courseId, name: 'A', active: true, createdAt: new Date().toISOString() },
-        { id: `${courseId}-sec-b`, courseId, name: 'B', active: true, createdAt: new Date().toISOString() },
-        { id: `${courseId}-sec-c`, courseId, name: 'C', active: true, createdAt: new Date().toISOString() },
+        { id: `${targetCourse}-sec-a`, courseId: targetCourse, name: 'A', specializationId: targetCourse === 'bscs' ? 'is' : 'wmad', active: true, createdAt: new Date().toISOString() },
+        { id: `${targetCourse}-sec-b`, courseId: targetCourse, name: 'B', specializationId: targetCourse === 'bscs' ? 'is' : 'wmad', active: true, createdAt: new Date().toISOString() },
       ];
     }
+  },
+
+  /**
+   * Fetch sections by specialization ID.
+   */
+  async getSectionsBySpecializationId(courseId: string, specId: string, activeOnly = false): Promise<Section[]> {
+    const courseSecs = await this.getSectionsByCourseId(courseId, activeOnly);
+    if (!specId) return courseSecs;
+    const targetSpec = specId.toLowerCase().trim();
+    return courseSecs.filter(
+      (s) => s.specializationId?.toLowerCase() === targetSpec || !s.specializationId
+    );
   },
 
   /**

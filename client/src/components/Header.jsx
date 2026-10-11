@@ -282,40 +282,54 @@ export const Header = ({ onOpenMobileMenu }) => {
     }
   };
 
-  // Map route to clean real page title
+  // Map route to clean real page title that precisely matches sidebar labels
   const getPageTitle = () => {
     const path = location.pathname;
+
+    // Main
     if (path === "/dashboard") return "Dashboard";
-    if (path === "/notifications") return "Notifications";
-    if (path === "/masterlist") return "Section Masterlist";
-    if (path === "/my-group") return "My Research Group";
-    if (path === "/advisers") return "Adviser Directory";
+
+    // Research Management
+    if (path.startsWith("/admin/groups") || path.startsWith("/research-groups") || path === "/groups") return "Research Groups";
+    if (path === "/my-group") return "My Group";
+    if (path === "/masterlist") return "Masterlist";
+    if (path.startsWith("/admin/manuscripts") || path.startsWith("/manuscripts")) return "Manuscripts";
+    if (path === "/research-documents") return "Research Documents";
     if (path === "/submit-title") return "Submit Title";
-    if (path === "/adviser-matching") return "Adviser Matching";
-    if (path.startsWith("/projects")) return "Research Projects";
     if (path.startsWith("/research/workspace") || path.startsWith("/workspace")) return "Research Workspace";
+    if (path === "/repository") return "Repository";
+
+    // People & Directory
+    if (path.startsWith("/admin/user-requests") || path.startsWith("/user-requests")) return "User Requests";
+    if (path.startsWith("/admin/users") || path === "/users") return "User Directory";
+    if (path.startsWith("/admin/advisers")) return "Advisers & Faculty";
+    if (path === "/advisers") return "Faculty Advisers";
+    if (path.startsWith("/admin/courses")) return "Programs & Sections";
+    if (path.startsWith("/students") || path.startsWith("/admin/students")) return "Student Directory";
+
+    // Advising & Defenses
     if (path === "/advisees") return "My Advisees";
-    if (path.startsWith("/faculty/workspace/")) return "Faculty Workspace";
+    if (path === "/adviser-requests") return "Adviser Requests";
     if (path === "/panelists") return "Defense Schedules";
     if (path === "/panelist/defendees") return "Panel Defendees";
+
+    // Academic Schedules
+    if (path.startsWith("/calendar") || path.startsWith("/admin/calendar") || path.startsWith("/admin/master-calendar")) return "Calendar";
+    if (path === "/schedules") return "Schedule";
+    if (path.startsWith("/admin/scheduling")) return "Scheduling";
+
+    // Notifications & Common
+    if (path === "/notifications") return "Notifications";
+    if (path.startsWith("/admin/analytics")) return "Data Analytics";
+    if (path === "/adviser-matching") return "Adviser Matching";
+    if (path.startsWith("/projects")) return "Research Projects";
+    if (path.startsWith("/faculty/workspace/")) return "Faculty Workspace";
     if (path === "/documents") return "Documents";
     if (path.startsWith("/documents/")) return "Document Editor";
     if (path.startsWith("/reviews")) return "Reviews & Annotations";
-    if (path.startsWith("/schedules")) return "Defense Schedules";
-    if (path.startsWith("/calendar") || path.startsWith("/admin/calendar") || path.startsWith("/admin/master-calendar")) return "Master Calendar";
-    if (path === "/repository") return "Research Repository";
     if (path === "/profile" || path === "/profile-settings" || path === "/settings") return "Account Settings";
-    if (path.startsWith("/admin/scheduling")) return "Defense Scheduling";
-    if (path.startsWith("/students") || path.startsWith("/admin/students")) return "Student Directory";
-    if (path.startsWith("/research-groups") || path.startsWith("/groups") || path.startsWith("/admin/groups")) return "Research Groups";
-    if (path.startsWith("/admin/users")) return "User Directory";
-    if (path.startsWith("/admin/courses")) return "Courses & Sections";
-    if (path.startsWith("/admin/manuscripts") || path.startsWith("/manuscripts")) return "Manuscript Management";
-    if (path.startsWith("/admin/analytics")) return "Data Analytics Flow";
-    if (path.startsWith("/admin/advisers")) return "Adviser & Faculty Directory";
-    if (path === "/research-documents") return "Research Documents";
-    if (path === "/adviser-requests") return "Adviser Requests";
     if (path === "/onboarding") return "Profile Setup";
+
     return "Dashboard";
   };
 

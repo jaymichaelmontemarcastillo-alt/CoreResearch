@@ -44,6 +44,7 @@ export const UserRequests = () => {
   const [selectedSpecialization, setSelectedSpecialization] = useState("");
 
   const [actionLoadingUid, setActionLoadingUid] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastVariant, setToastVariant] = useState("success");
 
@@ -66,11 +67,14 @@ export const UserRequests = () => {
     } catch (e) {
       console.warn("[UserRequests] Failed to load request counts from API:", e);
       try {
-        const all = await userService.getAllUsers();
         const pending = all.filter(
           (u) =>
+            u.role !== "admin" &&
+            u.role !== "research_coordinator" &&
             u.status !== "approved" &&
+            u.status !== "active" &&
             u.status !== "rejected" &&
+            u.is_approved !== true &&
             (u.status === "pending" || u.is_approved === false)
         );
         const rejected = all.filter((u) => u.status === "rejected");
@@ -94,15 +98,29 @@ export const UserRequests = () => {
         specialization: selectedSpecialization || undefined,
       });
 
-      setRequests(result.users);
-      setTotalRequests(result.total);
-      setTotalPages(result.totalPages);
+      // Defensive filtering: Ensure admins and active/approved users are never shown as pending requests
+      const sanitizedUsers = (result.users || []).filter((u) => {
+        if (selectedTab === "pending") {
+          return (
+            u.role !== "admin" &&
+            u.role !== "research_coordinator" &&
+            u.status !== "approved" &&
+            u.status !== "active" &&
+            u.is_approved !== true
+          );
+        }
+        return true;
+      });
+
+      setRequests(sanitizedUsers);
+      setTotalRequests(sanitizedUsers.length);
+      setTotalPages(Math.ceil(sanitizedUsers.length / targetLimit) || 1);
 
       // Keep active tab badge perfectly aligned with the returned count
       if (selectedTab === "rejected") {
         setRejectedCount(result.total);
       } else if (selectedTab === "pending") {
-        setPendingCount(result.total);
+        setPendingCount(sanitizedUsers.length);
       }
     } catch (err) {
       console.error("[UserRequests] fetchRequests error:", err);
@@ -232,6 +250,154 @@ export const UserRequests = () => {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (requests.length === 0) return;
+
+    let targets = [...requests];
+    if (totalRequests > requests.length && !search.trim()) {
+      try {
+        const fullRes = await userService.getPaginatedUsers({
+          page: 1,
+          limit: 200,
+          status: "pending",
+          program: selectedProgram || undefined,
+          specialization: selectedSpecialization || undefined,
+        });
+        if (fullRes?.users?.length) {
+          targets = fullRes.users.filter(
+            (u) =>
+              u.role !== "admin" &&
+              u.role !== "research_coordinator" &&
+              u.status !== "approved" &&
+              u.status !== "active" &&
+              u.is_approved !== true
+          );
+        }
+      } catch (err) {
+        console.warn("[UserRequests] Failed to fetch all pending for bulk approve, falling back to current page:", err);
+      }
+    }
+
+    const count = targets.length;
+    if (count === 0) {
+      showToast("No eligible pending requests to approve.", "info");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Approve All Pending Requests (${count})`,
+      message: `Are you sure you want to approve all ${count} pending registration request${count > 1 ? "s" : ""}? This will grant access to all approved accounts immediately and initialize official roles.`,
+      confirmText: `Approve All (${count})`,
+      variant: "primary",
+    });
+
+    if (!confirmed) return;
+
+    setBulkLoading(true);
+    try {
+      const adminUid = currentUser?.uid || "admin";
+      const results = await Promise.allSettled(
+        targets.map((u) => userService.approveUser(u.uid, adminUid))
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+
+      if (failed === 0) {
+        showToast(
+          `Successfully approved all ${succeeded} pending registration${succeeded > 1 ? "s" : ""}.`,
+          "success"
+        );
+      } else {
+        showToast(
+          `Approved ${succeeded} request${succeeded > 1 ? "s" : ""}. ${failed} encountered an error.`,
+          "warning"
+        );
+      }
+      fetchTabCounts();
+      fetchRequests(page, limit);
+      if (detailModalOpen) setDetailModalOpen(false);
+    } catch (err) {
+      showToast(`Bulk approval failed: ${err.message}`, "error");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    if (requests.length === 0) return;
+
+    let targets = [...requests];
+    if (totalRequests > requests.length && !search.trim()) {
+      try {
+        const fullRes = await userService.getPaginatedUsers({
+          page: 1,
+          limit: 200,
+          status: "pending",
+          program: selectedProgram || undefined,
+          specialization: selectedSpecialization || undefined,
+        });
+        if (fullRes?.users?.length) {
+          targets = fullRes.users.filter(
+            (u) =>
+              u.role !== "admin" &&
+              u.role !== "research_coordinator" &&
+              u.status !== "approved" &&
+              u.status !== "active" &&
+              u.is_approved !== true
+          );
+        }
+      } catch (err) {
+        console.warn("[UserRequests] Failed to fetch all pending for bulk reject, falling back to current page:", err);
+      }
+    }
+
+    const count = targets.length;
+    if (count === 0) {
+      showToast("No eligible pending requests to reject.", "info");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Reject All Pending Requests (${count})`,
+      message: `Are you sure you want to reject all ${count} pending registration request${count > 1 ? "s" : ""}? These users will not be able to log in to CoreResearch.`,
+      confirmText: `Reject All (${count})`,
+      variant: "danger",
+    });
+
+    if (!confirmed) return;
+
+    setBulkLoading(true);
+    try {
+      const adminUid = currentUser?.uid || "admin";
+      const results = await Promise.allSettled(
+        targets.map((u) =>
+          userService.rejectUser(u.uid, adminUid, "Bulk rejected by administrator.")
+        )
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+
+      if (failed === 0) {
+        showToast(
+          `Successfully rejected ${succeeded} pending registration${succeeded > 1 ? "s" : ""}.`,
+          "success"
+        );
+      } else {
+        showToast(
+          `Rejected ${succeeded} request${succeeded > 1 ? "s" : ""}. ${failed} encountered an error.`,
+          "warning"
+        );
+      }
+      fetchTabCounts();
+      fetchRequests(page, limit);
+      if (detailModalOpen) setDetailModalOpen(false);
+    } catch (err) {
+      showToast(`Bulk rejection failed: ${err.message}`, "error");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const handleDelete = async (u) => {
     const confirmed = await confirm({
       title: "Confirm Permanent Deletion",
@@ -243,8 +409,13 @@ export const UserRequests = () => {
     if (!confirmed) return;
 
     try {
-      await userService.deleteUser(u.uid);
+      await userService.deleteUser(u.uid, u.email);
       showToast("Registration record deleted.");
+      // Optimistically remove from state immediately
+      setRequests((prev) => prev.filter((item) => (item.uid || item.id) !== u.uid && item.email !== u.email));
+      setRejectedCount((prev) => Math.max(0, prev - 1));
+      setTotalRequests((prev) => Math.max(0, prev - 1));
+
       fetchTabCounts();
       fetchRequests(page, limit);
       if (detailModalOpen && selectedRequest?.uid === u.uid) {
@@ -368,6 +539,41 @@ export const UserRequests = () => {
               )}
             </button>
           ))}
+
+          {/* Quick Action Shortcuts (Approve All & Reject All) */}
+          {selectedTab === "pending" && requests.length > 0 && (
+            <div className="flex items-center gap-2 ml-1 pl-2 border-l border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                disabled={bulkLoading || loading}
+                onClick={handleApproveAll}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all whitespace-nowrap"
+                title="Shortcut: Approve all pending registration requests"
+              >
+                {bulkLoading ? (
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <HiCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                )}
+                <span>Approve All</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={bulkLoading || loading}
+                onClick={handleRejectAll}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-900/60 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all whitespace-nowrap"
+                title="Shortcut: Reject all pending registration requests"
+              >
+                {bulkLoading ? (
+                  <div className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                ) : (
+                  <HiXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                )}
+                <span>Reject All</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -442,6 +648,54 @@ export const UserRequests = () => {
           </button>
         )}
       </div>
+
+      {/* Pending Bulk Quick Actions Banner */}
+      {selectedTab === "pending" && !loading && requests.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <div className="text-xs font-medium text-emerald-950 dark:text-emerald-200">
+              <span className="font-bold text-emerald-900 dark:text-emerald-100">
+                {totalRequests || requests.length} Pending Registration{(totalRequests || requests.length) > 1 ? "s" : ""}
+              </span>{" "}
+              ready for action. Process all with one click:
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              disabled={bulkLoading}
+              onClick={handleApproveAll}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all"
+            >
+              {bulkLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <HiCheck className="w-4 h-4 stroke-[2.5]" />
+              )}
+              <span>Approve All ({totalRequests || requests.length})</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={bulkLoading}
+              onClick={handleRejectAll}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl text-red-600 dark:text-red-400 bg-white dark:bg-[#151621] hover:bg-red-50 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-900/50 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all"
+            >
+              {bulkLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+              ) : (
+                <HiXMark className="w-4 h-4 stroke-[2.5]" />
+              )}
+              <span>Reject All ({totalRequests || requests.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Requests Table */}
       <DataTable columns={columns} className="shadow-sm">
@@ -531,7 +785,7 @@ export const UserRequests = () => {
                   <Button
                     size="xs"
                     variant="primary"
-                    disabled={actionLoadingUid === u.uid}
+                    disabled={bulkLoading || actionLoadingUid === u.uid}
                     onClick={() => handleApprove(u)}
                     className="!px-2.5 !py-1 text-xs"
                   >
@@ -542,7 +796,7 @@ export const UserRequests = () => {
                     <Button
                       size="xs"
                       variant="danger"
-                      disabled={actionLoadingUid === u.uid}
+                      disabled={bulkLoading || actionLoadingUid === u.uid}
                       onClick={() => handleReject(u)}
                       className="!px-2.5 !py-1 text-xs"
                     >
@@ -552,6 +806,7 @@ export const UserRequests = () => {
                     <button
                       className="text-red-400 hover:text-red-600 transition-colors p-1"
                       title="Permanently Delete Record"
+                      disabled={bulkLoading}
                       onClick={() => handleDelete(u)}
                     >
                       <HiTrash className="w-4 h-4" />

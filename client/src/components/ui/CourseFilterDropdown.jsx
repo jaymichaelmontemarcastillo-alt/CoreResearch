@@ -29,22 +29,41 @@ export const CourseFilterDropdown = ({
   }, []);
 
   const getLabel = () => {
-    const course = courses.find((c) => c.id === selectedCourse);
+    const course = courses.find(
+      (c) => c.id === selectedCourse || c.id?.toLowerCase() === selectedCourse?.toLowerCase()
+    );
     if (!course) return placeholder;
-    const spec = course.specializations?.find((s) => s.id === selectedSpecialization);
-    const allSecs = sectionsByCourse[selectedCourse] || [];
+    const spec = course.specializations?.find(
+      (s) => s.id === selectedSpecialization || s.id?.toLowerCase() === selectedSpecialization?.toLowerCase()
+    );
+    const allSecs =
+      sectionsByCourse[selectedCourse] ||
+      sectionsByCourse[selectedCourse?.toLowerCase()] ||
+      [];
     const sec = allSecs.find((s) => s.id === selectedSection);
     let label = course.code;
     if (spec) label += " - " + (spec.code || spec.name);
-    if (sec) label += " - " + sec.name;
+    if (sec) {
+      const cleanSec = (sec.name || '').replace(/^section\s+/i, '');
+      label += " - Section " + cleanSec;
+    }
     return label;
   };
 
-  const hoveredCourseObj = courses.find((c) => c.id === hoveredCourse);
+  const hoveredCourseObj = courses.find(
+    (c) => c.id === hoveredCourse || c.id?.toLowerCase() === hoveredCourse?.toLowerCase()
+  );
   const hoveredCourseSpecs = hoveredCourseObj?.specializations || [];
-  const hoveredCourseSecs = sectionsByCourse[hoveredCourse] || [];
+  const hoveredCourseSecs =
+    sectionsByCourse[hoveredCourse] ||
+    sectionsByCourse[hoveredCourse?.toLowerCase()] ||
+    [];
   const hoveredSpecSecs = hoveredSpec
-    ? hoveredCourseSecs.filter((s) => s.specializationId === hoveredSpec)
+    ? hoveredCourseSecs.filter(
+        (s) =>
+          s.specializationId?.toLowerCase() === hoveredSpec?.toLowerCase() ||
+          (!s.specializationId && s.courseId?.toLowerCase() === hoveredCourse?.toLowerCase())
+      )
     : [];
 
   const close = () => {
@@ -127,7 +146,11 @@ export const CourseFilterDropdown = ({
                 <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">All specializations</span>
               </button>
               {hoveredCourseSpecs.map((spec) => {
-                const specSecs = hoveredCourseSecs.filter((s) => s.specializationId === spec.id);
+                const specSecs = hoveredCourseSecs.filter(
+                  (s) =>
+                    s.specializationId?.toLowerCase() === spec.id?.toLowerCase() ||
+                    (!s.specializationId && s.courseId?.toLowerCase() === hoveredCourse?.toLowerCase())
+                );
                 const isSpecHovered = hoveredSpec === spec.id;
                 return (
                   <button key={spec.id} className={itemBaseCls + " " + (isSpecHovered ? itemActiveCls : itemIdleCls)} onClick={() => handleSelectSpec(hoveredCourse, spec.id)} onMouseEnter={() => setHoveredSpec(spec.id)}>
@@ -148,11 +171,11 @@ export const CourseFilterDropdown = ({
             <div className={panelCls} style={{ minWidth: "160px" }}>
               <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-[#6b6f84] uppercase tracking-widest">Section</div>
               <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-[#222433] mb-1"} onClick={() => handleSelectCourse(hoveredCourse)}>
-                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">No specific section</span>
+                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">All sections</span>
               </button>
               {hoveredCourseSecs.map((sec) => (
                 <button key={sec.id} className={itemBaseCls + " " + itemIdleCls} onClick={() => handleSelectSection(hoveredCourse, null, sec.id)}>
-                  <span className="font-semibold">{sec.name}</span>
+                  <span className="font-semibold">{sec.name.toLowerCase().startsWith("section") ? sec.name : `Section ${sec.name}`}</span>
                 </button>
               ))}
             </div>
@@ -162,11 +185,11 @@ export const CourseFilterDropdown = ({
             <div className={panelCls} style={{ minWidth: "160px" }}>
               <div className="px-4 pb-1 pt-0.5 text-[10px] font-bold text-gray-400 dark:text-[#6b6f84] uppercase tracking-widest">Section</div>
               <button className={itemBaseCls + " " + itemIdleCls + " border-b border-gray-100 dark:border-[#222433] mb-1"} onClick={() => handleSelectSpec(hoveredCourse, hoveredSpec)}>
-                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">No specific section</span>
+                <span className="text-[12px] text-gray-400 dark:text-[#6b6f84] italic">All sections</span>
               </button>
               {hoveredSpecSecs.map((sec) => (
                 <button key={sec.id} className={itemBaseCls + " " + itemIdleCls} onClick={() => handleSelectSection(hoveredCourse, hoveredSpec, sec.id)}>
-                  <span className="font-semibold">{sec.name}</span>
+                  <span className="font-semibold">{sec.name.toLowerCase().startsWith("section") ? sec.name : `Section ${sec.name}`}</span>
                 </button>
               ))}
             </div>

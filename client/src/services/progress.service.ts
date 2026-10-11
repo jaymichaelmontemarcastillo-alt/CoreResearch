@@ -189,10 +189,9 @@ export const progressService = {
           dynamicStatus = 'in_progress';
         }
 
-        const dynamicPercentage = Math.max(
-          25,
-          Math.round((resolvedItems / totalItems) * 100)
-        );
+        const dynamicPercentage = totalItems > 0
+          ? Math.round((resolvedItems / totalItems) * 100)
+          : 0;
 
         return {
           ...sec,
@@ -208,7 +207,7 @@ export const progressService = {
         name: chapDef.title,
         order: idx + 1,
         status: dynamicStatus,
-        progress: dynamicStatus === 'in_progress' ? Math.max(25, sec.progress || 25) : 0,
+        progress: 0,
       };
     });
   },
@@ -350,7 +349,7 @@ export const progressService = {
       const completedCount = dynamicSections.filter(
         (s) => chapterIds.includes(s.id) && s.status === 'completed'
       ).length;
-      const overallProgress = Math.min(100, Math.max(0, Math.round((completedCount / 5) * 100)));
+      const overallProgress = this.calculateWorkspaceProgress(ws, [], []);
       return { overallProgress, completedChapters: completedCount };
     } catch (err) {
       return { overallProgress: 0, completedChapters: 0 };

@@ -135,10 +135,13 @@ export default function App() {
                       <Route path="/groups" element={<ResearchGroups />} />
                       <Route path="/admin/groups" element={<ResearchGroups />} />
                       <Route path="/admin/scheduling" element={<Scheduling />} />
+                      <Route path="/scheduling" element={<Scheduling />} />
                       <Route path="/research-documents" element={<ResearchDocumentsPage />} />
                     </Route>
 
                     <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator']} />}>
+                      <Route path="/admin/manuscripts" element={<AdminManuscripts />} />
+                      <Route path="/manuscripts" element={<AdminManuscripts />} />
                       <Route path="/admin/users" element={<UserDirectory />} />
                       <Route path="/admin/user-requests" element={<UserRequests />} />
                       <Route path="/user-requests" element={<Navigate to="/admin/user-requests" replace />} />
@@ -147,8 +150,6 @@ export default function App() {
                     </Route>
                     <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                       <Route path="/admin/advisers" element={<AdminAdvisers />} />
-                      <Route path="/admin/manuscripts" element={<AdminManuscripts />} />
-                      <Route path="/manuscripts" element={<AdminManuscripts />} />
                       <Route path="/admin/profile" element={<ProfileSettings />} />
                     </Route>
                   </Route>

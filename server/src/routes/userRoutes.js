@@ -9,8 +9,8 @@ router.put('/me', verifyToken, updateMyProfile);
 router.patch('/me', verifyToken, updateMyProfile);
 router.post('/me/password', verifyToken, changeMyPassword);
 
-// Admin-only user directory and role modification
-router.get('/', verifyToken, requireRole(['admin']), getAllUsers);
+// User directory (Admin & Research Coordinator) and role modification (Admin only)
+router.get('/', verifyToken, requireRole(['admin', 'research_coordinator']), getAllUsers);
 router.patch('/:uid/role', verifyToken, requireRole(['admin']), updateUserRole);
 router.patch('/:uid', verifyToken, requireRole(['admin']), updateUserProfile);
 router.delete('/:uid', verifyToken, requireRole(['admin']), deleteUser);

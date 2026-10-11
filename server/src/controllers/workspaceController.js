@@ -1,7 +1,7 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 
 const SEED_DEFAULT_SECTIONS = [
-  { id: 'chapter_1', name: 'Chapter 1: Introduction & Background', order: 1, status: 'in_progress', progress: 25 },
+  { id: 'chapter_1', name: 'Chapter 1: Introduction & Background', order: 1, status: 'not_started', progress: 0 },
   { id: 'chapter_2', name: 'Chapter 2: Review of Related Literature', order: 2, status: 'pending', progress: 0 },
   { id: 'chapter_3', name: 'Chapter 3: Methodology & System Architecture', order: 3, status: 'pending', progress: 0 },
   { id: 'chapter_4', name: 'Chapter 4: Results, Implementation & Discussion', order: 4, status: 'pending', progress: 0 },

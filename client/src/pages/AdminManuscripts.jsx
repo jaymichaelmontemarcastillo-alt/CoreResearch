@@ -44,6 +44,7 @@ import {
 
 export const AdminManuscripts = () => {
   const { userProfile, role } = useAuth();
+  const isAdmin = role === 'admin' || userProfile?.role === 'admin';
   const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -353,7 +354,7 @@ export const AdminManuscripts = () => {
 
   // Delete Manuscripts
   const handleDeleteSelected = async () => {
-    if (selectedIds.length === 0) return;
+    if (!isAdmin || selectedIds.length === 0) return;
     const confirmed = await confirm({
       title: 'Delete Manuscripts',
       message: `Are you sure you want to permanently delete ${selectedIds.length} selected manuscript(s)? This action cannot be undone.`,
@@ -373,6 +374,7 @@ export const AdminManuscripts = () => {
   };
 
   const handleDeleteSingle = async (m) => {
+    if (!isAdmin) return;
     const confirmed = await confirm({
       title: 'Delete Manuscript',
       message: `Are you sure you want to permanently delete "${m.title || m.projectTitle}"? This action cannot be undone.`,
@@ -438,11 +440,11 @@ export const AdminManuscripts = () => {
       {/* Page Header */}
       <PageHeader
         icon={HiDocumentText}
-        title="Admin Manuscript Management & Workflow Hub"
+        title={isAdmin ? "Admin Manuscript Management & Workflow Hub" : "Manuscript Management & Best Thesis Hub"}
         description="Comprehensive supervision of student research manuscripts: track new uploads, monitor ongoing revisions, approve camera-ready copies, award Best Thesis, edit defense grades, and archive records."
         actions={
           <div className="flex items-center gap-2">
-            {selectedIds.length > 0 && (
+            {isAdmin && selectedIds.length > 0 && (
               <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
                 <HiTrash className="w-4 h-4 mr-1.5" /> Delete Selected ({selectedIds.length})
               </Button>
@@ -668,15 +670,17 @@ export const AdminManuscripts = () => {
         </Card>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <input 
-              type="checkbox" 
-              className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 mr-3 cursor-pointer"
-              checked={selectedIds.length > 0 && selectedIds.length === filteredManuscripts.length}
-              onChange={toggleAllSelection}
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Select All</span>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 mr-3 cursor-pointer"
+                checked={selectedIds.length > 0 && selectedIds.length === filteredManuscripts.length}
+                onChange={toggleAllSelection}
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Select All</span>
+            </div>
+          )}
 
           {filteredManuscripts.map((m) => (
             <Card
@@ -688,14 +692,16 @@ export const AdminManuscripts = () => {
               }`}
             >
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                <div className="pt-1">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                    checked={selectedIds.includes(m.id)}
-                    onChange={() => toggleSelection(m.id)}
-                  />
-                </div>
+                {isAdmin && (
+                  <div className="pt-1">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                      checked={selectedIds.includes(m.id)}
+                      onChange={() => toggleSelection(m.id)}
+                    />
+                  </div>
+                )}
                 {/* Left: Metadata */}
                 <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -877,15 +883,17 @@ export const AdminManuscripts = () => {
                     </Button>
 
                     {/* Delete Single Button */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteSingle(m)}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                      title="Delete Manuscript"
-                    >
-                      <HiTrash className="w-4 h-4" />
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSingle(m)}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        title="Delete Manuscript"
+                      >
+                        <HiTrash className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -122,6 +122,10 @@ export const ResearchGroups = () => {
           try {
             const secs = await sectionService.getSectionsByCourseId(course.id);
             sectionMap[course.id] = secs;
+            if (course.id) {
+              sectionMap[course.id.toLowerCase()] = secs;
+              sectionMap[course.id.toUpperCase()] = secs;
+            }
           } catch (e) {
             sectionMap[course.id] = [];
           }
@@ -137,7 +141,11 @@ export const ResearchGroups = () => {
         if (firstCourse.specializations && firstCourse.specializations.length > 0) {
           const firstSpec = firstCourse.specializations[0];
           setSelectedSpecialization(firstSpec.id);
-          const specSections = courseSections.filter(s => s.specializationId === firstSpec.id);
+          const specSections = courseSections.filter(
+            (s) =>
+              s.specializationId?.toLowerCase() === firstSpec.id.toLowerCase() ||
+              (!s.specializationId && s.courseId?.toLowerCase() === firstCourse.id.toLowerCase())
+          );
           if (specSections.length > 0) {
             setSelectedSection(specSections[0].id);
           }
@@ -170,6 +178,14 @@ export const ResearchGroups = () => {
     try {
       const sectionsData = await sectionService.getSectionsByCourseId(courseId);
       setSections(sectionsData);
+      if (courseId) {
+        setAllSectionsByCourse((prev) => ({
+          ...prev,
+          [courseId]: sectionsData,
+          [courseId.toLowerCase()]: sectionsData,
+          [courseId.toUpperCase()]: sectionsData,
+        }));
+      }
     } catch (error) {
       console.error("Failed to load sections:", error);
     }
@@ -178,13 +194,20 @@ export const ResearchGroups = () => {
   // ---------------------------------------------------------------------------
   // 2. Derived State & Filter Logic
   // ---------------------------------------------------------------------------
-  const courseObj = courses.find((c) => c.id === selectedCourse);
+  const courseObj = courses.find(
+    (c) =>
+      c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
+      c.code?.toLowerCase() === selectedCourse?.toLowerCase()
+  );
   const specializations = courseObj?.specializations || [];
   const hasSpecializations = specializations.length > 0;
 
   const relevantSections = sections.filter((s) => {
     if (hasSpecializations && selectedSpecialization) {
-      return s.specializationId === selectedSpecialization;
+      return (
+        s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+        (!s.specializationId && s.courseId?.toLowerCase() === selectedCourse?.toLowerCase())
+      );
     }
     return true;
   });
@@ -193,7 +216,7 @@ export const ResearchGroups = () => {
 
   const showSectionFilter =
     (!hasSpecializations && selectedCourse) || 
-    (hasSpecializations && selectedSpecialization && specHasSections);
+    (hasSpecializations && (selectedSpecialization ? specHasSections : sections.length > 0));
 
 
 
@@ -205,12 +228,30 @@ export const ResearchGroups = () => {
     setToastVariant(variant);
   };
 
-  const handleCourseSelect = (courseId, specId, sectionId) => {
+  const handleCourseSelect = async (courseId, specId, sectionId) => {
     setSelectedCourse(courseId || "");
     setSelectedSpecialization(specId || "");
     setSelectedSection(sectionId || "");
     if (courseId) {
-      setSections(allSectionsByCourse[courseId] || []);
+      let found =
+        allSectionsByCourse[courseId] ||
+        allSectionsByCourse[courseId?.toLowerCase()] ||
+        allSectionsByCourse[courseId?.toUpperCase()];
+
+      if (!found || found.length === 0) {
+        try {
+          found = await sectionService.getSectionsByCourseId(courseId);
+          setAllSectionsByCourse((prev) => ({
+            ...prev,
+            [courseId]: found,
+            [courseId.toLowerCase()]: found,
+            [courseId.toUpperCase()]: found,
+          }));
+        } catch (e) {
+          found = [];
+        }
+      }
+      setSections(found || []);
     } else {
       setSections([]);
     }

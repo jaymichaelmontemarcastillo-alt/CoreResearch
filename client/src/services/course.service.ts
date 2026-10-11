@@ -153,6 +153,7 @@ export const courseService = {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+    coursesCache = null;
   },
 
   /**
@@ -161,6 +162,7 @@ export const courseService = {
   async deleteCourse(id: string): Promise<void> {
     const courseRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(courseRef);
+    coursesCache = null;
   },
 };
 

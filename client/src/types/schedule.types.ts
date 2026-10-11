@@ -1,6 +1,12 @@
 export type DefenseType = 'proposal_defense' | 'final_defense';
 
-export type ScheduleStatus = 'scheduled' | 'rescheduled' | 'completed' | 'cancelled';
+export type ScheduleStatus =
+  | 'scheduled'
+  | 'rescheduled'
+  | 'completed'
+  | 'cancelled'
+  | 'failed'
+  | 'for_redefense';
 
 export interface SchedulePanelist {
   id?: string;
@@ -28,6 +34,10 @@ export interface DefenseSchedule {
   adviserId?: string;
   adviserName?: string;
   status: ScheduleStatus;
+  attempt?: number;
+  defenseStage?: string;
+  notes?: string;
+  resultStatus?: 'passed' | 're_defense' | 'failed' | 'pending';
   createdAt: string;
   updatedAt?: string;
 }
@@ -44,5 +54,10 @@ export interface CreateScheduleInput {
   panelists?: SchedulePanelist[];
   adviserId?: string;
   adviserName?: string;
+  status?: ScheduleStatus;
+  attempt?: number;
+  defenseStage?: string;
+  notes?: string;
+  resultStatus?: 'passed' | 're_defense' | 'failed' | 'pending';
 }
 

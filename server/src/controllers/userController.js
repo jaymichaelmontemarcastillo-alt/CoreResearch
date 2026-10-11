@@ -144,15 +144,19 @@ export const getAllUsers = async (req, res) => {
       if (status === 'pending') {
         usersList = usersList.filter(
           u =>
+            u.role !== 'admin' &&
+            u.role !== 'research_coordinator' &&
             u.status !== 'approved' &&
+            u.status !== 'active' &&
             u.status !== 'rejected' &&
+            u.is_approved !== true &&
             (u.status === 'pending' || u.is_approved === false)
         );
       } else if (status === 'rejected') {
         usersList = usersList.filter(u => u.status === 'rejected');
       } else if (status === 'approved') {
         usersList = usersList.filter(
-          u => u.status === 'approved' || u.status === 'active' || u.is_approved === true
+          u => u.status === 'approved' || u.status === 'active' || u.is_approved === true || u.role === 'admin' || u.role === 'research_coordinator'
         );
       }
     }
@@ -500,22 +504,32 @@ export const deleteUser = async (req, res) => {
       return res.status(400).json({ success: false, error: 'User ID is required' });
     }
 
-    // 1. Delete from Firebase Auth if not in mock mode
+    const email = req.query?.email || req.body?.email;
+
+    // 1. Delete from Firebase Auth if not in mock mode (non-fatal if auth has expired token or user missing)
     if (!isDevMockMode && auth) {
       try {
         await auth.deleteUser(uid);
       } catch (authErr) {
-        if (authErr.code !== 'auth/user-not-found') {
-          console.error('[UserController] Auth delete error:', authErr);
-          throw authErr;
-        }
+        console.warn('[UserController] Auth delete warning (proceeding with database cleanup):', authErr.message || authErr);
       }
     }
 
     // 2. Delete from MongoDB
     if (mongoose.connection.readyState === 1) {
       try {
-        await User.findOneAndDelete({ uid });
+        const queryConditions = [
+          { uid },
+          { email: uid },
+        ];
+        if (mongoose.isValidObjectId(uid)) {
+          queryConditions.push({ _id: uid });
+        }
+        if (email) {
+          queryConditions.push({ email: email.trim().toLowerCase() });
+        }
+        const deleteResult = await User.deleteMany({ $or: queryConditions });
+        console.log(`[UserController] MongoDB deleted ${deleteResult.deletedCount} user record(s) for uid: ${uid}`);
       } catch (mongoErr) {
         console.error('[UserController] MongoDB delete error:', mongoErr);
       }
@@ -527,6 +541,12 @@ export const deleteUser = async (req, res) => {
     } else if (db) {
       try {
         await db.collection('users').doc(uid).delete();
+        if (email) {
+          const emailSnap = await db.collection('users').where('email', '==', email.trim().toLowerCase()).get();
+          const batch = db.batch();
+          emailSnap.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
       } catch (fsErr) {
         console.error('[UserController] Firestore delete error:', fsErr);
       }

@@ -156,6 +156,7 @@ export const ProposalGradingModal = ({
         totals,
         verdict,
         panelistName,
+        panelistRole: groupDetails?.expert || '',
         MAX_SCORES,
       });
 
@@ -165,10 +166,10 @@ export const ProposalGradingModal = ({
       // to avoid off-screen culling in html2canvas
       await html2pdf()
         .set({
-          margin: [15, 25, 15, 25], // adjusted to match original reference margins
+          margin: [10, 16, 10, 16],
           filename,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: false, logging: false },
           jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
           pagebreak: { mode: ['avoid-all'] },
         })

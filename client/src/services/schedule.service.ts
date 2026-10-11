@@ -13,19 +13,45 @@ export const scheduleService = {
   /**
    * Create a new defense schedule.
    */
+  /**
+   * Create a new defense schedule.
+   */
   async createSchedule(input: CreateScheduleInput): Promise<DefenseSchedule> {
     if (input.adviserId && Array.isArray(input.panelistIds) && input.panelistIds.includes(input.adviserId)) {
       throw new Error('Invalid Panelist Assignment: The assigned adviser of this research group cannot serve as a panelist for the same group.');
     }
-    const { data } = await api.post('/schedules', input);
+    const id = `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const now = new Date().toISOString();
+
+    let createdData: any = null;
     try {
-      if (data.data?.id) {
-        await setDoc(doc(db, COLLECTION_NAME, data.data.id), data.data, { merge: true });
-      }
-    } catch (fsErr) {
-      console.warn('[scheduleService] Firestore sync warning:', fsErr);
+      const { data } = await api.post('/schedules', { ...input, id });
+      createdData = data.data;
+    } catch (apiErr) {
+      console.warn('[scheduleService] API createSchedule notice, saving to Firestore:', apiErr);
     }
-    return data.data;
+
+    const scheduleData: DefenseSchedule = {
+      id: createdData?.id || id,
+      ...input,
+      ...(createdData || {}),
+      status: input.status || createdData?.status || 'scheduled',
+      attempt: input.attempt || 1,
+      defenseStage:
+        input.defenseStage ||
+        (input.attempt && input.attempt > 1
+          ? `Re-defense (Attempt ${input.attempt})`
+          : 'Title Defense'),
+      createdAt: createdData?.createdAt || now,
+      updatedAt: now,
+    };
+
+    try {
+      await setDoc(doc(db, COLLECTION_NAME, scheduleData.id), scheduleData, { merge: true });
+    } catch (fsErr) {
+      console.warn('[scheduleService] Firestore sync error:', fsErr);
+    }
+    return scheduleData;
   },
 
   /**

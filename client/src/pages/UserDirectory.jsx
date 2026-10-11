@@ -21,6 +21,7 @@ import {
   HiUserGroup,
   HiFunnel,
   HiXMark,
+  HiEye,
 } from "react-icons/hi2";
 import { userService } from "../services/user.service";
 import { courseService } from "../services/course.service";
@@ -30,6 +31,8 @@ import { groupService } from "../services/group.service";
 import { researchWorkspaceService } from "../services/researchWorkspace.service";
 
 export const UserDirectory = () => {
+  const { role, userProfile } = useAuth();
+  const isAdmin = role === "admin" || userProfile?.role === "admin";
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -204,6 +207,7 @@ export const UserDirectory = () => {
   // 3. User Actions (Role update, delete)
   // ---------------------------------------------------------------------------
   const handleRoleChange = async (uid, newRole) => {
+    if (!isAdmin) return;
     setUpdatingUid(uid);
     try {
       await userService.updateUser(uid, { role: newRole });
@@ -219,6 +223,7 @@ export const UserDirectory = () => {
   };
 
   const handleDeleteClick = async (u) => {
+    if (!isAdmin) return;
     const confirmed = await confirm({
       title: "Confirm Delete",
       message: `Are you sure you want to permanently delete account for ${u.fullName || u.email}? This action cannot be undone.`,
@@ -330,7 +335,7 @@ export const UserDirectory = () => {
 
   const handleSaveManageModal = async (e) => {
     e.preventDefault();
-    if (!selectedUser) return;
+    if (!isAdmin || !selectedUser) return;
     setSavingProfile(true);
 
     try {
@@ -412,13 +417,13 @@ export const UserDirectory = () => {
     { label: "Program", className: "min-w-[100px]" },
     { label: "Specialization", className: "min-w-[130px]" },
     { label: "Section", className: "min-w-[100px]" },
-    { label: "Actions", className: "text-right min-w-[120px]" },
+    { label: isAdmin ? "Actions" : "Details", className: "text-right min-w-[100px]" },
   ];
 
   const facultyAdminColumns = [
     { label: "Name", className: "w-[300px] min-w-[220px]" },
     { label: "Email", className: "min-w-[240px]" },
-    { label: "Actions", className: "text-right min-w-[120px]" },
+    { label: isAdmin ? "Actions" : "Details", className: "text-right min-w-[100px]" },
   ];
 
   const activeColumns = selectedTab === "student" ? studentColumns : facultyAdminColumns;
@@ -664,27 +669,42 @@ export const UserDirectory = () => {
                 </TableCell>
               )}
 
-              {/* Actions */}
+              {/* Actions / Details */}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
-                    size="xs"
-                    variant="secondary"
-                    onClick={() => handleOpenManageModal(u)}
-                    title={selectedTab === "student" ? "Manage Student Profile" : "Edit Account"}
-                    className="!px-2.5 !py-1 text-xs"
-                  >
-                    <HiPencilSquare className="w-3.5 h-3.5 mr-1 text-blue-500" />
-                    Manage
-                  </Button>
+                  {isAdmin ? (
+                    <>
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => handleOpenManageModal(u)}
+                        title={selectedTab === "student" ? "Manage Student Profile" : "Edit Account"}
+                        className="!px-2.5 !py-1 text-xs"
+                      >
+                        <HiPencilSquare className="w-3.5 h-3.5 mr-1 text-blue-500" />
+                        Manage
+                      </Button>
 
-                  <button
-                    className="text-red-400 hover:text-red-600 transition-colors p-1"
-                    title="Delete Account"
-                    onClick={() => handleDeleteClick(u)}
-                  >
-                    <HiTrash className="w-4 h-4" />
-                  </button>
+                      <button
+                        className="text-red-400 hover:text-red-600 transition-colors p-1"
+                        title="Delete Account"
+                        onClick={() => handleDeleteClick(u)}
+                      >
+                        <HiTrash className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => handleOpenManageModal(u)}
+                      title={selectedTab === "student" ? "View Student Details" : "View Account Details"}
+                      className="!px-2.5 !py-1 text-xs text-gray-700 dark:text-gray-300"
+                    >
+                      <HiEye className="w-3.5 h-3.5 mr-1 text-primary" />
+                      View
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -709,7 +729,11 @@ export const UserDirectory = () => {
       <Modal
         isOpen={manageModalOpen}
         onClose={() => setManageModalOpen(false)}
-        title={selectedUser?.role === "student" ? "Manage Student Profile" : "Edit Account Details"}
+        title={
+          selectedUser?.role === "student"
+            ? (isAdmin ? "Manage Student Profile" : "Student Record & Academic Details")
+            : (isAdmin ? "Edit Account Details" : "User Details")
+        }
         icon={HiAcademicCap}
         maxWidth="max-w-xl"
       >
@@ -723,7 +747,8 @@ export const UserDirectory = () => {
                 <Input
                   value={manageForm.fullName}
                   onChange={(e) => setManageForm({ ...manageForm, fullName: e.target.value })}
-                  className="shadow-sm text-xs"
+                  className={`shadow-sm text-xs ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin}
                   required
                 />
               </div>
@@ -735,7 +760,8 @@ export const UserDirectory = () => {
                 <Input
                   value={manageForm.studentIdOrEmployeeId}
                   onChange={(e) => setManageForm({ ...manageForm, studentIdOrEmployeeId: e.target.value })}
-                  className="shadow-sm text-xs"
+                  className={`shadow-sm text-xs ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin}
                 />
               </div>
 
@@ -758,7 +784,8 @@ export const UserDirectory = () => {
                 <Select
                   value={manageForm.role}
                   onChange={(e) => setManageForm({ ...manageForm, role: e.target.value })}
-                  className="text-xs"
+                  className={`text-xs ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin}
                 >
                   <option value="student">Student</option>
                   <optgroup label="Faculty Roles">
@@ -790,7 +817,8 @@ export const UserDirectory = () => {
                         });
                         setStudentSections(allSectionsByCourse[cId] || []);
                       }}
-                      className="w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                      className={`w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                      disabled={!isAdmin}
                     >
                       <option value="">No Program Assigned</option>
                       {courses.map((c) => (
@@ -808,8 +836,8 @@ export const UserDirectory = () => {
                     <select
                       value={manageForm.specializationId}
                       onChange={(e) => setManageForm({ ...manageForm, specializationId: e.target.value })}
-                      className="w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
-                      disabled={!manageForm.courseId}
+                      className={`w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin || !manageForm.courseId ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                      disabled={!isAdmin || !manageForm.courseId}
                     >
                       <option value="">None / General</option>
                       {(courses.find((c) => c.id === manageForm.courseId)?.specializations || []).map((s) => (
@@ -827,8 +855,8 @@ export const UserDirectory = () => {
                     <select
                       value={manageForm.sectionId}
                       onChange={(e) => setManageForm({ ...manageForm, sectionId: e.target.value })}
-                      className="w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
-                      disabled={!manageForm.courseId}
+                      className={`w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin || !manageForm.courseId ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                      disabled={!isAdmin || !manageForm.courseId}
                     >
                       <option value="">No Section Assigned</option>
                       {studentSections.map((sec) => (
@@ -846,7 +874,8 @@ export const UserDirectory = () => {
                     <select
                       value={manageForm.enrollmentStatus}
                       onChange={(e) => setManageForm({ ...manageForm, enrollmentStatus: e.target.value })}
-                      className="w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                      className={`w-full text-xs bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                      disabled={!isAdmin}
                     >
                       <option value="enrolled">Enrolled - Regular</option>
                       <option value="irregular">Enrolled - Irregular</option>
@@ -904,12 +933,20 @@ export const UserDirectory = () => {
             )}
 
             <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-[#222433]">
-              <Button variant="outline" size="sm" type="button" onClick={() => setManageModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" type="submit" isLoading={savingProfile}>
-                Save Profile Changes
-              </Button>
+              {isAdmin ? (
+                <>
+                  <Button variant="outline" size="sm" type="button" onClick={() => setManageModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" size="sm" type="submit" isLoading={savingProfile}>
+                    Save Profile Changes
+                  </Button>
+                </>
+              ) : (
+                <Button variant="secondary" size="sm" type="button" onClick={() => setManageModalOpen(false)}>
+                  Close
+                </Button>
+              )}
             </div>
           </form>
         )}

@@ -59,14 +59,20 @@ function normalizeUserProfile(raw: any): UserProfile {
   }
 
   const sectionName = u.sectionName || u.section || (u.role === 'student' ? 'A' : '');
-  const studentId = u.studentIdOrEmployeeId || u.studentId || '';
-  const isApproved = u.is_approved === true || u.status === 'approved';
+  const isApproved =
+    u.is_approved === true ||
+    u.status === 'approved' ||
+    u.status === 'active' ||
+    u.role === 'admin' ||
+    u.role === 'research_coordinator';
   const status = isApproved ? 'approved' : u.status === 'rejected' ? 'rejected' : (u.status || 'pending');
 
   const fullName =
     u.fullName ||
     `${u.first_name || ''} ${u.last_name || ''}`.trim() ||
     (u.role === 'student' ? 'Student Researcher' : 'User');
+
+  const studentId = u.studentId || u.studentIdOrEmployeeId || u.employeeId || '';
 
   return {
     ...u,
@@ -80,8 +86,8 @@ function normalizeUserProfile(raw: any): UserProfile {
       (programCode === 'BSCS'
         ? 'Bachelor of Science in Computer Science'
         : programCode === 'BSIT'
-        ? 'Bachelor of Science in Information Technology'
-        : ''),
+          ? 'Bachelor of Science in Information Technology'
+          : ''),
     majorCode: majorCode || '',
     major: u.major || u.programSpecialization || (majorCode ? `${majorCode}` : ''),
     programSpecialization: u.programSpecialization || u.major || (majorCode ? `${majorCode}` : ''),
@@ -214,14 +220,18 @@ export const userService = {
       if (params.status === 'pending') {
         filtered = filtered.filter(
           (u: any) =>
+            u.role !== 'admin' &&
+            u.role !== 'research_coordinator' &&
             u.status !== 'approved' &&
+            u.status !== 'active' &&
             u.status !== 'rejected' &&
+            u.is_approved !== true &&
             (u.status === 'pending' || u.is_approved === false)
         );
       } else if (params.status === 'rejected') {
         filtered = filtered.filter((u: any) => u.status === 'rejected');
       } else if (params.status === 'approved') {
-        filtered = filtered.filter((u: any) => u.status === 'approved' || u.is_approved === true);
+        filtered = filtered.filter((u: any) => u.status === 'approved' || u.status === 'active' || u.is_approved === true || u.role === 'admin' || u.role === 'research_coordinator');
       }
     }
 
@@ -514,8 +524,12 @@ export const userService = {
     const allUsers = await this.getAllUsers();
     return allUsers.filter(
       (u) =>
+        u.role !== 'admin' &&
+        u.role !== 'research_coordinator' &&
         u.status !== 'approved' &&
+        u.status !== 'active' &&
         u.status !== 'rejected' &&
+        u.is_approved !== true &&
         (u.status === 'pending' || u.is_approved === false)
     );
   },
@@ -557,9 +571,7 @@ export const userService = {
     }
   },
 
-  /**
-   * Reject a pending user account.
-   */
+
   async rejectUser(uid: string, adminUid: string, reason?: string): Promise<void> {
     const user = await this.getUserById(uid);
     if (!user) {
@@ -584,25 +596,52 @@ export const userService = {
     }
   },
 
-  /**
-   * Delete a user by UID from both backend API and Firestore.
-   */
-  async deleteUser(uid: string): Promise<void> {
-    if (!uid) return;
 
-    // 1. Delete from backend API (MongoDB / Firebase Admin Auth)
+  async deleteUser(uid: string, email?: string): Promise<void> {
+    if (!uid && !email) return;
+
+    let success = false;
+    let lastError: any = null;
+
+
     try {
-      await api.delete(`/users/${uid}`);
+      const url = email
+        ? `/users/${uid || 'by-email'}?email=${encodeURIComponent(email)}`
+        : `/users/${uid}`;
+      const res = await api.delete(url);
+      if (res?.data?.success) {
+        success = true;
+      }
     } catch (apiErr: any) {
-      console.warn('[userService] Backend deleteUser warning:', apiErr?.message);
+      console.warn('[userService] Backend deleteUser warning:', apiErr?.response?.data || apiErr?.message);
+      lastError = apiErr;
     }
 
-    // 2. Delete from Firestore client document store
+
     try {
-      const userRef = doc(db, COLLECTION_NAME, uid);
-      await deleteDoc(userRef);
+      if (uid) {
+        const userRef = doc(db, COLLECTION_NAME, uid);
+        await deleteDoc(userRef);
+        success = true;
+      }
+      if (email) {
+        const qEmail = query(
+          collection(db, COLLECTION_NAME),
+          where('email', '==', email.trim().toLowerCase())
+        );
+        const snap = await getDocs(qEmail);
+        for (const docSnap of snap.docs) {
+          await deleteDoc(docSnap.ref);
+          success = true;
+        }
+      }
     } catch (fsErr: any) {
       console.warn('[userService] Firestore deleteUser warning:', fsErr?.message);
+      if (!success) lastError = fsErr;
+    }
+
+    if (!success && lastError) {
+      throw new Error(lastError.response?.data?.message || lastError.message || 'Failed to delete user record.');
     }
   },
 };

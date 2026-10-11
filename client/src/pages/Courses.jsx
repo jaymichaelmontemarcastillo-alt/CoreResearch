@@ -16,6 +16,7 @@ import {
   HiChevronDown,
 } from "react-icons/hi2";
 import { courseService } from "../services/course.service";
+import { sectionService } from "../services/section.service";
 import { useConfirm } from "../context/ConfirmContext";
 
 export const Courses = () => {
@@ -159,20 +160,25 @@ export const Courses = () => {
       [specId]: isExpanding,
     }));
 
-    // If expanding and sections aren't cached, mock fetch them
-    if (isExpanding && !specSections[specId]) {
+    if (isExpanding) {
       setLoadingSections((prev) => ({ ...prev, [specId]: true }));
-      // Mock API latency
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setSpecSections((prev) => ({
-        ...prev,
-        [specId]: [
-          { id: `${specId}-sec-a`, name: "A", active: true },
-          { id: `${specId}-sec-b`, name: "B", active: true },
-          { id: `${specId}-sec-c`, name: "C", active: false },
-        ],
-      }));
-      setLoadingSections((prev) => ({ ...prev, [specId]: false }));
+      try {
+        const allSecs = await sectionService.getSectionsByCourseId(courseId);
+        const matching = allSecs.filter(
+          (s) =>
+            s.specializationId?.toLowerCase() === specId?.toLowerCase() ||
+            (!s.specializationId && s.courseId?.toLowerCase() === courseId?.toLowerCase())
+        );
+        setSpecSections((prev) => ({
+          ...prev,
+          [specId]: matching,
+        }));
+      } catch (err) {
+        console.error("[Courses] fetch sections error:", err);
+        showToast("Failed to load sections.", "error");
+      } finally {
+        setLoadingSections((prev) => ({ ...prev, [specId]: false }));
+      }
     }
   };
 
@@ -186,31 +192,45 @@ export const Courses = () => {
 
   const handleAddSpecSubmit = async (e) => {
     e.preventDefault();
+    if (!newSpecForm.code.trim() || !newSpecForm.name.trim()) return;
     setSavingSpec(true);
-    await new Promise((resolve) => setTimeout(resolve, 500)); // Mock Async Submit
 
-    const newSpec = {
-      id: newSpecForm.code.toLowerCase(),
-      code: newSpecForm.code.toUpperCase(),
-      name: newSpecForm.name,
-    };
+    try {
+      const targetCourse = courses.find((c) => c.id === newSpecForm.courseId);
+      if (!targetCourse) throw new Error("Course not found");
 
-    setCourses((prevCourses) =>
-      prevCourses.map((c) => {
-        if (c.id === newSpecForm.courseId) {
-          return {
-            ...c,
-            specializations: [...(c.specializations || []), newSpec],
-          };
-        }
-        return c;
-      })
-    );
+      const newSpec = {
+        id: newSpecForm.code.toLowerCase().trim(),
+        code: newSpecForm.code.toUpperCase().trim(),
+        name: newSpecForm.name.trim(),
+      };
 
-    setExpandedCourses((prev) => ({ ...prev, [newSpecForm.courseId]: true }));
-    setIsAddingSpec(false);
-    setSavingSpec(false);
-    showToast("Specialization added successfully.");
+      const updatedSpecs = [...(targetCourse.specializations || []), newSpec];
+      await courseService.updateCourse(targetCourse.id, {
+        specializations: updatedSpecs,
+      });
+
+      setCourses((prevCourses) =>
+        prevCourses.map((c) => {
+          if (c.id === newSpecForm.courseId) {
+            return {
+              ...c,
+              specializations: updatedSpecs,
+            };
+          }
+          return c;
+        })
+      );
+
+      setExpandedCourses((prev) => ({ ...prev, [newSpecForm.courseId]: true }));
+      setIsAddingSpec(false);
+      showToast("Specialization added successfully.");
+    } catch (err) {
+      console.error("[Courses] Add specialization error:", err);
+      showToast("Failed to add specialization.", "error");
+    } finally {
+      setSavingSpec(false);
+    }
   };
 
   const handleDeleteSpec = async (courseId, specId) => {
@@ -222,20 +242,33 @@ export const Courses = () => {
     });
     if (!isConfirmed) return;
 
-    await new Promise((resolve) => setTimeout(resolve, 300)); // Mock API delay
-    
-    setCourses((prevCourses) =>
-      prevCourses.map((c) => {
-        if (c.id === courseId) {
-          return {
-            ...c,
-            specializations: c.specializations.filter(s => s.id !== specId)
-          };
-        }
-        return c;
-      })
-    );
-    showToast("Specialization deleted.");
+    try {
+      const targetCourse = courses.find((c) => c.id === courseId);
+      if (!targetCourse) throw new Error("Course not found");
+
+      const updatedSpecs = (targetCourse.specializations || []).filter(
+        (s) => s.id !== specId
+      );
+      await courseService.updateCourse(targetCourse.id, {
+        specializations: updatedSpecs,
+      });
+
+      setCourses((prevCourses) =>
+        prevCourses.map((c) => {
+          if (c.id === courseId) {
+            return {
+              ...c,
+              specializations: updatedSpecs,
+            };
+          }
+          return c;
+        })
+      );
+      showToast("Specialization deleted.");
+    } catch (err) {
+      console.error("[Courses] Delete specialization error:", err);
+      showToast("Failed to delete specialization.", "error");
+    }
   };
 
   // -------------------------------------------------------------
@@ -248,26 +281,38 @@ export const Courses = () => {
 
   const handleAddSectionSubmit = async (e) => {
     e.preventDefault();
+    if (!newSectionForm.name.trim()) return;
     setSavingSection(true);
-    await new Promise((resolve) => setTimeout(resolve, 400)); // Mock Async Submit
 
-    const newSection = {
-      id: `${newSectionForm.specId}-sec-${newSectionForm.name.toLowerCase()}`,
-      name: newSectionForm.name,
-      active: true,
-    };
+    try {
+      let cleanName = newSectionForm.name.trim();
+      if (cleanName.toLowerCase().startsWith("section ")) {
+        cleanName = cleanName.slice(8).trim();
+      }
 
-    setSpecSections((prev) => {
-       const existing = prev[newSectionForm.specId] || [];
-       return {
-         ...prev,
-         [newSectionForm.specId]: [...existing, newSection]
-       };
-    });
+      const created = await sectionService.createSection({
+        name: cleanName,
+        courseId: newSectionForm.courseId.toLowerCase(),
+        specializationId: newSectionForm.specId.toLowerCase(),
+        active: true,
+      });
 
-    setIsAddingSection(false);
-    setSavingSection(false);
-    showToast("Section added successfully.");
+      setSpecSections((prev) => {
+        const existing = prev[newSectionForm.specId] || [];
+        return {
+          ...prev,
+          [newSectionForm.specId]: [...existing, created],
+        };
+      });
+
+      setIsAddingSection(false);
+      showToast("Section added successfully.");
+    } catch (err) {
+      console.error("[Courses] Add section error:", err);
+      showToast("Failed to add section.", "error");
+    } finally {
+      setSavingSection(false);
+    }
   };
 
   const handleDeleteSection = async (specId, sectionId) => {
@@ -279,13 +324,17 @@ export const Courses = () => {
     });
     if (!isConfirmed) return;
 
-    await new Promise((resolve) => setTimeout(resolve, 200)); // Mock API delay
-    
-    setSpecSections((prev) => ({
-      ...prev,
-      [specId]: prev[specId].filter(s => s.id !== sectionId)
-    }));
-    showToast("Section deleted.");
+    try {
+      await sectionService.deleteSection(sectionId);
+      setSpecSections((prev) => ({
+        ...prev,
+        [specId]: (prev[specId] || []).filter((s) => s.id !== sectionId),
+      }));
+      showToast("Section deleted.");
+    } catch (err) {
+      console.error("[Courses] Delete section error:", err);
+      showToast("Failed to delete section.", "error");
+    }
   };
 
   const columns = [
@@ -542,7 +591,7 @@ export const Courses = () => {
                                                 }`}
                                               >
                                                 <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">
-                                                  Section {sec.name}
+                                                  Section {(sec.name || '').replace(/^section\s+/i, '')}
                                                 </span>
                                                 <div className="flex items-center gap-3">
                                                   <Badge variant={sec.active ? "emerald" : "gray"} className="text-[10px] uppercase">

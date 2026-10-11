@@ -8,6 +8,9 @@ import { groupService } from '../../services/group.service';
 
 const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
   const [formData, setFormData] = useState({
+    defenseType: 'proposal_defense',
+    status: 'scheduled',
+    isRedefense: false,
     date: '',
     startTime: '',
     endTime: '',
@@ -59,7 +62,15 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
       const stat = pList.find(p => (p.role || '').toLowerCase().includes('stat'));
       const tech = pList.find(p => (p.role || '').toLowerCase().includes('tech'));
 
+      const isRedef =
+        schedule.status === 'for_redefense' ||
+        (schedule.defenseStage || '').toLowerCase().includes('re-defense') ||
+        (schedule.defenseType || '').includes('redefense');
+
       setFormData({
+        defenseType: schedule.defenseType === 'final_defense' ? 'final_defense' : 'proposal_defense',
+        status: schedule.status || 'scheduled',
+        isRedefense: isRedef,
         date: schedule.date || '',
         startTime: schedule.startTime || schedule.time || '',
         endTime: schedule.endTime || '',
@@ -86,6 +97,9 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
       if (!tech && unassigned.length > 0) tech = unassigned.shift();
 
       setFormData({
+        defenseType: 'proposal_defense',
+        status: 'scheduled',
+        isRedefense: false,
         date: '',
         startTime: '',
         endTime: '',
@@ -167,11 +181,18 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
         updatedPanelists.push({ id: formData.techId, name: formData.techName, role: 'Technical' });
       }
 
+      const isRedef = formData.isRedefense || formData.status === 'for_redefense';
+      const stageLabel = isRedef
+        ? (formData.defenseType === 'final_defense' ? 'Final Re-defense' : 'Proposal Re-defense')
+        : (formData.defenseType === 'final_defense' ? 'Final Defense' : 'Proposal Defense');
+
       const projectId = group?.id || schedule?.projectId;
       const payload = {
         projectId: projectId,
         projectTitle: group?.title || schedule?.projectTitle,
-        defenseType: schedule?.defenseType || 'proposal_defense',
+        defenseType: formData.defenseType,
+        defenseStage: stageLabel,
+        status: formData.status,
         date: formData.date,
         startTime: formData.startTime,
         endTime: formData.endTime,
@@ -221,6 +242,72 @@ const EditScheduleModal = ({ isOpen, onClose, schedule, group, onSaved }) => {
         </div>
 
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Defense Stage & Result */}
+          <div className="space-y-4">
+            <h3 className="text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider">
+              Defense Stage & Result
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
+                  Defense Stage
+                </label>
+                <select
+                  name="defenseType"
+                  value={formData.defenseType}
+                  onChange={handleChange}
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-sm font-medium text-gray-700 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
+                >
+                  <option value="proposal_defense">Proposal Defense</option>
+                  <option value="final_defense">Final Defense</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
+                  Defense Status / Result
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={(e) => {
+                    const newStatus = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      status: newStatus,
+                      isRedefense: newStatus === 'for_redefense' ? true : prev.isRedefense
+                    }));
+                  }}
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-2xl text-sm font-medium text-gray-700 dark:text-gray-300 px-3 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
+                >
+                  <option value="scheduled">Scheduled</option>
+                  <option value="completed">Completed / Passed</option>
+                  <option value="for_redefense">Needs Re-defense (For Re-defense)</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="isRedefenseCheckbox"
+                checked={formData.isRedefense}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setFormData(prev => ({
+                    ...prev,
+                    isRedefense: checked,
+                    status: checked && prev.status === 'completed' ? 'for_redefense' : prev.status
+                  }));
+                }}
+                className="w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500 cursor-pointer"
+              />
+              <label htmlFor="isRedefenseCheckbox" className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                Mark this presentation as a <span className="font-bold text-amber-600 dark:text-amber-400">Re-defense</span>
+              </label>
+            </div>
+          </div>
           <div className="space-y-4">
             <h3 className="text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider">Time & Venue</h3>
             <div className="grid grid-cols-2 gap-4">

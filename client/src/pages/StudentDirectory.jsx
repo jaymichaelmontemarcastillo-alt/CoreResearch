@@ -23,6 +23,7 @@ import {
   HiBuildingOffice2,
   HiUserGroup,
   HiDocumentText,
+  HiEye,
 } from "react-icons/hi2";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
@@ -34,7 +35,8 @@ import { researchWorkspaceService } from "../services/researchWorkspace.service"
 import { useAuth } from "../context/AuthContext";
 
 export const StudentDirectory = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, role, userProfile } = useAuth();
+  const isAdmin = role === "admin" || userProfile?.role === "admin";
   
   // --- Data State ---
   const [courses, setCourses] = useState([]);
@@ -156,7 +158,7 @@ export const StudentDirectory = () => {
 
   const handleSaveStudentProfile = async (e) => {
     e.preventDefault();
-    if (!selectedStudent) return;
+    if (!isAdmin || !selectedStudent) return;
     setSavingProfile(true);
     try {
       const courseObj = courses.find((c) => c.id === studentForm.courseId);
@@ -251,6 +253,10 @@ export const StudentDirectory = () => {
           try {
             const secs = await sectionService.getSectionsByCourseId(course.id);
             sectionMap[course.id] = secs;
+            if (course.id) {
+              sectionMap[course.id.toLowerCase()] = secs;
+              sectionMap[course.id.toUpperCase()] = secs;
+            }
           } catch (e) {
             sectionMap[course.id] = [];
           }
@@ -269,6 +275,14 @@ export const StudentDirectory = () => {
     try {
       const sectionsData = await sectionService.getSectionsByCourseId(courseId);
       setSections(sectionsData);
+      if (courseId) {
+        setAllSectionsByCourse((prev) => ({
+          ...prev,
+          [courseId]: sectionsData,
+          [courseId.toLowerCase()]: sectionsData,
+          [courseId.toUpperCase()]: sectionsData,
+        }));
+      }
     } catch (error) {
       console.error("Failed to load sections:", error);
     }
@@ -293,14 +307,21 @@ export const StudentDirectory = () => {
   // ---------------------------------------------------------------------------
   // 2. Derived State & Filter Logic (The Core Requirements)
   // ---------------------------------------------------------------------------
-  const courseObj = courses.find((c) => c.id === selectedCourse);
+  const courseObj = courses.find(
+    (c) =>
+      c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
+      c.code?.toLowerCase() === selectedCourse?.toLowerCase()
+  );
   const specializations = courseObj?.specializations || [];
   const hasSpecializations = specializations.length > 0;
 
   // Sections that belong to the selected specialization (or all course sections if no specialization is selected)
   const relevantSections = sections.filter((s) => {
     if (hasSpecializations && selectedSpecialization) {
-      return s.specializationId === selectedSpecialization;
+      return (
+        s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+        (!s.specializationId && s.courseId?.toLowerCase() === selectedCourse?.toLowerCase())
+      );
     }
     return true;
   });
@@ -311,7 +332,7 @@ export const StudentDirectory = () => {
   // Determine if we should render the Section dropdown
   const showSectionFilter =
     (!hasSpecializations && selectedCourse) || 
-    (hasSpecializations && selectedSpecialization && specHasSections);
+    (hasSpecializations && (selectedSpecialization ? specHasSections : sections.length > 0));
 
   // Determine if the Invite Link button should be enabled based on strict rules
   const isInviteEnabled = () => {
@@ -409,7 +430,7 @@ export const StudentDirectory = () => {
   };
 
   const handleGenerateLink = async () => {
-    if (!isInviteEnabled()) return;
+    if (!isAdmin || !isInviteEnabled()) return;
 
     setGeneratingLink(true);
     try {
@@ -445,6 +466,7 @@ export const StudentDirectory = () => {
   };
 
   const handleDeactivate = async (inviteId) => {
+    if (!isAdmin) return;
     try {
       await enrollmentService.deactivateInvitation(inviteId);
       showToast("Invitation deactivated.");
@@ -460,7 +482,7 @@ export const StudentDirectory = () => {
   };
 
   const executeDelete = async () => {
-    if (!inviteToDelete) return;
+    if (!isAdmin || !inviteToDelete) return;
     try {
       await enrollmentService.deleteInvitation(inviteToDelete);
       showToast("Invitation deleted.");
@@ -475,6 +497,7 @@ export const StudentDirectory = () => {
 
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
+    if (!isAdmin) return;
     if (!selectedCourse || !selectedSection || !assignUid) {
       showToast("Please select a course, section, and a student.", "error");
       return;
@@ -531,13 +554,30 @@ export const StudentDirectory = () => {
     return "—";
   };
 
-  const handleCourseSelect = (courseId, specId, sectionId) => {
+  const handleCourseSelect = async (courseId, specId, sectionId) => {
     setSelectedCourse(courseId || "");
     setSelectedSpecialization(specId || "");
     setSelectedSection(sectionId || "");
-    // Also update current sections cache for the filter bar
     if (courseId) {
-      setSections(allSectionsByCourse[courseId] || []);
+      let found =
+        allSectionsByCourse[courseId] ||
+        allSectionsByCourse[courseId?.toLowerCase()] ||
+        allSectionsByCourse[courseId?.toUpperCase()];
+
+      if (!found || found.length === 0) {
+        try {
+          found = await sectionService.getSectionsByCourseId(courseId);
+          setAllSectionsByCourse((prev) => ({
+            ...prev,
+            [courseId]: found,
+            [courseId.toLowerCase()]: found,
+            [courseId.toUpperCase()]: found,
+          }));
+        } catch (e) {
+          found = [];
+        }
+      }
+      setSections(found || []);
     } else {
       setSections([]);
     }
@@ -570,7 +610,7 @@ export const StudentDirectory = () => {
     { label: "Specialization", className: "min-w-[130px]" },
     { label: "Section", className: "min-w-[90px]" },
     { label: "Status", className: "min-w-[110px]" },
-    { label: "Actions", className: "min-w-[100px] text-right" },
+    { label: isAdmin ? "Actions" : "Details", className: "min-w-[100px] text-right" },
   ];
 
   return (
@@ -586,7 +626,7 @@ export const StudentDirectory = () => {
       )}
 
       {/* Manual Assignment Form (Legacy/Preserved) */}
-      {showAssignForm && selectedCourse && selectedSection && (
+      {isAdmin && showAssignForm && selectedCourse && selectedSection && (
         <Card className="p-4 bg-blue-50/40 dark:bg-blue-950/20 border-blue-100 dark:border-blue-800/40">
           <h3 className="text-sm font-bold mb-3 text-blue-800 dark:text-blue-300">Assign Student</h3>
           <form onSubmit={handleAssignSubmit} className="flex flex-col md:flex-row gap-3 items-end">
@@ -719,29 +759,31 @@ export const StudentDirectory = () => {
         </div>
 
         {/* Generate Invite Link & Manual Assign Buttons (Far Right) */}
-        <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex flex-col md:flex-row gap-2">
-          <Button
-            variant="outline"
-            size="md"
-            className="w-full md:w-auto h-10 shadow-sm"
-            onClick={() => setShowAssignForm(!showAssignForm)}
-            disabled={!selectedCourse || !selectedSection}
-          >
-            <HiCheckCircle className="w-4 h-4 mr-2" />
-            Manual Assign
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            className="w-full md:w-auto h-10 shadow-sm"
-            onClick={handleGenerateLink}
-            disabled={!isInviteEnabled()}
-            isLoading={generatingLink}
-          >
-            <LinkIcon className="w-4 h-4 mr-2" />
-            Create Invite Link
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex flex-col md:flex-row gap-2">
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full md:w-auto h-10 shadow-sm"
+              onClick={() => setShowAssignForm(!showAssignForm)}
+              disabled={!selectedCourse || !selectedSection}
+            >
+              <HiCheckCircle className="w-4 h-4 mr-2" />
+              Manual Assign
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full md:w-auto h-10 shadow-sm"
+              onClick={handleGenerateLink}
+              disabled={!isInviteEnabled()}
+              isLoading={generatingLink}
+            >
+              <LinkIcon className="w-4 h-4 mr-2" />
+              Create Invite Link
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Invitations List (Appears below filter bar if valid filters selected) */}
@@ -772,26 +814,28 @@ export const StudentDirectory = () => {
                     <Button variant="ghost" size="sm" onClick={() => handleCopyLink(invite.id)} title="Copy Link">
                       <HiDocumentDuplicate className="w-4 h-4 text-gray-500 dark:text-[#9396a8]" />
                     </Button>
-                    {invite.active ? (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10" 
-                        onClick={() => handleDeactivate(invite.id)}
-                        title="Deactivate Link"
-                      >
-                        <HiXCircle className="w-4 h-4" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" 
-                        onClick={() => confirmDelete(invite.id)}
-                        title="Delete Link"
-                      >
-                        <HiTrash className="w-4 h-4" />
-                      </Button>
+                    {isAdmin && (
+                      invite.active ? (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10" 
+                          onClick={() => handleDeactivate(invite.id)}
+                          title="Deactivate Link"
+                        >
+                          <HiXCircle className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" 
+                          onClick={() => confirmDelete(invite.id)}
+                          title="Delete Link"
+                        >
+                          <HiTrash className="w-4 h-4" />
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>
@@ -868,15 +912,28 @@ export const StudentDirectory = () => {
               </TableCell>
 
               <TableCell className="text-right max-w-[110px]">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleOpenStudentProfile(u)}
-                  title="Manage Student Profile"
-                >
-                  <HiPencilSquare className="w-3.5 h-3.5 mr-1 text-blue-500" />
-                  Manage
-                </Button>
+                {isAdmin ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleOpenStudentProfile(u)}
+                    title="Manage Student Profile"
+                  >
+                    <HiPencilSquare className="w-3.5 h-3.5 mr-1 text-blue-500" />
+                    Manage
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenStudentProfile(u)}
+                    title="View Student Record"
+                    className="text-gray-700 dark:text-gray-300"
+                  >
+                    <HiEye className="w-3.5 h-3.5 mr-1 text-primary" />
+                    View
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           ))
@@ -887,7 +944,7 @@ export const StudentDirectory = () => {
       <Modal
         isOpen={profileModalOpen}
         onClose={() => setProfileModalOpen(false)}
-        title="Manage Student Profile & Academic Record"
+        title={isAdmin ? "Manage Student Profile & Academic Record" : "Student Record & Academic Details"}
         icon={HiAcademicCap}
         maxWidth="max-w-2xl"
       >
@@ -916,6 +973,8 @@ export const StudentDirectory = () => {
                 <Input
                   value={studentForm.fullName}
                   onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
+                  className={!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}
+                  disabled={!isAdmin}
                   required
                 />
               </div>
@@ -926,6 +985,8 @@ export const StudentDirectory = () => {
                   value={studentForm.studentIdOrEmployeeId}
                   onChange={(e) => setStudentForm({ ...studentForm, studentIdOrEmployeeId: e.target.value })}
                   placeholder="e.g. 2022-10492"
+                  className={!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}
+                  disabled={!isAdmin}
                 />
               </div>
 
@@ -938,7 +999,8 @@ export const StudentDirectory = () => {
                     setStudentForm({ ...studentForm, courseId: cId, specializationId: "", sectionId: "" });
                     setStudentSections(allSectionsByCourse[cId] || []);
                   }}
-                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                  className={`w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin}
                 >
                   <option value="">No Program Assigned</option>
                   {courses.map((c) => (
@@ -954,8 +1016,8 @@ export const StudentDirectory = () => {
                 <select
                   value={studentForm.specializationId}
                   onChange={(e) => setStudentForm({ ...studentForm, specializationId: e.target.value })}
-                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
-                  disabled={!studentForm.courseId}
+                  className={`w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin || !studentForm.courseId ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin || !studentForm.courseId}
                 >
                   <option value="">None / General</option>
                   {(courses.find((c) => c.id === studentForm.courseId)?.specializations || []).map((s) => (
@@ -971,8 +1033,8 @@ export const StudentDirectory = () => {
                 <select
                   value={studentForm.sectionId}
                   onChange={(e) => setStudentForm({ ...studentForm, sectionId: e.target.value })}
-                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
-                  disabled={!studentForm.courseId}
+                  className={`w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin || !studentForm.courseId ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin || !studentForm.courseId}
                 >
                   <option value="">No Section Assigned</option>
                   {studentSections.map((sec) => (
@@ -988,7 +1050,8 @@ export const StudentDirectory = () => {
                 <select
                   value={studentForm.enrollmentStatus}
                   onChange={(e) => setStudentForm({ ...studentForm, enrollmentStatus: e.target.value })}
-                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                  className={`w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white ${!isAdmin ? "bg-gray-100 dark:bg-[#1f202e] opacity-75 cursor-not-allowed" : ""}`}
+                  disabled={!isAdmin}
                 >
                   <option value="enrolled">Enrolled - Regular</option>
                   <option value="irregular">Enrolled - Irregular</option>
@@ -1041,12 +1104,20 @@ export const StudentDirectory = () => {
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
-              <Button variant="outline" size="sm" type="button" onClick={() => setProfileModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" type="submit" isLoading={savingProfile}>
-                Save Student Profile
-              </Button>
+              {isAdmin ? (
+                <>
+                  <Button variant="outline" size="sm" type="button" onClick={() => setProfileModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" size="sm" type="submit" isLoading={savingProfile}>
+                    Save Student Profile
+                  </Button>
+                </>
+              ) : (
+                <Button variant="secondary" size="sm" type="button" onClick={() => setProfileModalOpen(false)}>
+                  Close
+                </Button>
+              )}
             </div>
           </form>
         )}
