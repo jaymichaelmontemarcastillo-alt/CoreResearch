@@ -8,6 +8,8 @@ import { Button } from "../components/ui/Button";
 import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useNavigate } from "react-router-dom";
+import { GroupInvitationModal } from "../components/group/GroupInvitationModal";
+import { groupService } from "../services/group.service";
 import {
   HiBell,
   HiCheck,
@@ -18,6 +20,8 @@ import {
   HiChatBubbleLeftRight,
   HiExclamationCircle,
   HiInformationCircle,
+  HiUserGroup,
+  HiXMark,
 } from "react-icons/hi2";
 
 const formatRelativeTime = (dateStr) => {
@@ -51,6 +55,9 @@ export const Notifications = () => {
 
   const [filter, setFilter] = useState("all"); // 'all' | 'unread'
   const [markingAll, setMarkingAll] = useState(false);
+  const [selectedInvitation, setSelectedInvitation] = useState(null);
+  const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
+  const [invitationActionLoading, setInvitationActionLoading] = useState(false);
 
   const handleMarkAllAsRead = async () => {
     if (unreadCount === 0 || markingAll) return;
@@ -64,31 +71,177 @@ export const Notifications = () => {
     }
   };
 
+  const resolveInvitation = async (notif) => {
+    const invId = notif.invitationId || notif.relatedId || notif.metadata?.invitationId;
+    if (invId) {
+      try {
+        const inv = await groupService.getInvitationById(invId);
+        if (inv) return inv;
+      } catch (err) {
+        console.warn("[Notifications] Failed to fetch invitation by id:", err);
+      }
+    }
+    if (notif.metadata?.groupId || notif.groupId) {
+      return {
+        id: invId || notif.id,
+        groupId: notif.groupId || notif.metadata?.groupId,
+        groupName: notif.metadata?.groupName || "Research Group",
+        groupTitle: notif.metadata?.groupTitle || "",
+        inviterName: notif.metadata?.inviterName || "A classmate",
+        status: "pending",
+        createdAt: notif.createdAt,
+      };
+    }
+    return null;
+  };
+
+  const handleInlineAccept = async (notif, e) => {
+    e.stopPropagation();
+    const invId = notif.invitationId || notif.relatedId || notif.metadata?.invitationId;
+    if (!invId) return;
+    setInvitationActionLoading(true);
+    try {
+      await groupService.acceptInvitation(invId, userProfile);
+      await markAsRead(notif.id);
+      navigate("/my-group");
+    } catch (err) {
+      alert(err.message || "Failed to accept invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleInlineDecline = async (notif, e) => {
+    e.stopPropagation();
+    const invId = notif.invitationId || notif.relatedId || notif.metadata?.invitationId;
+    if (!invId) return;
+    setInvitationActionLoading(true);
+    try {
+      await groupService.declineInvitation(invId, userProfile);
+      await markAsRead(notif.id);
+    } catch (err) {
+      alert(err.message || "Failed to decline invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleModalAccept = async (invitation) => {
+    setInvitationActionLoading(true);
+    try {
+      await groupService.acceptInvitation(invitation.id, userProfile);
+      setIsInvitationModalOpen(false);
+      setSelectedInvitation(null);
+      navigate("/my-group");
+    } catch (err) {
+      alert(err.message || "Failed to accept invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleModalDecline = async (invitation) => {
+    setInvitationActionLoading(true);
+    try {
+      await groupService.declineInvitation(invitation.id, userProfile);
+      setIsInvitationModalOpen(false);
+      setSelectedInvitation(null);
+    } catch (err) {
+      alert(err.message || "Failed to decline invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
   const handleNotificationClick = async (notif) => {
     if (!notif.read) {
       await markAsRead(notif.id);
     }
 
-    // Contextual routing based on notification content/type
     const titleLower = (notif.title || "").toLowerCase();
+    const messageLower = (notif.message || "").toLowerCase();
     const typeLower = (notif.type || "").toLowerCase();
+    const rawLink = notif.linkUrl || notif.link;
 
-    if (typeLower === "schedule" || titleLower.includes("defense") || titleLower.includes("schedule")) {
-      navigate("/schedules");
-    } else if (titleLower.includes("adviser request")) {
-      if (userProfile?.role === "adviser") {
+    // Group Invitation Notification — opens popup modal with details & action buttons
+    const isGroupInvite =
+      typeLower === "group_invitation" ||
+      titleLower.includes("group invitation") ||
+      Boolean(notif.invitationId);
+
+    if (isGroupInvite) {
+      const invite = await resolveInvitation(notif);
+      if (invite) {
+        if (invite.status && invite.status !== "pending") {
+          alert(`This invitation has already been ${invite.status}.`);
+          return;
+        }
+        setSelectedInvitation(invite);
+        setIsInvitationModalOpen(true);
+        return;
+      }
+    }
+
+    // 1. Admin account registration / pending approval notifications
+    if (
+      titleLower.includes("registration") ||
+      titleLower.includes("new student") ||
+      titleLower.includes("new faculty") ||
+      titleLower.includes("pending approval") ||
+      titleLower.includes("account approval") ||
+      messageLower.includes("registered a new") ||
+      rawLink?.includes("user-requests") ||
+      rawLink?.includes("tab=pending")
+    ) {
+      if (userProfile?.role === "admin" || userProfile?.role === "research_coordinator") {
+        navigate("/admin/user-requests?tab=pending");
+        return;
+      }
+    }
+
+    // 2. Direct link routing if provided
+    if (rawLink) {
+      const targetLink = rawLink.includes("/admin/users?tab=pending")
+        ? "/admin/user-requests?tab=pending"
+        : rawLink;
+      navigate(targetLink);
+      return;
+    }
+
+    // 3. Adviser Request notifications
+    if (titleLower.includes("adviser request")) {
+      if (userProfile?.role === "adviser" || userProfile?.role === "faculty") {
         navigate("/adviser-requests");
       } else {
         navigate("/research/workspace");
       }
-    } else if (typeLower === "proposal" || titleLower.includes("proposal") || titleLower.includes("title")) {
+      return;
+    }
+
+    // 4. Defense schedule notifications
+    if (typeLower === "schedule" || titleLower.includes("defense") || titleLower.includes("schedule")) {
+      if (userProfile?.role === "admin") {
+        navigate("/admin/calendar");
+      } else {
+        navigate("/schedules");
+      }
+      return;
+    }
+
+    // 5. Proposal notifications
+    if (typeLower === "proposal" || titleLower.includes("proposal") || titleLower.includes("title")) {
       if (userProfile?.role === "student") {
         navigate("/submit-title");
       } else {
-        navigate("/proposals");
+        navigate("/dashboard");
       }
-    } else if (typeLower === "comment" || titleLower.includes("review") || titleLower.includes("feedback")) {
+      return;
+    }
+
+    // 6. Review / Feedback notifications
+    if (typeLower === "comment" || titleLower.includes("review") || titleLower.includes("feedback")) {
       navigate("/reviews");
+      return;
     }
   };
 
@@ -99,6 +252,8 @@ export const Notifications = () => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
+      case "group_invitation":
+        return <HiUserGroup className="w-5 h-5 text-purple-500" />;
       case "schedule":
         return <HiCalendarDays className="w-5 h-5 text-purple-500" />;
       case "proposal":
@@ -114,6 +269,8 @@ export const Notifications = () => {
 
   const getBadgeVariant = (type) => {
     switch (type) {
+      case "group_invitation":
+        return "purple";
       case "schedule":
         return "purple";
       case "proposal":
@@ -215,6 +372,11 @@ export const Notifications = () => {
         <div className="space-y-2 sm:space-y-3">
           {filteredNotifications.map((notif) => {
             const isUnread = !notif.read;
+            const isGroupInvite =
+              notif.type === "group_invitation" ||
+              (notif.title || "").toLowerCase().includes("group invitation") ||
+              Boolean(notif.invitationId);
+
             return (
               <div
                 key={notif.id}
@@ -256,11 +418,15 @@ export const Notifications = () => {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        {notif.type && (
+                        {isGroupInvite ? (
+                          <Badge variant="purple" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5 font-bold">
+                            INVITATION
+                          </Badge>
+                        ) : notif.type ? (
                           <Badge variant={getBadgeVariant(notif.type)} className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
                             {notif.type.toUpperCase()}
                           </Badge>
-                        )}
+                        ) : null}
                         <span className="text-[10px] sm:text-[11px] text-gray-400 dark:text-[#6b6f84]">
                           {formatRelativeTime(notif.createdAt)}
                         </span>
@@ -276,6 +442,37 @@ export const Notifications = () => {
                     >
                       {notif.message}
                     </p>
+
+                    {/* Inline Group Invitation Action Buttons */}
+                    {isGroupInvite && (
+                      <div className="pt-2.5 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          disabled={invitationActionLoading}
+                          onClick={(e) => handleInlineAccept(notif, e)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs text-xs py-1 px-3"
+                        >
+                          <HiCheck className="w-3.5 h-3.5 mr-1" />
+                          Accept & Join
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={invitationActionLoading}
+                          onClick={(e) => handleInlineDecline(notif, e)}
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 text-xs py-1 px-3"
+                        >
+                          <HiXMark className="w-3.5 h-3.5 mr-1" />
+                          Decline
+                        </Button>
+                        <span className="text-[11px] text-gray-400 dark:text-[#6b6f84] ml-1">
+                          or click to review group details
+                        </span>
+                      </div>
+                    )}
 
                     {/* Footer Actions */}
                     <div className="pt-2 flex items-center justify-between">
@@ -302,6 +499,19 @@ export const Notifications = () => {
           })}
         </div>
       )}
+
+      {/* Interactive Group Invitation Modal Popup */}
+      <GroupInvitationModal
+        isOpen={isInvitationModalOpen}
+        onClose={() => {
+          setIsInvitationModalOpen(false);
+          setSelectedInvitation(null);
+        }}
+        invitation={selectedInvitation}
+        onAccept={handleModalAccept}
+        onDecline={handleModalDecline}
+        loading={invitationActionLoading}
+      />
     </div>
   );
 };

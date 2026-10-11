@@ -46,3 +46,21 @@ export interface CreateResearchGroupInput {
   adviserId?: string;
   adviserName?: string;
 }
+
+export interface GroupInvitation {
+  id: string;
+  groupId: string;
+  groupName: string;
+  groupTitle?: string;
+  courseId: string;
+  sectionId: string;
+  inviterId: string;
+  inviterName: string;
+  inviterEmail: string;
+  inviteeId: string;
+  inviteeName: string;
+  inviteeEmail: string;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
+  createdAt: string;
+  respondedAt?: string;
+}

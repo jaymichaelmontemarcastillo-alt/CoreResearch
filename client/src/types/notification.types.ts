@@ -1,4 +1,4 @@
-export type NotificationType = 'system' | 'proposal' | 'manuscript' | 'schedule' | 'evaluation' | 'task' | 'info' | 'success' | 'warning';
+export type NotificationType = 'system' | 'proposal' | 'manuscript' | 'schedule' | 'evaluation' | 'task' | 'info' | 'success' | 'warning' | 'group_invitation';
 
 export interface AppNotification {
   id: string;
@@ -11,6 +11,9 @@ export interface AppNotification {
   link?: string;
   relatedStudentId?: string;
   relatedId?: string;
+  invitationId?: string;
+  groupId?: string;
+  metadata?: Record<string, any>;
   createdAt: string;
 }
 
@@ -23,4 +26,7 @@ export interface CreateNotificationInput {
   link?: string;
   relatedStudentId?: string;
   relatedId?: string;
+  invitationId?: string;
+  groupId?: string;
+  metadata?: Record<string, any>;
 }

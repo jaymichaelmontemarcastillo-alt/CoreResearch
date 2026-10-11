@@ -477,6 +477,7 @@ export const adminAnalyticsService = {
       courses,
       filteredWsSnap,
       filteredPropSnap,
+      allUsersFromService,
       filteredStudentsSnap,
       advisersSnap,
       filteredGroupsSnap,
@@ -486,6 +487,7 @@ export const adminAnalyticsService = {
       dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE).catch(() => [] as Course[]),
       getDocs(wsQuery),
       getDocs(propQuery),
+      userService.getAllUsers().catch(() => [] as UserProfile[]),
       getDocs(studentQuery),
       getDocs(advisersQuery), // For advisers
       getDocs(groupsQuery), // For adviser workload
@@ -495,9 +497,32 @@ export const adminAnalyticsService = {
 
     const filteredWorkspaces = filteredWsSnap.docs.map(d => d.data() as ManuscriptWorkspace);
     const filteredProposals = filteredPropSnap.docs.map(d => d.data() as TitleProposal);
-    const studentUsers = filteredStudentsSnap.docs.map(d => d.data() as UserProfile);
+    const firestoreStudentUsers = filteredStudentsSnap.docs.map(d => d.data() as UserProfile);
     const advisers = advisersSnap.docs.map(d => d.data() as UserProfile);
     const groups = filteredGroupsSnap.docs.map(d => d.data() as ResearchGroup);
+
+    // Filter strictly for students: exclude advisers, admins, panelists, and faculty
+    const nonStudentRoles = ['adviser', 'admin', 'panelist', 'faculty', 'research_coordinator'];
+    const candidateUsers = (allUsersFromService && allUsersFromService.length > 0)
+      ? allUsersFromService
+      : firestoreStudentUsers;
+
+    const studentUsers = candidateUsers.filter((u) => {
+      const r = (u.role || '').toLowerCase().trim();
+      // Exclude any user with a non-student role
+      if (nonStudentRoles.includes(r)) return false;
+      // Must explicitly be a student
+      if (r !== 'student') return false;
+
+      // Apply active global dashboard filters
+      if (filterAY && u.academicYear && u.academicYear !== filterAY) return false;
+      if (filterSem && u.semester && u.semester !== filterSem) return false;
+      if (filterProg) {
+        const uProg = (u.courseId || u.programCode || u.program || '').toLowerCase();
+        if (!uProg.includes(filterProg)) return false;
+      }
+      return true;
+    });
     
     // Process evaluations for Final Verdicts
     const allEvaluations = [

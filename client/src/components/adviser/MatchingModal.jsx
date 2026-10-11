@@ -14,7 +14,11 @@ import {
   HiClock,
   HiExclamationCircle,
   HiChevronRight,
+  HiChevronDown,
+  HiChevronUp,
   HiArrowPath,
+  HiBookOpen,
+  HiDocumentText,
 } from 'react-icons/hi2';
 import adviserMatchingService from '../../services/adviserMatching.service';
 import adviserRequestService from '../../services/adviserRequest.service';
@@ -46,6 +50,10 @@ export const MatchingModal = ({
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [matches, setMatches] = useState([]);
+  const [availableAlternatives, setAvailableAlternatives] = useState([]);
+  const [allTopMatchesFull, setAllTopMatchesFull] = useState(false);
+  const [activeTab, setActiveTab] = useState('matches'); // 'matches' | 'available'
+  const [expandedAdviserId, setExpandedAdviserId] = useState(null);
   const [serviceError, setServiceError] = useState(null);
   const [submittingId, setSubmittingId] = useState(null);
   const [toast, setToast] = useState('');
@@ -74,11 +82,33 @@ export const MatchingModal = ({
     setLoading(true);
     setServiceError(null);
     try {
-      const recommendations = await adviserMatchingService.getRecommendations(
+      const recResult = await adviserMatchingService.getRecommendations(
         title,
         description || ''
       );
-      setMatches(recommendations.slice(0, 5));
+
+      const recMatches = Array.isArray(recResult)
+        ? recResult
+        : Array.isArray(recResult?.matches)
+        ? recResult.matches
+        : [];
+      const recAlternatives = Array.isArray(recResult?.availableAlternatives)
+        ? recResult.availableAlternatives
+        : [];
+      const topMatchesAreFull = Boolean(
+        recResult?.allTopMatchesFull ||
+        (recMatches.length > 0 && recMatches.every((m) => m.isFull || ((m.activeGroupsCount || 0) >= (m.maxCapacity || 5))))
+      );
+
+      setMatches(recMatches.slice(0, 5));
+      setAvailableAlternatives(recAlternatives);
+      setAllTopMatchesFull(topMatchesAreFull);
+
+      if (recMatches.length === 0 || topMatchesAreFull) {
+        setActiveTab('available');
+      } else {
+        setActiveTab('matches');
+      }
     } catch (err) {
       console.error('[MatchingModal] error:', err);
       setServiceError(err.message || 'Unable to complete adviser matching at this moment.');
@@ -92,6 +122,10 @@ export const MatchingModal = ({
       runMatching();
     } else {
       setMatches([]);
+      setAvailableAlternatives([]);
+      setAllTopMatchesFull(false);
+      setActiveTab('matches');
+      setExpandedAdviserId(null);
     }
   }, [isOpen, title, description]);
 
@@ -267,144 +301,300 @@ export const MatchingModal = ({
         {/* Results List */}
         {!loading && !serviceError && (
           <div className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
-              <HiSparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-blue-900 dark:text-blue-200">
-                <span className="font-bold">Top Matched Advisers</span> for:{' '}
-                <span className="italic">"{title}"</span>. Review their expertise and choose an
-                adviser to guide your research.
+            {/* Tabs if alternatives exist */}
+            {availableAlternatives.length > 0 && (
+              <div className="flex items-center gap-2 border-b border-gray-200 dark:border-[#222433] pb-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('matches')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    activeTab === 'matches'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <HiSparkles className="w-3.5 h-3.5" />
+                  Recommended Matches ({matches.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('available')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    activeTab === 'available'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <HiAcademicCap className="w-3.5 h-3.5" />
+                  Available Faculty Directory ({availableAlternatives.length})
+                </button>
               </div>
-            </div>
+            )}
 
-            {matches.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                No matching advisers found for this title. You may try modifying your research title
-                or keywords.
+            {/* Context Banner */}
+            {activeTab === 'available' ? (
+              <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 flex items-start gap-3">
+                <HiExclamationCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-900 dark:text-amber-200">
+                  <span className="font-bold">
+                    {allTopMatchesFull
+                      ? 'All top-matching advisers are currently at maximum capacity.'
+                      : 'Available Faculty Directory.'}
+                  </span>{' '}
+                  These faculty members currently have open slots. You can inspect their published research works to evaluate their expertise.
+                </div>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
-                {matches.map((adviser, index) => {
-                  const score = adviser.compatibilityScore || adviser.score || 0;
-                  const scoreVariant = score >= 85 ? 'emerald' : score >= 70 ? 'blue' : 'amber';
+              <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 flex items-start gap-3">
+                <HiSparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-900 dark:text-blue-200">
+                  <span className="font-bold">Top Matched Advisers</span> for:{' '}
+                  <span className="italic">"{title}"</span>. Review their expertise and choose an
+                  adviser to guide your research.
+                </div>
+              </div>
+            )}
 
-                  return (
-                    <div
-                      key={adviser.adviserId}
-                      className="p-4 rounded-xl border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#15161e] hover:border-blue-300 dark:hover:border-blue-700/60 transition-all shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                    >
-                      {/* Left: Avatar & Info */}
-                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                        {/* Profile Picture */}
-                        <div className="relative shrink-0">
-                          {adviser.profile_image ? (
-                            <img
-                              src={adviser.profile_image}
-                              alt={adviser.adviserName}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-blue-500/20 shadow-sm"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-sm items-center justify-center shadow-sm ${
-                              adviser.profile_image ? 'hidden' : 'flex'
-                            }`}
-                          >
-                            {adviser.adviserName
-                              ?.split(' ')
-                              .map((n) => n[0])
-                              .slice(0, 2)
-                              .join('')
-                              .toUpperCase() || 'AD'}
-                          </div>
-                          <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-600 dark:text-gray-300 flex items-center justify-center border border-gray-200 dark:border-slate-700">
-                            #{index + 1}
-                          </span>
-                        </div>
+            {(() => {
+              const displayedList = activeTab === 'matches' ? matches : availableAlternatives;
 
-                        {/* Text Details */}
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                              {adviser.adviserName}
-                            </h4>
-                            <Badge variant={scoreVariant} size="sm">
-                              {score}% Match
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                              {adviser.department || 'Faculty Adviser'}
-                            </p>
-                            <span className="text-[10px] text-gray-300 dark:text-gray-600 hidden sm:block">•</span>
-                            <div className="flex items-center gap-1 text-[11px]">
-                              <HiUser className="w-3 h-3 text-gray-400" />
-                              <span className={adviser.activeGroupsCount >= (adviser.maxCapacity || 5) ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}>
-                                {adviser.activeGroupsCount || 0}/{adviser.maxCapacity || 5} Groups
-                                {adviser.activeGroupsCount >= (adviser.maxCapacity || 5) ? ' (Full)' : ''}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Matched Keywords */}
-                          {adviser.matchedKeywords && adviser.matchedKeywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-1">
-                              {adviser.matchedKeywords.slice(0, 4).map((kw, ki) => (
-                                <span
-                                  key={ki}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/40"
-                                >
-                                  <HiTag className="w-2.5 h-2.5" />
-                                  {kw}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {adviser.explanation && (
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 italic pt-0.5">
-                              "{adviser.explanation}"
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right: Select Action */}
-                      <div className="shrink-0 w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-[#222433]">
-                        {declinedAdviserIds.includes(adviser.adviserId) ? (
-                          <div className="text-xs font-semibold text-red-500 py-1.5 px-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                            Previously Declined
-                          </div>
-                        ) : (adviser.activeGroupsCount >= (adviser.maxCapacity || 5) || adviser.isAvailable === false) ? (
-                          <div className="text-xs font-semibold text-amber-600 dark:text-amber-500 py-1.5 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                            Capacity Full
-                          </div>
-                        ) : (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            className="w-full sm:w-auto shadow-sm"
-                            disabled={submittingId !== null}
-                            onClick={() => handleSelectAdviser(adviser)}
-                          >
-                            {submittingId === adviser.adviserId ? (
-                              'Sending...'
-                            ) : (
-                              <>
-                                Select Adviser <HiChevronRight className="w-4 h-4 ml-1" />
-                              </>
-                            )}
+              if (displayedList.length === 0) {
+                return (
+                  <div className="p-8 text-center text-gray-500">
+                    {activeTab === 'matches' ? (
+                      <div className="space-y-3">
+                        <p>No matching advisers found for this title.</p>
+                        {availableAlternatives.length > 0 && (
+                          <Button variant="primary" size="sm" onClick={() => setActiveTab('available')}>
+                            Browse Available Faculty Directory ({availableAlternatives.length})
                           </Button>
                         )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    ) : (
+                      <p>No faculty members currently have open advisee slots. Please contact your coordinator.</p>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+                  {displayedList.map((adviser, index) => {
+                    const score = adviser.compatibilityScore || adviser.score || 0;
+                    const isAtCapacity =
+                      adviser.isFull ||
+                      (adviser.activeGroupsCount || 0) >= (adviser.maxCapacity || 5) ||
+                      adviser.isAvailable === false;
+                    const scoreVariant = score >= 85 ? 'emerald' : score >= 70 ? 'blue' : 'amber';
+                    const hasPublishedWorks = adviser.publishedWorks && adviser.publishedWorks.length > 0;
+                    const isExpanded = expandedAdviserId === adviser.adviserId;
+
+                    return (
+                      <div
+                        key={`${adviser.adviserId}-${index}`}
+                        className={`p-4 rounded-xl border transition-all shadow-sm ${
+                          isAtCapacity
+                            ? 'border-gray-200 dark:border-[#222433] bg-gray-50/70 dark:bg-slate-900/40 opacity-85'
+                            : 'border-gray-200 dark:border-[#222433] bg-white dark:bg-[#15161e] hover:border-blue-300 dark:hover:border-blue-700/60'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          {/* Left: Avatar & Info */}
+                          <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                            {/* Profile Picture */}
+                            <div className="relative shrink-0">
+                              {adviser.profile_image ? (
+                                <img
+                                  src={adviser.profile_image}
+                                  alt={adviser.adviserName}
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-blue-500/20 shadow-sm"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-sm items-center justify-center shadow-sm ${
+                                  adviser.profile_image ? 'hidden' : 'flex'
+                                }`}
+                              >
+                                {adviser.adviserName
+                                  ?.split(' ')
+                                  .map((n) => n[0])
+                                  .slice(0, 2)
+                                  .join('')
+                                  .toUpperCase() || 'AD'}
+                              </div>
+                              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-600 dark:text-gray-300 flex items-center justify-center border border-gray-200 dark:border-slate-700">
+                                #{index + 1}
+                              </span>
+                            </div>
+
+                            {/* Text Details */}
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                  {adviser.adviserName}
+                                </h4>
+                                {score > 0 ? (
+                                  <Badge variant={scoreVariant} size="sm">
+                                    {score}% Match
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="emerald" size="sm">
+                                    Open Slot
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  {adviser.department || 'Faculty Adviser'}
+                                </p>
+                                <span className="text-[10px] text-gray-300 dark:text-gray-600 hidden sm:block">•</span>
+                                <div className="flex items-center gap-1 text-[11px]">
+                                  <HiUser className="w-3 h-3 text-gray-400" />
+                                  <span className={isAtCapacity ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}>
+                                    {adviser.availableSlots ?? Math.max(0, (adviser.maxCapacity || 5) - (adviser.activeGroupsCount || 0))} / {adviser.maxCapacity || 5} Slots Open
+                                    {isAtCapacity ? ' (Full)' : ''}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Matched Keywords */}
+                              {adviser.matchedKeywords && adviser.matchedKeywords.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-1">
+                                  {adviser.matchedKeywords.slice(0, 4).map((kw, ki) => (
+                                    <span
+                                      key={ki}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/40"
+                                    >
+                                      <HiTag className="w-2.5 h-2.5" />
+                                      {kw}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {adviser.explanation && (
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 italic pt-0.5">
+                                  "{adviser.explanation}"
+                                </p>
+                              )}
+
+                              {/* Published Works Trigger */}
+                              {hasPublishedWorks && (
+                                <div className="pt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedAdviserId((prev) => (prev === adviser.adviserId ? null : adviser.adviserId))
+                                    }
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-300 transition-colors border border-blue-200 dark:border-blue-800"
+                                  >
+                                    <HiBookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                    Explore Published Works ({adviser.publishedWorks.length})
+                                    {isExpanded ? (
+                                      <HiChevronUp className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <HiChevronDown className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right: Select Action */}
+                          <div className="shrink-0 w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-[#222433]">
+                            {declinedAdviserIds.includes(adviser.adviserId) ? (
+                              <div className="text-xs font-semibold text-red-500 py-1.5 px-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                Previously Declined
+                              </div>
+                            ) : isAtCapacity ? (
+                              <div className="text-xs font-semibold text-amber-600 dark:text-amber-500 py-1.5 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                                Capacity Full
+                              </div>
+                            ) : (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                className="w-full sm:w-auto shadow-sm"
+                                disabled={submittingId !== null}
+                                onClick={() => handleSelectAdviser(adviser)}
+                              >
+                                {submittingId === adviser.adviserId ? (
+                                  'Sending...'
+                                ) : (
+                                  <>
+                                    Select Adviser <HiChevronRight className="w-4 h-4 ml-1" />
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Collapsible Published Works Section */}
+                        {hasPublishedWorks && isExpanded && (
+                          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#222433] space-y-2">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <HiDocumentText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                              Published Research Papers ({adviser.publishedWorks.length})
+                            </div>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                              {adviser.publishedWorks.map((paper, pi) => (
+                                <div
+                                  key={paper.id || pi}
+                                  className="p-2.5 rounded-lg bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-800 space-y-1"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h5 className="text-xs font-bold text-gray-900 dark:text-white leading-snug">
+                                      {paper.title}
+                                    </h5>
+                                    {paper.year && (
+                                      <span className="text-[10px] font-semibold text-gray-500 shrink-0">
+                                        {paper.year}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {paper.abstract && (
+                                    <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2">
+                                      {paper.abstract}
+                                    </p>
+                                  )}
+                                  {(paper.methodologies?.length > 0 || paper.keywords?.length > 0) && (
+                                    <div className="flex flex-wrap gap-1 pt-1">
+                                      {(paper.methodologies || []).slice(0, 3).map((m, mi) => (
+                                        <span
+                                          key={`meth-${mi}`}
+                                          className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                        >
+                                          {m}
+                                        </span>
+                                      ))}
+                                      {(paper.keywords || []).slice(0, 3).map((k, ki) => (
+                                        <span
+                                          key={`kw-${ki}`}
+                                          className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                                        >
+                                          #{k}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

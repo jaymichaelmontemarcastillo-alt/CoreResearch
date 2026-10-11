@@ -152,7 +152,7 @@ export const getAllUsers = async (req, res) => {
         usersList = usersList.filter(u => u.status === 'rejected');
       } else if (status === 'approved') {
         usersList = usersList.filter(
-          u => u.status === 'approved' || u.is_approved === true
+          u => u.status === 'approved' || u.status === 'active' || u.is_approved === true
         );
       }
     }
@@ -255,13 +255,21 @@ export const updateUserRole = async (req, res) => {
       });
     }
 
+    const roleDocUpdates = { role, updatedAt: new Date().toISOString() };
+    if (role === 'adviser' || role === 'faculty') {
+      roleDocUpdates.role = 'adviser';
+      roleDocUpdates.role_id = 'adviser';
+      roleDocUpdates.isAvailable = true;
+      roleDocUpdates.maxCapacity = 5;
+    }
+
     let savedToMongo = false;
     try {
       if (mongoose.connection.readyState === 1) {
         await User.findOneAndUpdate(
           { uid },
-          { role, updatedAt: new Date().toISOString() },
-          { new: true, upsert: false }
+          roleDocUpdates,
+          { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
         );
         savedToMongo = true;
       }
@@ -273,7 +281,9 @@ export const updateUserRole = async (req, res) => {
       if (isDevMockMode) {
         const existing = mockUsersDb.get(uid);
         if (existing) {
-          existing.role = role;
+          existing.role = roleDocUpdates.role;
+          if (roleDocUpdates.role_id) existing.role_id = roleDocUpdates.role_id;
+          if (roleDocUpdates.isAvailable !== undefined) existing.isAvailable = roleDocUpdates.isAvailable;
           existing.updatedAt = new Date().toISOString();
           mockUsersDb.set(uid, existing);
         }
@@ -281,15 +291,15 @@ export const updateUserRole = async (req, res) => {
         const userRef = db.collection('users').doc(uid);
         const doc = await userRef.get();
         if (doc.exists) {
-          await userRef.update({ role, updatedAt: new Date().toISOString() });
+          await userRef.update(roleDocUpdates);
         }
       }
     }
 
     return res.status(200).json({
       success: true,
-      message: `User role successfully updated to '${role}'.`,
-      data: { uid, role }
+      message: `User role successfully updated to '${roleDocUpdates.role}'.`,
+      data: { uid, role: roleDocUpdates.role }
     });
   } catch (error) {
     console.error('[UserController] updateUserRole error:', error);
@@ -303,7 +313,22 @@ export const updateUserRole = async (req, res) => {
 export const updateUserProfile = async (req, res) => {
   try {
     const { uid } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // When approving or updating an adviser/faculty, guarantee active adviser status and capacity
+    if (updates.role === 'adviser' || updates.role === 'faculty') {
+      updates.role = 'adviser';
+      updates.role_id = 'adviser';
+      if (updates.isAvailable === undefined) updates.isAvailable = true;
+      if (updates.maxCapacity === undefined) updates.maxCapacity = 5;
+      if (updates.activeGroupsCount === undefined) updates.activeGroupsCount = 0;
+    }
+
+    if (updates.status === 'approved' || updates.is_approved === true) {
+      updates.is_approved = true;
+      // 'active' grants immediate full login and directory access across the platform
+      updates.status = 'active';
+    }
 
     let savedToMongo = false;
     try {
@@ -311,7 +336,7 @@ export const updateUserProfile = async (req, res) => {
         await User.findOneAndUpdate(
           { uid },
           { ...updates, updatedAt: new Date().toISOString() },
-          { new: true, upsert: false }
+          { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
         );
         savedToMongo = true;
       }

@@ -8,20 +8,34 @@
 
 import express from 'express';
 import multer from 'multer';
-import { matchAdvisers, extractDocument } from '../controllers/adviserMatchingController.js';
+import { matchAdvisers, extractDocument, getAvailableAdvisers } from '../controllers/adviserMatchingController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 import adviserMatchingService from '../services/adviserMatchingService.js';
 
 const router = express.Router();
 
-// Memory storage for temporary document extraction
-const upload = multer({ storage: multer.memoryStorage() });
+// Memory storage for temporary document extraction with 15MB limit
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf' || ext === 'docx' || ext === 'doc' || file.mimetype?.includes('pdf') || file.mimetype?.includes('word')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF and DOCX files are allowed.'));
+    }
+  }
+});
 
-// Extract metadata from a student's uploaded document
-router.post('/extract-document', verifyToken, requireRole(['student']), upload.single('document'), extractDocument);
+// Extract metadata from an uploaded document
+router.post('/extract-document', verifyToken, requireRole(['student', 'admin', 'adviser', 'faculty', 'research_coordinator']), upload.single('document'), extractDocument);
 
 // Run adviser matching — requires authenticated student
 router.post('/match', verifyToken, requireRole(['student']), matchAdvisers);
+
+// Get all available advisers with open slots and their published research
+router.get('/available', verifyToken, requireRole(['student', 'admin', 'adviser', 'faculty', 'research_coordinator']), getAvailableAdvisers);
 
 // NLP service health check — no auth required (for monitoring/debugging)
 router.get('/health', async (req, res) => {

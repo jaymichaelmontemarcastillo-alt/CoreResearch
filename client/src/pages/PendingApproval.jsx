@@ -1,6 +1,7 @@
 // src/pages/PendingApproval.jsx
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
 import {
   HiClock,
@@ -19,12 +20,14 @@ import {
   HiMagnifyingGlass,
 } from "react-icons/hi2";
 import { userService } from "../services/user.service";
+import logoImg from "../assets/logo.png";
 
 const STORAGE_KEY = "core_research_last_pending_reg";
 
 export const PendingApproval = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser, userProfile, role: authRole, login, refreshProfile } = useAuth();
 
   // Load registration data from route state, or fallback to session storage
   const [regData, setRegData] = useState(() => {
@@ -61,7 +64,13 @@ export const PendingApproval = () => {
   const fullName = checkResult?.data?.fullName || regData?.fullName || "";
   const program = checkResult?.data?.program || regData?.program || "";
   const major = checkResult?.data?.major || regData?.major || "";
-  const role = checkResult?.data?.role || regData?.role || "student";
+  const section =
+    checkResult?.data?.section ||
+    checkResult?.data?.sectionName ||
+    regData?.section ||
+    regData?.sectionName ||
+    "";
+  const role = checkResult?.data?.role || regData?.role || authRole || "student";
   const department = checkResult?.data?.department || regData?.department || "";
   const submittedAt = checkResult?.data?.submittedAt || regData?.submittedAt;
 
@@ -77,6 +86,86 @@ export const PendingApproval = () => {
       return "Recently";
     }
   }, [submittedAt]);
+
+  const redirectUserToWorkspace = (approvedRole) => {
+    const finalRole = approvedRole || authRole || role || 'student';
+    if (finalRole === 'student') {
+      navigate('/research/workspace', { replace: true });
+    } else if (finalRole === 'adviser' || finalRole === 'faculty') {
+      navigate('/advisees', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
+  };
+
+  // 1. Instant real-time redirect when userProfile in AuthContext becomes approved
+  useEffect(() => {
+    if (userProfile?.is_approved === true || userProfile?.status === 'approved') {
+      setCheckResult({ type: "approved", data: userProfile });
+      setCheckMessage("Account approved! Automatically directing you to your workspace...");
+      const timer = setTimeout(() => {
+        redirectUserToWorkspace(userProfile.role);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [userProfile?.is_approved, userProfile?.status, userProfile?.role]);
+
+  // 2. Active background status polling
+  useEffect(() => {
+    if (userProfile?.is_approved === true || userProfile?.status === 'approved' || checkResult?.type === 'approved') {
+      return;
+    }
+
+    const targetEmail = email || regData?.email || location.state?.email;
+    const targetId = studentId || regData?.studentId || location.state?.studentId;
+
+    if (!targetEmail && !targetId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const isEmail = targetEmail && targetEmail.includes("@");
+        const res = await userService.checkRegistrationStatus({
+          email: isEmail ? targetEmail : undefined,
+          id: !isEmail ? (targetEmail || targetId) : targetId,
+        });
+
+        if (res && (res.status === "approved" || res.is_approved)) {
+          clearInterval(pollInterval);
+          setCheckResult({ type: "approved", data: res });
+          setCheckMessage("Account approved! Automatically directing you to your workspace...");
+
+          if (currentUser) {
+            if (refreshProfile) await refreshProfile();
+            setTimeout(() => {
+              redirectUserToWorkspace(res.role);
+            }, 800);
+            return;
+          }
+
+          const savedPass = regData?.password || location.state?.password;
+          if (targetEmail && savedPass && login) {
+            try {
+              await login(targetEmail, savedPass);
+              setTimeout(() => {
+                redirectUserToWorkspace(res.role);
+              }, 800);
+              return;
+            } catch (err) {
+              console.warn('[PendingApproval] Auto-login error:', err);
+            }
+          }
+
+          setTimeout(() => {
+            navigate(`/student/login?approved=1&email=${encodeURIComponent(targetEmail)}&returnTo=/research/workspace`, { replace: true });
+          }, 1200);
+        }
+      } catch (err) {
+        // silent polling catch
+      }
+    }, 3500);
+
+    return () => clearInterval(pollInterval);
+  }, [email, studentId, regData, location.state, currentUser, userProfile?.is_approved, userProfile?.status, checkResult?.type]);
 
   const handleCheckStatus = async (identifierOverride = null) => {
     const targetEmail = identifierOverride || email;
@@ -108,7 +197,32 @@ export const PendingApproval = () => {
 
       if (res.status === "approved" || res.is_approved) {
         setCheckResult({ type: "approved", data: res });
-        setCheckMessage("Your account has been approved by the administrator! You may now sign in.");
+        setCheckMessage("Account approved! Directing you to your research workspace...");
+
+        if (currentUser) {
+          if (refreshProfile) await refreshProfile();
+          setTimeout(() => {
+            redirectUserToWorkspace(res.role);
+          }, 800);
+          return;
+        }
+
+        const savedPass = regData?.password || location.state?.password;
+        if (targetEmail && savedPass && login) {
+          try {
+            await login(targetEmail, savedPass);
+            setTimeout(() => {
+              redirectUserToWorkspace(res.role);
+            }, 800);
+            return;
+          } catch (loginErr) {
+            console.warn('[PendingApproval] Auto-login error:', loginErr);
+          }
+        }
+
+        setTimeout(() => {
+          navigate(`/student/login?approved=1&email=${encodeURIComponent(targetEmail)}&returnTo=/research/workspace`, { replace: true });
+        }, 1200);
       } else if (res.status === "rejected") {
         setCheckResult({ type: "rejected", data: res });
         setCheckMessage(
@@ -148,6 +262,20 @@ export const PendingApproval = () => {
       cardWidthClass="w-full max-w-[760px] xl:max-w-[800px]"
     >
       <div className="space-y-6">
+        {/* Brand Logo Header */}
+        <div className="flex justify-center -mt-2 mb-1">
+          <Link to="/" className="inline-flex items-center gap-2.5 group cursor-pointer">
+            <img
+              src={logoImg}
+              alt="CoreResearch"
+              className="w-9 h-9 object-contain drop-shadow-[0_0_12px_rgba(59,130,246,0.5)] transition-transform group-hover:scale-105"
+            />
+            <span className="font-brand text-xl font-bold tracking-wider uppercase text-gray-900 dark:text-white flex items-center">
+              <span>Core</span>
+              <span className="text-blue-500">Research</span>
+            </span>
+          </Link>
+        </div>
         {/* Dynamic Status Notification Alert */}
         {checkMessage && (
           <div
@@ -202,20 +330,11 @@ export const PendingApproval = () => {
             </div>
           ) : (
             <div className="relative inline-flex items-center justify-center mb-4">
-              <div className="w-20 h-20 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10 ring-4 ring-amber-500/20 relative">
+              <div className="w-20 h-20 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10 ring-4 ring-amber-500/20">
                 <HiClock className="w-11 h-11" />
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
-                </span>
               </div>
             </div>
           )}
-
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            {isApproved ? "Approved & Ready" : isRejected ? "Application Declined" : "Pending Administrator Approval"}
-          </div>
 
           <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
             {isApproved
@@ -263,7 +382,7 @@ export const PendingApproval = () => {
                 {isApproved ? (
                   <HiCheckCircle className="w-5 h-5" />
                 ) : (
-                  <HiClock className="w-5 h-5 animate-pulse" />
+                  <HiClock className="w-5 h-5" />
                 )}
               </div>
               <span className="font-semibold text-gray-900 dark:text-gray-100">Step 2</span>

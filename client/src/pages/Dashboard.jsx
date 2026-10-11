@@ -475,8 +475,14 @@ const AdminDashboardMetrics = () => {
         const activeProps = proposals.filter((p) => p.status && p.status !== "draft");
         const approvedProps = proposals.filter((p) => p.status === "approved");
 
+        const nonStudentRoles = ['adviser', 'admin', 'panelist', 'faculty', 'research_coordinator'];
+        const studentUsers = users.filter((u) => {
+          const r = (u.role || '').toLowerCase().trim();
+          return r === 'student' && !nonStudentRoles.includes(r);
+        });
+
         setMetrics({
-          totalUsers: users.length,
+          totalStudents: studentUsers.length,
           activeProposals: activeProps.length,
           publishedTheses: approvedProps.length,
           loading: false,
@@ -495,8 +501,8 @@ const AdminDashboardMetrics = () => {
   return (
     <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
       <StatCard
-        label="Total Users"
-        value={metrics.loading ? "..." : metrics.totalUsers.toString()}
+        label="Total Registered Students"
+        value={metrics.loading ? "..." : (metrics.totalStudents ?? 0).toString()}
         trend="Registered in System"
         trendType="positive"
       />

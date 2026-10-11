@@ -56,6 +56,7 @@ export const FacultyWorkspaceView = () => {
   const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
   const isAdviser = effectiveRole === 'adviser';
   const isPanelist = effectiveRole === 'panelist';
+  const isAdmin = effectiveRole === 'admin' || role === 'admin' || role === 'research_coordinator';
 
   useEffect(() => {
     let unsubscribeWs = () => {};
@@ -522,15 +523,17 @@ export const FacultyWorkspaceView = () => {
       </Card>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 ${isAdmin ? 'items-stretch' : ''}`}>
         
         {/* Left Column: Progress Circle */}
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="p-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">
-              Research Progress
-            </h3>
-            <div className="flex flex-col items-center justify-center">
+        <div className={`lg:col-span-1 ${isAdmin ? 'flex flex-col' : 'space-y-6'}`}>
+          <Card className={`p-6 ${isAdmin ? 'h-full flex flex-col justify-between' : ''}`}>
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">
+                Research Progress
+              </h3>
+            </div>
+            <div className="flex flex-col items-center justify-center flex-1 my-auto py-2">
               <ResearchProgressCircle progress={overallProgress} size={140} />
               <div className="mt-4 text-center">
                 <div className="text-sm font-bold text-gray-900 dark:text-white">
@@ -539,14 +542,22 @@ export const FacultyWorkspaceView = () => {
                 <div className="text-xs text-gray-500 mt-1">Current Focus Area</div>
               </div>
             </div>
+            {isAdmin && (
+              <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>Overall Status:</span>
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {overallProgress}% Completed
+                </span>
+              </div>
+            )}
           </Card>
         </div>
 
         {/* Right Column: Chapters Review, Tasks & Feedback */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={`lg:col-span-2 ${isAdmin ? 'flex flex-col' : 'space-y-6'}`}>
           
           {/* Manuscript Chapters Evaluation & Review */}
-          <Card className="p-6 space-y-4">
+          <Card className={`p-6 space-y-4 ${isAdmin ? 'h-full flex flex-col justify-between' : ''}`}>
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white flex items-center gap-2">
@@ -617,11 +628,11 @@ export const FacultyWorkspaceView = () => {
                     </div>
 
                     {/* Evaluation & Revision Actions */}
-                    {(isAdviser || isPanelist || role === 'research_coordinator') && (
+                    {(isAdviser || isPanelist || role === 'research_coordinator' || isAdmin) && (
                       <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
                         {isSubmitted ? (
                           <>
-                            {(isAdviser || role === 'research_coordinator') && (
+                            {(isAdviser || role === 'research_coordinator' || isAdmin) && (
                               <Button
                                 size="sm"
                                 variant="primary"
@@ -654,15 +665,17 @@ export const FacultyWorkspaceView = () => {
                             >
                               <HiPencilSquare className="w-3.5 h-3.5 mr-1" /> View
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleRequestRevision(sec.id, sec.name)}
-                              className="text-xs py-1 px-2 text-amber-600 hover:text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-                              title="Revert approved chapter and flag revisions needed (deducts progress until resolved)"
-                            >
-                              Flag Revision
-                            </Button>
+                            {(isAdviser || role === 'research_coordinator' || isAdmin) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleRequestRevision(sec.id, sec.name)}
+                                className="text-xs py-1 px-2 text-amber-600 hover:text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                title="Revert approved chapter and flag revisions needed (deducts progress until resolved)"
+                              >
+                                Flag Revision
+                              </Button>
+                            )}
                           </div>
                         ) : isRevision ? (
                           <div className="flex items-center gap-2">
@@ -702,75 +715,79 @@ export const FacultyWorkspaceView = () => {
             </div>
           </Card>
           
-          {/* Tasks Overview */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Actionable Tasks
-              </h3>
-              
-              <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
-                <button
-                  onClick={() => setTaskFilter('all')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                    taskFilter === 'all' ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => setTaskFilter('completed')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                    taskFilter === 'completed' ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  Completed
-                </button>
+          {/* Tasks Overview (Hidden in Admin view) */}
+          {!isAdmin && (
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Actionable Tasks
+                </h3>
+                
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                  <button
+                    onClick={() => setTaskFilter('all')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      taskFilter === 'all' ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'
+                    }`}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    onClick={() => setTaskFilter('completed')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      taskFilter === 'completed' ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'
+                    }`}
+                  >
+                    Completed
+                  </button>
+                </div>
+
+                {isAdviser && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setIsTaskModalOpen(true)}
+                    className="ml-2"
+                  >
+                    <HiPlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
+                  </Button>
+                )}
               </div>
 
-              {isAdviser && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => setIsTaskModalOpen(true)}
-                  className="ml-2"
-                >
-                  <HiPlusCircle className="w-3.5 h-3.5 mr-1" /> Assign Task
-                </Button>
-              )}
-            </div>
+              <div className="space-y-3">
+                {filteredTasks.length === 0 ? (
+                  <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl">
+                    <HiCheckCircle className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-gray-500">
+                      {taskFilter === 'completed' ? 'No completed tasks yet.' : 'All pending tasks have been completed!'}
+                    </p>
+                  </div>
+                ) : (
+                  filteredTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      isAdviser={isAdviser}
+                      onStatusChange={(newStatus) => handleTaskStatusChange(task.id, newStatus)}
+                      onReview={handleTaskReview}
+                      onDelete={handleTaskDelete}
+                      onOpenInEditor={handleOpenTaskInEditor}
+                    />
+                  ))
+                )}
+              </div>
+            </Card>
+          )}
 
-            <div className="space-y-3">
-              {filteredTasks.length === 0 ? (
-                <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl">
-                  <HiCheckCircle className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-gray-500">
-                    {taskFilter === 'completed' ? 'No completed tasks yet.' : 'All pending tasks have been completed!'}
-                  </p>
-                </div>
-              ) : (
-                filteredTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    isAdviser={isAdviser}
-                    onStatusChange={(newStatus) => handleTaskStatusChange(task.id, newStatus)}
-                    onReview={handleTaskReview}
-                    onDelete={handleTaskDelete}
-                    onOpenInEditor={handleOpenTaskInEditor}
-                  />
-                ))
-              )}
-            </div>
-          </Card>
-
-          {/* Feedback Threads (Module Component) */}
-          <ResearchFeedbackSection 
-            workspaceId={workspace.id}
-            feedbackList={feedbackList}
-            currentUser={currentUser}
-            userProfile={{ ...userProfile, role: effectiveRole }} // Pass down effectiveRole
-          />
+          {/* Feedback Threads (Hidden in Admin view) */}
+          {!isAdmin && (
+            <ResearchFeedbackSection 
+              workspaceId={workspace.id}
+              feedbackList={feedbackList}
+              currentUser={currentUser}
+              userProfile={{ ...userProfile, role: effectiveRole }} // Pass down effectiveRole
+            />
+          )}
         </div>
       </div>
 

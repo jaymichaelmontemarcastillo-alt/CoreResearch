@@ -117,6 +117,7 @@ export const generateTimeSlots = (config, groups, existingSchedules) => {
       const proposed = {
         projectId: group.id,
         projectTitle: group.title || group.name || 'Research Group',
+        memberIds: group.memberIds || (group.members || []).map(m => m.uid || m.id).filter(Boolean),
         date,
         startTime: formatTime(currentMinutes),
         endTime: formatTime(potentialEnd),

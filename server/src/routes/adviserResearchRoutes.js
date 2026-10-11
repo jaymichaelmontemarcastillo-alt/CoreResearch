@@ -20,15 +20,13 @@ router.get('/adviser/:adviserId', getAdviserDocuments);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 15 * 1024 * 1024, // 15MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword'
-    ];
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    const isDoc = ext === 'pdf' || ext === 'docx' || ext === 'doc';
+    const isMime = file.mimetype?.includes('pdf') || file.mimetype?.includes('word') || file.mimetype === 'application/octet-stream';
+    if (isDoc || isMime) {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Only PDF and DOCX are allowed.'));

@@ -82,6 +82,17 @@ const buildUserProfileDoc = (data) => {
     status: data.status || (role === 'admin' ? 'active' : 'pending'),
     is_approved: data.is_approved !== undefined ? Boolean(data.is_approved) : (role === 'admin'),
     profile_image: data.profile_image || data.photoURL || data.picture || '',
+    
+    // Adviser fields
+    isAvailable: data.isAvailable !== undefined ? Boolean(data.isAvailable) : true,
+    maxCapacity: data.maxCapacity !== undefined ? Number(data.maxCapacity) : 5,
+    activeGroupsCount: data.activeGroupsCount !== undefined ? Number(data.activeGroupsCount) : 0,
+    expertise: Array.isArray(data.expertise) ? data.expertise : [],
+    specialization: Array.isArray(data.specialization) ? data.specialization : [],
+    researchInterests: Array.isArray(data.researchInterests) ? data.researchInterests : [],
+    keywords: Array.isArray(data.keywords) ? data.keywords : [],
+    selectedExpertise: Array.isArray(data.selectedExpertise) ? data.selectedExpertise : [],
+
     created_at: data.created_at || data.createdAt || now,
     updated_at: now,
     createdAt: data.createdAt || data.created_at || now,

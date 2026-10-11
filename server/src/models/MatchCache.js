@@ -28,12 +28,14 @@ const MatchCacheSchema = new mongoose.Schema({
     }],
     explanation: String,
   }],
+  availableAlternatives: [{ type: mongoose.Schema.Types.Mixed }],
   provider: { type: String },
   algorithmVersion: { type: String },
   executionTimeMs: { type: Number },
   generatedAt: { type: Date, required: true },
 }, {
   timestamps: false,
+  strict: false,
 });
 
 export const MatchCache = mongoose.model('MatchCache', MatchCacheSchema);

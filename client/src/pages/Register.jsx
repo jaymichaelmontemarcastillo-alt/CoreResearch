@@ -239,6 +239,7 @@ export const Register = ({ portal: initialPortal }) => {
           specializationId: specId,
           section: secName,
           role: "student",
+          password,
           submittedAt: new Date().toISOString(),
         },
       });
@@ -307,6 +308,7 @@ export const Register = ({ portal: initialPortal }) => {
           email: facultyEmail.trim().toLowerCase(),
           department: "College of Computer Studies",
           role: "adviser",
+          password,
           submittedAt: new Date().toISOString(),
         },
       });
@@ -368,11 +370,11 @@ export const Register = ({ portal: initialPortal }) => {
 
   return (
     <AuthLayout
-      title={isStudent ? "CREATE STUDENT ACCOUNT" : "FACULTY REGISTRATION"}
+      title={isStudent ? "CREATE STUDENT ACCOUNT" : "FACULTY ADVISER REGISTRATION"}
       subtitle={
         isStudent
           ? "Register your student research account"
-          : "Register your faculty advising account"
+          : "Register your faculty account (automatically assigned as official Adviser upon approval)"
       }
     >
       {error && (
@@ -711,10 +713,10 @@ export const Register = ({ portal: initialPortal }) => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Registering Faculty...
+                Registering Faculty Adviser...
               </span>
             ) : (
-              "Register as Faculty"
+              "Register as Faculty Adviser"
             )}
           </button>
         </form>

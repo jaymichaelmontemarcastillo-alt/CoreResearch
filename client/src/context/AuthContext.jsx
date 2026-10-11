@@ -7,7 +7,7 @@ import {
   sendPasswordResetEmail,
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../services/firebase';
 import api from '../services/api';
 import { userService } from '../services/user.service';
@@ -50,11 +50,16 @@ export const AuthProvider = ({ children }) => {
 
         // Enforce approval for non-admin accounts: pending/rejected cannot remain logged in
         if (profile.role !== 'admin' && (profile.status === 'pending' || profile.status === 'rejected' || profile.is_approved === false)) {
-          console.warn('[AuthContext] Account is pending or rejected. Logging out.');
-          await signOut(auth);
-          setCurrentUser(null);
-          setUserProfile(null);
-          return null;
+          if (profile.status === 'rejected') {
+            console.warn('[AuthContext] Account is rejected. Logging out.');
+            await signOut(auth);
+            setCurrentUser(null);
+            setUserProfile(null);
+            return null;
+          }
+          // Retain session & profile for pending accounts so approval detection works in real time
+          setUserProfile(profile);
+          return profile;
         }
 
         setUserProfile(profile);
@@ -115,6 +120,41 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
+  // Real-time listener for pending accounts to automatically detect approval
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    // If already approved or active, do not attach or keep listener
+    if (userProfile && (userProfile.is_approved === true || userProfile.status === 'approved' || userProfile.status === 'active')) {
+      return;
+    }
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    let handled = false;
+
+    const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists() && !handled) {
+        const updated = docSnap.data();
+        if (updated.is_approved === true || updated.status === 'approved' || updated.status === 'active') {
+          handled = true;
+          console.log('[AuthContext] Account approved in real-time Firestore update!');
+          setUserProfile(prev => {
+            if (prev?.is_approved === true && (prev?.status === 'approved' || prev?.status === 'active')) {
+              return prev;
+            }
+            return { ...prev, ...updated, is_approved: true, status: 'approved' };
+          });
+        }
+      }
+    }, () => {
+      // Silent suppression of adblocker / network retry warnings
+    });
+
+    return () => {
+      unsubscribeSnapshot();
+    };
+  }, [currentUser?.uid, userProfile?.is_approved, userProfile?.status]);
+
   // Standard Authentication Actions
 
   /**
@@ -159,9 +199,8 @@ export const AuthProvider = ({ children }) => {
         // 2. Validate Approval Status for non-admins
         if (profile.role !== 'admin') {
           if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
-            await signOut(auth);
-            setCurrentUser(null);
-            setUserProfile(null);
+            setCurrentUser(result.user);
+            setUserProfile(profile);
             const pendingErr = new Error('Account Pending Approval\nYour account has been successfully registered but is still waiting for administrator approval. Please wait until an administrator approves your account.');
             pendingErr.code = 'auth/account-pending';
             throw pendingErr;
@@ -332,14 +371,10 @@ export const AuthProvider = ({ children }) => {
         console.warn('[registerStudent] Admin notification warning:', notifErr?.message);
       });
 
-      // 6. Sign out cleanly so pending student cannot enter the dashboard
-      try {
-        await signOut(auth);
-      } catch (signOutErr) {
-        console.warn('[registerStudent] SignOut warning:', signOutErr?.message);
-      }
-      setCurrentUser(null);
-      setUserProfile(null);
+      // 6. Keep session & profile active with pending status.
+      // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
+      setCurrentUser(result.user);
+      setUserProfile(userProfileData);
 
       return { success: true, pendingApproval: true, studentData: userProfileData };
     } catch (error) {
@@ -406,6 +441,9 @@ export const AuthProvider = ({ children }) => {
         college: 'College of Computer Studies',
         status: 'pending',
         is_approved: false,
+        isAvailable: true,
+        maxCapacity: 5,
+        activeGroupsCount: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -439,14 +477,10 @@ export const AuthProvider = ({ children }) => {
         console.warn('[registerFaculty] Admin notification warning:', notifErr?.message);
       });
 
-      // Sign out cleanly so pending faculty account cannot access the dashboard before approval
-      try {
-        await signOut(auth);
-      } catch (signOutErr) {
-        console.warn('[registerFaculty] SignOut warning:', signOutErr?.message);
-      }
-      setCurrentUser(null);
-      setUserProfile(null);
+      // Keep session & profile active with pending status.
+      // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
+      setCurrentUser(result.user);
+      setUserProfile(userProfileData);
 
       return { success: true, pendingApproval: true, facultyData: userProfileData };
     } catch (error) {
@@ -769,7 +803,8 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     selectDevRole,
     updateProfileLocal,
-    updateUserProfile
+    updateUserProfile,
+    refreshProfile: () => currentUser ? syncProfileWithBackend(currentUser) : null
   };
 
 

@@ -70,11 +70,15 @@ class AdviserResearchProcessingService {
       throw new Error('No file data received.');
     }
 
-    if (fileSize > 10 * 1024 * 1024) {
+    if (fileSize > 12 * 1024 * 1024) {
       throw new Error('File size exceeds the 10MB limit.');
     }
 
-    if (mimeType !== 'application/pdf' && !mimeType.includes('wordprocessingml') && !mimeType.includes('docx')) {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase();
+    const isPdf = ext === 'pdf' || (mimeType || '').includes('pdf');
+    const isDoc = ext === 'docx' || ext === 'doc' || (mimeType || '').includes('word') || (mimeType || '').includes('msword');
+
+    if (!isPdf && !isDoc) {
       throw new Error('Unsupported file format. Only PDF and DOCX are allowed.');
     }
 
@@ -106,7 +110,7 @@ class AdviserResearchProcessingService {
     });
 
     // 3. Kick off async processing (fire and forget)
-    this.processDocumentTask(documentId, fileBuffer, mimeType).catch(err => {
+    this.processDocumentTask(documentId, fileBuffer, mimeType, cleanFileName).catch(err => {
       console.error(`[AdviserResearchProcessingService] Async processing failed for ${documentId}:`, err);
     });
 
@@ -115,7 +119,7 @@ class AdviserResearchProcessingService {
   /**
    * Main background task for text extraction and NLP analysis
    */
-  async processDocumentTask(documentId, fileBuffer, mimeType) {
+  async processDocumentTask(documentId, fileBuffer, mimeType, fileName = '') {
     try {
       await AdviserResearchDocument.findOneAndUpdate(
         { id: documentId }, 
@@ -128,7 +132,7 @@ class AdviserResearchProcessingService {
       );
 
       // 1. Extract text using DocumentAnalysisService
-      const extractedText = await documentAnalysisService.extractText(fileBuffer, mimeType);
+      const extractedText = await documentAnalysisService.extractText(fileBuffer, mimeType, fileName);
 
       // We only need the first ~30k characters to identify the main topic/methodology
       const textToProcess = extractedText.substring(0, 30000);

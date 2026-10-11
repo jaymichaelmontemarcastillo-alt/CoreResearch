@@ -27,6 +27,7 @@ import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
 import { scheduleService } from "../services/schedule.service";
+import { GroupInvitationModal } from "../components/group/GroupInvitationModal";
 
 export const MyGroup = () => {
   const { userProfile, role } = useAuth();
@@ -48,6 +49,12 @@ export const MyGroup = () => {
   const [loadingClassmates, setLoadingClassmates] = useState(false);
   const [selectedClassmateId, setSelectedClassmateId] = useState("");
   const [addingMember, setAddingMember] = useState(false);
+
+  // Group Invitations State
+  const [pendingInvitations, setPendingInvitations] = useState([]);
+  const [receivedInvitations, setReceivedInvitations] = useState([]);
+  const [activeInviteModal, setActiveInviteModal] = useState(null);
+  const [invitationActionLoading, setInvitationActionLoading] = useState(false);
 
   // Toast / Error state
   const [toast, setToast] = useState({ message: "", variant: "success" });
@@ -86,6 +93,15 @@ export const MyGroup = () => {
         // Ensure student profile and assets are synced to this group project
         groupService.syncMemberToGroupProject(myGroup.id, userProfile.uid, userProfile).catch(() => {});
 
+        // Fetch pending invitations sent by this group
+        try {
+          const sentInvites = await groupService.getPendingInvitationsForGroup(myGroup.id);
+          setPendingInvitations(sentInvites);
+        } catch (e) {
+          console.warn("[MyGroup] Pending invites fetch error:", e);
+        }
+        setReceivedInvitations([]);
+
         if (myGroup.courseId && !course) {
           setCourse(allCourses.find((c) => c.id === myGroup.courseId) || null);
         }
@@ -108,6 +124,15 @@ export const MyGroup = () => {
       } else {
         setGroup(null);
         setDefenseSchedule(null);
+        setPendingInvitations([]);
+
+        // Fetch any invitations this student received
+        try {
+          const received = await groupService.getPendingInvitationsForStudent(userProfile.uid);
+          setReceivedInvitations(received);
+        } catch (e) {
+          console.warn("[MyGroup] Received invites fetch error:", e);
+        }
       }
     } catch (error) {
       console.error("[MyGroup] Initial load error:", error);
@@ -196,7 +221,7 @@ export const MyGroup = () => {
     }
   };
 
-  const handleAddClassmate = async (uid) => {
+  const handleInviteClassmate = async (uid) => {
     if (!uid || !group) return;
 
     const candidate = availableClassmates.find((s) => s.uid === uid);
@@ -210,22 +235,72 @@ export const MyGroup = () => {
         candidate.studentNumber ||
         "";
 
-      const updated = await groupService.addMemberToGroup(group.id, {
-        uid: candidate.uid,
-        fullName: candidate.fullName || `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || "Student",
-        email: candidate.email || "",
-        studentNumber: candidateStudentNum,
-      });
+      const inv = await groupService.inviteStudentToGroup(
+        group.id,
+        {
+          uid: userProfile.uid,
+          fullName: userProfile.fullName || "Student Researcher",
+          email: userProfile.email || "",
+        },
+        {
+          uid: candidate.uid,
+          fullName: candidate.fullName || `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || "Student",
+          email: candidate.email || "",
+          studentNumber: candidateStudentNum,
+        }
+      );
 
-      setGroup(updated);
+      setPendingInvitations((prev) => [...prev, inv]);
       setIsAddModalOpen(false);
-      const titleNotice = updated.title ? ` and automatically assigned to "${updated.title}"` : "";
-      showToast(`${candidate.fullName} has been added to your group${titleNotice}!`);
+      showToast(`Invitation sent to ${candidate.fullName}! They will receive a notification to accept or decline.`);
     } catch (err) {
-      console.error("[MyGroup] Add member error:", err);
-      showToast(err.message || "Failed to add member to group.", "error");
+      console.error("[MyGroup] Invite member error:", err);
+      showToast(err.message || "Failed to send invitation.", "error");
     } finally {
       setAddingMember(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId) => {
+    try {
+      await groupService.cancelInvitation(invitationId);
+      setPendingInvitations((prev) => prev.filter((i) => i.id !== invitationId));
+      showToast("Invitation cancelled.");
+    } catch (err) {
+      console.error("[MyGroup] Cancel invitation error:", err);
+      showToast("Failed to cancel invitation.", "error");
+    }
+  };
+
+  const handleAcceptReceivedInvite = async (invitation) => {
+    setInvitationActionLoading(true);
+    try {
+      const joinedGroup = await groupService.acceptInvitation(invitation.id, userProfile);
+      setGroup(joinedGroup);
+      setReceivedInvitations([]);
+      setActiveInviteModal(null);
+      showToast(`You have joined ${joinedGroup.name}!`);
+      loadInitialData();
+    } catch (err) {
+      console.error("[MyGroup] Accept invitation error:", err);
+      showToast(err.message || "Failed to join group.", "error");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleDeclineReceivedInvite = async (invitation) => {
+    setInvitationActionLoading(true);
+    try {
+      await groupService.declineInvitation(invitation.id, userProfile);
+      setReceivedInvitations((prev) => prev.filter((i) => i.id !== invitation.id));
+      setActiveInviteModal(null);
+      showToast("Invitation declined.");
+    } catch (err) {
+      console.error("[MyGroup] Decline invitation error:", err);
+      showToast("Failed to decline invitation.", "error");
+    } finally {
+      setInvitationActionLoading(false);
     }
   };
 
@@ -311,6 +386,68 @@ export const MyGroup = () => {
           title="My Research Group"
           description="Create your research team or join classmates from your section."
         />
+
+        {/* Received Group Invitations Banner */}
+        {receivedInvitations.length > 0 && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HiUserPlus className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <h3 className="font-bold text-amber-900 dark:text-amber-200 text-sm">
+                  Group Invitation{receivedInvitations.length > 1 ? "s" : ""} Received ({receivedInvitations.length})
+                </h3>
+              </div>
+              <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                You can accept or decline below
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {receivedInvitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="p-3.5 bg-white dark:bg-[#12131d] rounded-xl border border-amber-200/70 dark:border-amber-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900 dark:text-white text-sm">
+                        {inv.groupName}
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        Section {section?.name || "A"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Invited by <strong className="text-gray-800 dark:text-gray-200">{inv.inviterName}</strong>
+                      {inv.groupTitle ? ` • Proposed Title: "${inv.groupTitle}"` : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeclineReceivedInvite(inv)}
+                      disabled={invitationActionLoading}
+                      className="text-rose-600 border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs px-3 py-1.5"
+                    >
+                      Decline
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => handleAcceptReceivedInvite(inv)}
+                      disabled={invitationActionLoading}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 shadow-sm shadow-emerald-600/20"
+                    >
+                      {invitationActionLoading ? "Joining..." : "Accept & Join"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Card className="p-10 text-center bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] rounded-2xl shadow-sm">
           <div className="w-16 h-16 bg-gray-100 dark:bg-[#1c1d28] rounded-2xl flex items-center justify-center mx-auto mb-4 text-gray-400 dark:text-[#6b6f84]">
@@ -518,9 +655,41 @@ export const MyGroup = () => {
               </div>
             ))}
 
-            {/* Empty Slots */}
-            {group.members.length < 3 &&
-              Array.from({ length: 3 - group.members.length }).map((_, idx) => (
+            {/* Pending Invitations Slots */}
+            {pendingInvitations.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex flex-col p-4 rounded-2xl border border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/40 dark:bg-amber-950/20 transition"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold text-xs">
+                    {(inv.inviteeName || "S").charAt(0)}
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider bg-amber-100/70 dark:bg-amber-900/40 px-2 py-0.5 rounded-full border border-amber-300/60 dark:border-amber-800/60">
+                    Invited
+                  </span>
+                </div>
+
+                <h4 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100 mb-0.5 truncate">
+                  {inv.inviteeName}
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-3">
+                  Awaiting confirmation
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => handleCancelInvitation(inv.id)}
+                  className="mt-auto text-[11px] font-medium text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 text-left hover:underline"
+                >
+                  Cancel Invite
+                </button>
+              </div>
+            ))}
+
+            {/* Remaining Empty Slots */}
+            {group.members.length + pendingInvitations.length < 3 &&
+              Array.from({ length: Math.max(0, 3 - group.members.length - pendingInvitations.length) }).map((_, idx) => (
                 <div
                   key={`empty-${idx}`}
                   onClick={openAddClassmateModal}
@@ -546,12 +715,12 @@ export const MyGroup = () => {
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Add Classmate to Group"
+        title="Invite Classmate to Group"
         icon={HiUserPlus}
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-[#9396a8]">
-            Only eligible classmates in your section (<strong className="text-gray-900 dark:text-white">{section?.name}</strong>) who are not yet in a research group can be added.
+            Only eligible classmates in your section (<strong className="text-gray-900 dark:text-white">{section?.name}</strong>) who are not yet in a research group can be invited. An invitation will be sent for them to accept or decline.
           </p>
 
           {loadingClassmates ? (
@@ -568,30 +737,40 @@ export const MyGroup = () => {
             </div>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              {availableClassmates.map((student) => (
-                <div
-                  key={student.uid}
-                  className="flex items-center justify-between p-3 rounded-xl border bg-white dark:bg-[#0e0f15] border-gray-200 dark:border-[#222433] transition hover:border-gray-300"
-                >
-                  <div className="min-w-0 pr-3">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                      {student.fullName || `${student.first_name || ""} ${student.last_name || ""}`}
-                    </div>
-                    <div className="text-[11px] sm:text-xs text-gray-500 mt-0.5 truncate font-medium">
-                      {student.studentIdOrEmployeeId || "No Student Number"} • {student.email}
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddClassmate(student.uid)}
-                    disabled={addingMember}
-                    className="bg-green-500/10 hover:bg-green-500/20 text-green-700 dark:text-green-400 border-green-600 dark:border-green-500/70 hover:text-green-800 dark:hover:text-green-300 shrink-0 shadow-sm font-semibold"
+              {availableClassmates.map((student) => {
+                const isAlreadyInvited = pendingInvitations.some((p) => p.inviteeId === student.uid);
+
+                return (
+                  <div
+                    key={student.uid}
+                    className="flex items-center justify-between p-3 rounded-xl border bg-white dark:bg-[#0e0f15] border-gray-200 dark:border-[#222433] transition hover:border-gray-300"
                   >
-                    Invite
-                  </Button>
-                </div>
-              ))}
+                    <div className="min-w-0 pr-3">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                        {student.fullName || `${student.first_name || ""} ${student.last_name || ""}`}
+                      </div>
+                      <div className="text-[11px] sm:text-xs text-gray-500 mt-0.5 truncate font-medium">
+                        {student.studentIdOrEmployeeId || "No Student Number"} • {student.email}
+                      </div>
+                    </div>
+                    {isAlreadyInvited ? (
+                      <span className="px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg shrink-0">
+                        Invited (Pending)
+                      </span>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleInviteClassmate(student.uid)}
+                        disabled={addingMember || (group.members.length + pendingInvitations.length >= 3)}
+                        className="bg-green-500/10 hover:bg-green-500/20 text-green-700 dark:text-green-400 border-green-600 dark:border-green-500/70 hover:text-green-800 dark:hover:text-green-300 shrink-0 shadow-sm font-semibold"
+                      >
+                        Invite
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -606,6 +785,16 @@ export const MyGroup = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Received Invitation Action Modal */}
+      <GroupInvitationModal
+        isOpen={Boolean(activeInviteModal)}
+        onClose={() => setActiveInviteModal(null)}
+        invitation={activeInviteModal}
+        onAccept={handleAcceptReceivedInvite}
+        onDecline={handleDeclineReceivedInvite}
+        loading={invitationActionLoading}
+      />
     </div>
   );
 };

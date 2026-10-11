@@ -173,10 +173,13 @@ export const UserRequests = () => {
   };
 
   const handleApprove = async (u) => {
+    const isAdviser = u.role === "adviser" || u.role === "faculty";
     const idText = u.studentIdOrEmployeeId ? ` (${u.studentIdOrEmployeeId})` : "";
     const confirmed = await confirm({
-      title: "Approve User Registration",
-      message: `Are you sure you want to approve registration for ${u.fullName || u.email}${idText}? This will grant them access to CoreResearch.`,
+      title: isAdviser ? "Approve Faculty Adviser Registration" : "Approve User Registration",
+      message: isAdviser
+        ? `Are you sure you want to approve registration for Faculty Adviser ${u.fullName || u.email}${idText}? This will automatically assign them as an official Adviser in CoreResearch with 5 active advising slots.`
+        : `Are you sure you want to approve registration for ${u.fullName || u.email}${idText}? This will grant them access to CoreResearch.`,
       confirmText: "Approve",
       variant: "primary",
     });
@@ -186,7 +189,11 @@ export const UserRequests = () => {
     setActionLoadingUid(u.uid);
     try {
       await userService.approveUser(u.uid, currentUser?.uid || "admin");
-      showToast(`User ${u.fullName || u.email} approved successfully.`);
+      showToast(
+        isAdviser
+          ? `Faculty Adviser ${u.fullName || u.email} approved and assigned as active adviser.`
+          : `User ${u.fullName || u.email} approved successfully.`
+      );
       fetchTabCounts();
       fetchRequests(page, limit);
       if (detailModalOpen && selectedRequest?.uid === u.uid) {
@@ -278,11 +285,11 @@ export const UserRequests = () => {
   };
 
   const columns = [
-    { label: "Student Name", className: "w-[240px] min-w-[200px]" },
-    { label: "Student ID", className: "min-w-[130px]" },
-    { label: "Program", className: "min-w-[100px]" },
+    { label: "Name & Role", className: "w-[260px] min-w-[220px]" },
+    { label: "ID / Employee No.", className: "min-w-[130px]" },
+    { label: "Program / Dept", className: "min-w-[130px]" },
     { label: "Specialization", className: "min-w-[130px]" },
-    { label: "Section", className: "min-w-[100px]" },
+    { label: "Section / Pool", className: "min-w-[110px]" },
     { label: "Actions", className: "text-right min-w-[170px]" },
   ];
 
@@ -291,7 +298,7 @@ export const UserRequests = () => {
       <PageHeader
         icon={HiUserPlus}
         title="User Requests"
-        description="Review, verify, and approve or reject student registration requests."
+        description="Review, verify, and approve or reject student and faculty adviser registration requests."
       />
 
       {toastMessage && (
@@ -463,8 +470,8 @@ export const UserRequests = () => {
         ) : (
           requests.map((u, index) => (
             <TableRow key={u.uid || u.id || index}>
-              {/* Student Name */}
-              <TableCell className="w-[260px] min-w-[200px]">
+              {/* Name & Role */}
+              <TableCell className="w-[260px] min-w-[220px]">
                 <div className="flex items-center gap-3">
                   <Avatar
                     src={u.profile_image || u.photoURL}
@@ -473,8 +480,19 @@ export const UserRequests = () => {
                     className="shrink-0"
                   />
                   <div className="min-w-0">
-                    <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
-                      {u.fullName || "Unnamed User"}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
+                        {u.fullName || "Unnamed User"}
+                      </span>
+                      {u.role === "adviser" || u.role === "faculty" ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          Faculty Adviser
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          Student
+                        </span>
+                      )}
                     </div>
                     <div className="text-gray-400 dark:text-gray-500 text-[11px] truncate">
                       {u.email}
@@ -483,24 +501,28 @@ export const UserRequests = () => {
                 </div>
               </TableCell>
 
-              {/* Student ID */}
+              {/* ID / Employee No. */}
               <TableCell className="font-semibold text-gray-700 dark:text-gray-300 text-xs">
-                {u.studentIdOrEmployeeId || "—"}
+                {u.studentIdOrEmployeeId || (u.role === "adviser" || u.role === "faculty" ? "Faculty" : "—")}
               </TableCell>
 
-              {/* Program */}
+              {/* Program / Dept */}
               <TableCell className="font-semibold text-gray-700 dark:text-gray-300 text-xs">
-                {getProgramDisplay(u)}
+                {u.role === "adviser" || u.role === "faculty" ? (u.department || "College of Computer Studies") : getProgramDisplay(u)}
               </TableCell>
 
               {/* Specialization */}
               <TableCell className="font-semibold text-gray-700 dark:text-gray-300 text-xs">
-                {getSpecializationDisplay(u)}
+                {u.role === "adviser" || u.role === "faculty" ? "Faculty Adviser" : getSpecializationDisplay(u)}
               </TableCell>
 
-              {/* Section */}
+              {/* Section / Pool */}
               <TableCell className="font-semibold text-gray-700 dark:text-gray-300 text-xs">
-                {getSectionDisplay(u)}
+                {u.role === "adviser" || u.role === "faculty" ? (
+                  <span className="text-purple-600 dark:text-purple-400 font-bold">Adviser Pool (5 slots)</span>
+                ) : (
+                  getSectionDisplay(u)
+                )}
               </TableCell>
 
               {/* Actions */}
@@ -572,7 +594,11 @@ export const UserRequests = () => {
       <Modal
         isOpen={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
-        title="Student Registration Details"
+        title={
+          selectedRequest?.role === "adviser" || selectedRequest?.role === "faculty"
+            ? "Faculty Adviser Registration Details"
+            : "Student Registration Details"
+        }
         icon={HiAcademicCap}
         maxWidth="max-w-md"
       >
@@ -585,8 +611,19 @@ export const UserRequests = () => {
                 size="md"
               />
               <div className="min-w-0">
-                <div className="font-bold text-gray-900 dark:text-white text-sm">
-                  {selectedRequest.fullName || "Unnamed User"}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-900 dark:text-white text-sm">
+                    {selectedRequest.fullName || "Unnamed User"}
+                  </span>
+                  {selectedRequest.role === "adviser" || selectedRequest.role === "faculty" ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                      Faculty Adviser
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      Student
+                    </span>
+                  )}
                 </div>
                 <div className="text-gray-500 dark:text-gray-400 truncate">
                   {selectedRequest.email}
@@ -594,58 +631,113 @@ export const UserRequests = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 dark:bg-[#1a1b26] rounded-xl border border-gray-100 dark:border-[#2b2d3f]">
-              <div>
-                <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
-                  Student ID Number
-                </span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {selectedRequest.studentIdOrEmployeeId || "—"}
-                </span>
+            {selectedRequest.role === "adviser" || selectedRequest.role === "faculty" ? (
+              <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 dark:bg-[#1a1b26] rounded-xl border border-gray-100 dark:border-[#2b2d3f]">
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Target Role
+                  </span>
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">
+                    Faculty Adviser
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Employee / Faculty ID
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {selectedRequest.studentIdOrEmployeeId || "Faculty"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Department
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {selectedRequest.department || "College of Computer Studies"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Advising Capacity
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    5 Groups (Default)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Submission Date
+                  </span>
+                  <span className="font-medium text-gray-600 dark:text-gray-300">
+                    {selectedRequest.created_at
+                      ? new Date(selectedRequest.created_at).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Current Queue
+                  </span>
+                  <span className="font-semibold capitalize text-amber-500">
+                    {selectedRequest.status || "Pending"}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
-                  Degree Program
-                </span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {getProgramDisplay(selectedRequest)}
-                </span>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 dark:bg-[#1a1b26] rounded-xl border border-gray-100 dark:border-[#2b2d3f]">
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Student ID Number
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {selectedRequest.studentIdOrEmployeeId || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Degree Program
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {getProgramDisplay(selectedRequest)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Specialization
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {getSpecializationDisplay(selectedRequest)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Assigned Section
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {getSectionDisplay(selectedRequest)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Submission Date
+                  </span>
+                  <span className="font-medium text-gray-600 dark:text-gray-300">
+                    {selectedRequest.created_at
+                      ? new Date(selectedRequest.created_at).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
+                    Current Queue
+                  </span>
+                  <span className="font-semibold capitalize text-amber-500">
+                    {selectedRequest.status || "Pending"}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
-                  Specialization
-                </span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {getSpecializationDisplay(selectedRequest)}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
-                  Assigned Section
-                </span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {getSectionDisplay(selectedRequest)}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
-                  Submission Date
-                </span>
-                <span className="font-medium text-gray-600 dark:text-gray-300">
-                  {selectedRequest.created_at
-                    ? new Date(selectedRequest.created_at).toLocaleDateString()
-                    : "—"}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-400 uppercase text-[10px] font-bold block mb-0.5">
-                  Current Queue
-                </span>
-                <span className="font-semibold capitalize text-amber-500">
-                  {selectedRequest.status || "Pending"}
-                </span>
-              </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
               {selectedRequest.status !== "approved" && (

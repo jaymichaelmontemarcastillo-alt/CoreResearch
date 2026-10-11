@@ -7,13 +7,14 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { NetworkStatus } from './components/NetworkStatus';
 import { PageLoadingFallback } from './components/ui/PageLoadingFallback';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy loaded pages
 const Login = React.lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
 const Register = React.lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
 const Unauthorized = React.lazy(() => import('./pages/Unauthorized').then(m => ({ default: m.Unauthorized })));
-const PendingApproval = React.lazy(() => import('./pages/PendingApproval').then(m => ({ default: m.PendingApproval })));
+const PendingApproval = React.lazy(() => import('./pages/PendingApproval').then(m => ({ default: m.PendingApproval || m.default })));
 const Onboarding = React.lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
 const Dashboard = React.lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const JoinSection = React.lazy(() => import('./pages/JoinSection').then(m => ({ default: m.JoinSection })));
@@ -58,7 +59,8 @@ export default function App() {
         <AuthProvider>
           <ConfirmProvider>
             <NetworkStatus />
-            <Suspense fallback={<PageLoadingFallback />}>
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoadingFallback />}>
               <Routes>
                 {/* Public Auth Routes */}
                 <Route path="/login" element={<Login portal="student" />} />
@@ -156,6 +158,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Suspense>
+          </ErrorBoundary>
           </ConfirmProvider>
         </AuthProvider>
       </ThemeProvider>

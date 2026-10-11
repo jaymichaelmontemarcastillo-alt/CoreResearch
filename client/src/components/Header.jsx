@@ -7,6 +7,8 @@ import { useNotifications } from "../hooks/useNotifications";
 import { useConfirm } from "../context/ConfirmContext";
 import api from "../services/api";
 import { Avatar } from "./ui/Avatar";
+import { GroupInvitationModal } from "./group/GroupInvitationModal";
+import { groupService } from "../services/group.service";
 import {
   HiBars3,
   HiBell,
@@ -17,6 +19,9 @@ import {
   HiSun,
   HiMoon,
   HiComputerDesktop,
+  HiCheck,
+  HiXMark,
+  HiUserGroup,
 } from "react-icons/hi2";
 
 export const Header = ({ onOpenMobileMenu }) => {
@@ -25,6 +30,10 @@ export const Header = ({ onOpenMobileMenu }) => {
   const { confirm } = useConfirm();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [selectedInvitation, setSelectedInvitation] = useState(null);
+  const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
+  const [invitationActionLoading, setInvitationActionLoading] = useState(false);
+
   const dropdownRef = useRef(null);
   const notificationDropdownRef = useRef(null);
   const location = useLocation();
@@ -57,19 +66,179 @@ export const Header = ({ onOpenMobileMenu }) => {
     prevUnreadCountRef.current = unreadCount;
   }, [unreadCount]);
 
+  const resolveInvitation = async (notif) => {
+    const invId = notif.invitationId || notif.relatedId || notif.metadata?.invitationId;
+    if (invId) {
+      try {
+        const inv = await groupService.getInvitationById(invId);
+        if (inv) return inv;
+      } catch (err) {
+        console.warn("[Header] Failed to fetch invitation by id:", err);
+      }
+    }
+    if (notif.metadata?.groupId || notif.groupId) {
+      return {
+        id: invId || notif.id,
+        groupId: notif.groupId || notif.metadata?.groupId,
+        groupName: notif.metadata?.groupName || "Research Group",
+        groupTitle: notif.metadata?.groupTitle || "",
+        inviterName: notif.metadata?.inviterName || "A classmate",
+        status: "pending",
+        createdAt: notif.createdAt,
+      };
+    }
+    return null;
+  };
+
+  const handleInlineAccept = async (notif, e) => {
+    e.stopPropagation();
+    const invId = notif.invitationId || notif.relatedId || notif.metadata?.invitationId;
+    if (!invId) return;
+    setInvitationActionLoading(true);
+    try {
+      await groupService.acceptInvitation(invId, userProfile);
+      await markAsRead(notif.id);
+      setNotificationDropdownOpen(false);
+      navigate("/my-group");
+    } catch (err) {
+      alert(err.message || "Failed to accept invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleInlineDecline = async (notif, e) => {
+    e.stopPropagation();
+    const invId = notif.invitationId || notif.relatedId || notif.metadata?.invitationId;
+    if (!invId) return;
+    setInvitationActionLoading(true);
+    try {
+      await groupService.declineInvitation(invId, userProfile);
+      await markAsRead(notif.id);
+    } catch (err) {
+      alert(err.message || "Failed to decline invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleModalAccept = async (invitation) => {
+    setInvitationActionLoading(true);
+    try {
+      await groupService.acceptInvitation(invitation.id, userProfile);
+      setIsInvitationModalOpen(false);
+      setSelectedInvitation(null);
+      navigate("/my-group");
+    } catch (err) {
+      alert(err.message || "Failed to accept invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleModalDecline = async (invitation) => {
+    setInvitationActionLoading(true);
+    try {
+      await groupService.declineInvitation(invitation.id, userProfile);
+      setIsInvitationModalOpen(false);
+      setSelectedInvitation(null);
+    } catch (err) {
+      alert(err.message || "Failed to decline invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
   const handleNotificationClick = async (notif) => {
     if (!notif.read) {
       await markAsRead(notif.id);
     }
     setNotificationDropdownOpen(false);
-    
-    // Simple navigation rules based on notification title/type
-    if (notif.title.toLowerCase().includes('adviser request')) {
+
+    const titleLower = (notif.title || "").toLowerCase();
+    const messageLower = (notif.message || "").toLowerCase();
+    const typeLower = (notif.type || "").toLowerCase();
+    const rawLink = notif.linkUrl || notif.link;
+
+    // Group Invitation Notification — opens popup modal with details & action buttons
+    const isGroupInvite =
+      typeLower === "group_invitation" ||
+      titleLower.includes("group invitation") ||
+      Boolean(notif.invitationId);
+
+    if (isGroupInvite) {
+      const invite = await resolveInvitation(notif);
+      if (invite) {
+        if (invite.status && invite.status !== "pending") {
+          alert(`This invitation has already been ${invite.status}.`);
+          return;
+        }
+        setSelectedInvitation(invite);
+        setIsInvitationModalOpen(true);
+        return;
+      }
+    }
+
+    // 1. Admin account registration / pending approval notifications
+    if (
+      titleLower.includes("registration") ||
+      titleLower.includes("new student") ||
+      titleLower.includes("new faculty") ||
+      titleLower.includes("pending approval") ||
+      titleLower.includes("account approval") ||
+      messageLower.includes("registered a new") ||
+      rawLink?.includes("user-requests") ||
+      rawLink?.includes("tab=pending")
+    ) {
+      if (userProfile?.role === "admin" || userProfile?.role === "research_coordinator") {
+        navigate("/admin/user-requests?tab=pending");
+        return;
+      }
+    }
+
+    // 2. Direct link routing if provided
+    if (rawLink) {
+      const targetLink = rawLink.includes('/admin/users?tab=pending')
+        ? '/admin/user-requests?tab=pending'
+        : rawLink;
+      navigate(targetLink);
+      return;
+    }
+
+    // 3. Adviser Request notifications
+    if (titleLower.includes('adviser request')) {
       if (userProfile?.role === 'adviser' || userProfile?.role === 'faculty') {
         navigate('/adviser-requests');
       } else {
         navigate('/research/workspace');
       }
+      return;
+    }
+
+    // 4. Defense schedule notifications
+    if (typeLower === 'schedule' || titleLower.includes('defense') || titleLower.includes('schedule')) {
+      if (userProfile?.role === 'admin') {
+        navigate('/admin/calendar');
+      } else {
+        navigate('/schedules');
+      }
+      return;
+    }
+
+    // 5. Proposal notifications
+    if (typeLower === 'proposal' || titleLower.includes('proposal') || titleLower.includes('title')) {
+      if (userProfile?.role === 'student') {
+        navigate('/submit-title');
+      } else {
+        navigate('/dashboard');
+      }
+      return;
+    }
+
+    // 6. Review / Feedback notifications
+    if (typeLower === 'comment' || titleLower.includes('review') || titleLower.includes('feedback')) {
+      navigate('/reviews');
+      return;
     }
   };
 
@@ -172,9 +341,10 @@ export const Header = ({ onOpenMobileMenu }) => {
       : "Student";
 
   return (
-    <header
-      className="sticky top-0 z-50 h-14 sm:h-[76px] sm:pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
-    >
+    <>
+      <header
+        className="sticky top-0 z-50 h-14 sm:h-[76px] sm:pt-3 bg-gray-50/80 dark:bg-[#0b0c10]/80 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 transition-all duration-300 ease-in-out"
+      >
       {/* LEFT SECTION — Mobile Menu + Page Title */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
         <button
@@ -233,32 +403,74 @@ export const Header = ({ onOpenMobileMenu }) => {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {notifications.slice(0, 6).map((notif) => (
-                      <div 
-                        key={notif.id}
-                        onClick={() => handleNotificationClick(notif)}
-                        className={`p-3 rounded-xl cursor-pointer transition-colors flex gap-3 items-start ${
-                          notif.read 
-                            ? 'hover:bg-gray-50 dark:hover:bg-[#1c1d28]/60' 
-                            : 'bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30'
-                        }`}
-                      >
-                        <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${notif.read ? 'bg-transparent' : 'bg-blue-500'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm ${notif.read ? 'text-gray-900 dark:text-[#9396a8]' : 'font-semibold text-gray-900 dark:text-white'}`}>
-                            {notif.title}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-[#6b6f84] mt-0.5 line-clamp-2">
-                            {notif.message}
-                          </p>
-                          <p className="text-[10px] text-gray-400 dark:text-[#4c5064] mt-1.5">
-                            {new Date(notif.createdAt).toLocaleString(undefined, { 
-                              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-                            })}
-                          </p>
+                    {notifications.slice(0, 6).map((notif) => {
+                      const isGroupInvite =
+                        notif.type === "group_invitation" ||
+                        (notif.title || "").toLowerCase().includes("group invitation") ||
+                        Boolean(notif.invitationId);
+
+                      return (
+                        <div 
+                          key={notif.id}
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`p-3 rounded-xl cursor-pointer transition-colors flex gap-3 items-start ${
+                            notif.read 
+                              ? "hover:bg-gray-50 dark:hover:bg-[#1c1d28]/60" 
+                              : "bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                          }`}
+                        >
+                          <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${notif.read ? "bg-transparent" : "bg-blue-500"}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <p className={`text-sm ${notif.read ? "text-gray-900 dark:text-[#9396a8]" : "font-semibold text-gray-900 dark:text-white"}`}>
+                                {notif.title}
+                              </p>
+                              {isGroupInvite && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 shrink-0">
+                                  INVITATION
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-[#6b6f84] mt-0.5 line-clamp-2">
+                              {notif.message}
+                            </p>
+
+                            {/* Direct Accept / Decline action buttons in dropdown */}
+                            {isGroupInvite && (
+                              <div className="mt-2.5 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  disabled={invitationActionLoading}
+                                  onClick={(e) => handleInlineAccept(notif, e)}
+                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  <HiCheck className="w-3.5 h-3.5" />
+                                  Accept
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={invitationActionLoading}
+                                  onClick={(e) => handleInlineDecline(notif, e)}
+                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  <HiXMark className="w-3.5 h-3.5" />
+                                  Decline
+                                </button>
+                                <span className="text-[10px] text-gray-400 dark:text-[#6b6f84] ml-auto">
+                                  Click for details
+                                </span>
+                              </div>
+                            )}
+
+                            <p className="text-[10px] text-gray-400 dark:text-[#4c5064] mt-1.5">
+                              {new Date(notif.createdAt).toLocaleString(undefined, { 
+                                month: "short", day: "numeric", hour: "numeric", minute: "2-digit" 
+                              })}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -381,6 +593,20 @@ export const Header = ({ onOpenMobileMenu }) => {
         </div>
       </div>
     </header>
+
+      {/* Interactive Group Invitation Modal Popup */}
+      <GroupInvitationModal
+        isOpen={isInvitationModalOpen}
+        onClose={() => {
+          setIsInvitationModalOpen(false);
+          setSelectedInvitation(null);
+        }}
+        invitation={selectedInvitation}
+        onAccept={handleModalAccept}
+        onDecline={handleModalDecline}
+        loading={invitationActionLoading}
+      />
+    </>
   );
 };
 

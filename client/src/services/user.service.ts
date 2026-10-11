@@ -530,13 +530,24 @@ export const userService = {
     }
     const userRef = doc(db, COLLECTION_NAME, uid);
     const now = new Date().toISOString();
-    const updatePayload = {
-      status: 'approved' as const,
+    const isAdviser = user.role === 'adviser' || (user.role as string) === 'faculty';
+
+    const updatePayload: any = {
+      status: 'approved',
       is_approved: true,
       approvedAt: now,
       approvedBy: adminUid,
       updated_at: now,
     };
+
+    if (isAdviser) {
+      updatePayload.role = 'adviser';
+      updatePayload.role_id = 'adviser';
+      updatePayload.isAvailable = true;
+      updatePayload.maxCapacity = (user as any).maxCapacity || 5;
+      updatePayload.activeGroupsCount = (user as any).activeGroupsCount || 0;
+    }
+
     await updateDoc(userRef, updatePayload);
 
     try {

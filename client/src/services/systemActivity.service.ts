@@ -17,6 +17,10 @@ export interface SystemActivity {
   description: string;
   actorName: string;
   actorRole?: string;
+  actorId?: string;
+  action?: string;
+  targetId?: string;
+  targetType?: string;
   category: 'proposal' | 'workspace' | 'task' | 'feedback' | 'adviser' | 'repository' | 'schedule';
   timestamp: string;
 }

@@ -1,5 +1,15 @@
 import api from './api';
 
+export interface PublishedWork {
+  id: string;
+  title: string;
+  abstract?: string;
+  keywords?: string[];
+  researchTopics?: string[];
+  methodologies?: string[];
+  fileUrl?: string;
+}
+
 export interface AdviserMatchResult {
   adviserId: string;
   adviserName: string;
@@ -24,8 +34,19 @@ export interface AdviserMatchResult {
   algorithmVersion?: string;
   maxCapacity?: number;
   activeGroupsCount?: number;
+  availableSlots?: number;
+  isFull?: boolean;
   isAvailable?: boolean;
   profile_image?: string;
+  publishedWorks?: PublishedWork[];
+}
+
+export interface RecommendationResponse {
+  matches: AdviserMatchResult[];
+  availableAlternatives: AdviserMatchResult[];
+  allTopMatchesFull: boolean;
+  totalAvailableAdvisers: number;
+  meta?: any;
 }
 
 export interface MatchMeta {
@@ -44,21 +65,16 @@ export interface MatchMeta {
  * The frontend does NOT know or care about the underlying provider implementation.
  */
 class AdviserMatchingService {
-  async getRecommendations(title: string, description: string): Promise<AdviserMatchResult[]> {
+  async getRecommendations(title: string, description: string): Promise<RecommendationResponse> {
     try {
       const response = await api.post('/adviser-matching/match', {
         title,
         description,
       });
 
-      const { data: results, meta } = response.data;
+      const { data: results, availableAlternatives = [], meta } = response.data;
 
-      if (!results || !Array.isArray(results)) {
-        return [];
-      }
-
-      // Normalize results to the AdviserMatchResult interface
-      return results.map((r: any) => ({
+      const normalizeAdviser = (r: any): AdviserMatchResult => ({
         adviserId: r.adviserId,
         adviserName: r.adviserName || 'Unknown Adviser',
         department: r.department || 'N/A',
@@ -77,9 +93,23 @@ class AdviserMatchingService {
         algorithmVersion: r.algorithmVersion || meta?.algorithmVersion,
         maxCapacity: r.maxCapacity ?? 5,
         activeGroupsCount: r.activeGroupsCount ?? 0,
+        availableSlots: r.availableSlots ?? Math.max(0, (r.maxCapacity ?? 5) - (r.activeGroupsCount ?? 0)),
+        isFull: r.isFull ?? ((r.activeGroupsCount ?? 0) >= (r.maxCapacity ?? 5)),
         isAvailable: r.isAvailable ?? true,
         profile_image: r.profile_image || '',
-      }));
+        publishedWorks: r.publishedWorks || [],
+      });
+
+      const matches = Array.isArray(results) ? results.map(normalizeAdviser) : [];
+      const alternatives = Array.isArray(availableAlternatives) ? availableAlternatives.map(normalizeAdviser) : [];
+
+      return {
+        matches,
+        availableAlternatives: alternatives,
+        allTopMatchesFull: Boolean(meta?.allTopMatchesFull || (matches.length > 0 && matches.every(m => m.isFull))),
+        totalAvailableAdvisers: meta?.totalAvailableAdvisers ?? alternatives.length,
+        meta,
+      };
     } catch (error: any) {
       // Re-throw with user-friendly messages based on status
       if (error.response) {
@@ -102,6 +132,33 @@ class AdviserMatchingService {
 
       console.error('Error fetching adviser recommendations:', error);
       throw new Error('Failed to generate adviser recommendations.');
+    }
+  }
+
+  async getAvailableAdvisers(): Promise<AdviserMatchResult[]> {
+    try {
+      const response = await api.get('/adviser-matching/available');
+      const data = response.data?.data || [];
+      return data.map((r: any) => ({
+        adviserId: r.adviserId,
+        adviserName: r.adviserName || 'Unknown Adviser',
+        department: r.department || 'N/A',
+        compatibilityScore: r.compatibilityScore ?? 0,
+        score: r.score ?? 0,
+        matchedKeywords: r.matchedKeywords || [],
+        matchedAreas: r.matchedAreas || [],
+        explanation: r.explanation || '',
+        maxCapacity: r.maxCapacity ?? 5,
+        activeGroupsCount: r.activeGroupsCount ?? 0,
+        availableSlots: r.availableSlots ?? Math.max(0, (r.maxCapacity ?? 5) - (r.activeGroupsCount ?? 0)),
+        isFull: false,
+        isAvailable: true,
+        profile_image: r.profile_image || '',
+        publishedWorks: r.publishedWorks || [],
+      }));
+    } catch (err: any) {
+      console.warn('[adviserMatchingService] getAvailableAdvisers error:', err);
+      return [];
     }
   }
 

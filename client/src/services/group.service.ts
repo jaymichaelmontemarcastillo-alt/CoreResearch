@@ -12,9 +12,11 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
-import { ResearchGroup, CreateResearchGroupInput } from '../types/group.types';
+import { ResearchGroup, CreateResearchGroupInput, GroupInvitation } from '../types/group.types';
+import { notificationService } from './notification.service';
 
 const COLLECTION_NAME = 'research_groups';
+const INVITATIONS_COLLECTION = 'group_invitations';
 
 export const groupService = {
   /**
@@ -859,6 +861,233 @@ export const groupService = {
     } catch (actErr) {}
 
     return { ...group, ...updates } as ResearchGroup;
+  },
+
+  /**
+   * Send an invitation to a fellow student to join a research group.
+   * Does NOT directly add them to members.
+   * Creates an invitation document and notifies the invited student.
+   */
+  async inviteStudentToGroup(
+    groupId: string,
+    inviter: { uid: string; fullName: string; email: string },
+    invitee: { uid: string; fullName: string; email: string; studentNumber?: string }
+  ): Promise<GroupInvitation> {
+    const group = await this.getGroupById(groupId);
+    if (!group) {
+      throw new Error('Research group not found.');
+    }
+
+    if ((group.members && group.members.length >= 3) || (group.memberIds && group.memberIds.length >= 3)) {
+      throw new Error('Group is Full: A research group can have a maximum of 3 members.');
+    }
+
+    if (group.memberIds.includes(invitee.uid)) {
+      throw new Error('This student is already a member of this research group.');
+    }
+
+    const existingGroup = await this.getGroupByStudentId(invitee.uid);
+    if (existingGroup) {
+      throw new Error('This student is already a member of another research group.');
+    }
+
+    // Check existing pending invitations for this group
+    const pendingInvites = await this.getPendingInvitationsForGroup(groupId);
+    const alreadyInvited = pendingInvites.find((inv) => inv.inviteeId === invitee.uid && inv.status === 'pending');
+    if (alreadyInvited) {
+      throw new Error('An invitation has already been sent to this student and is pending their response.');
+    }
+
+    if ((group.members.length + pendingInvites.length) >= 3) {
+      throw new Error('Invitation Limit Reached: The total of confirmed members and pending invitations cannot exceed 3.');
+    }
+
+    const inviteRef = doc(collection(db, INVITATIONS_COLLECTION));
+    const now = new Date().toISOString();
+
+    const invitation: GroupInvitation = {
+      id: inviteRef.id,
+      groupId: group.id,
+      groupName: group.name,
+      groupTitle: group.title || '',
+      courseId: group.courseId,
+      sectionId: group.sectionId,
+      inviterId: inviter.uid,
+      inviterName: inviter.fullName || 'Group Member',
+      inviterEmail: inviter.email || '',
+      inviteeId: invitee.uid,
+      inviteeName: invitee.fullName || 'Student',
+      inviteeEmail: invitee.email || '',
+      status: 'pending',
+      createdAt: now,
+    };
+
+    await setDoc(inviteRef, invitation);
+
+    // Notify the invited student in real time
+    try {
+      await notificationService.createNotification({
+        userId: invitee.uid,
+        title: 'Research Group Invitation',
+        message: `${inviter.fullName || 'A classmate'} invited you to join ${group.name}${group.title ? ` ("${group.title}")` : ''}.`,
+        type: 'group_invitation',
+        relatedId: inviteRef.id,
+        invitationId: inviteRef.id,
+        groupId: group.id,
+        linkUrl: '/my-group',
+        metadata: {
+          invitationId: inviteRef.id,
+          groupId: group.id,
+          groupName: group.name,
+          groupTitle: group.title || '',
+          inviterName: inviter.fullName || 'A classmate',
+        },
+      });
+    } catch (notifErr) {
+      console.warn('[groupService] Failed to send invitation notification:', notifErr);
+    }
+
+    return invitation;
+  },
+
+  /**
+   * Get all pending invitations for a specific research group.
+   */
+  async getPendingInvitationsForGroup(groupId: string): Promise<GroupInvitation[]> {
+    try {
+      const q = query(
+        collection(db, INVITATIONS_COLLECTION),
+        where('groupId', '==', groupId),
+        where('status', '==', 'pending')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data() as GroupInvitation);
+    } catch (e) {
+      console.warn('[groupService] getPendingInvitationsForGroup error:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Get all pending invitations for a specific student.
+   */
+  async getPendingInvitationsForStudent(studentId: string): Promise<GroupInvitation[]> {
+    try {
+      const q = query(
+        collection(db, INVITATIONS_COLLECTION),
+        where('inviteeId', '==', studentId),
+        where('status', '==', 'pending')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data() as GroupInvitation);
+    } catch (e) {
+      console.warn('[groupService] getPendingInvitationsForStudent error:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch an invitation by its ID.
+   */
+  async getInvitationById(id: string): Promise<GroupInvitation | null> {
+    try {
+      const inviteRef = doc(db, INVITATIONS_COLLECTION, id);
+      const snap = await getDoc(inviteRef);
+      if (!snap.exists()) return null;
+      return snap.data() as GroupInvitation;
+    } catch (e) {
+      console.warn('[groupService] getInvitationById error:', e);
+      return null;
+    }
+  },
+
+  /**
+   * Accept an invitation to join a research group.
+   */
+  async acceptInvitation(
+    invitationId: string,
+    studentProfile: { uid: string; fullName: string; email: string; studentNumber?: string; studentIdOrEmployeeId?: string }
+  ): Promise<ResearchGroup> {
+    const invite = await this.getInvitationById(invitationId);
+    if (!invite) {
+      throw new Error('Invitation not found.');
+    }
+    if (invite.status !== 'pending') {
+      throw new Error(`This invitation has already been ${invite.status}.`);
+    }
+
+    const studentNumber = studentProfile.studentNumber || studentProfile.studentIdOrEmployeeId || '';
+    const updatedGroup = await this.addMemberToGroup(invite.groupId, {
+      uid: studentProfile.uid,
+      fullName: studentProfile.fullName || 'Student Researcher',
+      email: studentProfile.email || '',
+      studentNumber,
+    });
+
+    const inviteRef = doc(db, INVITATIONS_COLLECTION, invitationId);
+    const now = new Date().toISOString();
+    await updateDoc(inviteRef, {
+      status: 'accepted',
+      respondedAt: now,
+    });
+
+    try {
+      await notificationService.createNotification({
+        userId: invite.inviterId,
+        title: 'Invitation Accepted',
+        message: `${studentProfile.fullName || 'Your classmate'} accepted your invitation to join ${invite.groupName}!`,
+        type: 'success',
+        linkUrl: '/my-group',
+      });
+    } catch (e) {}
+
+    return updatedGroup;
+  },
+
+  /**
+   * Decline an invitation to join a research group.
+   */
+  async declineInvitation(
+    invitationId: string,
+    studentProfile: { uid: string; fullName: string }
+  ): Promise<void> {
+    const invite = await this.getInvitationById(invitationId);
+    if (!invite) {
+      throw new Error('Invitation not found.');
+    }
+    if (invite.status !== 'pending') {
+      throw new Error(`This invitation has already been ${invite.status}.`);
+    }
+
+    const inviteRef = doc(db, INVITATIONS_COLLECTION, invitationId);
+    const now = new Date().toISOString();
+    await updateDoc(inviteRef, {
+      status: 'declined',
+      respondedAt: now,
+    });
+
+    try {
+      await notificationService.createNotification({
+        userId: invite.inviterId,
+        title: 'Invitation Declined',
+        message: `${studentProfile.fullName || 'Your classmate'} declined the invitation to join ${invite.groupName}.`,
+        type: 'info',
+        linkUrl: '/my-group',
+      });
+    } catch (e) {}
+  },
+
+  /**
+   * Cancel a pending invitation (inviter only).
+   */
+  async cancelInvitation(invitationId: string): Promise<void> {
+    const invite = await this.getInvitationById(invitationId);
+    if (!invite) return;
+    const inviteRef = doc(db, INVITATIONS_COLLECTION, invitationId);
+    await updateDoc(inviteRef, {
+      status: 'cancelled',
+      respondedAt: new Date().toISOString(),
+    });
   }
 };
 

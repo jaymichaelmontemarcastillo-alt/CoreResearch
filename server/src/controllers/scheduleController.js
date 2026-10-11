@@ -31,11 +31,124 @@ const seedMockSchedulesIfEmpty = () => {
 };
 
 /**
+ * Send real-time in-app notifications to Students, Advisers, and Panelists
+ */
+const sendDefenseNotifications = async (schedules) => {
+  if (!Array.isArray(schedules) || schedules.length === 0) return;
+
+  for (const s of schedules) {
+    try {
+      const scheduleId = s.id || `sch-${Date.now()}`;
+      const title = s.projectTitle || 'Research Defense';
+      const dateStr = s.date || '';
+      const timeStr = s.startTime || s.time || '';
+      const venueStr = s.venue || s.location ? ` at ${s.venue || s.location}` : '';
+      const defType = (s.defenseType === 'final_defense' || s.type === 'final_defense') ? 'Final Defense' : 'Proposal Defense';
+
+      // 1. Resolve student members
+      let studentIds = s.memberIds || [];
+      let adviserId = s.adviserId;
+      let panelistIds = s.panelistIds || (s.panelists || []).map(p => p.id || p.uid).filter(Boolean);
+
+      // If studentIds is empty, query Firestore or MongoDB research_groups
+      if ((!studentIds || studentIds.length === 0) && s.projectId) {
+        if (db) {
+          try {
+            const groupDoc = await db.collection('research_groups').doc(s.projectId).get();
+            if (groupDoc.exists) {
+              const gData = groupDoc.data();
+              studentIds = gData.memberIds || [];
+              if (!adviserId) adviserId = gData.adviserId;
+            }
+          } catch (e) {
+            console.warn('[ScheduleController] Firestore group lookup warning:', e.message);
+          }
+        }
+      }
+
+      const notifsToCreate = [];
+
+      // A. Notifications for student members
+      if (Array.isArray(studentIds)) {
+        for (const sid of studentIds) {
+          if (!sid) continue;
+          notifsToCreate.push({
+            id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            userId: sid,
+            title: `${defType} Scheduled`,
+            message: `Your ${defType.toLowerCase()} presentation for "${title}" is scheduled on ${dateStr} at ${timeStr}${venueStr}.`,
+            type: 'schedule',
+            read: false,
+            link: '/schedules',
+            linkUrl: '/schedules',
+            relatedId: scheduleId,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // B. Notification for group adviser
+      if (adviserId) {
+        notifsToCreate.push({
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          userId: adviserId,
+          title: `Advisee ${defType} Scheduled`,
+          message: `The ${defType.toLowerCase()} presentation for your advisee group "${title}" is scheduled on ${dateStr} at ${timeStr}${venueStr}.`,
+          type: 'schedule',
+          read: false,
+          link: '/schedules',
+          linkUrl: '/schedules',
+          relatedId: scheduleId,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // C. Notifications for assigned panelists
+      if (Array.isArray(panelistIds)) {
+        for (const pid of panelistIds) {
+          if (!pid || pid === adviserId) continue;
+          notifsToCreate.push({
+            id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            userId: pid,
+            title: `Defense Panelist Assignment`,
+            message: `You have been assigned as a panelist for "${title}" on ${dateStr} at ${timeStr}${venueStr}.`,
+            type: 'schedule',
+            read: false,
+            link: '/schedules',
+            linkUrl: '/schedules',
+            relatedId: scheduleId,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // Write to Firestore / Mock DB
+      if (db) {
+        const batch = db.batch();
+        for (const n of notifsToCreate) {
+          batch.set(db.collection('notifications').doc(n.id), n);
+        }
+        await batch.commit();
+      } else if (isDevMockMode) {
+        if (!mockFirestoreDb.has('notifications')) mockFirestoreDb.set('notifications', new Map());
+        const map = mockFirestoreDb.get('notifications');
+        for (const n of notifsToCreate) {
+          map.set(n.id, n);
+        }
+      }
+      console.log(`[ScheduleController] Created ${notifsToCreate.length} defense notifications for schedule ${scheduleId}`);
+    } catch (notifErr) {
+      console.error('[ScheduleController] sendDefenseNotifications error:', notifErr.message);
+    }
+  }
+};
+
+/**
  * Schedule defense presentation (Admin only)
  */
 export const createSchedule = async (req, res) => {
   try {
-    const { projectId, projectTitle, studentName, defenseType, date, startTime, endTime, venue, panelistIds, adviserId, adviserName } = req.body;
+    const { projectId, projectTitle, studentName, defenseType, date, startTime, endTime, venue, panelistIds, adviserId, adviserName, memberIds } = req.body;
 
     if (!projectTitle || !date || !startTime) {
       return res.status(400).json({
@@ -121,9 +234,18 @@ export const createSchedule = async (req, res) => {
       venue: createdSchedule.location,
       panelistIds: createdSchedule.panelists.map(p => p.id),
       panelistNames: createdSchedule.panelists.map(p => p.name),
+      panelists: createdSchedule.panelists,
+      adviserId,
+      adviserName,
+      memberIds: memberIds || [],
       status: createdSchedule.status,
       createdAt: createdSchedule.createdAt
     };
+
+    // Dispatch notifications to Students, Adviser, and Panelists
+    sendDefenseNotifications([responseData]).catch(err => {
+      console.error('[ScheduleController] Failed to dispatch notifications:', err.message);
+    });
 
     return res.status(201).json({
       success: true,
@@ -144,9 +266,25 @@ export const getSchedules = async (req, res) => {
     let list = [];
     let fetchedFromMongo = false;
 
+    // Auto-archive past defense schedules
+    // If today is Oct 15, schedules for Oct 14 or earlier are automatically marked as archived
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     try {
       if (mongoose.connection.readyState === 1) {
-        const mongoDocs = await MongoSchedule.find().lean();
+        // Auto-archive past schedules in MongoDB
+        await MongoSchedule.updateMany(
+          { date: { $lt: todayStr }, status: { $ne: 'archived' } },
+          { $set: { status: 'archived' } }
+        );
+
+        // By default, do not return archived schedules unless explicitly requested
+        const queryFilter = req.query.includeArchived === 'true' 
+          ? {} 
+          : { status: { $ne: 'archived' } };
+
+        const mongoDocs = await MongoSchedule.find(queryFilter).lean();
         if (mongoDocs) {
           list = mongoDocs.map(doc => ({
             id: doc.id,
@@ -346,7 +484,7 @@ export const generateSchedulePreview = async (req, res) => {
     // Fetch existing schedules from DB to check conflicts
     let existingSchedules = [];
     if (mongoose.connection.readyState === 1) {
-      const mongoDocs = await MongoSchedule.find({ date: config.date, status: { $ne: 'cancelled' } }).lean();
+      const mongoDocs = await MongoSchedule.find({ date: config.date, status: { $nin: ['cancelled', 'archived'] } }).lean();
       if (mongoDocs) {
         const groupIds = groups.map(g => g.id);
         existingSchedules = mongoDocs
@@ -424,6 +562,7 @@ export const bulkCreateSchedules = async (req, res) => {
       panelists: s.panelists || [],
       panelistIds: (s.panelists || []).map(p => p.id || p.uid).filter(Boolean),
       panelistNames: (s.panelists || []).map(p => p.name || p.fullName).filter(Boolean),
+      memberIds: s.memberIds || [],
       createdAt: new Date().toISOString()
     }));
 
@@ -472,6 +611,11 @@ export const bulkCreateSchedules = async (req, res) => {
         message: 'Could not save schedules to authoritative database.'
       });
     }
+
+    // Dispatch notifications to Students, Advisers, and Panelists
+    sendDefenseNotifications(docsToInsert).catch(err => {
+      console.error('[ScheduleController] Failed to dispatch bulk notifications:', err.message);
+    });
 
     return res.status(201).json({
       success: true,

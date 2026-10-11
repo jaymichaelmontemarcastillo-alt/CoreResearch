@@ -93,23 +93,8 @@ export const Scheduling = () => {
         })
       );
       setAllSectionsByCourse(sectionMap);
-
-      if (coursesData && coursesData.length > 0) {
-        const firstCourse = coursesData[0];
-        setSelectedCourse(firstCourse.id);
-        const courseSections = sectionMap[firstCourse.id] || [];
-        
-        if (firstCourse.specializations && firstCourse.specializations.length > 0) {
-          const firstSpec = firstCourse.specializations[0];
-          setSelectedSpecialization(firstSpec.id);
-          const specSections = courseSections.filter(s => s.specializationId === firstSpec.id);
-          if (specSections.length > 0) {
-            setSelectedSection(specSections[0].id);
-          }
-        } else if (courseSections.length > 0) {
-          setSelectedSection(courseSections[0].id);
-        }
-      }
+      // Default to "All Programs" (selectedCourse = "", selectedSpecialization = "", selectedSection = "")
+      // This displays all courses, sections, and groups on initial mount without manual filtering.
     } catch (error) {
       console.error("Failed to load initial data:", error);
       showToast("Failed to load initial data.", "error");
@@ -182,7 +167,18 @@ export const Scheduling = () => {
 
   const getProposalForGroup = (groupId) => proposals.find(p => p.groupId === groupId);
   const getScheduleForGroup = (groupId) => {
-    const groupSchedules = schedules.filter(s => s.projectId === groupId);
+    // Current date formatted as YYYY-MM-DD
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Filter active schedules: exclude archived schedules and past schedules (< today)
+    const groupSchedules = schedules.filter(s => {
+      if (s.projectId !== groupId) return false;
+      if (s.status === 'archived') return false;
+      if (s.date && s.date < todayStr) return false;
+      return true;
+    });
+
     if (groupSchedules.length === 0) return null;
     
     // If a group has multiple schedules (e.g. proposal and final defense),
@@ -410,12 +406,28 @@ export const Scheduling = () => {
                       return matchName || matchMember || matchTitle;
                     });
 
+                    const specialization = course.specializations?.find(s => s.id === section.specializationId);
+                    const specName = specialization?.name || section.specializationName || '';
+                    const specCode = specialization?.code || '';
+
                     return (
                       <div key={section.id} className="bg-white dark:bg-[#15161e] rounded-xl border border-gray-200 dark:border-[#222433] shadow-card overflow-hidden">
-                        <div className="p-5 border-b border-gray-200 dark:border-[#222433] flex items-center justify-between gap-4">
-                          <h2 className="text-xl font-medium text-gray-900 dark:text-white leading-tight">
-                            {course.name}
-                          </h2>
+                        <div className="p-5 border-b border-gray-200 dark:border-[#222433] flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <h2 className="text-xl font-medium text-gray-900 dark:text-white leading-tight">
+                              {course.name}
+                              {specName && (
+                                <span className="text-gray-500 dark:text-gray-400 font-normal">
+                                  {" — "}{specName}
+                                </span>
+                              )}
+                            </h2>
+                            {(specCode || specName) && (
+                              <Badge variant="purple" className="shrink-0 w-fit">
+                                {specCode || specName}
+                              </Badge>
+                            )}
+                          </div>
                           <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-widest text-right shrink-0">
                             Section <span className="text-gray-900 dark:text-white">{section.name}</span>
                           </h3>
