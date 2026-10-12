@@ -243,6 +243,28 @@ export const Notifications = () => {
       navigate("/reviews");
       return;
     }
+
+    // 7. Manuscript / Chapter Submission notifications
+    if (
+      typeLower === "manuscript" ||
+      titleLower.includes("chapter") ||
+      messageLower.includes("chapter")
+    ) {
+      if (rawLink) {
+        navigate(rawLink);
+        return;
+      }
+      if (["adviser", "faculty", "research_coordinator", "admin"].includes(userProfile?.role)) {
+        if (notif.relatedId) {
+          navigate(`/faculty/workspace/${notif.relatedId}`);
+        } else {
+          navigate("/advisees");
+        }
+      } else {
+        navigate("/research/workspace");
+      }
+      return;
+    }
   };
 
   const filteredNotifications = notifications.filter((notif) => {

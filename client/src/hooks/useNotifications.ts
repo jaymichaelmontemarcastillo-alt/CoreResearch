@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import notificationService from '../services/notification.service';
+import researchWorkspaceService from '../services/researchWorkspace.service';
 import { AppNotification, CreateNotificationInput } from '../types/notification.types';
+
+const syncedAdvisersSet = new Set<string>();
 
 export const useNotifications = (userId?: string) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -17,6 +20,14 @@ export const useNotifications = (userId?: string) => {
 
     setLoading(true);
     setError(null);
+
+    // Auto-heal: Ensure submitted chapters notify the adviser if previously missing (runs once per user session)
+    if (!syncedAdvisersSet.has(userId)) {
+      syncedAdvisersSet.add(userId);
+      researchWorkspaceService
+        .syncSubmittedChapterNotificationsForAdviser(userId)
+        .catch((e) => console.warn('[useNotifications] Auto-sync chapter notifications fallback:', e));
+    }
 
     const unsubscribe = notificationService.subscribeUserNotifications(userId, (data) => {
       setNotifications(data);

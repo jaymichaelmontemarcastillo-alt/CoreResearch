@@ -184,6 +184,13 @@ export const StudentResearchWorkspace = () => {
           }
           setWorkspace(targetWorkspace);
 
+          // Auto-sync missing adviser notifications for any submitted chapters
+          if (targetWorkspace.adviserId) {
+            researchWorkspaceService
+              .syncSubmittedChapterNotificationsForAdviser(targetWorkspace.adviserId)
+              .catch(() => {});
+          }
+
           // Subscribe to evaluations in real-time
           unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
              setProposalEvals(evals);
