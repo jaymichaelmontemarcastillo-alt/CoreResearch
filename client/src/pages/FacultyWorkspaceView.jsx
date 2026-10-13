@@ -148,9 +148,10 @@ export const FacultyWorkspaceView = () => {
         await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
       }
 
+      const readModeParam = isAdmin ? '&mode=read' : '';
       const targetUrl = chapterId
-        ? `${editorUrl}?workspaceId=${workspace.id}&chapterId=${chapterId}`
-        : `${editorUrl}?workspaceId=${workspace.id}`;
+        ? `${editorUrl}?workspaceId=${workspace.id}&chapterId=${chapterId}${readModeParam}`
+        : `${editorUrl}?workspaceId=${workspace.id}${readModeParam}`;
 
       navigate(targetUrl, { state: { from: location.pathname + location.search } });
     } catch (err) {

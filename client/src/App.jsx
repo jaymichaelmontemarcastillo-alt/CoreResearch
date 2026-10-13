@@ -97,6 +97,10 @@ export default function App() {
                       <Route path="/masterlist" element={<Masterlist />} />
                       <Route path="/advisers" element={<AdvisersList />} />
                       <Route path="/submit-title" element={<SubmitTitle />} />
+                    </Route>
+
+                    {/* Collaborative Research Workspace (Students, Faculty, Coordinators, Admins) */}
+                    <Route element={<ProtectedRoute allowedRoles={['student', 'adviser', 'faculty', 'research_coordinator', 'admin']} />}>
                       <Route path="/research/workspace" element={<StudentResearchWorkspace />} />
                       <Route path="/workspace" element={<StudentResearchWorkspace />} />
                     </Route>

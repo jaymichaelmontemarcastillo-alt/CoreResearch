@@ -44,7 +44,7 @@ export const StudentResearchWorkspace = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const queryWorkspaceId = searchParams.get('id');
+  const queryWorkspaceId = searchParams.get('id') || searchParams.get('workspaceId');
 
   const [workspace, setWorkspace] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -68,6 +68,11 @@ export const StudentResearchWorkspace = () => {
     // Advisers and faculty manage advisee research from /advisees and should not see the student workspace
     if (!queryWorkspaceId && (role === 'adviser' || role === 'faculty')) {
       navigate('/advisees', { replace: true });
+      return;
+    }
+    // Admins and coordinators manage research from /admin/manuscripts unless inspecting a specific workspace
+    if (!queryWorkspaceId && (role === 'admin' || role === 'research_coordinator')) {
+      navigate('/admin/manuscripts', { replace: true });
       return;
     }
 
@@ -174,8 +179,8 @@ export const StudentResearchWorkspace = () => {
         }
 
         if (targetWorkspace) {
-          // Ensure current user is in workspace memberIds
-          if (currentUser?.uid && (!targetWorkspace.memberIds || !targetWorkspace.memberIds.includes(currentUser.uid))) {
+          // Ensure current user is in workspace memberIds only if they are a student researcher
+          if (isStudent && currentUser?.uid && (!targetWorkspace.memberIds || !targetWorkspace.memberIds.includes(currentUser.uid))) {
             researchWorkspaceService.addMemberToWorkspace(targetWorkspace.id, {
               uid: currentUser.uid,
               fullName: userProfile?.fullName || 'Student Researcher',
@@ -254,7 +259,10 @@ export const StudentResearchWorkspace = () => {
         await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
       }
 
-      navigate(editorUrl, { state: { from: location.pathname + location.search } });
+      const targetUrl = isCoordinator
+        ? `${editorUrl}?mode=read&workspaceId=${workspace.id}`
+        : editorUrl;
+      navigate(targetUrl, { state: { from: location.pathname + location.search } });
     } catch (err) {
       console.error('Failed to open manuscript document:', err);
       setToast('Failed to open manuscript editor: ' + err.message);

@@ -1,10 +1,9 @@
 // src/pages/AdminManuscripts.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -12,75 +11,80 @@ import { Toast } from '../components/ui/Toast';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
 import manuscriptService from '../services/manuscript.service';
+import courseService from '../services/course.service';
+import researchWorkspaceService from '../services/researchWorkspace.service';
+import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
+import { documentStore } from '../services/documentStore';
 import {
   HiDocumentText,
   HiMagnifyingGlass,
   HiFunnel,
   HiArrowPath,
   HiCheckCircle,
-  HiExclamationCircle,
+  HiXCircle,
   HiClock,
   HiStar,
   HiArchiveBox,
   HiArchiveBoxArrowDown,
   HiPencilSquare,
-  HiChatBubbleBottomCenterText,
   HiCalculator,
-  HiArrowTopRightOnSquare,
   HiBookOpen,
   HiUserGroup,
   HiAcademicCap,
-  HiArrowUpTray,
   HiTag,
-  HiPaperAirplane,
   HiSparkles,
-  HiCheckBadge,
-  HiDocumentCheck,
   HiTrophy,
   HiEye,
   HiArrowDownTray,
-  HiTrash
+  HiTrash,
+  HiCheckBadge
 } from 'react-icons/hi2';
 
 export const AdminManuscripts = () => {
   const { userProfile, role } = useAuth();
   const isAdmin = role === 'admin' || userProfile?.role === 'admin';
+  const isCoordinator = role === 'research_coordinator' || userProfile?.role === 'research_coordinator';
+  const isAuthorizedManager = isAdmin || isCoordinator;
+
   const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Navigation View / Tab: 'all' | 'publication_review' | 'ranking' | 'archived'
   const tabParam = searchParams.get('tab') || 'all';
   const [selectedTab, setSelectedTab] = useState(tabParam);
 
+  // Sub-filter for Publication Review tab: 'all' | 'pending_publication' | 'approved' | 'rejected'
+  const [pubSubFilter, setPubSubFilter] = useState('all');
+
+  // Academic status filter dropdown
+  const [academicStatusFilter, setAcademicStatusFilter] = useState('all');
+
+  // Dynamic Programs and Majors from Admin Settings (courseService)
+  const [programsList, setProgramsList] = useState([]);
+  const [programFilter, setProgramFilter] = useState('all');
+  const [majorFilter, setMajorFilter] = useState('all');
+
+  // Data state
   const [manuscripts, setManuscripts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [deptFilter, setDeptFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // Toast
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState('success');
 
+  // Select All Ref for indeterminate state
+  const selectAllRef = useRef(null);
+
   // Modals state
-  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [gradeModalOpen, setGradeModalOpen] = useState(false);
   const [paperModalOpen, setPaperModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [bestThesisModalOpen, setBestThesisModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedManuscript, setSelectedManuscript] = useState(null);
-
-  // Feedback form
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackSection, setFeedbackSection] = useState('General');
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
-
-  // Grade form (Rubric scores)
-  const [presentationScore, setPresentationScore] = useState(18);
-  const [methodologyScore, setMethodologyScore] = useState(26);
-  const [resultsScore, setResultsScore] = useState(26);
-  const [manuscriptScore, setManuscriptScore] = useState(18);
-  const [gradeRemarks, setGradeRemarks] = useState('');
-  const [submittingGrade, setSubmittingGrade] = useState(false);
 
   // Edit form
   const [editTitle, setEditTitle] = useState('');
@@ -94,10 +98,24 @@ export const AdminManuscripts = () => {
   const [bestThesisNotes, setBestThesisNotes] = useState('');
   const [submittingBestThesis, setSubmittingBestThesis] = useState(false);
 
+  // Reject publication form
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [submittingReject, setSubmittingReject] = useState(false);
+
+  // Load programs from Admin Settings (single source of truth)
   useEffect(() => {
-    fetchManuscripts();
+    const fetchPrograms = async () => {
+      try {
+        const courses = await courseService.getAllCourses();
+        setProgramsList(courses || []);
+      } catch (err) {
+        console.warn('[AdminManuscripts] Failed to load programs configuration:', err);
+      }
+    };
+    fetchPrograms();
   }, []);
 
+  // Sync tab with URL
   useEffect(() => {
     if (tabParam !== selectedTab) {
       setSelectedTab(tabParam);
@@ -107,7 +125,7 @@ export const AdminManuscripts = () => {
   const handleTabChange = (newTab) => {
     setSelectedTab(newTab);
     setSearchParams({ tab: newTab });
-    setSelectedIds([]); // Clear selection on tab change
+    setSelectedIds([]); // Clear selection when switching views
   };
 
   const showToast = (message, variant = 'success') => {
@@ -128,96 +146,196 @@ export const AdminManuscripts = () => {
     }
   };
 
-  // Status mapping and counters
+  useEffect(() => {
+    fetchManuscripts();
+  }, []);
+
+  // Compute available majors dynamically based on the selected program
+  const availableMajors = useMemo(() => {
+    if (programFilter === 'all') {
+      const uniqueMap = new Map();
+      programsList.forEach((prog) => {
+        (prog.specializations || []).forEach((spec) => {
+          if (!uniqueMap.has(spec.code)) {
+            uniqueMap.set(spec.code, spec);
+          }
+        });
+      });
+      return Array.from(uniqueMap.values());
+    }
+
+    const currentCourse = programsList.find(
+      (p) =>
+        p.code?.toUpperCase() === programFilter.toUpperCase() ||
+        p.id?.toLowerCase() === programFilter.toLowerCase()
+    );
+    return currentCourse?.specializations || [];
+  }, [programsList, programFilter]);
+
+  // Handle program filter change and reset major filter
+  const handleProgramFilterChange = (newProg) => {
+    setProgramFilter(newProg);
+    setMajorFilter('all');
+    setSelectedIds([]);
+  };
+
+  // Status mapping and counter badges for tabs
   const counts = useMemo(() => {
     const res = {
       all: 0,
-      new_upload: 0,
-      ongoing_revision: 0,
-      approved: 0,
-      accepted: 0,
-      pending_publish: 0,
-      best_thesis: 0,
+      publicationReview: 0,
+      pendingPublication: 0,
+      approvedPublication: 0,
+      rejectedPublication: 0,
       archived: 0,
+      rankedEligible: 0,
     };
-    manuscripts.forEach((m) => {
-      if (!m.isArchived) res.all++;
-      if (m.isArchived || m.status === 'archived') res.archived++;
-      if (m.isBestThesis) res.best_thesis++;
 
-      if (!m.isArchived) {
-        if (m.status === 'new_upload') res.new_upload++;
-        if (m.status === 'ongoing_revision' || m.status === 'revisions_requested' || m.status === 'revisions_required') {
-          res.ongoing_revision++;
+    manuscripts.forEach((m) => {
+      const isArchived = Boolean(m.isArchived || m.status === 'archived');
+      if (!isArchived) {
+        res.all++;
+        if (m.grade?.score && typeof m.grade.score === 'number' && m.grade.score > 0) {
+          res.rankedEligible++;
         }
-        if (m.status === 'approved') res.approved++;
-        if (m.status === 'accepted') res.accepted++;
-        if (m.status === 'pending_publish') res.pending_publish++;
+      } else {
+        res.archived++;
       }
+
+      // Publication status counters (separate from academic status)
+      const pubStatus = m.publicationStatus || (m.status === 'published' ? 'approved' : (m.status === 'pending_publish' ? 'pending_publication' : null));
+      if (pubStatus === 'pending_publication') res.pendingPublication++;
+      if (pubStatus === 'approved') res.approvedPublication++;
+      if (pubStatus === 'rejected') res.rejectedPublication++;
+      if (pubStatus) res.publicationReview++;
     });
+
     return res;
   }, [manuscripts]);
 
-  // Filtered manuscripts
-  const filteredManuscripts = useMemo(() => {
-    return manuscripts.filter((m) => {
-      // Tab filter
-      let matchesTab = true;
-      if (selectedTab === 'new_upload') {
-        matchesTab = !m.isArchived && m.status === 'new_upload';
-      } else if (selectedTab === 'ongoing_revision') {
-        matchesTab = !m.isArchived && (m.status === 'ongoing_revision' || m.status === 'revisions_requested' || m.status === 'revisions_required');
-      } else if (selectedTab === 'approved') {
-        matchesTab = !m.isArchived && m.status === 'approved';
-      } else if (selectedTab === 'accepted') {
-        matchesTab = !m.isArchived && m.status === 'accepted';
-      } else if (selectedTab === 'pending_publish') {
-        matchesTab = !m.isArchived && m.status === 'pending_publish';
-      } else if (selectedTab === 'best_thesis') {
-        matchesTab = Boolean(m.isBestThesis);
-      } else if (selectedTab === 'archived') {
-        matchesTab = Boolean(m.isArchived || m.status === 'archived');
-      } else {
-        // 'all' excludes archived unless specifically looking at archive
-        matchesTab = !m.isArchived && m.status !== 'archived';
-      }
-
-      // Department filter
-      const matchesDept = deptFilter === 'all' || m.department === deptFilter;
-
-      // Search query
-      const query = searchQuery.trim().toLowerCase();
-      const title = (m.title || m.projectTitle || '').toLowerCase();
-      const uploader = (m.uploaderName || m.studentName || '').toLowerCase();
-      const adviser = (m.adviserName || '').toLowerCase();
-      const authors = Array.isArray(m.authors) ? m.authors.join(' ').toLowerCase() : '';
-      const matchesSearch = !query || title.includes(query) || uploader.includes(query) || adviser.includes(query) || authors.includes(query);
-
-      return matchesTab && matchesDept && matchesSearch;
-    });
-  }, [manuscripts, selectedTab, deptFilter, searchQuery]);
-
-  // Open Feedback Modal
-  const handleOpenFeedback = (m) => {
-    setSelectedManuscript(m);
-    setFeedbackText('');
-    setFeedbackSection('General');
-    setFeedbackModalOpen(true);
+  // Helper to test if a manuscript matches the program filter
+  const matchesProgram = (m, filterProg) => {
+    if (filterProg === 'all') return true;
+    const target = filterProg.toUpperCase();
+    const progCode = (m.program || m.courseId || '').toUpperCase();
+    return progCode.includes(target) || target.includes(progCode);
   };
 
-  const handleSubmitFeedback = async (e) => {
-    e.preventDefault();
-    if (!feedbackText.trim() || !selectedManuscript) return;
-    setSubmittingFeedback(true);
-    try {
-      await manuscriptService.addFeedback(selectedManuscript.id, feedbackText, feedbackSection);
-      showToast('Feedback comment added to manuscript successfully!');
-      setFeedbackModalOpen(false);
-      fetchManuscripts();
-    } catch (err) {
-      showToast('Failed to add feedback comment.', 'error');
-    } finally {
-      setSubmittingFeedback(false);
+  // Helper to test if a manuscript matches the major filter
+  const matchesMajor = (m, filterMaj) => {
+    if (filterMaj === 'all') return true;
+    const target = filterMaj.toUpperCase();
+    const mMajor = (m.major || m.majorCode || m.specialization || '').toUpperCase();
+    return mMajor.includes(target) || target.includes(mMajor);
+  };
+
+  // Filtered manuscripts according to active tab, program, major, academic status, and search query
+  const filteredManuscripts = useMemo(() => {
+    return manuscripts.filter((m) => {
+      const isArchived = Boolean(m.isArchived || m.status === 'archived');
+
+      // 1. Tab / View Filtering
+      if (selectedTab === 'archived') {
+        if (!isArchived) return false;
+      } else if (selectedTab === 'publication_review') {
+        if (isArchived) return false;
+        const pubStatus = m.publicationStatus || (m.status === 'published' ? 'approved' : (m.status === 'pending_publish' ? 'pending_publication' : 'pending_publication'));
+        if (pubSubFilter !== 'all' && pubStatus !== pubSubFilter) {
+          return false;
+        }
+      } else if (selectedTab === 'all') {
+        if (isArchived) return false;
+      }
+
+      // 2. Dynamic Program Filter
+      if (!matchesProgram(m, programFilter)) return false;
+
+      // 3. Dynamic Major/Specialization Filter
+      if (!matchesMajor(m, majorFilter)) return false;
+
+      // 4. Academic Status Filter
+      if (academicStatusFilter !== 'all') {
+        if (m.status !== academicStatusFilter) return false;
+      }
+
+      // 5. Search Query Filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        const title = (m.title || m.projectTitle || '').toLowerCase();
+        const uploader = (m.uploaderName || m.studentName || '').toLowerCase();
+        const adviser = (m.adviserName || '').toLowerCase();
+        const authors = Array.isArray(m.authors) ? m.authors.join(' ').toLowerCase() : '';
+        const keywords = Array.isArray(m.keywords) ? m.keywords.join(' ').toLowerCase() : '';
+        if (
+          !title.includes(query) &&
+          !uploader.includes(query) &&
+          !adviser.includes(query) &&
+          !authors.includes(query) &&
+          !keywords.includes(query)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    manuscripts,
+    selectedTab,
+    pubSubFilter,
+    programFilter,
+    majorFilter,
+    academicStatusFilter,
+    searchQuery,
+  ]);
+
+  // Top 5 Ranking based on finalized panelist grades (only eligible active manuscripts)
+  const top5Manuscripts = useMemo(() => {
+    const eligible = manuscripts.filter((m) => {
+      // Must be active
+      if (m.isArchived || m.status === 'archived') return false;
+      // Must have valid finalized panelist score
+      if (!m.grade || typeof m.grade.score !== 'number' || m.grade.score <= 0) return false;
+      // Match active program and major filters
+      if (!matchesProgram(m, programFilter)) return false;
+      if (!matchesMajor(m, majorFilter)) return false;
+      return true;
+    });
+
+    // Authoritative sort: Primary by score descending, secondary by date
+    return eligible
+      .sort((a, b) => {
+        if (b.grade.score !== a.grade.score) {
+          return b.grade.score - a.grade.score;
+        }
+        const timeA = new Date(a.grade.updatedAt || a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.grade.updatedAt || b.updatedAt || b.createdAt || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return (a.title || '').localeCompare(b.title || '');
+      })
+      .slice(0, 5);
+  }, [manuscripts, programFilter, majorFilter]);
+
+  // Handle Indeterminate state on Select All checkbox
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate =
+        selectedIds.length > 0 && selectedIds.length < filteredManuscripts.length;
+    }
+  }, [selectedIds, filteredManuscripts]);
+
+  // Selection handlers
+  const toggleSelection = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedIds.length === filteredManuscripts.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredManuscripts.map((m) => m.id));
     }
   };
 
@@ -233,10 +351,104 @@ export const AdminManuscripts = () => {
     setGradeModalOpen(true);
   };
 
-  // Open Live Research Workspace
-  const handleOpenWorkspace = (m) => {
-    const wsId = m.workspaceId || m.id;
-    navigate(`/workspace?workspaceId=${wsId}`);
+  // Open Live Research Workspace (Full Workspace View)
+  const handleOpenWorkspace = async (m) => {
+    try {
+      let targetWsId = m.workspaceId;
+
+      if (!targetWsId && m.sections && m.sections.length > 0) {
+        targetWsId = m.id;
+      }
+
+      if (!targetWsId && (m.groupId || m.uploadedBy || m.studentId)) {
+        const foundWs = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
+          m.uploadedBy || m.studentId || '',
+          m.groupId
+        );
+        if (foundWs) targetWsId = foundWs.id;
+      }
+
+      if (targetWsId) {
+        navigate(`/faculty/workspace/${targetWsId}`, {
+          state: { from: location.pathname + location.search },
+        });
+        return;
+      }
+
+      // If no separate workspace document exists, but documentId exists, open in editor directly
+      if (m.documentId) {
+        navigate(`/documents/${m.documentId}?mode=read`, {
+          state: { from: location.pathname + location.search },
+        });
+        return;
+      }
+
+      if (m.fileUrl) {
+        window.open(m.fileUrl, '_blank');
+        return;
+      }
+
+      showToast('No active research workspace or document found for this manuscript record.', 'warning');
+    } catch (err) {
+      console.error('[AdminManuscripts] Error opening workspace:', err);
+      showToast('Failed to open research workspace: ' + err.message, 'error');
+    }
+  };
+
+  // Inspect Full Document in Integrated Editor (Read-Only by default for Admins)
+  const handleInspectDocument = async (m, chapterId = '') => {
+    try {
+      let docId = m.documentId;
+      let targetWs = null;
+
+      if (m.workspaceId || (m.sections && m.sections.length > 0)) {
+        const wsId = m.workspaceId || m.id;
+        targetWs = await researchWorkspaceService.getWorkspaceById(wsId);
+      }
+
+      if (!targetWs && (m.groupId || m.uploadedBy || m.studentId)) {
+        targetWs = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
+          m.uploadedBy || m.studentId || '',
+          m.groupId
+        );
+      }
+
+      if (targetWs) {
+        const { documentId } = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
+          targetWs,
+          userProfile
+        );
+        docId = documentId;
+      }
+
+      if (!docId) {
+        const allDocs = await documentStore.fetchDocuments(userProfile);
+        const match = (allDocs || []).find(
+          (d) =>
+            (m.groupId && d.groupId === m.groupId) ||
+            (d.title && m.title && d.title.toLowerCase() === m.title.toLowerCase())
+        );
+        if (match && match.id) docId = match.id;
+      }
+
+      if (docId) {
+        const targetUrl = chapterId
+          ? `/documents/${docId}?mode=read&workspaceId=${targetWs?.id || m.id}&chapterId=${chapterId}`
+          : `/documents/${docId}?mode=read${targetWs ? `&workspaceId=${targetWs.id}` : ''}`;
+        navigate(targetUrl, { state: { from: location.pathname + location.search } });
+        return;
+      }
+
+      if (m.fileUrl) {
+        window.open(m.fileUrl, '_blank');
+        return;
+      }
+
+      showToast('No document or attached file found for this manuscript.', 'warning');
+    } catch (err) {
+      console.error('[AdminManuscripts] handleInspectDocument error:', err);
+      showToast('Failed to open document: ' + err.message, 'error');
+    }
   };
 
   // Open Edit Modal
@@ -283,13 +495,13 @@ export const AdminManuscripts = () => {
     }
   };
 
-  // Archive / Restore
+  // Individual Archive / Restore action
   const handleToggleArchive = async (m) => {
     const isNowArchiving = !m.isArchived;
     const confirmed = await confirm({
       title: isNowArchiving ? 'Archive Manuscript' : 'Restore Manuscript',
       message: isNowArchiving
-        ? `Are you sure you want to move "${m.title || m.projectTitle}" to the institutional archive?`
+        ? `Are you sure you want to move "${m.title || m.projectTitle}" to the institutional archive? All defense evaluations, grades, revisions, and relationships will be preserved.`
         : `Are you sure you want to restore "${m.title || m.projectTitle}" back to active status?`,
       confirmText: isNowArchiving ? 'Archive' : 'Restore',
       variant: isNowArchiving ? 'danger' : 'primary',
@@ -298,67 +510,55 @@ export const AdminManuscripts = () => {
 
     try {
       await manuscriptService.toggleArchiveManuscript(m.id, isNowArchiving);
-      showToast(isNowArchiving ? 'Manuscript moved to archive.' : 'Manuscript restored from archive.');
+      showToast(
+        isNowArchiving
+          ? `Archived "${m.title || m.projectTitle}".`
+          : `Restored "${m.title || m.projectTitle}" to active status.`
+      );
       fetchManuscripts();
     } catch (err) {
       showToast('Failed to update archive status.', 'error');
     }
   };
 
-  // Best Thesis Modal
-  const handleOpenBestThesis = (m) => {
-    setSelectedManuscript(m);
-    setBestThesisNotes(m.bestThesisNotes || '');
-    setBestThesisModalOpen(true);
-  };
+  // Bulk Archive / Restore action
+  const handleBulkArchive = async (targetArchiveState) => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    const actionLabel = targetArchiveState ? 'Archive' : 'Restore';
 
-  const handleSubmitBestThesis = async (e) => {
-    e.preventDefault();
-    if (!selectedManuscript) return;
-    setSubmittingBestThesis(true);
-    try {
-      const nextBest = !selectedManuscript.isBestThesis;
-      await manuscriptService.toggleBestThesis(selectedManuscript.id, nextBest, bestThesisNotes);
-      showToast(
-        nextBest
-          ? `Selected "${selectedManuscript.title || selectedManuscript.projectTitle}" as Best Thesis!`
-          : 'Best Thesis recognition removed.'
-      );
-      setBestThesisModalOpen(false);
-      fetchManuscripts();
-    } catch (err) {
-      showToast('Failed to update Best Thesis status.', 'error');
-    } finally {
-      setSubmittingBestThesis(false);
-    }
-  };
-
-  // Publish to Institutional Repository
-  const handlePublishToRepository = async (m) => {
     const confirmed = await confirm({
-      title: 'Publish to Institutional Repository',
-      message: `Do you want to release "${m.title || m.projectTitle}" to the public Institutional Repository?`,
-      confirmText: 'Publish Now',
-      variant: 'primary',
+      title: `${actionLabel} Selected Manuscripts`,
+      message: `Are you sure you want to ${actionLabel.toLowerCase()} ${count} selected manuscript(s)? All grades, revision history, and relationships are safely preserved.`,
+      confirmText: `${actionLabel} (${count})`,
+      variant: targetArchiveState ? 'danger' : 'primary',
     });
     if (!confirmed) return;
 
     try {
-      await manuscriptService.publishToRepository(m.id);
-      showToast('Manuscript successfully published to Institutional Repository!');
+      const result = await manuscriptService.bulkArchiveManuscripts(selectedIds, targetArchiveState);
+      if (result.failedCount === 0) {
+        showToast(`Successfully ${actionLabel.toLowerCase()}d ${result.successCount} manuscript(s).`);
+      } else {
+        showToast(
+          `Updated ${result.successCount} manuscript(s). ${result.failedCount} records failed.`,
+          'warning'
+        );
+      }
+      setSelectedIds([]);
       fetchManuscripts();
     } catch (err) {
-      showToast('Failed to publish to repository.', 'error');
+      showToast(`Bulk ${actionLabel.toLowerCase()} operation failed.`, 'error');
     }
   };
 
-  // Delete Manuscripts
+  // Bulk Delete action (Admin only)
   const handleDeleteSelected = async () => {
     if (!isAdmin || selectedIds.length === 0) return;
     const confirmed = await confirm({
       title: 'Delete Manuscripts',
       message: `Are you sure you want to permanently delete ${selectedIds.length} selected manuscript(s)? This action cannot be undone.`,
-      confirmText: 'Delete',
+      confirmText: 'Delete Permanently',
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -386,28 +586,87 @@ export const AdminManuscripts = () => {
     try {
       await manuscriptService.deleteAdminManuscripts([m.id]);
       showToast('Manuscript deleted successfully.');
-      setSelectedIds(selectedIds.filter(id => id !== m.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== m.id));
       fetchManuscripts();
     } catch (err) {
       showToast('Failed to delete manuscript.', 'error');
     }
   };
 
-  const toggleSelection = (id) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+  // Best Thesis Modal
+  const handleOpenBestThesis = (m) => {
+    setSelectedManuscript(m);
+    setBestThesisNotes(m.bestThesisNotes || '');
+    setBestThesisModalOpen(true);
   };
 
-  const toggleAllSelection = () => {
-    if (selectedIds.length === filteredManuscripts.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredManuscripts.map(m => m.id));
+  const handleSubmitBestThesis = async (e) => {
+    e.preventDefault();
+    if (!selectedManuscript) return;
+    setSubmittingBestThesis(true);
+    try {
+      const nextBest = !selectedManuscript.isBestThesis;
+      await manuscriptService.toggleBestThesis(selectedManuscript.id, nextBest, bestThesisNotes);
+      showToast(
+        nextBest
+          ? `Designated "${selectedManuscript.title || selectedManuscript.projectTitle}" as Best Thesis!`
+          : 'Best Thesis designation removed.'
+      );
+      setBestThesisModalOpen(false);
+      fetchManuscripts();
+    } catch (err) {
+      showToast('Failed to update Best Thesis status.', 'error');
+    } finally {
+      setSubmittingBestThesis(false);
     }
   };
 
-  const getStatusBadge = (m) => {
+  // Publication Review Actions: Approve
+  const handleApprovePublication = async (m) => {
+    const confirmed = await confirm({
+      title: 'Approve for Repository Publication',
+      message: `Approve "${m.title || m.projectTitle}" for release in the institutional Research Repository? This will make the approved research accessible according to repository visibility rules.`,
+      confirmText: 'Approve & Publish',
+      variant: 'primary',
+    });
+    if (!confirmed) return;
+
+    try {
+      await manuscriptService.approvePublication(m.id, { name: userProfile?.fullName });
+      showToast('Manuscript approved and released to Institutional Repository!');
+      fetchManuscripts();
+    } catch (err) {
+      showToast('Failed to approve publication.', 'error');
+    }
+  };
+
+  // Publication Review Actions: Open Reject Modal
+  const handleOpenRejectPublication = (m) => {
+    setSelectedManuscript(m);
+    setRejectionReason('');
+    setRejectModalOpen(true);
+  };
+
+  const handleSubmitRejectPublication = async (e) => {
+    e.preventDefault();
+    if (!selectedManuscript || !rejectionReason.trim()) return;
+    setSubmittingReject(true);
+    try {
+      await manuscriptService.rejectPublication(selectedManuscript.id, rejectionReason.trim(), {
+        name: userProfile?.fullName,
+      });
+      showToast('Publication rejected. Review feedback was recorded and authors notified.');
+      setRejectModalOpen(false);
+      fetchManuscripts();
+    } catch (err) {
+      showToast('Failed to reject publication.', 'error');
+    } finally {
+      setSubmittingReject(false);
+    }
+  };
+
+  // Academic status badge helper
+  const getAcademicStatusBadge = (m) => {
     if (m.isArchived || m.status === 'archived') {
       return <Badge variant="gray">Archived</Badge>;
     }
@@ -419,15 +678,42 @@ export const AdminManuscripts = () => {
       case 'revisions_required':
         return <Badge variant="orange">Ongoing Revision</Badge>;
       case 'approved':
-        return <Badge variant="emerald">Approved</Badge>;
+        return <Badge variant="emerald">Academic Approved</Badge>;
       case 'accepted':
         return <Badge variant="cyan">Accepted</Badge>;
-      case 'pending_publish':
-        return <Badge variant="purple">Pending Publish</Badge>;
-      case 'published':
-        return <Badge variant="emerald">Published in Repo</Badge>;
+      case 'completed':
+        return <Badge variant="emerald">Completed</Badge>;
       default:
         return <Badge variant="gray">{m.status || 'Under Review'}</Badge>;
+    }
+  };
+
+  // Publication workflow status badge helper
+  const getPublicationStatusBadge = (m) => {
+    const pubStatus = m.publicationStatus || (m.status === 'published' ? 'approved' : (m.status === 'pending_publish' ? 'pending_publication' : null));
+    if (!pubStatus) return null;
+
+    switch (pubStatus) {
+      case 'pending_publication':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-300 dark:border-purple-600">
+            <HiClock className="w-3.5 h-3.5" /> Pending Pub Review
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-600">
+            <HiCheckCircle className="w-3.5 h-3.5" /> Published in Repo
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-300 dark:border-rose-600">
+            <HiXCircle className="w-3.5 h-3.5" /> Publication Rejected
+          </span>
+        );
+      default:
+        return null;
     }
   };
 
@@ -440,186 +726,37 @@ export const AdminManuscripts = () => {
       {/* Page Header */}
       <PageHeader
         icon={HiDocumentText}
-        title={isAdmin ? "Admin Manuscript Management & Workflow Hub" : "Manuscript Management & Best Thesis Hub"}
-        description="Comprehensive supervision of student research manuscripts: track new uploads, monitor ongoing revisions, approve camera-ready copies, award Best Thesis, edit defense grades, and archive records."
+        title={isAuthorizedManager ? "Manuscript Management & Research Repository Hub" : "Manuscript Repository"}
+        description="Oversee university research manuscripts: review publication submissions, inspect panelist defense grades, award official Best Thesis honors, and manage institutional archives."
         actions={
           <div className="flex items-center gap-2">
-            {isAdmin && selectedIds.length > 0 && (
-              <Button variant="danger" size="sm" onClick={handleDeleteSelected}>
-                <HiTrash className="w-4 h-4 mr-1.5" /> Delete Selected ({selectedIds.length})
-              </Button>
-            )}
             <Button variant="outline" size="sm" onClick={fetchManuscripts} isLoading={loading}>
-              <HiArrowPath className="w-4 h-4 mr-1.5" /> Refresh List
+              <HiArrowPath className="w-4 h-4 mr-1.5" /> Refresh
             </Button>
             <Button
-              variant="primary"
+              variant={selectedTab === 'ranking' ? 'primary' : 'outline'}
               size="sm"
-              onClick={() => handleTabChange('best_thesis')}
-              className="bg-amber-500 hover:bg-amber-600 focus:ring-amber-500/20 text-white"
+              onClick={() => handleTabChange('ranking')}
+              className={selectedTab === 'ranking' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'border-amber-400 text-amber-700 dark:text-amber-400'}
             >
-              <HiTrophy className="w-4 h-4 mr-1.5" /> Best Thesis Showcase
+              <HiTrophy className="w-4 h-4 mr-1.5" /> Top 5 Ranking
             </Button>
           </div>
         }
       />
 
-      {/* Metric Cards Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <button
-          onClick={() => handleTabChange('all')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'all'
-              ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-500 dark:border-blue-500/40 ring-1 ring-blue-500'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">All</span>
-            <HiBookOpen className="w-4 h-4 text-blue-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.all}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Active records</div>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('new_upload')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'new_upload'
-              ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-500 dark:border-blue-500/40 ring-1 ring-blue-500'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">New Uploads</span>
-            <HiArrowUpTray className="w-4 h-4 text-blue-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.new_upload}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Awaiting initial review</div>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('ongoing_revision')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'ongoing_revision'
-              ? 'bg-orange-50/80 dark:bg-orange-900/20 border-orange-500 dark:border-orange-500/40 ring-1 ring-orange-500'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">Revisions</span>
-            <HiClock className="w-4 h-4 text-orange-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.ongoing_revision}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Ongoing author edits</div>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('approved')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'approved'
-              ? 'bg-emerald-50/80 dark:bg-emerald-900/20 border-emerald-500 dark:border-emerald-500/40 ring-1 ring-emerald-500'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Approved</span>
-            <HiCheckCircle className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.approved}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Panel approved</div>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('accepted')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'accepted'
-              ? 'bg-cyan-50/80 dark:bg-cyan-900/20 border-cyan-500 dark:border-cyan-500/40 ring-1 ring-cyan-500'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Accepted</span>
-            <HiCheckBadge className="w-4 h-4 text-cyan-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.accepted}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Graduation cleared</div>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('pending_publish')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'pending_publish'
-              ? 'bg-purple-50/80 dark:bg-purple-900/20 border-purple-500 dark:border-purple-500/40 ring-1 ring-purple-500'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Pending Pub</span>
-            <HiDocumentCheck className="w-4 h-4 text-purple-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.pending_publish}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Camera-ready check</div>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('archived')}
-          className={`p-3.5 rounded-xl border text-left transition-all ${
-            selectedTab === 'archived'
-              ? 'bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-500 ring-1 ring-gray-400'
-              : 'bg-white dark:bg-[#15161e] border-gray-200/80 dark:border-[#222433] hover:border-gray-300 dark:hover:border-gray-700'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Archived</span>
-            <HiArchiveBox className="w-4 h-4 text-gray-400" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{counts.archived}</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">Historical records</div>
-        </button>
-      </div>
-
-      {/* Controls & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161e] p-4 rounded-2xl border border-gray-200/80 dark:border-[#222433] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
-        {/* Search */}
-        <div className="relative flex-1">
-          <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search manuscripts by title, uploader, authors, or adviser..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Department Filter */}
-        <div className="flex items-center gap-2">
-          <HiFunnel className="w-4 h-4 text-gray-400 shrink-0" />
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Departments</option>
-            <option value="Computer Science">Computer Science</option>
-            <option value="Information Technology">Information Technology</option>
-            <option value="Information Systems">Information Systems</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Tabs Bar */}
+      {/* Clean Filter Navigation Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-gray-200/80 dark:border-[#222433]">
         {[
-          { id: 'all', label: 'All Manuscripts', count: counts.all },
-          { id: 'new_upload', label: 'New Uploads & Comments', count: counts.new_upload },
-          { id: 'ongoing_revision', label: 'Ongoing Revision', count: counts.ongoing_revision },
-          { id: 'approved', label: 'Approved Manuscripts', count: counts.approved },
-          { id: 'accepted', label: 'Accepted Students', count: counts.accepted },
-          { id: 'pending_publish', label: 'Pending Publish', count: counts.pending_publish },
-          { id: 'best_thesis', label: 'Best Thesis Nominees', count: counts.best_thesis, icon: HiStar },
-          { id: 'archived', label: 'Archived Manuscripts', count: counts.archived },
+          { id: 'all', label: 'All Active Manuscripts', count: counts.all },
+          {
+            id: 'publication_review',
+            label: 'Publication Review',
+            count: counts.pendingPublication,
+            badgeVariant: counts.pendingPublication > 0 ? 'purple' : 'gray',
+          },
+          { id: 'ranking', label: 'Top 5 Leaderboard', icon: HiTrophy, count: counts.rankedEligible },
+          { id: 'archived', label: 'Institutional Archive', icon: HiArchiveBox, count: counts.archived },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = selectedTab === tab.id;
@@ -627,510 +764,670 @@ export const AdminManuscripts = () => {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-t-lg font-medium text-xs whitespace-nowrap transition-colors border-b-2 ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl font-medium text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
                 isActive
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10 font-semibold'
                   : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-[#9396a8] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1c1d28]'
               }`}
             >
-              {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-500' : 'text-amber-500'}`} />}
+              {Icon && <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-amber-500'}`} />}
               <span>{tab.label}</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-semibold ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8]'
-                }`}
-              >
-                {tab.count}
-              </span>
+              {typeof tab.count === 'number' && (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : tab.badgeVariant === 'purple'
+                      ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                      : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8]'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* Manuscripts List */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center space-y-3">
-          <div className="w-8 h-8 border-3 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-          <span className="text-sm text-gray-500">Loading manuscripts...</span>
-        </div>
-      ) : filteredManuscripts.length === 0 ? (
-        <Card className="p-12 text-center">
-          <EmptyState
-            icon={HiDocumentText}
-            title={`No manuscripts in "${selectedTab.replace('_', ' ')}"`}
-            description="No manuscript entries match the current filter or search criteria."
-            action={
-              <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setDeptFilter('all'); }}>
-                Reset Filters
-              </Button>
-            }
-          />
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {isAdmin && (
-            <div className="flex items-center px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <input 
-                type="checkbox" 
-                className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 mr-3 cursor-pointer"
-                checked={selectedIds.length > 0 && selectedIds.length === filteredManuscripts.length}
-                onChange={toggleAllSelection}
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Select All</span>
-            </div>
-          )}
+      {/* Dynamic Controls & Filter Bar */}
+      <div className="bg-white dark:bg-[#15161e] p-4 rounded-2xl border border-gray-200/80 dark:border-[#222433] space-y-3 shadow-xs">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by manuscript title, student/group, authors, keywords, or adviser..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-          {filteredManuscripts.map((m) => (
-            <Card
-              key={m.id}
-              className={`p-5 transition-all hover:border-gray-300 dark:hover:border-gray-600 ${
-                m.isBestThesis
-                  ? 'border-amber-300 dark:border-amber-500/40 bg-gradient-to-r from-amber-50/30 dark:from-amber-950/10 to-transparent'
-                  : ''
-              }`}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <HiFunnel className="w-4 h-4 text-gray-400 shrink-0 hidden sm:block" />
+
+            {/* Dynamic Program Filter */}
+            <select
+              value={programFilter}
+              onChange={(e) => handleProgramFilterChange(e.target.value)}
+              className="text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by Program configured in Admin Settings"
             >
-              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                {isAdmin && (
-                  <div className="pt-1">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                      checked={selectedIds.includes(m.id)}
-                      onChange={() => toggleSelection(m.id)}
-                    />
-                  </div>
-                )}
-                {/* Left: Metadata */}
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {getStatusBadge(m)}
-                    {m.isBestThesis && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 animate-pulse">
-                        <HiTrophy className="w-3.5 h-3.5" /> Best Thesis Awardee
-                      </span>
-                    )}
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8]">
-                      {m.versionNumber || 'v1.0'}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {m.department || 'Computer Studies'} • {m.program || 'BSIT'} {m.section ? `(${m.section})` : ''}
-                    </span>
-                  </div>
+              <option value="all">All Programs</option>
+              {programsList.map((prog) => (
+                <option key={prog.id} value={prog.code}>
+                  {prog.code} — {prog.name}
+                </option>
+              ))}
+            </select>
 
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-snug">
-                    {m.title || m.projectTitle}
-                  </h3>
+            {/* Dynamic Major / Specialization Filter */}
+            <select
+              value={majorFilter}
+              onChange={(e) => setMajorFilter(e.target.value)}
+              className="text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by Major or Specialization configured in Admin Settings"
+            >
+              <option value="all">
+                {programFilter === 'all' ? 'All Majors / Specializations' : `All ${programFilter} Majors`}
+              </option>
+              {availableMajors.map((maj) => (
+                <option key={maj.id || maj.code} value={maj.code}>
+                  {maj.code} — {maj.name}
+                </option>
+              ))}
+            </select>
 
-                  {m.abstract && (
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-[#9396a8] line-clamp-2 leading-relaxed">
-                      {m.abstract}
-                    </p>
-                  )}
+            {/* Academic Status Filter */}
+            {selectedTab !== 'archived' && (
+              <select
+                value={academicStatusFilter}
+                onChange={(e) => setAcademicStatusFilter(e.target.value)}
+                className="text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Academic Statuses</option>
+                <option value="new_upload">New Upload</option>
+                <option value="under_review">Under Review</option>
+                <option value="ongoing_revision">Ongoing Revision</option>
+                <option value="approved">Academic Approved</option>
+                <option value="accepted">Accepted</option>
+              </select>
+            )}
 
-                  {m.bestThesisNotes && m.isBestThesis && (
-                    <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                      <HiSparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="font-semibold">Best Thesis Citation:</strong> {m.bestThesisNotes}
-                      </div>
-                    </div>
-                  )}
+            {(programFilter !== 'all' || majorFilter !== 'all' || academicStatusFilter !== 'all' || searchQuery) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setProgramFilter('all');
+                  setMajorFilter('all');
+                  setAcademicStatusFilter('all');
+                  setSearchQuery('');
+                  setSelectedIds([]);
+                }}
+                className="text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white"
+              >
+                Reset
+              </Button>
+            )}
+          </div>
+        </div>
 
-                  {/* Authors, Adviser & Grade Info */}
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-xs text-gray-500 dark:text-[#9396a8]">
-                    <div className="flex items-center gap-1.5">
-                      <HiAcademicCap className="w-4 h-4 text-gray-400" />
-                      <span>
-                        Authors:{' '}
-                        <strong className="font-semibold text-gray-800 dark:text-gray-200">
-                          {Array.isArray(m.authors) ? m.authors.join(', ') : m.uploaderName || 'Student Group'}
-                        </strong>
-                      </span>
-                    </div>
+        {/* Publication Review Sub-filter Pills (When on publication_review tab) */}
+        {selectedTab === 'publication_review' && (
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-[#222433] flex-wrap">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-1">
+              Publication Review Stage:
+            </span>
+            {[
+              { id: 'all', label: 'All Submissions' },
+              { id: 'pending_publication', label: `Pending Review (${counts.pendingPublication})` },
+              { id: 'approved', label: `Approved in Repo (${counts.approvedPublication})` },
+              { id: 'rejected', label: `Publication Rejected (${counts.rejectedPublication})` },
+            ].map((sub) => (
+              <button
+                key={sub.id}
+                onClick={() => setPubSubFilter(sub.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  pubSubFilter === sub.id
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8] hover:bg-gray-200 dark:hover:bg-gray-800'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <HiUserGroup className="w-4 h-4 text-gray-400" />
-                      <span>
-                        Adviser:{' '}
-                        <strong className="font-semibold text-gray-800 dark:text-gray-200">
-                          {m.adviserName || 'Assigned Adviser'}
-                        </strong>
-                      </span>
-                    </div>
+      {/* Floating / Sticky Bulk Action Bar */}
+      {selectedIds.length > 0 && isAuthorizedManager && (
+        <div className="sticky top-4 z-20 bg-blue-900/90 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 border border-blue-700/50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold">
+            <HiCheckCircle className="w-5 h-5 text-blue-300" />
+            <span>
+              {selectedIds.length} manuscript{selectedIds.length > 1 ? 's' : ''} selected
+            </span>
+          </div>
 
-                    {m.grade && m.grade.score ? (
-                      <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 px-2.5 py-1 rounded-lg">
-                        <HiCalculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span>
-                          Defense Grade:{' '}
-                          <strong className="font-bold text-emerald-700 dark:text-emerald-300">
-                            {m.grade.score}/100
-                          </strong>{' '}
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">({m.grade.letter})</span>
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-[#1c1d28] px-2.5 py-1 rounded-lg text-gray-500 dark:text-gray-400">
-                        <HiClock className="w-4 h-4 text-amber-500" />
-                        <span>
-                          Defense Grade:{' '}
-                          <strong className="font-medium text-amber-600 dark:text-amber-400">Pending Evaluation</strong>
-                        </span>
-                      </div>
-                    )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedTab === 'archived' ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleBulkArchive(false)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <HiArchiveBoxArrowDown className="w-4 h-4 mr-1.5" /> Bulk Restore ({selectedIds.length})
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleBulkArchive(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                <HiArchiveBox className="w-4 h-4 mr-1.5" /> Bulk Archive ({selectedIds.length})
+              </Button>
+            )}
 
-                    <div className="flex items-center gap-1">
-                      <HiChatBubbleBottomCenterText className="w-4 h-4 text-gray-400" />
-                      <span>{m.commentsCount || (m.comments ? m.comments.length : 0)} comments</span>
-                    </div>
-                  </div>
-                </div>
+            {isAdmin && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleDeleteSelected}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <HiTrash className="w-4 h-4 mr-1.5" /> Delete Selected ({selectedIds.length})
+              </Button>
+            )}
 
-                {/* Right: Actions Hub */}
-                <div className="flex flex-wrap lg:flex-col gap-2 shrink-0 items-end justify-start">
-                  <div className="flex items-center gap-2">
-                    {/* View Paper Button */}
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleOpenPaper(m)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
-                      title="Read manuscript paper, chapters, and abstract"
-                    >
-                      <HiBookOpen className="w-4 h-4 mr-1.5" />
-                      View Paper
-                    </Button>
-
-                    {/* Defense Grade Button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenGrade(m)}
-                      title="View panelist defense evaluations and rubric scores"
-                      className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-                    >
-                      <HiCalculator className="w-4 h-4 mr-1 text-emerald-500" />
-                      {m.grade?.score ? `Defense Grade (${m.grade.score}/100)` : 'Defense Grade'}
-                    </Button>
-
-                    {/* Comments Button */}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleOpenFeedback(m)}
-                      title="Give comments & review notes"
-                    >
-                      <HiChatBubbleBottomCenterText className="w-4 h-4 mr-1 text-blue-500" />
-                      Comments ({m.comments?.length || m.commentsCount || 0})
-                    </Button>
-
-                    {/* Edit Details */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenEdit(m)}
-                      title="Edit manuscript metadata"
-                    >
-                      <HiPencilSquare className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Toggle Best Thesis */}
-                    <Button
-                      variant={m.isBestThesis ? 'primary' : 'outline'}
-                      size="sm"
-                      onClick={() => handleOpenBestThesis(m)}
-                      className={
-                        m.isBestThesis
-                          ? 'bg-amber-500 hover:bg-amber-600 border-none text-white'
-                          : 'border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20'
-                      }
-                      title="Select as Best Thesis"
-                    >
-                      <HiStar className="w-4 h-4 mr-1" />
-                      {m.isBestThesis ? 'Best Thesis ★' : 'Select Best'}
-                    </Button>
-
-                    {/* Pending publish action */}
-                    {m.status === 'pending_publish' && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handlePublishToRepository(m)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        <HiArrowTopRightOnSquare className="w-4 h-4 mr-1" />
-                        Publish
-                      </Button>
-                    )}
-
-                    {/* Archive / Restore Button */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleArchive(m)}
-                      className={m.isArchived ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'}
-                      title={m.isArchived ? 'Restore from archive' : 'Archive manuscript'}
-                    >
-                      {m.isArchived ? (
-                        <HiArchiveBoxArrowDown className="w-4 h-4" />
-                      ) : (
-                        <HiArchiveBox className="w-4 h-4" />
-                      )}
-                    </Button>
-
-                    {/* Delete Single Button */}
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteSingle(m)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        title="Delete Manuscript"
-                      >
-                        <HiTrash className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedIds([])}
+              className="border-white/30 text-white hover:bg-white/10"
+            >
+              Clear
+            </Button>
+          </div>
         </div>
       )}
 
-      {/* 1. GIVE COMMENTS / FEEDBACK MODAL */}
-      <Modal
-        isOpen={feedbackModalOpen}
-        onClose={() => setFeedbackModalOpen(false)}
-        title="Manuscript Comments & Review Feedback"
-        icon={HiChatBubbleBottomCenterText}
-        maxWidth="max-w-2xl"
-      >
-        {selectedManuscript && (
-          <div className="space-y-4">
-            <div className="p-3 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433]">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Manuscript</div>
-              <div className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
-                {selectedManuscript.title || selectedManuscript.projectTitle}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Version: {selectedManuscript.versionNumber} • Uploader: {selectedManuscript.uploaderName || 'Student Group'}
-              </div>
-            </div>
-
-            {/* Comment Thread List */}
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">Previous Comments & Notes:</div>
-              {selectedManuscript.comments && selectedManuscript.comments.length > 0 ? (
-                selectedManuscript.comments.map((c, idx) => (
-                  <div
-                    key={c.id || idx}
-                    className="p-3 rounded-xl bg-gray-50 dark:bg-[#1c1d28]/70 border border-gray-100 dark:border-[#222433] space-y-1"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <strong className="text-gray-900 dark:text-white">{c.authorName || 'Reviewer'}</strong>
-                        <span className="text-[10px] uppercase px-1.5 py-0.2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                          {c.authorRole || 'adviser'}
-                        </span>
-                      </div>
-                      <span className="text-gray-400 text-[11px]">
-                        {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
-                      </span>
-                    </div>
-                    {c.section && (
-                      <div className="text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                        Section: {c.section}
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {c.text || c.comment}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <div className="p-4 text-center text-xs text-gray-400 italic bg-gray-50 dark:bg-[#1c1d28] rounded-xl">
-                  No comments recorded yet. Post the first review feedback below.
-                </div>
-              )}
-            </div>
-
-            {/* Post New Comment Form */}
-            <form onSubmit={handleSubmitFeedback} className="space-y-3 pt-2 border-t border-gray-100 dark:border-[#222433]">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0">Section / Chapter:</label>
-                <select
-                  value={feedbackSection}
-                  onChange={(e) => setFeedbackSection(e.target.value)}
-                  className="text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-lg px-2.5 py-1.5 text-gray-900 dark:text-white"
-                >
-                  <option value="General">General Manuscript</option>
-                  <option value="Abstract & Keywords">Abstract & Keywords</option>
-                  <option value="Chapter 1 - Introduction">Chapter 1 - Introduction</option>
-                  <option value="Chapter 2 - Literature Review">Chapter 2 - Literature Review</option>
-                  <option value="Chapter 3 - Methodology">Chapter 3 - Methodology</option>
-                  <option value="Chapter 4 - Results & Discussion">Chapter 4 - Results & Discussion</option>
-                  <option value="Chapter 5 - Conclusion & Recommendations">Chapter 5 - Conclusion & Recommendations</option>
-                </select>
-              </div>
-
+      {/* VIEW: TOP 5 RANKING LEADERBOARD */}
+      {selectedTab === 'ranking' ? (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30">
+            <div className="flex items-center gap-2.5">
+              <HiTrophy className="w-6 h-6 text-amber-500" />
               <div>
-                <textarea
-                  rows={3}
-                  placeholder="Type constructive comments, revision requirements, or thesis recommendations..."
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  required
-                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" type="button" onClick={() => setFeedbackModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" size="sm" type="submit" isLoading={submittingFeedback}>
-                  <HiPaperAirplane className="w-3.5 h-3.5 mr-1" /> Post Comment
-                </Button>
-              </div>
-            </form>
-          </div>
-        )}
-      </Modal>
-
-      {/* 2. OFFICIAL PANELIST DEFENSE EVALUATION & GRADES MODAL */}
-      <Modal
-        isOpen={gradeModalOpen}
-        onClose={() => setGradeModalOpen(false)}
-        title="Official Panelist Defense Evaluations"
-        icon={HiCalculator}
-        maxWidth="max-w-2xl"
-      >
-        {selectedManuscript && (
-          <div className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433]">
-              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Research Project</div>
-              <div className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">
-                {selectedManuscript.title || selectedManuscript.projectTitle}
-              </div>
-              <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                <span>Authors: <strong>{Array.isArray(selectedManuscript.authors) ? selectedManuscript.authors.join(', ') : selectedManuscript.uploaderName || 'Student Group'}</strong></span>
-                <span>Adviser: <strong>{selectedManuscript.adviserName || 'Assigned Adviser'}</strong></span>
-              </div>
-            </div>
-
-            {selectedManuscript.grade && selectedManuscript.grade.score ? (
-              <div className="space-y-4">
-                {/* Official Score Summary Card */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/30 flex items-center justify-between">
-                  <div>
-                    <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                      Official Defense Grade
-                    </div>
-                    <div className="text-base font-extrabold text-emerald-900 dark:text-emerald-200 mt-0.5">
-                      {selectedManuscript.grade.letter}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {selectedManuscript.grade.remarks}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                      {selectedManuscript.grade.score}
-                    </span>
-                    <span className="text-sm font-medium text-gray-400">/100</span>
-                  </div>
-                </div>
-
-                {/* Individual Panelist Evaluations */}
-                <div className="space-y-3">
-                  <div className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                    Panelist Evaluations ({selectedManuscript.grade.panelistEvaluations?.length || 1})
-                  </div>
-
-                  {Array.isArray(selectedManuscript.grade.panelistEvaluations) &&
-                  selectedManuscript.grade.panelistEvaluations.length > 0 ? (
-                    selectedManuscript.grade.panelistEvaluations.map((ev, idx) => (
-                      <div
-                        key={ev.id || idx}
-                        className="p-3.5 rounded-xl border border-gray-200/80 dark:border-[#222433] bg-white dark:bg-[#181924] space-y-2.5 shadow-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <HiAcademicCap className="w-4 h-4 text-blue-500" />
-                            <span className="font-semibold text-xs text-gray-900 dark:text-white">
-                              {ev.panelistName || 'Defense Panelist'}
-                            </span>
-                          </div>
-                          <Badge variant="emerald" size="sm">
-                            {ev.verdict ? String(ev.verdict).replace(/_/g, ' ') : 'PASSED'}
-                          </Badge>
-                        </div>
-
-                        {/* Subtotal rubrics breakdown */}
-                        {ev.subTotals && (
-                          <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
-                              <div className="text-[10px] text-gray-400">Manuscript</div>
-                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                {ev.subTotals.manuscript ?? '-'}/30
-                              </div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
-                              <div className="text-[10px] text-gray-400">Oral Defense</div>
-                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                {ev.subTotals.oral ?? '-'}/20
-                              </div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
-                              <div className="text-[10px] text-gray-400">Project / System</div>
-                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                {ev.subTotals.project ?? '-'}/50
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {ev.remarks && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-[#1c1d28] p-2.5 rounded-lg border border-gray-100 dark:border-[#222433] italic">
-                            "{ev.remarks}"
-                          </p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-3.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50 dark:bg-[#1c1d28] text-xs text-gray-600 dark:text-gray-300">
-                      Evaluated during defense. Grade recorded: {selectedManuscript.grade.score}/100.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="py-8 text-center space-y-2 bg-gray-50 dark:bg-[#1c1d28] rounded-xl border border-gray-100 dark:border-[#222433]">
-                <HiClock className="w-8 h-8 text-amber-500 mx-auto" />
-                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  No Defense Evaluations Submitted Yet
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
-                  Panelists have not graded this manuscript's proposal or final oral defense yet. Once panel members submit their rubric scores, the authoritative defense grades will appear here.
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {programFilter === 'all'
+                    ? 'Top 5 Overall Research Manuscripts'
+                    : majorFilter === 'all'
+                    ? `Top 5 for ${programFilter}`
+                    : `Top 5 for ${programFilter} — ${majorFilter}`}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Determined strictly by finalized panelist defense evaluations. The official Best Thesis honors are conferred separately by the Research Coordinator.
                 </p>
               </div>
-            )}
-
-            <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-[#222433]">
-              <Button variant="outline" size="sm" onClick={() => setGradeModalOpen(false)}>
-                Close
-              </Button>
             </div>
           </div>
-        )}
-      </Modal>
 
-      {/* 2b. VIEW MANUSCRIPT PAPER & CHAPTERS MODAL (Admin Full Paper Access) */}
+          {top5Manuscripts.length === 0 ? (
+            <Card className="p-12 text-center">
+              <EmptyState
+                icon={HiTrophy}
+                title="No Eligible Finalized Grades Found"
+                description={`No manuscripts in ${
+                  programFilter === 'all' ? 'the university' : programFilter
+                } currently have finalized panelist defense evaluations recorded. Panelists must submit their defense rubrics to appear in the Top 5 rankings.`}
+                action={
+                  <Button variant="outline" size="sm" onClick={() => handleProgramFilterChange('all')}>
+                    Show All Programs
+                  </Button>
+                }
+              />
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {top5Manuscripts.map((m, index) => {
+                const rank = index + 1;
+                return (
+                  <Card
+                    key={m.id}
+                    className={`p-5 transition-all hover:shadow-md ${
+                      rank === 1
+                        ? 'border-amber-400 dark:border-amber-500/60 bg-gradient-to-r from-amber-50/50 dark:from-amber-950/20 to-transparent ring-1 ring-amber-400/30'
+                        : rank === 2
+                        ? 'border-slate-300 dark:border-slate-600 bg-gradient-to-r from-slate-50/50 dark:from-slate-900/20 to-transparent'
+                        : rank === 3
+                        ? 'border-amber-700/30 dark:border-amber-800/40'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* Left: Rank Badge & Info */}
+                      <div className="flex items-start gap-4 flex-1 min-w-0">
+                        {/* Rank Badge */}
+                        <div
+                          className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 font-extrabold shadow-sm ${
+                            rank === 1
+                              ? 'bg-amber-500 text-white ring-4 ring-amber-500/20'
+                              : rank === 2
+                              ? 'bg-slate-400 text-white ring-4 ring-slate-400/20'
+                              : rank === 3
+                              ? 'bg-amber-700 text-white ring-4 ring-amber-700/20'
+                              : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <span className="text-xs uppercase tracking-tighter">Rank</span>
+                          <span className="text-lg leading-none">#{rank}</span>
+                        </div>
+
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                              {m.program || 'BSIT'}
+                            </span>
+                            {m.major && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#1c1d28] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                {m.major}
+                              </span>
+                            )}
+                            {m.isBestThesis && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200 border border-amber-300 dark:border-amber-600 animate-pulse">
+                                <HiSparkles className="w-3.5 h-3.5 text-amber-600" /> Best Thesis Awardee
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="text-base font-bold text-gray-900 dark:text-white leading-snug">
+                            {m.title || m.projectTitle}
+                          </h4>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-[#9396a8]">
+                            <span>
+                              Authors:{' '}
+                              <strong className="text-gray-800 dark:text-gray-200 font-semibold">
+                                {Array.isArray(m.authors) ? m.authors.join(', ') : m.uploaderName || 'Student Group'}
+                              </strong>
+                            </span>
+                            <span>
+                              Adviser:{' '}
+                              <strong className="text-gray-800 dark:text-gray-200 font-semibold">
+                                {m.adviserName || 'Assigned Adviser'}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Defense Grade & Action Buttons */}
+                      <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                        <div className="text-right p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                            Defense Grade
+                          </div>
+                          <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {m.grade.score} <span className="text-xs font-normal text-gray-400">/ 100</span>
+                          </div>
+                          <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                            {m.grade.letter}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleOpenPaper(m)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <HiBookOpen className="w-3.5 h-3.5 mr-1" /> View Paper
+                          </Button>
+
+                          {isAuthorizedManager && (
+                            <Button
+                              variant={m.isBestThesis ? 'primary' : 'outline'}
+                              size="sm"
+                              onClick={() => handleOpenBestThesis(m)}
+                              className={
+                                m.isBestThesis
+                                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                  : 'border-amber-400 text-amber-700 dark:text-amber-400 hover:bg-amber-50'
+                              }
+                              title="Award or update Best Thesis honors (Coordinator/Admin)"
+                            >
+                              <HiStar className="w-3.5 h-3.5 mr-1" />
+                              {m.isBestThesis ? 'Best Thesis ★' : 'Award BEST'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* VIEW: REGULAR MANUSCRIPT LIST (ALL, PUBLICATION REVIEW, ARCHIVED) */
+        <div className="space-y-4">
+          {/* Select All Bar */}
+          {isAuthorizedManager && filteredManuscripts.length > 0 && (
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-[#181924] rounded-xl border border-gray-200/80 dark:border-[#222433]">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                  checked={selectedIds.length > 0 && selectedIds.length === filteredManuscripts.length}
+                  onChange={toggleAllSelection}
+                />
+                <span>Select All ({filteredManuscripts.length} manuscripts)</span>
+              </label>
+
+              <span className="text-xs text-gray-500">
+                Showing {filteredManuscripts.length} of {manuscripts.length} records
+              </span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="py-20 flex flex-col items-center justify-center space-y-3">
+              <div className="w-8 h-8 border-3 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+              <span className="text-xs sm:text-sm text-gray-500">Loading manuscripts...</span>
+            </div>
+          ) : filteredManuscripts.length === 0 ? (
+            <Card className="p-12 text-center">
+              <EmptyState
+                icon={HiDocumentText}
+                title="No Manuscripts Match Your Filter Criteria"
+                description="Try adjusting your Program, Major, search keywords, or switching filter tabs."
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setProgramFilter('all');
+                      setMajorFilter('all');
+                      setAcademicStatusFilter('all');
+                      setSearchQuery('');
+                      setSelectedIds([]);
+                    }}
+                  >
+                    Reset Filters
+                  </Button>
+                }
+              />
+            </Card>
+          ) : (
+            filteredManuscripts.map((m) => (
+              <Card
+                key={m.id}
+                className={`p-5 transition-all hover:border-gray-300 dark:hover:border-gray-600 ${
+                  m.isBestThesis
+                    ? 'border-amber-300 dark:border-amber-500/40 bg-gradient-to-r from-amber-50/20 dark:from-amber-950/10 to-transparent'
+                    : ''
+                }`}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                  {/* Selection Checkbox */}
+                  {isAuthorizedManager && (
+                    <div className="pt-1">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                        checked={selectedIds.includes(m.id)}
+                        onChange={() => toggleSelection(m.id)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Left: Metadata */}
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Academic status badge */}
+                      {getAcademicStatusBadge(m)}
+
+                      {/* Separate Publication workflow status badge */}
+                      {getPublicationStatusBadge(m)}
+
+                      {/* Best Thesis distinction badge */}
+                      {m.isBestThesis && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                          <HiTrophy className="w-3.5 h-3.5" /> Best Thesis Awardee
+                        </span>
+                      )}
+
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8]">
+                        {m.versionNumber || 'v1.0'}
+                      </span>
+
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {m.program || 'BSIT'} {m.major ? `• ${m.major}` : ''} {m.section ? `(${m.section})` : ''}
+                      </span>
+                    </div>
+
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-snug">
+                      {m.title || m.projectTitle}
+                    </h3>
+
+                    {m.abstract && (
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-[#9396a8] line-clamp-2 leading-relaxed">
+                        {m.abstract}
+                      </p>
+                    )}
+
+                    {/* Best Thesis citation if present */}
+                    {m.bestThesisNotes && m.isBestThesis && (
+                      <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                        <HiSparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="font-semibold">Best Thesis Citation:</strong> {m.bestThesisNotes}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Publication rejection reason note if rejected */}
+                    {m.publicationStatus === 'rejected' && m.publicationRejectionReason && (
+                      <div className="p-2.5 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 flex items-start gap-2">
+                        <HiXCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="font-semibold">Publication Reviewer Feedback:</strong>{' '}
+                          {m.publicationRejectionReason}
+                          {m.publicationReviewerName && (
+                            <span className="block text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
+                              Reviewed by {m.publicationReviewerName} on{' '}
+                              {m.publicationReviewedAt ? new Date(m.publicationReviewedAt).toLocaleDateString() : 'recent'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Authors, Adviser & Defense Grade Info */}
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-xs text-gray-500 dark:text-[#9396a8]">
+                      <div className="flex items-center gap-1.5">
+                        <HiAcademicCap className="w-4 h-4 text-gray-400" />
+                        <span>
+                          Authors:{' '}
+                          <strong className="font-semibold text-gray-800 dark:text-gray-200">
+                            {Array.isArray(m.authors) ? m.authors.join(', ') : m.uploaderName || 'Student Group'}
+                          </strong>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <HiUserGroup className="w-4 h-4 text-gray-400" />
+                        <span>
+                          Adviser:{' '}
+                          <strong className="font-semibold text-gray-800 dark:text-gray-200">
+                            {m.adviserName || 'Assigned Adviser'}
+                          </strong>
+                        </span>
+                      </div>
+
+                      {m.grade && m.grade.score ? (
+                        <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 px-2.5 py-1 rounded-lg">
+                          <HiCalculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <span>
+                            Defense Grade:{' '}
+                            <strong className="font-bold text-emerald-700 dark:text-emerald-300">
+                              {m.grade.score}/100
+                            </strong>{' '}
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">({m.grade.letter})</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-[#1c1d28] px-2.5 py-1 rounded-lg text-gray-500 dark:text-gray-400">
+                          <HiClock className="w-4 h-4 text-amber-500" />
+                          <span>
+                            Defense Grade:{' '}
+                            <strong className="font-medium text-amber-600 dark:text-amber-400">Pending Evaluation</strong>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Actions Hub (Comments button removed per Requirement 6!) */}
+                  <div className="flex flex-wrap lg:flex-col gap-2 shrink-0 items-end justify-start">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* View Paper Button */}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleOpenPaper(m)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                        title="Read manuscript chapters, paper overview, and abstract"
+                      >
+                        <HiBookOpen className="w-4 h-4 mr-1.5" />
+                        View Paper
+                      </Button>
+
+                      {/* Defense Grade Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenGrade(m)}
+                        title="View panelist defense evaluations and rubric scores"
+                        className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                      >
+                        <HiCalculator className="w-4 h-4 mr-1 text-emerald-500" />
+                        {m.grade?.score ? `Grade (${m.grade.score}/100)` : 'Defense Grade'}
+                      </Button>
+
+                      {/* Best Thesis Button (For Authorized Coordinators / Admins) */}
+                      {isAuthorizedManager && (
+                        <Button
+                          variant={m.isBestThesis ? 'primary' : 'outline'}
+                          size="sm"
+                          onClick={() => handleOpenBestThesis(m)}
+                          className={
+                            m.isBestThesis
+                              ? 'bg-amber-500 hover:bg-amber-600 border-none text-white'
+                              : 'border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20'
+                          }
+                          title="Assign or remove official Best Thesis distinction"
+                        >
+                          <HiStar className="w-4 h-4 mr-1" />
+                          {m.isBestThesis ? 'Best Thesis ★' : 'BEST'}
+                        </Button>
+                      )}
+
+                      {/* Edit Details Button */}
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEdit(m)}
+                          title="Edit manuscript metadata"
+                        >
+                          <HiPencilSquare className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Publication Review Workflow Actions */}
+                    {isAuthorizedManager && (m.publicationStatus === 'pending_publication' || selectedTab === 'publication_review') && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        {m.publicationStatus !== 'approved' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleApprovePublication(m)}
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                            title="Approve manuscript for public repository publication"
+                          >
+                            <HiCheckCircle className="w-4 h-4 mr-1" /> Approve Pub
+                          </Button>
+                        )}
+
+                        {m.publicationStatus !== 'rejected' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenRejectPublication(m)}
+                            className="border-rose-300 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs"
+                            title="Reject repository publication with feedback"
+                          >
+                            <HiXCircle className="w-4 h-4 mr-1 text-rose-500" /> Reject Pub
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Archive / Restore Action (Requirement 3) */}
+                    {isAuthorizedManager && (
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleArchive(m)}
+                          className={m.isArchived ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'}
+                          title={m.isArchived ? 'Restore to active list' : 'Move to institutional archive'}
+                        >
+                          {m.isArchived ? (
+                            <>
+                              <HiArchiveBoxArrowDown className="w-4 h-4 mr-1 text-blue-600" /> Restore
+                            </>
+                          ) : (
+                            <>
+                              <HiArchiveBox className="w-4 h-4 mr-1 text-gray-500" /> Archive
+                            </>
+                          )}
+                        </Button>
+
+                        {/* Delete Single Button (Admin only) */}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteSingle(m)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            title="Delete Manuscript Permanently"
+                          >
+                            <HiTrash className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* MODAL 1: VIEW MANUSCRIPT PAPER & CHAPTERS */}
       <Modal
         isOpen={paperModalOpen}
         onClose={() => setPaperModalOpen(false)}
@@ -1140,15 +1437,15 @@ export const AdminManuscripts = () => {
       >
         {selectedManuscript && (
           <div className="space-y-4">
-            {/* Header info card */}
             <div className="p-4 rounded-2xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-200/80 dark:border-[#222433] space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                {getStatusBadge(selectedManuscript)}
+                {getAcademicStatusBadge(selectedManuscript)}
+                {getPublicationStatusBadge(selectedManuscript)}
                 <span className="text-xs font-semibold px-2 py-0.5 rounded bg-gray-200/80 dark:bg-[#282a3c] text-gray-700 dark:text-[#9396a8]">
                   {selectedManuscript.versionNumber || 'v1.0'}
                 </span>
                 <span className="text-xs text-gray-400">
-                  {selectedManuscript.department || 'Computer Studies'} • {selectedManuscript.program || 'BSIT'} {selectedManuscript.section ? `(${selectedManuscript.section})` : ''}
+                  {selectedManuscript.program || 'BSIT'} {selectedManuscript.major ? `• ${selectedManuscript.major}` : ''} {selectedManuscript.section ? `(${selectedManuscript.section})` : ''}
                 </span>
               </div>
 
@@ -1169,16 +1466,26 @@ export const AdminManuscripts = () => {
             {/* Quick Actions Bar */}
             <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/30">
               <div className="text-xs text-blue-900 dark:text-blue-300 font-medium">
-                Admin Paper Inspection & Real-time Collaboration:
+                Research Collaboration & Live Inspection:
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={() => handleOpenWorkspace(selectedManuscript)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs shadow-xs"
+                  title="Open live collaboration workspace with tasks and feedback"
                 >
                   <HiEye className="w-3.5 h-3.5 mr-1" /> Open in Full Workspace
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleInspectDocument(selectedManuscript)}
+                  className="text-xs bg-white dark:bg-[#1a1b26] text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-semibold"
+                  title="Open manuscript content in document editor (Read-Only inspection)"
+                >
+                  <HiDocumentText className="w-3.5 h-3.5 mr-1" /> Read Full Paper (Editor)
                 </Button>
                 {selectedManuscript.fileUrl && (
                   <Button
@@ -1186,6 +1493,7 @@ export const AdminManuscripts = () => {
                     size="sm"
                     onClick={() => window.open(selectedManuscript.fileUrl, '_blank')}
                     className="text-xs"
+                    title="View uploaded PDF or attached manuscript file"
                   >
                     <HiArrowDownTray className="w-3.5 h-3.5 mr-1" /> View Attached File
                   </Button>
@@ -1226,7 +1534,7 @@ export const AdminManuscripts = () => {
               </div>
             )}
 
-            {/* Manuscript Chapters Outline & Approvals */}
+            {/* Manuscript Chapters Outline */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -1237,20 +1545,20 @@ export const AdminManuscripts = () => {
 
               <div className="space-y-2">
                 {[
-                  { id: 'ch1', num: 'Chapter 1', title: 'The Problem and Its Background (Objectives & Scope)' },
-                  { id: 'ch2', num: 'Chapter 2', title: 'Review of Related Literature and Studies' },
-                  { id: 'ch3', num: 'Chapter 3', title: 'Research Methodology and Technical Design' },
-                  { id: 'ch4', num: 'Chapter 4', title: 'Results, Analysis, and Discussion' },
-                  { id: 'ch5', num: 'Chapter 5', title: 'Summary, Conclusions, and Recommendations' },
+                  { id: 'chapter_1', num: 'Chapter 1', title: 'The Problem and Its Background (Objectives & Scope)' },
+                  { id: 'chapter_2', num: 'Chapter 2', title: 'Review of Related Literature and Studies' },
+                  { id: 'chapter_3', num: 'Chapter 3', title: 'Research Methodology and Technical Design' },
+                  { id: 'chapter_4', num: 'Chapter 4', title: 'Results, Analysis, and Discussion' },
+                  { id: 'chapter_5', num: 'Chapter 5', title: 'Summary, Conclusions, and Recommendations' },
                 ].map((ch, idx) => {
-                  const sectionData = selectedManuscript.sections?.find((s) => s.order === idx + 1 || s.id === `chapter_${idx + 1}`);
+                  const sectionData = selectedManuscript.sections?.find((s) => s.order === idx + 1 || s.id === ch.id || s.id === `ch${idx + 1}`);
                   const isDone = sectionData?.status === 'completed' || selectedManuscript.status === 'approved' || selectedManuscript.status === 'accepted';
                   return (
                     <div
                       key={ch.id}
-                      className="p-3 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/70 dark:bg-[#1c1d28]/70 flex items-center justify-between"
+                      className="p-3 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50/70 dark:bg-[#1c1d28]/70 flex items-center justify-between gap-3"
                     >
-                      <div className="space-y-0.5">
+                      <div className="space-y-0.5 min-w-0">
                         <div className="text-xs font-bold text-gray-900 dark:text-white">
                           {ch.num}: {ch.title}
                         </div>
@@ -1260,25 +1568,27 @@ export const AdminManuscripts = () => {
                           </div>
                         )}
                       </div>
-                      <Badge variant={isDone ? 'emerald' : sectionData?.status === 'revision_required' ? 'rose' : 'blue'} size="sm">
-                        {isDone ? 'Approved' : sectionData?.status === 'revision_required' ? 'Revision' : 'In Progress'}
-                      </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant={isDone ? 'emerald' : sectionData?.status === 'revision_required' ? 'rose' : 'blue'} size="sm">
+                          {isDone ? 'Approved' : sectionData?.status === 'revision_required' ? 'Revision' : 'In Progress'}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleInspectDocument(selectedManuscript, ch.id)}
+                          className="text-[11px] text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 px-2 py-1 font-semibold flex items-center gap-1"
+                          title={`Inspect ${ch.num} in document editor`}
+                        >
+                          <HiEye className="w-3 h-3" /> Inspect
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-[#222433]">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOpenFeedback(selectedManuscript)}
-                className="text-xs"
-              >
-                <HiChatBubbleBottomCenterText className="w-3.5 h-3.5 mr-1 text-blue-500" />
-                Add Review Comments
-              </Button>
+            <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-[#222433]">
               <Button variant="primary" size="sm" onClick={() => setPaperModalOpen(false)}>
                 Done
               </Button>
@@ -1287,7 +1597,132 @@ export const AdminManuscripts = () => {
         )}
       </Modal>
 
-      {/* 3. EDIT MANUSCRIPT DETAILS MODAL */}
+      {/* MODAL 2: OFFICIAL PANELIST DEFENSE EVALUATION & GRADES */}
+      <Modal
+        isOpen={gradeModalOpen}
+        onClose={() => setGradeModalOpen(false)}
+        title="Official Panelist Defense Evaluations"
+        icon={HiCalculator}
+        maxWidth="max-w-2xl"
+      >
+        {selectedManuscript && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433]">
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Research Project</div>
+              <div className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">
+                {selectedManuscript.title || selectedManuscript.projectTitle}
+              </div>
+              <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                <span>Authors: <strong>{Array.isArray(selectedManuscript.authors) ? selectedManuscript.authors.join(', ') : selectedManuscript.uploaderName || 'Student Group'}</strong></span>
+                <span>Adviser: <strong>{selectedManuscript.adviserName || 'Assigned Adviser'}</strong></span>
+              </div>
+            </div>
+
+            {selectedManuscript.grade && selectedManuscript.grade.score ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/30 flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                      Authoritative Defense Grade
+                    </div>
+                    <div className="text-base font-extrabold text-emerald-900 dark:text-emerald-200 mt-0.5">
+                      {selectedManuscript.grade.letter}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {selectedManuscript.grade.remarks}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                      {selectedManuscript.grade.score}
+                    </span>
+                    <span className="text-sm font-medium text-gray-400">/100</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Panelist Evaluations ({selectedManuscript.grade.panelistEvaluations?.length || 1})
+                  </div>
+
+                  {Array.isArray(selectedManuscript.grade.panelistEvaluations) &&
+                  selectedManuscript.grade.panelistEvaluations.length > 0 ? (
+                    selectedManuscript.grade.panelistEvaluations.map((ev, idx) => (
+                      <div
+                        key={ev.id || idx}
+                        className="p-3.5 rounded-xl border border-gray-200/80 dark:border-[#222433] bg-white dark:bg-[#181924] space-y-2.5 shadow-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <HiAcademicCap className="w-4 h-4 text-blue-500" />
+                            <span className="font-semibold text-xs text-gray-900 dark:text-white">
+                              {ev.panelistName || 'Defense Panelist'}
+                            </span>
+                          </div>
+                          <Badge variant="emerald" size="sm">
+                            {ev.verdict ? String(ev.verdict).replace(/_/g, ' ') : 'PASSED'}
+                          </Badge>
+                        </div>
+
+                        {ev.subTotals && (
+                          <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
+                              <div className="text-[10px] text-gray-400">Manuscript</div>
+                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                {ev.subTotals.manuscript ?? '-'}/30
+                              </div>
+                            </div>
+                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
+                              <div className="text-[10px] text-gray-400">Oral Defense</div>
+                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                {ev.subTotals.oral ?? '-'}/20
+                              </div>
+                            </div>
+                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
+                              <div className="text-[10px] text-gray-400">Project / System</div>
+                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                {ev.subTotals.project ?? '-'}/50
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {ev.remarks && (
+                          <p className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-[#1c1d28] p-2.5 rounded-lg border border-gray-100 dark:border-[#222433] italic">
+                            "{ev.remarks}"
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50 dark:bg-[#1c1d28] text-xs text-gray-600 dark:text-gray-300">
+                      Evaluated during defense. Score recorded: {selectedManuscript.grade.score}/100.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center space-y-2 bg-gray-50 dark:bg-[#1c1d28] rounded-xl border border-gray-100 dark:border-[#222433]">
+                <HiClock className="w-8 h-8 text-amber-500 mx-auto" />
+                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  No Defense Evaluations Submitted Yet
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+                  Panelists have not graded this manuscript's defense yet. Once panel members complete and finalize their defense rubrics, the authoritative scores will automatically populate here.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-[#222433]">
+              <Button variant="outline" size="sm" onClick={() => setGradeModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* MODAL 3: EDIT MANUSCRIPT DETAILS */}
       <Modal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
@@ -1298,56 +1733,59 @@ export const AdminManuscripts = () => {
         {selectedManuscript && (
           <form onSubmit={handleSubmitEdit} className="space-y-3.5">
             <div>
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Manuscript Title</label>
-              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                Authors (comma-separated)
-              </label>
-              <Input
-                value={editAuthors}
-                onChange={(e) => setEditAuthors(e.target.value)}
-                placeholder="Alex Rivera, Maria Santos"
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Manuscript Title</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                required
+                className="w-full text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Workflow Status</label>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Authors (comma-separated)</label>
+              <input
+                type="text"
+                value={editAuthors}
+                onChange={(e) => setEditAuthors(e.target.value)}
+                className="w-full text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Abstract</label>
+              <textarea
+                rows={4}
+                value={editAbstract}
+                onChange={(e) => setEditAbstract(e.target.value)}
+                className="w-full text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Keywords (comma-separated)</label>
+              <input
+                type="text"
+                value={editKeywords}
+                onChange={(e) => setEditKeywords(e.target.value)}
+                className="w-full text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Academic Status</label>
               <select
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value)}
-                className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
+                className="w-full text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
               >
                 <option value="new_upload">New Upload</option>
                 <option value="under_review">Under Review</option>
                 <option value="ongoing_revision">Ongoing Revision</option>
-                <option value="approved">Approved</option>
+                <option value="approved">Academic Approved</option>
                 <option value="accepted">Accepted</option>
-                <option value="pending_publish">Pending Publish</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
               </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Abstract</label>
-              <textarea
-                rows={3}
-                value={editAbstract}
-                onChange={(e) => setEditAbstract(e.target.value)}
-                className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Keywords (comma-separated)</label>
-              <Input
-                value={editKeywords}
-                onChange={(e) => setEditKeywords(e.target.value)}
-                placeholder="IoT, Agriculture, Precision Sensing"
-              />
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
@@ -1362,38 +1800,52 @@ export const AdminManuscripts = () => {
         )}
       </Modal>
 
-      {/* 4. BEST THESIS SELECTION MODAL */}
+      {/* MODAL 4: BEST THESIS SELECTION MODAL (Requirement 9) */}
       <Modal
         isOpen={bestThesisModalOpen}
         onClose={() => setBestThesisModalOpen(false)}
-        title="Best Thesis Designation & Award"
+        title="Best Thesis Designation"
         icon={HiTrophy}
         maxWidth="max-w-md"
       >
         {selectedManuscript && (
           <form onSubmit={handleSubmitBestThesis} className="space-y-4">
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-900 dark:text-amber-200 space-y-1">
-              <div className="font-semibold text-sm">
-                {selectedManuscript.isBestThesis ? 'Remove Best Thesis Designation' : 'Award Best Thesis Honors'}
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <div className="font-bold text-sm">
+                {selectedManuscript.isBestThesis ? 'Remove Best Thesis Designation' : 'Award Official Best Thesis Distinction'}
               </div>
-              <p>
+              <p className="leading-relaxed">
                 {selectedManuscript.isBestThesis
-                  ? 'This will remove the Best Thesis distinction and showcase tag from this manuscript.'
-                  : 'Designate this manuscript for special university research honors and highlight in the repository showcase.'}
+                  ? 'This will remove the official Best Thesis honors and badge from this manuscript. Its panelist defense grades and ranking will remain completely unaffected.'
+                  : 'Designate this manuscript for highest university research honors. This decision is coordinator-directed and independent of grade ranking.'}
               </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-[#1c1d28] border border-gray-100 dark:border-[#222433] text-xs space-y-1">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                {selectedManuscript.title || selectedManuscript.projectTitle}
+              </div>
+              <div className="text-gray-500">
+                Program: {selectedManuscript.program || 'BSIT'} {selectedManuscript.major ? `• ${selectedManuscript.major}` : ''}
+              </div>
+              {selectedManuscript.grade?.score && (
+                <div className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                  Final Defense Grade: {selectedManuscript.grade.score}/100
+                </div>
+              )}
             </div>
 
             {!selectedManuscript.isBestThesis && (
               <div>
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                   Award Citation & Recognition Notes
                 </label>
                 <textarea
                   rows={3}
                   value={bestThesisNotes}
                   onChange={(e) => setBestThesisNotes(e.target.value)}
-                  placeholder="E.g. Awarded Best Thesis 2026 for outstanding practical implementation and academic rigor."
-                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="E.g. Awarded Best Thesis for exceptional innovation, technical design, and empirical rigor."
+                  className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 mt-1"
                 />
               </div>
             )}
@@ -1407,9 +1859,58 @@ export const AdminManuscripts = () => {
                 size="sm"
                 type="submit"
                 isLoading={submittingBestThesis}
-                className={selectedManuscript.isBestThesis ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}
+                className={selectedManuscript.isBestThesis ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}
               >
-                {selectedManuscript.isBestThesis ? 'Remove Award' : 'Confirm Best Thesis'}
+                {selectedManuscript.isBestThesis ? 'Remove Designation' : 'Confirm Best Thesis'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* MODAL 5: REJECT PUBLICATION MODAL (Requirement 7.3) */}
+      <Modal
+        isOpen={rejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        title="Reject Repository Publication"
+        icon={HiXCircle}
+        maxWidth="max-w-md"
+      >
+        {selectedManuscript && (
+          <form onSubmit={handleSubmitRejectPublication} className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-900 dark:text-rose-200 space-y-1">
+              <div className="font-bold text-sm">Provide Rejection Reason & Feedback</div>
+              <p className="leading-relaxed">
+                The manuscript will remain unpublished in the Institutional Repository. Your constructive feedback will be saved to the review record and delivered to the authors. Academic grades and defense records are preserved.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Reason for Rejection / Camera-Ready Revision Notes <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={4}
+                required
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Specify required corrections (e.g., Abstract needs IEEE formatting, references must be updated, or camera-ready PDF file quality is insufficient)..."
+                className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 mt-1"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
+              <Button variant="outline" size="sm" type="button" onClick={() => setRejectModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                type="submit"
+                isLoading={submittingReject}
+                className="bg-rose-600 hover:bg-rose-700"
+              >
+                Confirm Rejection
               </Button>
             </div>
           </form>
