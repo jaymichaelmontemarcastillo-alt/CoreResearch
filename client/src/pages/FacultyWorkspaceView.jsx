@@ -57,6 +57,11 @@ export const FacultyWorkspaceView = () => {
   const isAdviser = effectiveRole === 'adviser';
   const isPanelist = effectiveRole === 'panelist';
   const isAdmin = effectiveRole === 'admin' || role === 'admin' || role === 'research_coordinator';
+  const isAssignedAdviser = Boolean(
+    workspace?.adviserId && currentUser?.uid && workspace.adviserId === currentUser.uid
+  );
+  const canApprove = isAdviser || isAssignedAdviser || isAdmin;
+  const canRequestRevision = isAdviser || isAssignedAdviser || isPanelist || role === 'research_coordinator' || isAdmin;
 
   useEffect(() => {
     let unsubscribeWs = () => {};
@@ -143,9 +148,10 @@ export const FacultyWorkspaceView = () => {
         await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
       }
 
+      const readModeParam = isAdmin ? '&mode=read' : '';
       const targetUrl = chapterId
-        ? `${editorUrl}?workspaceId=${workspace.id}&chapterId=${chapterId}`
-        : `${editorUrl}?workspaceId=${workspace.id}`;
+        ? `${editorUrl}?workspaceId=${workspace.id}&chapterId=${chapterId}${readModeParam}`
+        : `${editorUrl}?workspaceId=${workspace.id}${readModeParam}`;
 
       navigate(targetUrl, { state: { from: location.pathname + location.search } });
     } catch (err) {
@@ -241,8 +247,8 @@ export const FacultyWorkspaceView = () => {
   const currentFocusArea = progressService.getCurrentFocusArea(workspace, tasks, feedbackList);
 
   const handleApproveChapter = async (chapterId, chapterName) => {
-    if (!isAdviser) {
-      setToast('Only the assigned adviser can approve chapters.');
+    if (!canApprove) {
+      setToast('Only the assigned adviser, coordinators, or administrators can approve chapters.');
       return;
     }
     const confirmApprove = window.confirm(
@@ -265,8 +271,8 @@ export const FacultyWorkspaceView = () => {
   };
 
   const handleRequestRevision = async (chapterId, chapterName) => {
-    if (!isAdviser && !isPanelist && role !== 'research_coordinator') {
-      setToast('Only the assigned adviser, defense panelists, or coordinators can request chapter revisions.');
+    if (!canRequestRevision) {
+      setToast('Only the assigned adviser, defense panelists, coordinators, or administrators can request chapter revisions.');
       return;
     }
     const targetSection = (workspace.sections || []).find((s) => s.id === chapterId);

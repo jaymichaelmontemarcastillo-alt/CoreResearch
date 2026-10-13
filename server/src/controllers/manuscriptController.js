@@ -778,10 +778,18 @@ export const getAllAdminManuscripts = async (req, res) => {
               adviserName: data.adviserName,
               adviserId: data.adviserId,
               department: data.department || 'Computer Studies',
+              program: data.program || data.courseId?.toUpperCase() || 'BSIT',
+              major: data.major || data.majorCode || data.specialization || data.programSpecialization || '',
+              majorCode: data.majorCode || '',
+              courseId: data.courseId || '',
               versionNumber: 'v1.0',
               abstract: data.abstract || '',
               keywords: data.keywords || [],
               status: data.status || 'under_review',
+              publicationStatus: data.publicationStatus || (data.status === 'published' ? 'approved' : (data.status === 'pending_publish' ? 'pending_publication' : undefined)),
+              publicationRejectionReason: data.publicationRejectionReason || '',
+              publicationReviewedAt: data.publicationReviewedAt,
+              publicationReviewerName: data.publicationReviewerName,
               isArchived: Boolean(data.isArchived),
               isBestThesis: Boolean(data.isBestThesis),
               bestThesisNotes: data.bestThesisNotes || '',
@@ -960,11 +968,6 @@ export const toggleArchiveManuscript = async (req, res) => {
       }
       const nextArchive = isArchived !== undefined ? Boolean(isArchived) : !item.isArchived;
       item.isArchived = nextArchive;
-      if (nextArchive) {
-        item.status = 'archived';
-      } else if (item.status === 'archived') {
-        item.status = 'approved';
-      }
       item.updatedAt = new Date().toISOString();
       map.set(id, item);
       updated = item;
@@ -975,7 +978,6 @@ export const toggleArchiveManuscript = async (req, res) => {
       const nextArchive = isArchived !== undefined ? Boolean(isArchived) : !current.isArchived;
       const patch = {
         isArchived: nextArchive,
-        status: nextArchive ? 'archived' : (current.status === 'archived' ? 'approved' : current.status),
         updatedAt: new Date().toISOString()
       };
       await ref.update(patch);
@@ -1126,17 +1128,37 @@ export const publishManuscriptToRepository = async (req, res) => {
       if (!manuscript) {
         return res.status(404).json({ success: false, error: 'Manuscript not found' });
       }
-      manuscript.status = 'published';
+      manuscript.publicationStatus = 'approved';
+      manuscript.publicationReviewedAt = new Date().toISOString();
+      manuscript.publicationReviewerName = req.user?.fullName || 'Research Coordinator';
       manuscript.updatedAt = new Date().toISOString();
       map.set(id, manuscript);
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
       const doc = await ref.get();
       if (!doc.exists) {
-        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        // Check workspace
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (!wsDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+        await wsRef.update({
+          publicationStatus: 'approved',
+          publicationReviewedAt: new Date().toISOString(),
+          publicationReviewerName: req.user?.fullName || 'Research Coordinator',
+          updatedAt: new Date().toISOString()
+        });
+        manuscript = { id: wsDoc.id, ...wsDoc.data(), publicationStatus: 'approved' };
+      } else {
+        await ref.update({
+          publicationStatus: 'approved',
+          publicationReviewedAt: new Date().toISOString(),
+          publicationReviewerName: req.user?.fullName || 'Research Coordinator',
+          updatedAt: new Date().toISOString()
+        });
+        manuscript = { id: doc.id, ...doc.data(), publicationStatus: 'approved' };
       }
-      await ref.update({ status: 'published', updatedAt: new Date().toISOString() });
-      manuscript = { id: doc.id, ...doc.data(), status: 'published' };
     }
 
     let finalPdfUrl = manuscript.fileUrl || '';
@@ -1173,6 +1195,10 @@ export const publishManuscriptToRepository = async (req, res) => {
       downloadsCount: 0,
       versionNumber: manuscript.versionNumber || 'v1.0',
       isBestThesis: Boolean(manuscript.isBestThesis),
+      publicationStatus: 'approved',
+      reviewedBy: req.user?.uid || '',
+      reviewedByName: req.user?.fullName || 'Research Coordinator',
+      reviewedAt: new Date(),
       publishedAt: new Date().toISOString()
     };
 
@@ -1231,6 +1257,92 @@ export const deleteAdminManuscripts = async (req, res) => {
     });
   } catch (error) {
     console.error('[ManuscriptController] deleteAdminManuscripts error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Update publication status of a manuscript (Approve / Reject)
+ */
+export const updateManuscriptPublicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { publicationStatus, rejectionReason } = req.body;
+    const reviewerName = req.user?.fullName || 'Research Coordinator';
+    const reviewerId = req.user?.uid || '';
+    const now = new Date().toISOString();
+
+    if (!['pending_publication', 'approved', 'rejected'].includes(publicationStatus)) {
+      return res.status(400).json({ success: false, message: 'Invalid publication status' });
+    }
+
+    if (publicationStatus === 'rejected' && (!rejectionReason || !rejectionReason.trim())) {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required.' });
+    }
+
+    const updates = {
+      publicationStatus,
+      publicationRejectionReason: publicationStatus === 'rejected' ? rejectionReason.trim() : '',
+      publicationReviewedAt: now,
+      publicationReviewerName: reviewerName,
+      publicationReviewerId: reviewerId,
+      updatedAt: now
+    };
+
+    let updated = null;
+
+    if (isDevMockMode) {
+      seedMockManuscriptsIfEmpty();
+      const map = mockFirestoreDb.get('manuscripts');
+      const item = map?.get(id);
+      if (item) {
+        Object.assign(item, updates);
+        map.set(id, item);
+        updated = item;
+      }
+    } else {
+      const refV = db.collection('manuscript_versions').doc(id);
+      const docV = await refV.get();
+      if (docV.exists) {
+        await refV.update(updates);
+        const refD = await refV.get();
+        updated = { id: refD.id, ...refD.data() };
+      } else {
+        const refW = db.collection('manuscript_workspaces').doc(id);
+        const docW = await refW.get();
+        if (docW.exists) {
+          await refW.update(updates);
+          const refD = await refW.get();
+          updated = { id: refD.id, ...refD.data() };
+        }
+      }
+    }
+
+    // Sync corresponding RepositoryPublication if it exists
+    try {
+      await RepositoryPublication.findOneAndUpdate(
+        { $or: [{ manuscriptId: id }, { id }] },
+        {
+          publicationStatus,
+          rejectionReason: publicationStatus === 'rejected' ? rejectionReason.trim() : '',
+          reviewedBy: reviewerId,
+          reviewedByName: reviewerName,
+          reviewedAt: new Date()
+        }
+      );
+    } catch (repoSyncErr) {
+      console.warn('[ManuscriptController] Repo sync warning:', repoSyncErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: publicationStatus === 'approved'
+        ? 'Manuscript approved for publication in the Institutional Repository.'
+        : 'Publication submission rejected with reviewer feedback.',
+      data: updated
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] updateManuscriptPublicationStatus error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

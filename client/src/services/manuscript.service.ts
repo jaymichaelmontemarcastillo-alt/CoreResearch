@@ -21,6 +21,7 @@ import {
 const COLLECTION_NAME = 'manuscript_versions';
 
 import api from './api';
+import { notificationService } from './notification.service';
 
 export const manuscriptService = {
   /**
@@ -45,12 +46,43 @@ export const manuscriptService = {
         getDocs(collection(db, 'manuscript_workspaces')).catch(() => ({ docs: [] })),
       ]);
 
-      const versionItems = versionsSnap.docs.map(
-        (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ManuscriptVersion)
-      );
+      const resolveMajor = (raw?: string) => {
+        if (!raw) return '';
+        const upper = raw.toUpperCase();
+        if (upper.includes('WMAD') || upper.includes('WEB AND MOBILE')) return 'WMAD';
+        if (upper.includes('AMG') || upper.includes('ANIMATION')) return 'AMG';
+        if (upper.includes('SMP') || upper.includes('SERVICE MANAGEMENT')) return 'SMP';
+        if (upper.includes('IS') || upper.includes('INTELLIGENT SYSTEMS') || upper.includes('INFORMATION SYSTEMS')) return 'IS';
+        return raw;
+      };
+
+      const versionItems = versionsSnap.docs.map((docSnap) => {
+        const data = docSnap.data();
+        const rawMajor = data.major || data.majorCode || data.specialization || data.programSpecialization || '';
+        const resolvedMajor = resolveMajor(rawMajor);
+        const resolvedProgram = data.program || (data.courseId ? data.courseId.toUpperCase() : (resolvedMajor === 'IS' ? 'BSCS' : 'BSIT'));
+
+        return {
+          id: docSnap.id,
+          ...data,
+          program: resolvedProgram,
+          courseId: data.courseId || resolvedProgram.toLowerCase(),
+          major: resolvedMajor || data.major || '',
+          majorCode: resolvedMajor || data.majorCode || '',
+          specialization: resolvedMajor || data.specialization || '',
+          publicationStatus: data.publicationStatus || (data.status === 'published' ? 'approved' : (data.status === 'pending_publish' ? 'pending_publication' : undefined)),
+          publicationRejectionReason: data.publicationRejectionReason || '',
+          publicationReviewedAt: data.publicationReviewedAt,
+          publicationReviewerName: data.publicationReviewerName,
+        } as ManuscriptVersion;
+      });
 
       const workspaceItems = wsSnap.docs.map((docSnap) => {
         const data = docSnap.data();
+        const rawMajor = data.major || data.majorCode || data.specialization || data.programSpecialization || data.members?.[0]?.major || data.members?.[0]?.programSpecialization || '';
+        const resolvedMajor = resolveMajor(rawMajor);
+        const resolvedProgram = data.program || (data.courseId ? data.courseId.toUpperCase() : (resolvedMajor === 'IS' ? 'BSCS' : 'BSIT'));
+
         return {
           id: docSnap.id,
           projectId: data.projectId || data.proposalId || docSnap.id,
@@ -64,7 +96,11 @@ export const manuscriptService = {
           adviserName: data.adviserName || 'Assigned Adviser',
           adviserId: data.adviserId,
           department: data.department || 'Computer Studies',
-          program: data.program || 'BSIT',
+          program: resolvedProgram,
+          courseId: data.courseId || resolvedProgram.toLowerCase(),
+          major: resolvedMajor,
+          majorCode: resolvedMajor,
+          specialization: resolvedMajor,
           section: data.section || '',
           versionNumber: 'v1.0',
           fileUrl: data.fileUrl || '',
@@ -73,6 +109,10 @@ export const manuscriptService = {
           abstract: data.abstract || '',
           keywords: Array.isArray(data.keywords) ? data.keywords : [],
           status: data.status === 'completed' ? 'approved' : data.status || 'under_review',
+          publicationStatus: data.publicationStatus || (data.status === 'published' ? 'approved' : (data.status === 'pending_publish' ? 'pending_publication' : undefined)),
+          publicationRejectionReason: data.publicationRejectionReason || '',
+          publicationReviewedAt: data.publicationReviewedAt,
+          publicationReviewerName: data.publicationReviewerName,
           isArchived: Boolean(data.isArchived),
           isBestThesis: Boolean(data.isBestThesis),
           bestThesisNotes: data.bestThesisNotes || '',
@@ -254,6 +294,7 @@ export const manuscriptService = {
 
   /**
    * Toggle archive status of a manuscript
+   * Preserves academic status, publication status, grades, Best Thesis, and relationships
    */
   async toggleArchiveManuscript(id: string, isArchived?: boolean): Promise<ManuscriptVersion> {
     try {
@@ -265,17 +306,157 @@ export const manuscriptService = {
       console.warn('[manuscriptService] toggleArchiveManuscript API fallback:', err);
     }
 
-    const docRef = doc(db, COLLECTION_NAME, id);
-    const snap = await getDoc(docRef);
-    const current = snap.data() as ManuscriptVersion;
+    let targetColl = COLLECTION_NAME;
+    let docRef = doc(db, targetColl, id);
+    let snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      targetColl = 'manuscript_workspaces';
+      docRef = doc(db, targetColl, id);
+      snap = await getDoc(docRef);
+    }
+
+    const current = snap.exists() ? (snap.data() as ManuscriptVersion) : null;
     const nextArchive = isArchived !== undefined ? isArchived : !current?.isArchived;
-    await updateDoc(docRef, {
-      isArchived: nextArchive,
-      status: nextArchive ? 'archived' : (current?.status === 'archived' ? 'approved' : current?.status || 'approved'),
-      updatedAt: new Date().toISOString()
-    });
-    const refreshed = await getDoc(docRef);
-    return refreshed.data() as ManuscriptVersion;
+    
+    if (snap.exists()) {
+      await updateDoc(docRef, {
+        isArchived: nextArchive,
+        updatedAt: new Date().toISOString()
+      });
+      const refreshed = await getDoc(docRef);
+      return refreshed.data() as ManuscriptVersion;
+    }
+    return { id, isArchived: nextArchive } as ManuscriptVersion;
+  },
+
+  /**
+   * Bulk archive or restore multiple manuscripts
+   */
+  async bulkArchiveManuscripts(ids: string[], isArchived: boolean): Promise<{ successCount: number; failedCount: number }> {
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const id of ids) {
+      try {
+        await this.toggleArchiveManuscript(id, isArchived);
+        successCount++;
+      } catch (err) {
+        console.error(`[bulkArchiveManuscripts] Error updating ${id}:`, err);
+        failedCount++;
+      }
+    }
+
+    return { successCount, failedCount };
+  },
+
+  /**
+   * Approve manuscript publication to Institutional Repository
+   */
+  async approvePublication(id: string, reviewer?: { id?: string; name?: string }): Promise<any> {
+    const reviewerName = reviewer?.name || 'Research Coordinator';
+    const now = new Date().toISOString();
+
+    try {
+      const res = await api.patch(`/manuscripts/${id}/publication-status`, {
+        publicationStatus: 'approved',
+        reviewerName,
+      });
+      if (res.data && res.data.data) {
+        return res.data.data;
+      }
+    } catch (err) {
+      console.warn('[manuscriptService] approvePublication API fallback:', err);
+    }
+
+    // Fallback: update Firestore directly
+    let targetColl = COLLECTION_NAME;
+    let targetRef = doc(db, targetColl, id);
+    let snap = await getDoc(targetRef);
+    if (!snap.exists()) {
+      targetColl = 'manuscript_workspaces';
+      targetRef = doc(db, targetColl, id);
+      snap = await getDoc(targetRef);
+    }
+
+    const patch = {
+      publicationStatus: 'approved',
+      publicationReviewedAt: now,
+      publicationReviewerName: reviewerName,
+      updatedAt: now,
+    };
+
+    if (snap.exists()) {
+      await updateDoc(targetRef, patch);
+      const data = snap.data();
+      const authorId = data.uploadedBy || data.studentId;
+      if (authorId) {
+        notificationService.createNotification({
+          userId: authorId,
+          title: 'Manuscript Approved for Publication',
+          message: `Your research manuscript "${data.title || data.projectTitle}" has been approved for publication in the Institutional Repository.`,
+          type: 'manuscript',
+          linkUrl: '/repository',
+        }).catch((e) => console.warn('[notification] approval notify warning:', e));
+      }
+    }
+
+    return { success: true };
+  },
+
+  /**
+   * Reject manuscript publication with reviewer feedback
+   */
+  async rejectPublication(id: string, reason: string, reviewer?: { id?: string; name?: string }): Promise<any> {
+    const reviewerName = reviewer?.name || 'Research Coordinator';
+    const now = new Date().toISOString();
+
+    try {
+      const res = await api.patch(`/manuscripts/${id}/publication-status`, {
+        publicationStatus: 'rejected',
+        rejectionReason: reason,
+        reviewerName,
+      });
+      if (res.data && res.data.data) {
+        return res.data.data;
+      }
+    } catch (err) {
+      console.warn('[manuscriptService] rejectPublication API fallback:', err);
+    }
+
+    // Fallback: update Firestore directly
+    let targetColl = COLLECTION_NAME;
+    let targetRef = doc(db, targetColl, id);
+    let snap = await getDoc(targetRef);
+    if (!snap.exists()) {
+      targetColl = 'manuscript_workspaces';
+      targetRef = doc(db, targetColl, id);
+      snap = await getDoc(targetRef);
+    }
+
+    const patch = {
+      publicationStatus: 'rejected',
+      publicationRejectionReason: reason,
+      publicationReviewedAt: now,
+      publicationReviewerName: reviewerName,
+      updatedAt: now,
+    };
+
+    if (snap.exists()) {
+      await updateDoc(targetRef, patch);
+      const data = snap.data();
+      const authorId = data.uploadedBy || data.studentId;
+      if (authorId) {
+        notificationService.createNotification({
+          userId: authorId,
+          title: 'Repository Publication Feedback',
+          message: `Your publication submission for "${data.title || data.projectTitle}" was not approved: ${reason}`,
+          type: 'manuscript',
+          linkUrl: '/admin/manuscripts?tab=publication_review',
+        }).catch((e) => console.warn('[notification] reject notify warning:', e));
+      }
+    }
+
+    return { success: true };
   },
 
   /**
@@ -291,17 +472,27 @@ export const manuscriptService = {
       console.warn('[manuscriptService] toggleBestThesis API fallback:', err);
     }
 
-    const docRef = doc(db, COLLECTION_NAME, id);
-    const snap = await getDoc(docRef);
-    const current = snap.data() as ManuscriptVersion;
+    let targetColl = COLLECTION_NAME;
+    let docRef = doc(db, targetColl, id);
+    let snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      targetColl = 'manuscript_workspaces';
+      docRef = doc(db, targetColl, id);
+      snap = await getDoc(docRef);
+    }
+
+    const current = snap.exists() ? (snap.data() as ManuscriptVersion) : null;
     const nextBest = isBestThesis !== undefined ? isBestThesis : !current?.isBestThesis;
-    await updateDoc(docRef, {
-      isBestThesis: nextBest,
-      bestThesisNotes: nextBest ? (notes || current?.bestThesisNotes || 'Selected as Best Thesis.') : '',
-      updatedAt: new Date().toISOString()
-    });
-    const refreshed = await getDoc(docRef);
-    return refreshed.data() as ManuscriptVersion;
+    if (snap.exists()) {
+      await updateDoc(docRef, {
+        isBestThesis: nextBest,
+        bestThesisNotes: nextBest ? (notes || current?.bestThesisNotes || 'Selected as Best Thesis.') : '',
+        updatedAt: new Date().toISOString()
+      });
+      const refreshed = await getDoc(docRef);
+      return refreshed.data() as ManuscriptVersion;
+    }
+    return { id, isBestThesis: nextBest } as ManuscriptVersion;
   },
 
   /**

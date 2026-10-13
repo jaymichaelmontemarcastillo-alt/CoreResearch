@@ -57,6 +57,10 @@ export interface ManuscriptVersion {
   adviserId?: string;
   department?: string;
   program?: string;
+  courseId?: string;
+  major?: string;
+  majorCode?: string;
+  specialization?: string;
   section?: string;
   abstract?: string;
   keywords?: string[];
@@ -64,6 +68,11 @@ export interface ManuscriptVersion {
   commentsCount?: number;
   comments?: ManuscriptComment[];
   status: ManuscriptStatus;
+  publicationStatus?: 'pending_publication' | 'approved' | 'rejected';
+  publicationRejectionReason?: string;
+  publicationReviewedAt?: string;
+  publicationReviewerName?: string;
+  publicationReviewerId?: string;
   isArchived?: boolean;
   isBestThesis?: boolean;
   bestThesisNotes?: string;

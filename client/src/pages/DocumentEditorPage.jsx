@@ -168,8 +168,11 @@ export const DocumentEditorPage = () => {
   };
 
     const searchParams = new URLSearchParams(location.search);
-    const isPanelist = searchParams.get('mode') === 'panelist' || userProfile?.role === 'panelist' || currentFacultyMode === 'panelist';
-    const isAdviser = !isPanelist && (userProfile?.role === 'adviser' || userProfile?.role === 'research_coordinator' || userProfile?.role === 'admin' || (userProfile?.role === 'faculty' && currentFacultyMode !== 'panelist'));
+    const urlMode = searchParams.get('mode');
+    const isAdminOrCoordinator = userProfile?.role === 'admin' || userProfile?.role === 'research_coordinator';
+    const isExplicitReadOnly = urlMode === 'read' || (isAdminOrCoordinator && urlMode !== 'edit');
+    const isPanelist = urlMode === 'panelist' || userProfile?.role === 'panelist' || currentFacultyMode === 'panelist';
+    const isAdviser = !isPanelist && (userProfile?.role === 'adviser' || (userProfile?.role === 'faculty' && currentFacultyMode !== 'panelist'));
     const isPanelistMode = isPanelist;
     const urlWorkspaceId = searchParams.get('workspaceId');
     const urlChapterId = searchParams.get('chapterId');
@@ -588,7 +591,13 @@ export const DocumentEditorPage = () => {
         {/* Top Header Row - always visible */}
         <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 z-20 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <Button variant="ghost" size="sm" onClick={() => navigate(location.state?.from || (isPanelistMode ? '/panelists' : '/research/workspace'))} className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => navigate(location.state?.from || (isAdminOrCoordinator ? '/admin/manuscripts' : (isPanelistMode ? '/panelists' : '/research/workspace')))} 
+                className="px-2 text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                title="Return to previous page"
+              >
                 <HiChevronLeft className="w-5 h-5" />
               </Button>
               
@@ -599,13 +608,17 @@ export const DocumentEditorPage = () => {
               </div>
               
               <div className="flex flex-col min-w-0">
-                {isPanelistMode ? (
+                {isPanelistMode || isExplicitReadOnly ? (
                   <div className="flex items-center gap-2">
                     <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-xs">
                       {title || 'Research Manuscript'}
                     </span>
-                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                      Read-Only
+                    <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                      isAdminOrCoordinator
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                    }`}>
+                      {isAdminOrCoordinator ? 'Admin Review • Read-Only' : 'Read-Only'}
                     </span>
                   </div>
                 ) : (
@@ -628,8 +641,8 @@ export const DocumentEditorPage = () => {
                 </span>
               </div>
 
-              {/* Import Document Button - Hidden in Panelist Review Mode */}
-              {!isPanelistMode && (
+              {/* Import Document Button - Hidden in Read-Only Mode and Panelist Review */}
+              {!isPanelistMode && !isExplicitReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -690,8 +703,8 @@ export const DocumentEditorPage = () => {
 
         {/* Panelist Review Mode Banner Removed */}
 
-        {/* Faculty / Adviser Chapter Review & Revision Banner */}
-        {workspace && !isPanelistMode && (userProfile?.role === 'adviser' || userProfile?.role === 'faculty' || userProfile?.role === 'research_coordinator') && (
+        {/* Faculty / Adviser / Admin Chapter Review & Inspection Banner */}
+        {workspace && !isPanelistMode && (userProfile?.role === 'adviser' || userProfile?.role === 'faculty' || userProfile?.role === 'research_coordinator' || userProfile?.role === 'admin' || isAdminOrCoordinator) && (
           <div className="bg-gradient-to-r from-blue-900/40 via-indigo-950/40 to-slate-900 border-b border-blue-500/30 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-10 shrink-0 shadow-sm">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
@@ -703,7 +716,7 @@ export const DocumentEditorPage = () => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-white tracking-wide">
-                    Faculty Review:
+                    {isAdminOrCoordinator ? 'Administrative Inspection:' : 'Faculty Review:'}
                   </span>
                   
                   {/* Chapter Selector Dropdown */}
@@ -744,12 +757,14 @@ export const DocumentEditorPage = () => {
                 </div>
 
                 <p className="text-[11px] text-blue-200/80 hidden sm:block mt-0.5">
-                  Highlight manuscript text to add comments for revisions. When satisfied, click Approve Chapter below.
+                  {isAdminOrCoordinator
+                    ? 'Reviewing live student manuscript in read-only inspection mode. Switch chapters above to inspect progress.'
+                    : 'Highlight manuscript text to add comments for revisions. When satisfied, click Approve Chapter below.'}
                 </p>
               </div>
             </div>
 
-            {/* Actions: Comments & Revisions / Flag for Revision / Approve Chapter (Adviser Only) */}
+            {/* Actions: Comments & Revisions / Flag for Revision / Approve Chapter */}
             <div className="flex items-center gap-2 shrink-0">
               {toastMessage && (
                 <span className="text-xs font-medium text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-md border border-emerald-500/30 animate-fade-in">
@@ -774,7 +789,7 @@ export const DocumentEditorPage = () => {
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
                         : 'bg-white/10 text-slate-200 border-white/20 hover:bg-white/15'
                     }`}
-                    title="View comments & approve resolved parts"
+                    title="View comments & remarks"
                   >
                     <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -789,7 +804,8 @@ export const DocumentEditorPage = () => {
                 );
               })()}
 
-              {(() => {
+              {/* Only show approval/revision actions to authorized advisers (not during general administrative inspection) */}
+              {!isExplicitReadOnly && (() => {
                 const currSec = (workspace.sections || []).find((s) => s.id === activeChapterId);
                 const isApproved = currSec?.status === 'completed';
 
@@ -830,7 +846,6 @@ export const DocumentEditorPage = () => {
                       Flag for Revision
                     </Button>
 
-                    {/* ONLY assigned advisers / coordinators can approve the whole chapter */}
                     {isAdviser && (
                       <Button
                         size="sm"
@@ -852,11 +867,11 @@ export const DocumentEditorPage = () => {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => navigate(location.state?.from || `/faculty/workspace/${workspace.id}`)}
+                onClick={() => navigate(location.state?.from || (isAdminOrCoordinator ? '/admin/manuscripts' : `/faculty/workspace/${workspace.id}`))}
                 className="text-xs py-1 px-2 text-slate-300 hover:text-white hover:bg-white/10"
-                title="Return to Faculty Workspace"
+                title="Return to previous view"
               >
-                Back to Workspace →
+                {location.state?.from ? '← Back to List' : 'Back to Workspace →'}
               </Button>
             </div>
           </div>
@@ -1054,7 +1069,7 @@ export const DocumentEditorPage = () => {
           <div className="flex-1 w-full h-full p-0">
             <OnlyOfficeEditor 
               documentId={documentId} 
-              mode={isPanelistMode ? 'panelist' : 'edit'}
+              mode={isPanelistMode ? 'panelist' : (isExplicitReadOnly ? 'read' : 'edit')}
               workspace={workspace}
               tasks={tasks}
             />

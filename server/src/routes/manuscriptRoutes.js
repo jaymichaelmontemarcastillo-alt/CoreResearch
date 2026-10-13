@@ -16,7 +16,8 @@ import {
   toggleBestThesis,
   addManuscriptFeedback,
   publishManuscriptToRepository,
-  deleteAdminManuscripts
+  deleteAdminManuscripts,
+  updateManuscriptPublicationStatus
 } from '../controllers/manuscriptController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
@@ -45,6 +46,9 @@ router.post('/:id/feedback', verifyToken, requireRole(['admin', 'research_coordi
 
 // Admin: Publish manuscript to Institutional Repository
 router.post('/:id/publish-repository', verifyToken, requireRole(['admin', 'research_coordinator']), publishManuscriptToRepository);
+
+// Admin / Coordinator: Approve or reject manuscript publication
+router.patch('/:id/publication-status', verifyToken, requireRole(['admin', 'research_coordinator']), updateManuscriptPublicationStatus);
 
 // Get list of advisories for Adviser
 router.get('/advisories/all', verifyToken, requireRole(['adviser', 'admin']), getAdvisories);

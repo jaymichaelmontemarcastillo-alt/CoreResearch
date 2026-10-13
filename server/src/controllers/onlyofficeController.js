@@ -14,16 +14,7 @@ export const generateConfig = async (req, res) => {
   try {
     const { documentId } = req.params;
     console.log(`[onlyofficeController] generateConfig called for documentId: "${documentId}"`);
-    const document = await Document.findOne({ id: documentId });
-
-    if (!document) {
-      console.log(`[onlyofficeController] Document not found in DB for id: "${documentId}"`);
-      return res.status(404).json({ success: false, message: 'Document not found' });
-    }
-
-    if (!document.onlyofficeFileKey) {
-      return res.status(400).json({ success: false, message: 'Document has no ONLYOFFICE file key. Not migrated.' });
-    }
+    let document = await Document.findOne({ id: documentId });
 
     const user = req.user || {
       uid: req.headers['x-user-id'] || 'guest-user',
@@ -32,8 +23,55 @@ export const generateConfig = async (req, res) => {
     };
 
     const isExplicitPanelistMode = req.query.mode === 'panelist';
+    const isExplicitReadMode = req.query.mode === 'read';
+    const isAdmin = user.role === 'admin' || user.role === 'coordinator' || user.role === 'research_coordinator' || user.role === 'dean';
     const isAdviserOrPanelist = user.role === 'adviser' || user.role === 'panelist' || isExplicitPanelistMode;
-    const isAdmin = user.role === 'admin' || user.role === 'coordinator';
+
+    // Auto-initialize document in GridFS and MongoDB if missing
+    if (!document) {
+      console.log(`[onlyofficeController] Document not found in DB for id: "${documentId}". Auto-initializing document...`);
+      try {
+        const { Document: DocxDocument, Packer, Paragraph, TextRun } = await import('docx');
+        const doc = new DocxDocument({
+          styles: { default: { document: { run: { font: "Inter" } } } },
+          sections: [{ properties: {}, children: [new Paragraph({ children: [new TextRun('Research Manuscript')] })] }]
+        });
+        const b64 = await Packer.toBase64String(doc);
+        const fileBuffer = Buffer.from(b64, 'base64');
+        const storageProvider = getStorageProvider();
+        const storageKey = `documents/${documentId}/original/manuscript.docx`;
+        await storageProvider.upload(storageKey, fileBuffer, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', { documentId, uploadedBy: user.uid });
+        document = await Document.findOneAndUpdate(
+          { id: documentId },
+          { id: documentId, title: 'Research Manuscript', onlyofficeFileKey: storageKey, editorType: 'onlyoffice' },
+          { upsert: true, new: true }
+        );
+      } catch (initErr) {
+        console.error('[onlyofficeController] Auto-initialization error:', initErr);
+        return res.status(404).json({ success: false, message: 'Document not found and could not be initialized.' });
+      }
+    }
+
+    if (!document.onlyofficeFileKey) {
+      return res.status(400).json({ success: false, message: 'Document has no ONLYOFFICE file key. Not migrated.' });
+    }
+
+    // Authorization Check: Admins and Research Coordinators have system-wide access to all manuscripts.
+    // For students: ensure ownership or group membership.
+    if (!isAdmin && !isAdviserOrPanelist && user.role === 'student' && user.uid !== 'guest-user') {
+      const docAuthors = document.authors || [];
+      const isAuthor = docAuthors.includes(user.uid) || document.ownerId === user.uid;
+      let isGroupMember = false;
+      if (document.groupId && user.groupId) {
+        isGroupMember = document.groupId === user.groupId;
+      }
+      if (!isAuthor && !isGroupMember && (docAuthors.length > 0 || document.ownerId || document.groupId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access Restricted: You do not have permission to view other research groups\' private manuscripts.'
+        });
+      }
+    }
 
     // Authorization Check for Panelists/Advisers (if document or schedule has assigned personnel)
     if (!isAdmin && isAdviserOrPanelist && user.uid !== 'guest-user') {
@@ -64,7 +102,7 @@ export const generateConfig = async (req, res) => {
             if (!inSchedulePanelists && !inScheduleAdviser) {
               return res.status(403).json({
                 success: false,
-                message: 'Access Restricted: You do not have permission to access this manuscript. Only officially assigned panelists can review this document.'
+                message: 'Access Restricted: You do not have permission to access this manuscript. Only officially assigned personnel can review this document.'
               });
             }
           }
@@ -79,6 +117,10 @@ export const generateConfig = async (req, res) => {
     const documentUrl = `${backendHost}/api/onlyoffice/download/${documentId}`;
     const callbackUrl = `${backendHost}/api/onlyoffice/callback?id=${documentId}`;
 
+    // Inspection is read-only by default for Admins, Coordinators, Advisers, and Panelists.
+    // Explicit edit mode must be permitted and requested.
+    const isReadOnly = isAdviserOrPanelist || isExplicitReadMode || (isAdmin && req.query.mode !== 'edit');
+
     const config = {
       document: {
         fileType: 'docx',
@@ -86,7 +128,7 @@ export const generateConfig = async (req, res) => {
         title: document.title || 'Untitled Document',
         url: documentUrl,
         permissions: {
-          edit: !isAdviserOrPanelist,
+          edit: !isReadOnly,
           comment: true,
           chat: true,
           download: true,
@@ -102,7 +144,7 @@ export const generateConfig = async (req, res) => {
           id: user.uid,
           name: user.fullName
         },
-        mode: 'edit',
+        mode: isReadOnly ? 'view' : 'edit',
         customization: {
           compactHeader: false,
           toolbarNoTabs: false,

@@ -11,7 +11,18 @@ const RepositoryPublicationSchema = new mongoose.Schema({
   abstract: { type: String, required: true },
   keywords: [{ type: String }],
   pdfUrl: { type: String },
+  manuscriptId: { type: String, index: true },
   citation: { type: String },
+  publicationStatus: {
+    type: String,
+    enum: ['pending_publication', 'approved', 'rejected'],
+    default: 'approved',
+    index: true
+  },
+  rejectionReason: { type: String, default: '' },
+  reviewedBy: { type: String },
+  reviewedByName: { type: String },
+  reviewedAt: { type: Date },
   viewsCount: { type: Number, default: 0 },
   downloadsCount: { type: Number, default: 0 },
   publishedAt: { type: Date, default: Date.now }

@@ -18,6 +18,7 @@ export interface AppNotification {
 }
 
 export interface CreateNotificationInput {
+  id?: string;
   userId: string;
   title: string;
   message: string;
