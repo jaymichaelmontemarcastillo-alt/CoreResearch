@@ -100,6 +100,48 @@ const buildUserProfileDoc = (data) => {
   };
 };
 
+const notifyAdminsOfRegistration = async (userProfile) => {
+  if (!db || isDevMockMode) return;
+
+  try {
+    const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+    const now = new Date().toISOString();
+    const isStudent = userProfile.role === 'student';
+    const notificationTitle = isStudent ? 'New Student Registration' : 'New Faculty Registration';
+    const notificationMessage = isStudent
+      ? `${userProfile.fullName} has registered a new Student account. Student ID: ${userProfile.studentIdOrEmployeeId} | Email: ${userProfile.email} | Program: ${userProfile.programCode || userProfile.program || 'BSIT'} | Major: ${userProfile.majorCode || userProfile.programSpecialization || 'None'} | Section: ${userProfile.sectionName || 'None'} | Status: Pending Approval`
+      : `${userProfile.fullName} has registered a new Faculty/Adviser account. Email: ${userProfile.email} | Department: ${userProfile.department || 'College of Computer Studies'} | Status: Pending Approval`;
+
+    await Promise.all(adminSnapshot.docs.map(async (adminDoc) => {
+      const notificationId = `registration-${userProfile.uid}-${adminDoc.id}`;
+      const notificationRef = db.collection('notifications').doc(notificationId);
+      const notification = {
+        id: notificationId,
+        userId: adminDoc.id,
+        title: notificationTitle,
+        message: notificationMessage,
+        type: 'system',
+        read: false,
+        createdByUid: userProfile.uid,
+        relatedId: userProfile.uid,
+        ...(isStudent ? { relatedStudentId: userProfile.uid } : {}),
+        link: '/admin/user-requests?tab=pending',
+        linkUrl: '/admin/user-requests?tab=pending',
+        createdAt: now,
+      };
+
+      await db.runTransaction(async (transaction) => {
+        const existing = await transaction.get(notificationRef);
+        if (!existing.exists) {
+          transaction.create(notificationRef, notification);
+        }
+      });
+    }));
+  } catch (error) {
+    console.warn('[AuthController] Admin registration notification warning:', error.message);
+  }
+};
+
 /**
  * Register or synchronize user profile document in Firestore
  */
@@ -167,6 +209,8 @@ export const registerUserSync = async (req, res) => {
         console.warn(`[AuthController] Firestore write warning: ${dbErr.message}`);
       }
     }
+
+    await notifyAdminsOfRegistration(userProfile);
 
     return res.status(201).json({
       success: true,

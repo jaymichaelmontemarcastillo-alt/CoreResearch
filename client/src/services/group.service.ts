@@ -94,7 +94,8 @@ export const groupService = {
    */
   async addMemberToGroup(
     groupId: string,
-    newMember: { uid: string; fullName: string; email: string; studentNumber?: string }
+    newMember: { uid: string; fullName: string; email: string; studentNumber?: string },
+    invitationId?: string
   ): Promise<ResearchGroup> {
     const group = await this.getGroupById(groupId);
     if (!group) {
@@ -124,12 +125,16 @@ export const groupService = {
     const groupRef = doc(db, COLLECTION_NAME, groupId);
     const now = new Date().toISOString();
 
-    await updateDoc(groupRef, {
+    const groupUpdate: Partial<ResearchGroup> = {
       members: updatedMembers,
       memberIds: updatedMemberIds,
       status: updatedStatus,
       updatedAt: now,
-    });
+    };
+    if (invitationId) {
+      groupUpdate.lastAcceptedInvitationId = invitationId;
+    }
+    await updateDoc(groupRef, groupUpdate);
 
     // Automatically assign group project, title, adviser & workspace to the new member
     await this.syncMemberToGroupProject(groupId, newMember.uid, newMember);
@@ -268,14 +273,19 @@ export const groupService = {
   async updateGroupAdviser(
     groupId: string,
     adviserId: string,
-    adviserName: string
+    adviserName: string,
+    adviserRequestId?: string
   ): Promise<void> {
     const ref = doc(db, COLLECTION_NAME, groupId);
-    await updateDoc(ref, {
+    const updates: Partial<ResearchGroup> = {
       adviserId,
       adviserName,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    if (adviserRequestId) {
+      updates.lastAcceptedAdviserRequestId = adviserRequestId;
+    }
+    await updateDoc(ref, updates);
   },
 
   /**
@@ -1025,7 +1035,7 @@ export const groupService = {
       fullName: studentProfile.fullName || 'Student Researcher',
       email: studentProfile.email || '',
       studentNumber,
-    });
+    }, invitationId);
 
     const inviteRef = doc(db, INVITATIONS_COLLECTION, invitationId);
     const now = new Date().toISOString();

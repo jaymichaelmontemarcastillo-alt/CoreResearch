@@ -7,6 +7,7 @@ export interface AppNotification {
   message: string;
   type: NotificationType;
   read: boolean;
+  createdByUid?: string;
   linkUrl?: string;
   link?: string;
   relatedStudentId?: string;

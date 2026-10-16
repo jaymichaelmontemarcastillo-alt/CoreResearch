@@ -8,7 +8,7 @@ import {
   addDoc,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { auth, db } from '../firebase/firebase';
 import api from './api';
 
 export interface SystemActivity {
@@ -34,6 +34,7 @@ export const systemActivityService = {
       const colRef = collection(db, 'system_activities');
       await addDoc(colRef, {
         ...activity,
+        actorId: auth.currentUser?.uid,
         timestamp: new Date().toISOString(),
       });
     } catch (err) {

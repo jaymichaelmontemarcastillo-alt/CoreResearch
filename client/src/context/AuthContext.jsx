@@ -11,7 +11,6 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../services/firebase';
 import api from '../services/api';
 import { userService } from '../services/user.service';
-import { notificationService } from '../services/notification.service';
 
 
 const AuthContext = createContext(null);
@@ -356,21 +355,6 @@ export const AuthProvider = ({ children }) => {
         console.warn('[registerStudent] Client setDoc warning (server sync already performed):', fsErr?.message);
       }
 
-      // 5. Notify all system administrators asynchronously (never blocks the registration flow)
-      notificationService.notifyAdminsNewStudentRegistration({
-        uid: result.user.uid,
-        fullName: completeName,
-        studentIdOrEmployeeId: normalizedStudentId,
-        email: normalizedEmail,
-        program: userProfileData.program,
-        programCode: userProfileData.programCode,
-        programSpecialization: userProfileData.programSpecialization,
-        majorCode: userProfileData.majorCode,
-        sectionName: userProfileData.sectionName,
-      }).catch((notifErr) => {
-        console.warn('[registerStudent] Admin notification warning:', notifErr?.message);
-      });
-
       // 6. Keep session & profile active with pending status.
       // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
       setCurrentUser(result.user);
@@ -465,17 +449,6 @@ export const AuthProvider = ({ children }) => {
       } catch (fsErr) {
         console.warn('[registerFaculty] Client setDoc warning:', fsErr?.message);
       }
-
-      // Notify system administrators asynchronously
-      notificationService.notifyAdminsNewFacultyRegistration({
-        uid: result.user.uid,
-        fullName: completeName,
-        email: normalizedEmail,
-        department: userProfileData.department,
-        role: userProfileData.role,
-      }).catch((notifErr) => {
-        console.warn('[registerFaculty] Admin notification warning:', notifErr?.message);
-      });
 
       // Keep session & profile active with pending status.
       // ProtectedRoute restricts them to /pending-approval until an administrator approves them.

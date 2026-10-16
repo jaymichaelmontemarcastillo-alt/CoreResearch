@@ -125,7 +125,10 @@ export const verifyToken = async (req, res, next) => {
     if (
       userData &&
       !isRegistrationRequest &&
-      (userData.status === 'pending' || userData.status === 'rejected' || userData.is_approved === false)
+      (
+        userData.is_approved !== true ||
+        !['active', 'approved'].includes(userData.status)
+      )
     ) {
       return res.status(403).json({
         success: false,

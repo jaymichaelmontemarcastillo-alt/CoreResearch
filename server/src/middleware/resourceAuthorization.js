@@ -52,6 +52,7 @@ const getFirestoreRecord = async (collectionName, id) => {
 export const canAccessProject = async (user, projectId, additionalRecord = null) => {
   if (!user?.uid || !projectId) return false;
   if (privilegedRoles.includes(user.role)) return true;
+  if (additionalRecord && isResourceParticipant(additionalRecord, user)) return true;
 
   const records = additionalRecord ? [additionalRecord] : [];
   const collectionNames = [
@@ -86,9 +87,12 @@ export const canAccessProject = async (user, projectId, additionalRecord = null)
 
   if (['adviser', 'panelist'].includes(user.role) && mongoose.connection.readyState === 1) {
     const { Schedule } = await import('../models/Schedule.js');
-    const schedule = await Schedule.findOne({
-      $or: [{ projectId }, ...Array.from(groupIds, (groupId) => ({ projectId: groupId }))]
-    }).lean();
+    const scheduleProjectIds = new Set([
+      projectId,
+      ...records.map((record) => record.projectId).filter(Boolean),
+      ...groupIds,
+    ]);
+    const schedule = await Schedule.findOne({ projectId: { $in: Array.from(scheduleProjectIds) } }).lean();
     if (schedule) {
       if (user.role === 'adviser' && schedule.adviserId === user.uid) return true;
       if (

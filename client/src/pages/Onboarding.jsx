@@ -17,7 +17,6 @@ import {
 import { updatePassword, signOut } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
-import { notificationService } from "../services/notification.service";
 import { userService } from "../services/user.service";
 import { sectionService } from "../services/section.service";
 import api from "../services/api";
@@ -183,13 +182,7 @@ export const Onboarding = () => {
             console.warn('[Onboarding] Backend sync warning:', syncErr?.message);
           }
 
-        // Trigger admin notification and sign out pending approval
-        if (isStudentRole) {
-          await notificationService.notifyAdminsNewStudentRegistration(profileData);
-        } else {
-          // You could add a faculty specific notification here if desired
-          // await notificationService.notifyAdminsNewFacultyRegistration(profileData);
-        }
+        // Registration notifications are created by the authenticated backend.
         await signOut(auth);
         navigate("/pending-approval", {
           replace: true,
