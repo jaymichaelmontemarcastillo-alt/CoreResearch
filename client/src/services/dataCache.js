@@ -61,14 +61,19 @@ export const dataCache = {
     }
 
     // 3. Otherwise, initiate a new fetch
-    const promise = fetchFn()
+    let promise;
+    promise = fetchFn()
       .then((data) => {
-        this.set(key, data, ttl);
-        pending.delete(key);
+        if (pending.get(key) === promise) {
+          this.set(key, data, ttl);
+          pending.delete(key);
+        }
         return data;
       })
       .catch((err) => {
-        pending.delete(key);
+        if (pending.get(key) === promise) {
+          pending.delete(key);
+        }
         throw err;
       });
 

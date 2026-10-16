@@ -2,7 +2,7 @@
 import express from 'express';
 import multer from 'multer';
 import { importDocument, serveStorageAsset, updatePageSettings } from '../controllers/documentController.js';
-import { optionalVerifyToken } from '../middleware/authMiddleware.js';
+import { verifyToken, optionalVerifyToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -23,7 +23,7 @@ const upload = multer({
 });
 
 // Document Import Endpoint: POST /api/documents/import
-router.post('/import', (req, res, next) => {
+router.post('/import', verifyToken, (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -44,6 +44,6 @@ router.post('/import', (req, res, next) => {
 router.get('/assets/*', optionalVerifyToken, serveStorageAsset);
 
 // Update Page Settings: PUT /api/documents/:id/page-settings
-router.put('/:id/page-settings', express.json(), updatePageSettings);
+router.put('/:id/page-settings', verifyToken, express.json(), updatePageSettings);
 
 export default router;

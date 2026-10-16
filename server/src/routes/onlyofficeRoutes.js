@@ -10,7 +10,7 @@ router.post('/create', verifyToken, createDocument);
 // Generate ONLYOFFICE configuration (requires auth)
 router.get('/config/:documentId', verifyToken, generateConfig);
 
-// Download the actual DOCX file (this is called by the ONLYOFFICE server, so it may need a different auth mechanism in production, or public access if using temporary signed URLs)
+// ONLYOFFICE downloads through a short-lived, document-scoped signed token.
 router.get('/download/:documentId', downloadDocument);
 
 // Callback URL for ONLYOFFICE to save documents back to our server

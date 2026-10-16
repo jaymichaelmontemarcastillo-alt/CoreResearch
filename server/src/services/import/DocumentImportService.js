@@ -86,7 +86,11 @@ export class DocumentImportService {
           abstract: '', 
           status: 'draft',
           authors: [ownerId],
-          adviser: null,
+          ownerId,
+          ownerRole: userProfile?.role || 'student',
+          groupId: groupInfo?.groupId || '',
+          projectId: groupInfo?.projectId || '',
+          adviser: '',
           ...updateData
         });
       }

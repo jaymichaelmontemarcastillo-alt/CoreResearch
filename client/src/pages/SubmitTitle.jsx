@@ -224,7 +224,7 @@ export const SubmitTitle = () => {
             console.warn("[SubmitTitle] Auto workspace create error:", e);
           }
         }
-        if (ws) {
+        if (ws && ws.status !== 'archived' && !ws.isArchived) {
           if (isMounted) {
             setExistingWorkspace(ws);
             setLoading(false);
@@ -246,11 +246,11 @@ export const SubmitTitle = () => {
         attachRequestSubscription(null);
         if (
           isMounted &&
-          requests.some((request) => request.status === "declined")
+          requests.some((request) => request.status === "declined" && !request.isArchived)
         ) {
           setDeclinedAdviserIds(
             requests
-              .filter((request) => request.status === "declined")
+              .filter((request) => request.status === "declined" && !request.isArchived)
               .map((request) => request.adviserId),
           );
         }

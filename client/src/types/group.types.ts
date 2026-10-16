@@ -19,6 +19,8 @@ export interface ResearchGroup {
   status: 'incomplete' | 'ready' | 'active' | 'completed' | 'archived';
   adviserId?: string;      // UID of the assigned adviser (set by admin/coordinator)
   adviserName?: string;    // Denormalized for display
+  lastAcceptedInvitationId?: string;
+  lastAcceptedAdviserRequestId?: string;
   title?: string;          // Research title
   manuscriptId?: string;   // Associated manuscript ID
   panelists?: any[];

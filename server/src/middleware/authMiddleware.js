@@ -97,6 +97,12 @@ export const verifyToken = async (req, res, next) => {
       // In production, an unverified JWT must never authorize request creation.
       if (isDevMockMode && process.env.NODE_ENV !== "production") {
         decodedToken = decodeJwtPayload(token);
+      } else {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+          message: "Invalid or expired authentication token.",
+        });
       }
     }
 
@@ -141,8 +147,32 @@ export const verifyToken = async (req, res, next) => {
       }
     }
 
-    if (!userData) {
+    if (!userData && isDevMockMode) {
       userData = mockUsersDb.get(uid) || null;
+    }
+
+    const isRegistrationRequest = req.originalUrl.split('?')[0] === '/api/auth/register';
+    if (!userData && !isDevMockMode && !isRegistrationRequest) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'A registered user profile is required.'
+      });
+    }
+
+    if (
+      userData &&
+      !isRegistrationRequest &&
+      (
+        userData.is_approved !== true ||
+        !['active', 'approved'].includes(userData.status)
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'This account is not approved to access the application.'
+      });
     }
 
     const nameParts = (userData?.fullName || name).trim().split(" ");
@@ -161,9 +191,9 @@ export const verifyToken = async (req, res, next) => {
       department_id:
         userData?.department_id || userData?.department || "Computer Studies",
       studentIdOrEmployeeId: userData?.studentIdOrEmployeeId || "",
-      status: userData?.status || "active",
+      status: userData?.status || (isDevMockMode ? "active" : "pending"),
       is_approved:
-        userData?.is_approved !== undefined ? userData.is_approved : true,
+        userData?.is_approved !== undefined ? userData.is_approved : isDevMockMode,
       profile_image: userData?.profile_image || picture || "",
       created_at:
         userData?.created_at || userData?.createdAt || new Date().toISOString(),

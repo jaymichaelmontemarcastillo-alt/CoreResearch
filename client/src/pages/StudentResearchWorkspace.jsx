@@ -1,5 +1,5 @@
 // src/pages/StudentResearchWorkspace.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
@@ -38,6 +38,7 @@ import titleProposalService from '../services/titleProposal.service';
 import { adviserRequestService } from '../services/adviserRequest.service';
 import groupService from '../services/group.service';
 import { documentStore } from '../services/documentStore';
+import dataCache from '../services/dataCache';
 import gradingService from '../services/grading.service';
 import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
 import { FinalGradingModal } from '../components/editor/FinalGradingModal';
@@ -67,6 +68,8 @@ export const StudentResearchWorkspace = () => {
   const [finalEvals, setFinalEvals] = useState([]);
   const [selectedEval, setSelectedEval] = useState(null);
   const [gradingModalType, setGradingModalType] = useState(null);
+  const [isRestarting, setIsRestarting] = useState(false);
+  const restartInProgressRef = useRef(false);
 
   // Post-Defense Revision Workflow state
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
@@ -363,74 +366,95 @@ export const StudentResearchWorkspace = () => {
   };
 
   const handleResetWorkspace = async () => {
-    if (!workspace) return;
-    const isConfirmed = await confirm({
-      title: "Restart Research Progress",
-      message: "WARNING: This will archive your current workspace, manuscript, and group progress. You will be prompted to submit a new research title proposal to start fresh. Proceed?",
-      confirmText: "Archive and Restart",
-      variant: "danger"
-    });
-    if (!isConfirmed) return;
+    if (!workspace || restartInProgressRef.current) return;
+    restartInProgressRef.current = true;
 
     try {
+      const isConfirmed = await confirm({
+        title: "Restart Research Progress",
+        message: "WARNING: This will archive your current workspace, manuscript, and group progress. You will be prompted to submit a new research title proposal to start fresh. Proceed?",
+        confirmText: "Archive and Restart",
+        variant: "danger"
+      });
+      if (!isConfirmed) return;
+      if (!currentUser?.uid) throw new Error('You must be signed in to restart research progress.');
+
+      setIsRestarting(true);
       const now = new Date().toISOString();
       const reason = 'Student restarted research progress';
       const actorName = userProfile?.fullName || 'Student';
-      const { updateDoc, doc } = await import('firebase/firestore');
+      const { doc, getDoc, writeBatch } = await import('firebase/firestore');
       const { db } = await import('../firebase/firebase');
-
-      // 1. Archive Workspace
-      try {
-        await updateDoc(doc(db, 'manuscript_workspaces', workspace.id), {
-          isArchived: true,
-          status: 'archived',
-          archivedAt: now,
-          archivedBy: currentUser.uid,
-          archivedByName: actorName,
-          archiveReason: reason
-        });
-      } catch (wsErr) {
-        console.warn('Failed to archive workspace:', wsErr);
-      }
-
-      // 2. Archive Document
-      if (workspace.documentId) {
-        try {
-          await updateDoc(doc(db, 'manuscript_documents', workspace.documentId), {
-             isArchived: true,
-             status: 'archived'
-          });
-        } catch (docErr) {
-          console.warn('Failed to archive document:', docErr);
-        }
-      }
-
-      // 3. Archive Group
       const group = await groupService.getGroupByStudentId(currentUser.uid);
+      const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
+      const activeRequests = requests.filter((request) =>
+        request.status === 'pending' || request.status === 'accepted'
+      );
+      if (activeRequests.length > 497) {
+        throw new Error('Too many active adviser requests to restart safely. Please contact support.');
+      }
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'manuscript_workspaces', workspace.id), {
+        isArchived: true,
+        status: 'archived',
+        archivedAt: now,
+        archivedBy: currentUser.uid,
+        archivedByName: actorName,
+        archiveReason: reason,
+        updatedAt: now,
+      });
+
+      if (workspace.documentId) {
+        const documentRef = doc(db, 'manuscript_documents', workspace.documentId);
+        const manuscriptDocument = await getDoc(documentRef);
+        if (manuscriptDocument.exists()) {
+          batch.update(documentRef, {
+            isArchived: true,
+            status: 'archived',
+            archivedAt: now,
+            archivedBy: currentUser.uid,
+            archiveReason: reason,
+            updatedAt: now,
+          });
+        }
+      }
+
       if (group) {
-        await groupService.updateGroup(group.id, {
+        batch.update(doc(db, 'research_groups', group.id), {
           isArchived: true,
           status: 'archived',
           archivedAt: now,
           archivedBy: currentUser.uid,
           archivedByName: actorName,
-          archiveReason: reason
+          archiveReason: reason,
+          updatedAt: now,
         });
       }
 
-      // 4. Archive/Cancel any pending adviser requests
-      const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
-      for (const req of requests) {
-        if (req.status === 'pending' || req.status === 'accepted') {
-          await adviserRequestService.updateRequestStatus(req.id, 'rejected', 'Archived due to student restarting progress.');
-        }
+      for (const request of activeRequests) {
+        batch.update(doc(db, 'adviser_requests', request.id), {
+          status: 'declined',
+          isArchived: true,
+          updatedAt: now,
+          archiveReason: reason,
+        });
       }
+
+      await batch.commit();
+
+      dataCache.invalidate(`workspace_${currentUser.uid}`);
+      dataCache.invalidate(`group_${currentUser.uid}`);
+      dataCache.invalidate('user_docs');
 
       setToast('Workspace archived. You can now submit a new title.');
       navigate('/submit-title');
     } catch (err) {
       console.error('Reset workspace error:', err);
-      setToast('Failed to restart workspace: ' + err.message);
+      setToast('Failed to restart workspace: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      restartInProgressRef.current = false;
+      setIsRestarting(false);
     }
   };
 
@@ -704,8 +728,9 @@ export const StudentResearchWorkspace = () => {
                     size="sm"
                     className="text-xs text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 transition-colors py-1 px-3 h-auto"
                     onClick={handleResetWorkspace}
+                    disabled={isRestarting}
                   >
-                    Restart
+                    {isRestarting ? 'Restarting...' : 'Restart'}
                   </Button>
                   
                   <Button

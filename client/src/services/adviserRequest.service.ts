@@ -141,7 +141,8 @@ class AdviserRequestService {
           await groupService.updateGroupAdviser(
             requestData.groupId,
             requestData.adviserId,
-            requestData.adviserName
+            requestData.adviserName,
+            requestId
           );
         } catch (error) {
           console.error('Error updating group adviser:', error);
