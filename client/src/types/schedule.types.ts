@@ -20,7 +20,10 @@ export interface SchedulePanelist {
 export interface DefenseSchedule {
   id: string;
   projectId: string;
+  groupId?: string;
   projectTitle: string;
+  studentName?: string;
+  memberIds?: string[];
   defenseType: DefenseType;
   date: string;
   startTime: string;
@@ -60,4 +63,3 @@ export interface CreateScheduleInput {
   notes?: string;
   resultStatus?: 'passed' | 're_defense' | 'failed' | 'pending';
 }
-

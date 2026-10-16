@@ -185,31 +185,50 @@ export const registerUserSync = async (req, res) => {
       is_approved: false
     });
 
-    // Update in-memory mock cache
-    mockUsersDb.set(uid, userProfile);
-
-    // Persist to MongoDB if initialized
     let savedToMongo = false;
-    try {
-      if (mongoose.connection.readyState === 1) {
+    if (mongoose.connection.readyState === 1) {
+      try {
         await User.findOneAndUpdate({ uid }, userProfile, { upsert: true, new: true, setDefaultsOnInsert: true });
-        console.log(`[AuthController] Synchronized user document in MongoDB for UID: ${uid}`);
         savedToMongo = true;
+      } catch (mongoErr) {
+        console.error('[AuthController] MongoDB registration write failed:', mongoErr.message);
+        return res.status(503).json({
+          success: false,
+          error: 'Service Unavailable',
+          message: 'The profile could not be saved in the authoritative database.'
+        });
       }
-    } catch (mongoErr) {
-      console.warn(`[AuthController] MongoDB write warning: ${mongoErr.message}`);
     }
 
-    // ALWAYS persist to Firestore so client SDK direct queries find the profile
-    if (db) {
+    if (savedToMongo && !db && !isDevMockMode) {
+      return res.status(503).json({
+        success: false,
+        error: 'Partial Persistence',
+        message: 'The profile was saved in MongoDB, but Firestore is unavailable for profile synchronization.'
+      });
+    }
+    if (db && !isDevMockMode) {
       try {
         await db.collection('users').doc(uid).set(userProfile, { merge: true });
-        console.log(`[AuthController] Synchronized user document in Firestore for UID: ${uid}`);
       } catch (dbErr) {
-        console.warn(`[AuthController] Firestore write warning: ${dbErr.message}`);
+        console.error('[AuthController] Firestore registration projection sync failed:', dbErr.message);
+        return res.status(503).json({
+          success: false,
+          error: savedToMongo ? 'Partial Persistence' : 'Service Unavailable',
+          message: savedToMongo
+            ? 'The profile was saved in MongoDB, but its Firestore projection could not be synchronized.'
+            : 'The profile could not be saved in Firestore.'
+        });
       }
+    } else if (!savedToMongo && !isDevMockMode) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'No persistent user profile store is available.'
+      });
     }
 
+    mockUsersDb.set(uid, userProfile);
     await notifyAdminsOfRegistration(userProfile);
 
     return res.status(201).json({
@@ -287,6 +306,19 @@ export const loginSync = async (req, res) => {
 
     // Save back to mock db for consistency
     mockUsersDb.set(user.uid, finalProfile);
+
+    if (fetchedFromMongo && db && !isDevMockMode) {
+      try {
+        await db.collection('users').doc(user.uid).set(finalProfile, { merge: true });
+      } catch (syncError) {
+        console.error('[AuthController] MongoDB-to-Firestore profile sync failed:', syncError.message);
+        return res.status(503).json({
+          success: false,
+          error: 'Partial Persistence',
+          message: 'The profile was loaded from MongoDB, but its Firestore projection could not be synchronized.'
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,

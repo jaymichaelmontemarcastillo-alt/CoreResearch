@@ -1,6 +1,19 @@
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { db, isDevMockMode, mockUsersDb, auth } from '../config/firebaseAdmin.js';
+import { updateUserProfileStores } from '../services/userProfilePersistence.service.js';
+
+const sendUserProfileUpdateError = (res, error, action) => {
+  console.error(`[UserController] ${action} error:`, error);
+  if (error.code === 'PARTIAL_USER_PROFILE_SYNC') {
+    return res.status(503).json({
+      success: false,
+      error: 'Partial Persistence',
+      message: error.message
+    });
+  }
+  return res.status(500).json({ success: false, error: error.message });
+};
 
 // Seed initial mock users into mock storage if empty
 export const seedMockUsersIfEmpty = () => {
@@ -267,47 +280,18 @@ export const updateUserRole = async (req, res) => {
       roleDocUpdates.maxCapacity = 5;
     }
 
-    let savedToMongo = false;
-    try {
-      if (mongoose.connection.readyState === 1) {
-        await User.findOneAndUpdate(
-          { uid },
-          roleDocUpdates,
-          { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
-        );
-        savedToMongo = true;
-      }
-    } catch (mongoErr) {
-      console.warn('[UserController] MongoDB update warning:', mongoErr.message);
-    }
-
-    if (!savedToMongo) {
-      if (isDevMockMode) {
-        const existing = mockUsersDb.get(uid);
-        if (existing) {
-          existing.role = roleDocUpdates.role;
-          if (roleDocUpdates.role_id) existing.role_id = roleDocUpdates.role_id;
-          if (roleDocUpdates.isAvailable !== undefined) existing.isAvailable = roleDocUpdates.isAvailable;
-          existing.updatedAt = new Date().toISOString();
-          mockUsersDb.set(uid, existing);
-        }
-      } else if (db) {
-        const userRef = db.collection('users').doc(uid);
-        const doc = await userRef.get();
-        if (doc.exists) {
-          await userRef.update(roleDocUpdates);
-        }
-      }
+    const updatedProfile = await updateUserProfileStores(uid, roleDocUpdates);
+    if (!updatedProfile) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'User profile not found.' });
     }
 
     return res.status(200).json({
       success: true,
       message: `User role successfully updated to '${roleDocUpdates.role}'.`,
-      data: { uid, role: roleDocUpdates.role }
+      data: { uid, role: roleDocUpdates.role, updatedAt: updatedProfile.updatedAt || updatedProfile.updated_at }
     });
   } catch (error) {
-    console.error('[UserController] updateUserRole error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return sendUserProfileUpdateError(res, error, 'updateUserRole');
   }
 };
 
@@ -318,6 +302,9 @@ export const updateUserProfile = async (req, res) => {
   try {
     const { uid } = req.params;
     const updates = { ...req.body };
+    delete updates.uid;
+    delete updates._id;
+    delete updates.__v;
 
     // When approving or updating an adviser/faculty, guarantee active adviser status and capacity
     if (updates.role === 'adviser' || updates.role === 'faculty') {
@@ -334,44 +321,19 @@ export const updateUserProfile = async (req, res) => {
       updates.status = 'active';
     }
 
-    let savedToMongo = false;
-    try {
-      if (mongoose.connection.readyState === 1) {
-        await User.findOneAndUpdate(
-          { uid },
-          { ...updates, updatedAt: new Date().toISOString() },
-          { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
-        );
-        savedToMongo = true;
-      }
-    } catch (mongoErr) {
-      console.warn('[UserController] MongoDB update warning:', mongoErr.message);
-    }
-
-    if (!savedToMongo) {
-      if (isDevMockMode) {
-        const existing = mockUsersDb.get(uid);
-        if (existing) {
-          const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
-          mockUsersDb.set(uid, updated);
-        }
-      } else if (db) {
-        const userRef = db.collection('users').doc(uid);
-        const doc = await userRef.get();
-        if (doc.exists) {
-          await userRef.update({ ...updates, updatedAt: new Date().toISOString() });
-        }
-      }
+    const updatedAt = new Date().toISOString();
+    const updatedProfile = await updateUserProfileStores(uid, { ...updates, updatedAt });
+    if (!updatedProfile) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'User profile not found.' });
     }
 
     return res.status(200).json({
       success: true,
       message: `User profile updated.`,
-      data: { uid, ...updates }
+      data: updatedProfile
     });
   } catch (error) {
-    console.error('[UserController] updateUserProfile error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return sendUserProfileUpdateError(res, error, 'updateUserProfile');
   }
 };
 
@@ -388,7 +350,10 @@ export const updateMyProfile = async (req, res) => {
     const { 
       first_name, last_name, fullName, college, department, 
       studentIdOrEmployeeId, profile_image,
-      specialization, expertise, researchInterests, keywords, selectedExpertise
+      studentId, courseId, program_id, program, programCode, specializationId,
+      programSpecialization, major, majorCode, section, sectionName, sectionId,
+      enrollmentStatus, specialization, expertise, researchInterests, keywords,
+      selectedExpertise
     } = req.body;
 
     const updates = {
@@ -409,6 +374,19 @@ export const updateMyProfile = async (req, res) => {
       updates.department_id = department;
     }
     if (studentIdOrEmployeeId !== undefined) updates.studentIdOrEmployeeId = studentIdOrEmployeeId;
+    if (studentId !== undefined) updates.studentId = studentId;
+    if (courseId !== undefined) updates.courseId = courseId;
+    if (program_id !== undefined) updates.program_id = program_id;
+    if (program !== undefined) updates.program = program;
+    if (programCode !== undefined) updates.programCode = programCode;
+    if (specializationId !== undefined) updates.specializationId = specializationId;
+    if (programSpecialization !== undefined) updates.programSpecialization = programSpecialization;
+    if (major !== undefined) updates.major = major;
+    if (majorCode !== undefined) updates.majorCode = majorCode;
+    if (section !== undefined) updates.section = section;
+    if (sectionName !== undefined) updates.sectionName = sectionName;
+    if (sectionId !== undefined) updates.sectionId = sectionId;
+    if (enrollmentStatus !== undefined) updates.enrollmentStatus = enrollmentStatus;
     if (profile_image !== undefined) updates.profile_image = profile_image;
     
     // Academic fields (arrays of strings)
@@ -418,44 +396,18 @@ export const updateMyProfile = async (req, res) => {
     if (Array.isArray(keywords)) updates.keywords = keywords;
     if (Array.isArray(selectedExpertise)) updates.selectedExpertise = selectedExpertise;
 
-    let savedToMongo = false;
-    try {
-      if (mongoose.connection.readyState === 1) {
-        await User.findOneAndUpdate(
-          { uid },
-          { ...updates, updatedAt: new Date().toISOString() },
-          { new: true, upsert: true, setDefaultsOnInsert: true }
-        );
-        savedToMongo = true;
-      }
-    } catch (mongoErr) {
-      console.warn('[UserController] MongoDB update warning:', mongoErr.message);
-    }
-
-    if (!savedToMongo) {
-      if (isDevMockMode || !db) {
-        const existing = mockUsersDb.get(uid) || {};
-        const updated = { ...existing, uid, ...updates };
-        mockUsersDb.set(uid, updated);
-        return res.status(200).json({
-          success: true,
-          message: 'Profile updated successfully.',
-          data: updated
-        });
-      }
-
-      const userRef = db.collection('users').doc(uid);
-      await userRef.set(updates, { merge: true });
+    const updatedProfile = await updateUserProfileStores(uid, updates);
+    if (!updatedProfile) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'User profile not found.' });
     }
 
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully.',
-      data: { uid, ...updates }
+      data: updatedProfile
     });
   } catch (error) {
-    console.error('[UserController] updateMyProfile error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return sendUserProfileUpdateError(res, error, 'updateMyProfile');
   }
 };
 
@@ -506,16 +458,25 @@ export const deleteUser = async (req, res) => {
 
     const email = req.query?.email || req.body?.email;
 
-    // 1. Delete from Firebase Auth if not in mock mode (non-fatal if auth has expired token or user missing)
+    // Delete the identity first so a partially completed cleanup cannot leave an active account.
     if (!isDevMockMode && auth) {
       try {
         await auth.deleteUser(uid);
       } catch (authErr) {
-        console.warn('[UserController] Auth delete warning (proceeding with database cleanup):', authErr.message || authErr);
+        if (authErr.code !== 'auth/user-not-found') {
+          console.error('[UserController] Firebase Auth delete failed:', authErr);
+          return res.status(503).json({
+            success: false,
+            error: 'Service Unavailable',
+            message: 'Could not delete the Firebase Authentication account.'
+          });
+        }
       }
+    } else if (!isDevMockMode) {
+      return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'Firebase Authentication is unavailable.' });
     }
 
-    // 2. Delete from MongoDB
+    let deletedFromMongo = false;
     if (mongoose.connection.readyState === 1) {
       try {
         const queryConditions = [
@@ -528,14 +489,18 @@ export const deleteUser = async (req, res) => {
         if (email) {
           queryConditions.push({ email: email.trim().toLowerCase() });
         }
-        const deleteResult = await User.deleteMany({ $or: queryConditions });
-        console.log(`[UserController] MongoDB deleted ${deleteResult.deletedCount} user record(s) for uid: ${uid}`);
+        await User.deleteMany({ $or: queryConditions });
+        deletedFromMongo = true;
       } catch (mongoErr) {
         console.error('[UserController] MongoDB delete error:', mongoErr);
+        return res.status(503).json({
+          success: false,
+          error: 'Partial Persistence',
+          message: 'Firebase Authentication was deleted, but the MongoDB profile could not be removed.'
+        });
       }
     }
 
-    // 3. Delete from Firestore
     if (isDevMockMode) {
       mockUsersDb.delete(uid);
     } else if (db) {
@@ -549,7 +514,26 @@ export const deleteUser = async (req, res) => {
         }
       } catch (fsErr) {
         console.error('[UserController] Firestore delete error:', fsErr);
+        return res.status(503).json({
+          success: false,
+          error: deletedFromMongo ? 'Partial Persistence' : 'Service Unavailable',
+          message: deletedFromMongo
+            ? 'Firebase Authentication and MongoDB were deleted, but the Firestore profile could not be removed.'
+            : 'The Firestore profile could not be removed.'
+        });
       }
+    } else if (deletedFromMongo) {
+      return res.status(503).json({
+        success: false,
+        error: 'Partial Persistence',
+        message: 'Firebase Authentication and MongoDB were deleted, but Firestore is unavailable for profile cleanup.'
+      });
+    } else {
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'No persistent user profile store is available.'
+      });
     }
 
     return res.status(200).json({ success: true, message: 'User deleted successfully.' });
@@ -558,4 +542,3 @@ export const deleteUser = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
-

@@ -15,8 +15,7 @@ import {
   HiSquares2X2,
 } from "react-icons/hi2";
 import { updatePassword, signOut } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../services/firebase";
+import { auth } from "../services/firebase";
 import { userService } from "../services/user.service";
 import { sectionService } from "../services/section.service";
 import api from "../services/api";
@@ -133,7 +132,6 @@ export const Onboarding = () => {
         const first_name = firstName.trim();
         const last_name = lastName.trim();
 
-        const userRef = doc(db, "users", currentUser.uid);
         const isStudentRole = role === "student";
 
           const courseId = isStudentRole ? (programCode === "BSCS" ? "bscs" : "bsit") : "";
@@ -175,12 +173,7 @@ export const Onboarding = () => {
             needsOnboarding: false,
           };
 
-          await setDoc(userRef, profileData, { merge: true });
-          try {
-            await api.post('/auth/register', profileData);
-          } catch (syncErr) {
-            console.warn('[Onboarding] Backend sync warning:', syncErr?.message);
-          }
+          await api.post('/auth/register', profileData);
 
         // Registration notifications are created by the authenticated backend.
         await signOut(auth);

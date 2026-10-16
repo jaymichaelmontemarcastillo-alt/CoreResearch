@@ -3,13 +3,12 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
   deleteDoc,
   collection,
   query,
   where,
 } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { auth, db } from '../firebase/firebase';
 import { UserProfile, CreateUserInput, UpdateUserInput, UserRole } from '../types/user.types';
 import api from './api';
 
@@ -330,7 +329,7 @@ export const userService = {
   },
 
   /**
-   * Update an existing user profile document in Firestore and sync with backend API.
+   * Update an existing user profile through the backend persistence path.
    */
   async updateUser(uid: string, updates: UpdateUserInput): Promise<void> {
     if (!uid) return;
@@ -339,16 +338,8 @@ export const userService = {
       updated_at: new Date().toISOString(),
     });
 
-    // 1. Update Firestore
-    const userRef = doc(db, COLLECTION_NAME, uid);
-    await updateDoc(userRef, cleanUpdates);
-
-    // 2. Sync to backend API if possible
-    try {
-      await api.patch(`/users/${uid}`, cleanUpdates);
-    } catch (apiErr: any) {
-      console.warn('[userService] Backend updateUser sync warning (suppressed):', apiErr?.message);
-    }
+    const isSelfProfileUpdate = auth.currentUser?.uid === uid && !('role' in cleanUpdates);
+    await api.patch(isSelfProfileUpdate ? '/users/me' : `/users/${uid}`, cleanUpdates);
   },
 
   /**
@@ -542,7 +533,6 @@ export const userService = {
     if (!user) {
       throw new Error('User not found.');
     }
-    const userRef = doc(db, COLLECTION_NAME, uid);
     const now = new Date().toISOString();
     const isAdviser = user.role === 'adviser' || (user.role as string) === 'faculty';
 
@@ -562,13 +552,7 @@ export const userService = {
       updatePayload.activeGroupsCount = (user as any).activeGroupsCount || 0;
     }
 
-    await updateDoc(userRef, updatePayload);
-
-    try {
-      await api.patch(`/users/${uid}`, updatePayload);
-    } catch (e: any) {
-      console.warn('[userService] Backend approveUser sync warning:', e?.message);
-    }
+    await api.patch(`/users/${uid}`, updatePayload);
   },
 
 
@@ -577,7 +561,6 @@ export const userService = {
     if (!user) {
       throw new Error('User not found.');
     }
-    const userRef = doc(db, COLLECTION_NAME, uid);
     const now = new Date().toISOString();
     const updatePayload = {
       status: 'rejected' as const,
@@ -587,62 +570,17 @@ export const userService = {
       rejectionReason: reason || 'Registration application was not approved.',
       updated_at: now,
     };
-    await updateDoc(userRef, updatePayload);
-
-    try {
-      await api.patch(`/users/${uid}`, updatePayload);
-    } catch (e: any) {
-      console.warn('[userService] Backend rejectUser sync warning:', e?.message);
-    }
+    await api.patch(`/users/${uid}`, updatePayload);
   },
 
 
   async deleteUser(uid: string, email?: string): Promise<void> {
     if (!uid && !email) return;
 
-    let success = false;
-    let lastError: any = null;
-
-
-    try {
-      const url = email
-        ? `/users/${uid || 'by-email'}?email=${encodeURIComponent(email)}`
-        : `/users/${uid}`;
-      const res = await api.delete(url);
-      if (res?.data?.success) {
-        success = true;
-      }
-    } catch (apiErr: any) {
-      console.warn('[userService] Backend deleteUser warning:', apiErr?.response?.data || apiErr?.message);
-      lastError = apiErr;
-    }
-
-
-    try {
-      if (uid) {
-        const userRef = doc(db, COLLECTION_NAME, uid);
-        await deleteDoc(userRef);
-        success = true;
-      }
-      if (email) {
-        const qEmail = query(
-          collection(db, COLLECTION_NAME),
-          where('email', '==', email.trim().toLowerCase())
-        );
-        const snap = await getDocs(qEmail);
-        for (const docSnap of snap.docs) {
-          await deleteDoc(docSnap.ref);
-          success = true;
-        }
-      }
-    } catch (fsErr: any) {
-      console.warn('[userService] Firestore deleteUser warning:', fsErr?.message);
-      if (!success) lastError = fsErr;
-    }
-
-    if (!success && lastError) {
-      throw new Error(lastError.response?.data?.message || lastError.message || 'Failed to delete user record.');
-    }
+    const url = email
+      ? `/users/${uid || 'by-email'}?email=${encodeURIComponent(email)}`
+      : `/users/${uid}`;
+    await api.delete(url);
   },
 };
 

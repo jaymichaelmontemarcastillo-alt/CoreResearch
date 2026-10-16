@@ -1,34 +1,11 @@
 import mongoose from 'mongoose';
-import { db, isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
+import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 import { Schedule as MongoSchedule } from '../models/Schedule.js';
 import { generateTimeSlots } from '../services/schedulingService.js';
-
-// Pre-seed mock defense schedules if store is empty
-const seedMockSchedulesIfEmpty = () => {
-  if (!mockFirestoreDb.has('schedules')) {
-    const initialSchedules = [
-      {
-        id: 'sch-301',
-        projectId: 'proj-501',
-        projectTitle: 'Smart IoT Moisture & Nutrient Sensing System for Urban Farming',
-        studentName: 'Alex Rivera',
-        defenseType: 'proposal_defense',
-        date: '2026-08-14',
-        startTime: '10:00',
-        endTime: '11:30',
-        venue: 'Room 402, Engineering Hall (Hybrid Zoom Link: https://zoom.us/j/9981245)',
-        panelistIds: ['dev-panelist-01', 'dev-panelist-02'],
-        panelistNames: ['Prof. Marcus Chen', 'Prof. Sofia Gomez'],
-        status: 'scheduled',
-        createdAt: new Date().toISOString()
-      }
-    ];
-
-    const map = new Map();
-    initialSchedules.forEach(s => map.set(s.id, s));
-    mockFirestoreDb.set('schedules', map);
-  }
-};
+import {
+  syncDefenseScheduleProjections,
+  toDefenseScheduleProjection
+} from '../services/scheduleProjection.service.js';
 
 /**
  * Send real-time in-app notifications to Students, Advisers, and Panelists
@@ -148,7 +125,27 @@ const sendDefenseNotifications = async (schedules) => {
  */
 export const createSchedule = async (req, res) => {
   try {
-    const { projectId, projectTitle, studentName, defenseType, date, startTime, endTime, venue, panelistIds, adviserId, adviserName, memberIds } = req.body;
+    const {
+      id,
+      projectId,
+      projectTitle,
+      studentName,
+      defenseType,
+      date,
+      startTime,
+      endTime,
+      venue,
+      panelistIds: requestedPanelistIds,
+      panelists,
+      adviserId,
+      adviserName,
+      memberIds,
+      attempt,
+      defenseStage,
+      notes,
+      resultStatus
+    } = req.body;
+    const panelistIds = requestedPanelistIds || (panelists || []).map(panelist => panelist.id || panelist.uid).filter(Boolean);
 
     if (!projectTitle || !date || !startTime) {
       return res.status(400).json({
@@ -180,7 +177,7 @@ export const createSchedule = async (req, res) => {
       }
     }
 
-    const newScheduleId = `sch-${Date.now()}`;
+    const newScheduleId = id || `sch-${Date.now()}`;
     
     // [FINAL PRODUCTION ARCHITECTURE]
     // Strictly write to MongoDB. Hard fail if unavailable.
@@ -200,12 +197,21 @@ export const createSchedule = async (req, res) => {
           id: newScheduleId,
           projectId: projectId || 'proj-501',
           projectTitle,
+          studentName: studentName || 'Student Researcher',
+          memberIds: memberIds || [],
           date,
           time: startTime,
+          endTime: endTime || '11:00',
           location: venue || 'Conference Room A',
           type: defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
           status: 'scheduled',
-          panelists: panelistsList
+          adviserId,
+          adviserName,
+          panelists: panelistsList,
+          attempt: attempt || 1,
+          defenseStage: defenseStage || (attempt > 1 ? `Re-defense (Attempt ${attempt})` : 'Title Defense'),
+          notes,
+          resultStatus
         });
         mongoSuccess = true;
       }
@@ -221,26 +227,18 @@ export const createSchedule = async (req, res) => {
       });
     }
 
-    // Map back for response compatibility
-    const responseData = {
-      id: createdSchedule.id,
-      projectId: createdSchedule.projectId,
-      projectTitle: createdSchedule.projectTitle,
-      studentName: studentName || 'Student Researcher',
-      defenseType: createdSchedule.type === 'proposal' ? 'proposal_defense' : 'final_defense',
-      date: createdSchedule.date,
-      startTime: createdSchedule.time,
-      endTime: endTime || '11:00',
-      venue: createdSchedule.location,
-      panelistIds: createdSchedule.panelists.map(p => p.id),
-      panelistNames: createdSchedule.panelists.map(p => p.name),
-      panelists: createdSchedule.panelists,
-      adviserId,
-      adviserName,
-      memberIds: memberIds || [],
-      status: createdSchedule.status,
-      createdAt: createdSchedule.createdAt
-    };
+    const responseData = toDefenseScheduleProjection(createdSchedule);
+    try {
+      await syncDefenseScheduleProjections([createdSchedule]);
+    } catch (syncError) {
+      console.error('[ScheduleController] Firestore schedule projection sync failed:', syncError.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Partial Persistence',
+        message: 'The schedule was saved in MongoDB, but its Firestore projection could not be synchronized.',
+        scheduleId: createdSchedule.id
+      });
+    }
 
     // Dispatch notifications to Students, Adviser, and Panelists
     sendDefenseNotifications([responseData]).catch(err => {
@@ -264,52 +262,35 @@ export const createSchedule = async (req, res) => {
 export const getSchedules = async (req, res) => {
   try {
     let list = [];
-    let fetchedFromMongo = false;
 
     // Auto-archive past defense schedules
     // If today is Oct 15, schedules for Oct 14 or earlier are automatically marked as archived
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    try {
-      if (mongoose.connection.readyState === 1) {
-        // Auto-archive past schedules in MongoDB
-        await MongoSchedule.updateMany(
-          { date: { $lt: todayStr }, status: { $ne: 'archived' } },
-          { $set: { status: 'archived' } }
-        );
-
-        // By default, do not return archived schedules unless explicitly requested
-        const queryFilter = req.query.includeArchived === 'true' 
-          ? {} 
-          : { status: { $ne: 'archived' } };
-
-        const mongoDocs = await MongoSchedule.find(queryFilter).lean();
-        if (mongoDocs) {
-          list = mongoDocs.map(doc => ({
-            id: doc.id,
-            projectId: doc.projectId,
-            projectTitle: doc.projectTitle,
-            studentName: 'Student Researcher', // Unused in new schema
-            defenseType: doc.type === 'proposal' ? 'proposal_defense' : 'final_defense',
-            date: doc.date,
-            startTime: doc.time,
-            endTime: doc.endTime || doc.time,
-            venue: doc.location,
-            panelistIds: doc.panelists ? doc.panelists.map(p => p.id) : [],
-            panelistNames: doc.panelists ? doc.panelists.map(p => p.name) : [],
-            panelists: doc.panelists || [],
-            adviserId: doc.adviserId,
-            adviserName: doc.adviserName,
-            status: doc.status,
-            createdAt: doc.createdAt
-          }));
-        }
-      }
-    } catch (mongoErr) {
-      console.warn('[ScheduleController] MongoDB get schedules warning:', mongoErr.message);
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'MongoDB is required to read schedules.' });
     }
 
+    const pastSchedules = await MongoSchedule.find({
+      date: { $lt: todayStr },
+      status: { $ne: 'archived' }
+    }).lean();
+    if (pastSchedules.length > 0) {
+      await MongoSchedule.updateMany(
+        { id: { $in: pastSchedules.map(schedule => schedule.id) } },
+        { $set: { status: 'archived' } }
+      );
+      await syncDefenseScheduleProjections(
+        pastSchedules.map(schedule => ({ ...schedule, status: 'archived' }))
+      );
+    }
+
+    const queryFilter = req.query.includeArchived === 'true'
+      ? {}
+      : { status: { $ne: 'archived' } };
+    const mongoDocs = await MongoSchedule.find(queryFilter).lean();
+    list = mongoDocs.map(toDefenseScheduleProjection);
     list.sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
 
     return res.status(200).json({
@@ -330,57 +311,55 @@ export const updateScheduleStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
-    // [FINAL PRODUCTION ARCHITECTURE]
-    // Strictly write to MongoDB. Hard fail if unavailable.
-    let mongoSuccess = false;
-    let updatedSchedule = null;
-
-    try {
-      if (mongoose.connection.readyState === 1) {
-        updatedSchedule = await MongoSchedule.findOneAndUpdate(
-          { id: id },
-          { $set: { status } },
-          { new: true }
-        );
-
-        if (updatedSchedule) {
-          mongoSuccess = true;
-        }
-      }
-    } catch (mongoErr) {
-      console.error('[ScheduleController] MongoDB update schedule error:', mongoErr.message);
+    const allowedStatuses = ['scheduled', 'rescheduled', 'completed', 'cancelled', 'failed', 'for_redefense', 'archived'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Bad Request', message: 'Invalid schedule status.' });
     }
 
-    if (!mongoSuccess) {
+    if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({
         success: false,
         error: 'Service Unavailable',
-        message: 'Could not update schedule in authoritative database. Operation aborted.'
+        message: 'MongoDB is required to update schedules.'
       });
     }
 
-    // Map back for response compatibility
-    const updated = {
-      id: updatedSchedule.id,
-      projectId: updatedSchedule.projectId,
-      projectTitle: updatedSchedule.projectTitle,
-      studentName: 'Student Researcher', // Unused in new schema
-      defenseType: updatedSchedule.type === 'proposal' ? 'proposal_defense' : 'final_defense',
-      date: updatedSchedule.date,
-      startTime: updatedSchedule.time,
-      endTime: updatedSchedule.endTime || updatedSchedule.time,
-      venue: updatedSchedule.location,
-      panelistIds: updatedSchedule.panelists ? updatedSchedule.panelists.map(p => p.id) : [],
-      panelistNames: updatedSchedule.panelists ? updatedSchedule.panelists.map(p => p.name) : [],
-      status: updatedSchedule.status,
-      createdAt: updatedSchedule.createdAt
-    };
+    let updatedSchedule;
+    try {
+      updatedSchedule = await MongoSchedule.findOneAndUpdate(
+        { id },
+        { $set: { status } },
+        { new: true, runValidators: true }
+      );
+    } catch (mongoErr) {
+      console.error('[ScheduleController] MongoDB update schedule error:', mongoErr.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Service Unavailable',
+        message: 'Could not update schedule in authoritative database.'
+      });
+    }
+
+    if (!updatedSchedule) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'Schedule not found.' });
+    }
+
+    try {
+      await syncDefenseScheduleProjections([updatedSchedule]);
+    } catch (syncError) {
+      console.error('[ScheduleController] Firestore schedule projection sync failed:', syncError.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Partial Persistence',
+        message: 'The schedule status was saved in MongoDB, but its Firestore projection could not be synchronized.',
+        scheduleId: updatedSchedule.id
+      });
+    }
 
     return res.status(200).json({
       success: true,
       message: `Schedule status updated to '${status}'.`,
-      data: updated
+      data: toDefenseScheduleProjection(updatedSchedule)
     });
   } catch (error) {
     console.error('[ScheduleController] updateScheduleStatus error:', error);
@@ -394,7 +373,8 @@ export const updateScheduleStatus = async (req, res) => {
 export const updateSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, startTime, endTime, venue, adviserId, adviserName, panelists } = req.body;
+    const { date, startTime, endTime, venue, adviserId, adviserName, panelists, status, attempt, defenseStage, notes, resultStatus } = req.body;
+    const allowedStatuses = ['scheduled', 'rescheduled', 'completed', 'cancelled', 'failed', 'for_redefense', 'archived'];
 
     // Enforce Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
     if (adviserId && Array.isArray(panelists) && panelists.some(p => (p.id || p.uid) === adviserId)) {
@@ -404,69 +384,63 @@ export const updateSchedule = async (req, res) => {
         message: 'Invalid Panelist Assignment: The assigned adviser of this research group cannot serve as a panelist for the same group.'
       });
     }
-
-    let mongoSuccess = false;
-    let updatedSchedule = null;
-
-    if (mongoose.connection.readyState === 1) {
-      updatedSchedule = await MongoSchedule.findOneAndUpdate(
-        { id },
-        { 
-          $set: { 
-            date, 
-            time: startTime, 
-            endTime, 
-            location: venue, 
-            adviserId, 
-            adviserName, 
-            panelists 
-          } 
-        },
-        { new: true }
-      );
-
-      if (updatedSchedule) mongoSuccess = true;
+    if (status !== undefined && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Bad Request', message: 'Invalid schedule status.' });
+    }
+    if (panelists !== undefined && !Array.isArray(panelists)) {
+      return res.status(400).json({ success: false, error: 'Bad Request', message: 'Panelists must be an array.' });
     }
 
-    // Sync to Firestore / Dev store
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'MongoDB is required to update schedules.' });
+    }
+
+    const updates = {};
+    if (date !== undefined) updates.date = date;
+    if (startTime !== undefined) updates.time = startTime;
+    if (endTime !== undefined) updates.endTime = endTime;
+    if (venue !== undefined) updates.location = venue;
+    if (adviserId !== undefined) updates.adviserId = adviserId;
+    if (adviserName !== undefined) updates.adviserName = adviserName;
+    if (panelists !== undefined) {
+      updates.panelists = panelists.map(panelist => ({
+        id: panelist.id || panelist.uid,
+        name: panelist.name || panelist.fullName,
+        email: panelist.email || '',
+        role: panelist.role || 'panelist'
+      }));
+    }
+    if (status !== undefined) updates.status = status;
+    if (attempt !== undefined) updates.attempt = attempt;
+    if (defenseStage !== undefined) updates.defenseStage = defenseStage;
+    if (notes !== undefined) updates.notes = notes;
+    if (resultStatus !== undefined) updates.resultStatus = resultStatus;
+
+    const updatedSchedule = await MongoSchedule.findOneAndUpdate(
+      { id },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+    if (!updatedSchedule) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'Schedule not found.' });
+    }
+
     try {
-      if (db) {
-        await db.collection('schedules').doc(id).set({
-          date,
-          time: startTime,
-          startTime,
-          endTime,
-          venue,
-          location: venue,
-          adviserId,
-          adviserName,
-          panelists: panelists || [],
-          panelistIds: (panelists || []).map(p => p.id || p.uid).filter(Boolean),
-          panelistNames: (panelists || []).map(p => p.name || p.fullName).filter(Boolean),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-        mongoSuccess = true;
-      } else if (isDevMockMode) {
-        seedMockSchedulesIfEmpty();
-        const map = mockFirestoreDb.get('schedules');
-        if (map && map.has(id)) {
-          const existing = map.get(id);
-          map.set(id, { ...existing, date, startTime, endTime, venue, adviserId, adviserName, panelists });
-        }
-        mongoSuccess = true;
-      }
-    } catch (fsErr) {
-      console.warn('[ScheduleController] Firestore sync error:', fsErr.message);
-    }
-
-    if (!mongoSuccess && !updatedSchedule) {
-      return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'Could not update schedule' });
+      await syncDefenseScheduleProjections([updatedSchedule]);
+    } catch (syncError) {
+      console.error('[ScheduleController] Firestore schedule projection sync failed:', syncError.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Partial Persistence',
+        message: 'The schedule was updated in MongoDB, but its Firestore projection could not be synchronized.',
+        scheduleId: updatedSchedule.id
+      });
     }
 
     return res.status(200).json({
       success: true,
       message: `Schedule updated successfully.`,
-      data: updatedSchedule || { id, date, startTime, endTime, venue, adviserId, adviserName, panelists }
+      data: toDefenseScheduleProjection(updatedSchedule)
     });
   } catch (error) {
     console.error('[ScheduleController] updateSchedule error:', error);
@@ -541,86 +515,73 @@ export const bulkCreateSchedules = async (req, res) => {
       }
     }
 
-    let mongoSuccess = false;
-    let createdCount = 0;
-
     const docsToInsert = schedules.map(s => ({
       id: s.id || `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       projectId: s.projectId,
       projectTitle: s.projectTitle,
+      studentName: s.studentName || 'Student Researcher',
+      memberIds: s.memberIds || [],
       date: s.date,
       time: s.startTime, // Keeping 'time' for backward compatibility
-      startTime: s.startTime,
       endTime: s.endTime,
       location: s.venue,
-      venue: s.venue,
       type: s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
-      defenseType: s.defenseType || 'proposal_defense',
       status: 'scheduled',
       adviserId: s.adviserId,
       adviserName: s.adviserName,
-      panelists: s.panelists || [],
-      panelistIds: (s.panelists || []).map(p => p.id || p.uid).filter(Boolean),
-      panelistNames: (s.panelists || []).map(p => p.name || p.fullName).filter(Boolean),
-      memberIds: s.memberIds || [],
-      createdAt: new Date().toISOString()
+      panelists: (s.panelists || []).map(panelist => ({
+        id: panelist.id || panelist.uid,
+        name: panelist.name || panelist.fullName,
+        email: panelist.email || '',
+        role: panelist.role || 'panelist'
+      })),
+      attempt: s.attempt || 1,
+      defenseStage: s.defenseStage || (s.attempt > 1 ? `Re-defense (Attempt ${s.attempt})` : 'Title Defense'),
+      notes: s.notes,
+      resultStatus: s.resultStatus
     }));
 
-    if (mongoose.connection.readyState === 1) {
-      const projectIds = schedules.map(s => s.projectId);
-      const defenseTypes = [...new Set(schedules.map(s => s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense'))];
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'MongoDB is required to create schedules.' });
+    }
+
+    const projectIds = schedules.map(s => s.projectId);
+    const defenseTypes = [...new Set(schedules.map(s => s.defenseType === 'proposal_defense' ? 'proposal' : 'final_defense'))];
+    const previousSchedules = await MongoSchedule.find({
+      projectId: { $in: projectIds },
+      type: { $in: defenseTypes }
+    }).lean();
       
-      // Clear existing schedules for these groups and defense types to prevent duplicates
-      await MongoSchedule.deleteMany({ 
-        projectId: { $in: projectIds },
-        type: { $in: defenseTypes }
-      });
+    // Replace prior schedules for the same groups and defense types.
+    await MongoSchedule.deleteMany({
+      projectId: { $in: projectIds },
+      type: { $in: defenseTypes }
+    });
 
-      await MongoSchedule.insertMany(docsToInsert);
-      mongoSuccess = true;
-      createdCount = docsToInsert.length;
-    }
+    const insertedSchedules = await MongoSchedule.insertMany(docsToInsert);
 
-    // Also sync to Firestore / Dev store
     try {
-      if (db) {
-        const batch = db.batch();
-        docsToInsert.forEach(d => {
-          const docRef = db.collection('schedules').doc(d.id);
-          batch.set(docRef, d);
-        });
-        await batch.commit();
-        mongoSuccess = true;
-        createdCount = docsToInsert.length;
-      } else if (isDevMockMode) {
-        seedMockSchedulesIfEmpty();
-        const map = mockFirestoreDb.get('schedules') || new Map();
-        docsToInsert.forEach(d => map.set(d.id, d));
-        mockFirestoreDb.set('schedules', map);
-        mongoSuccess = true;
-        createdCount = docsToInsert.length;
-      }
-    } catch (fsErr) {
-      console.warn('[ScheduleController] Firestore bulk sync warning:', fsErr.message);
-    }
-
-    if (!mongoSuccess) {
+      await syncDefenseScheduleProjections(insertedSchedules, previousSchedules.map(schedule => schedule.id));
+    } catch (syncError) {
+      console.error('[ScheduleController] Firestore bulk schedule projection sync failed:', syncError.message);
       return res.status(503).json({
         success: false,
-        error: 'Service Unavailable',
-        message: 'Could not save schedules to authoritative database.'
+        error: 'Partial Persistence',
+        message: 'Schedules were saved in MongoDB, but their Firestore projections could not be synchronized.',
+        scheduleIds: insertedSchedules.map(schedule => schedule.id)
       });
     }
 
     // Dispatch notifications to Students, Advisers, and Panelists
-    sendDefenseNotifications(docsToInsert).catch(err => {
+    const responseSchedules = insertedSchedules.map(toDefenseScheduleProjection);
+    sendDefenseNotifications(responseSchedules).catch(err => {
       console.error('[ScheduleController] Failed to dispatch bulk notifications:', err.message);
     });
 
     return res.status(201).json({
       success: true,
-      message: `${createdCount} schedules successfully generated.`,
-      data: docsToInsert
+      message: `${responseSchedules.length} schedules successfully generated.`,
+      data: responseSchedules
     });
 
   } catch (error) {
@@ -640,6 +601,17 @@ export const deleteSchedule = async (req, res) => {
       const result = await MongoSchedule.findOneAndDelete({ id: id });
       if (!result) {
         return res.status(404).json({ success: false, message: 'Schedule not found in MongoDB' });
+      }
+      try {
+        await syncDefenseScheduleProjections([], [id]);
+      } catch (syncError) {
+        console.error('[ScheduleController] Firestore schedule projection delete failed:', syncError.message);
+        return res.status(503).json({
+          success: false,
+          error: 'Partial Persistence',
+          message: 'The schedule was deleted from MongoDB, but its Firestore projection could not be removed.',
+          scheduleId: id
+        });
       }
       return res.status(200).json({ success: true, message: 'Schedule deleted successfully' });
     }

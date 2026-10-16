@@ -7,7 +7,7 @@ import {
   sendPasswordResetEmail,
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../services/firebase';
 import api from '../services/api';
 import { userService } from '../services/user.service';
@@ -33,12 +33,11 @@ export const AuthProvider = ({ children }) => {
     localStorage.getItem('core_research_faculty_mode') || 'adviser'
   );
 
-  // Sync profile with Express backend API
+  // Read the client-facing Firestore profile projection after authentication.
   // Kapag nag-login o register ang user via Firebase Auth (email man o Google), 
-  // kailangan nating i-sync yung UID nila papunta sa backend natin.
-  // Dito natin kinukuha yung buong Profile details galing sa Firestore 'users' collection 
-  // gamit ang API natin para magamit ng buong app (e.g. for Dashboard at Protected Routes).
-  // Sync profile with Firestore 'users' collection
+  // kailangan nating kunin yung profile para sa buong app.
+  // Dito natin kinukuha yung buong Profile details galing sa Firestore 'users' collection
+  // para magamit ng buong app (e.g. for Dashboard at Protected Routes).
   const syncProfileWithBackend = async (firebaseUser, defaultRole = 'student') => {
     try {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -337,23 +336,7 @@ export const AuthProvider = ({ children }) => {
       };
 
       // 4. Persist profile document:
-      // A) Backend Admin API sync - uses Firebase Admin SDK to guarantee persistence in Firestore and MongoDB
-      try {
-        await api.post('/auth/register', userProfileData);
-      } catch (backendErr) {
-        console.warn('[registerStudent] Backend sync warning:', backendErr?.message);
-      }
-
-      // B) Direct Client Firestore SDK write (with timeout fallback so it never hangs)
-      const userRef = doc(db, 'users', result.user.uid);
-      try {
-        await Promise.race([
-          setDoc(userRef, userProfileData, { merge: true }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-        ]);
-      } catch (fsErr) {
-        console.warn('[registerStudent] Client setDoc warning (server sync already performed):', fsErr?.message);
-      }
+      await api.post('/auth/register', userProfileData);
 
       // 6. Keep session & profile active with pending status.
       // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
@@ -432,23 +415,7 @@ export const AuthProvider = ({ children }) => {
         updated_at: new Date().toISOString()
       };
 
-      // Backend sync
-      try {
-        await api.post('/auth/register', userProfileData);
-      } catch (backendErr) {
-        console.warn('[registerFaculty] Backend sync warning:', backendErr?.message);
-      }
-
-      // Client setDoc with timeout
-      const userRef = doc(db, 'users', result.user.uid);
-      try {
-        await Promise.race([
-          setDoc(userRef, userProfileData, { merge: true }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-        ]);
-      } catch (fsErr) {
-        console.warn('[registerFaculty] Client setDoc warning:', fsErr?.message);
-      }
+      await api.post('/auth/register', userProfileData);
 
       // Keep session & profile active with pending status.
       // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
@@ -628,21 +595,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUserProfile = async (updatedData) => {
-    // 1. Update state & dev storage
-    updateProfileLocal(updatedData);
-
-    // 2. If logged in with Firebase, sync to Firestore
+    // Persist through the backend so MongoDB remains authoritative and Firestore stays a projection.
     if (currentUser?.uid && !devMode) {
-      try {
-        const userRef = doc(db, 'users', currentUser.uid);
-        await setDoc(userRef, {
-          ...updatedData,
-          updated_at: new Date().toISOString()
-        }, { merge: true });
-      } catch (err) {
-        console.warn('[AuthContext] Firestore profile update warning:', err.message);
-      }
+      await api.patch('/users/me', {
+        ...updatedData,
+        updated_at: new Date().toISOString()
+      });
     }
+    updateProfileLocal(updatedData);
   };
 
 

@@ -1,5 +1,3 @@
-import { db } from '../firebase/firebase';
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import api from './api';
 import {
   DefenseSchedule,
@@ -7,12 +5,7 @@ import {
   ScheduleStatus,
 } from '../types/schedule.types';
 
-const COLLECTION_NAME = 'schedules';
-
 export const scheduleService = {
-  /**
-   * Create a new defense schedule.
-   */
   /**
    * Create a new defense schedule.
    */
@@ -23,34 +16,28 @@ export const scheduleService = {
     const id = `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const now = new Date().toISOString();
 
-    let createdData: any = null;
-    try {
-      const { data } = await api.post('/schedules', { ...input, id });
-      createdData = data.data;
-    } catch (apiErr) {
-      console.warn('[scheduleService] API createSchedule notice, saving to Firestore:', apiErr);
+    const { data } = await api.post('/schedules', { ...input, id });
+    const createdData = data.data;
+    if (!createdData || typeof createdData.id !== 'string') {
+      throw new Error('The schedules API returned an invalid created schedule.');
     }
 
     const scheduleData: DefenseSchedule = {
-      id: createdData?.id || id,
+      id: createdData.id,
       ...input,
-      ...(createdData || {}),
-      status: input.status || createdData?.status || 'scheduled',
-      attempt: input.attempt || 1,
+      ...createdData,
+      status: createdData?.status || input.status || 'scheduled',
+      attempt: createdData?.attempt || input.attempt || 1,
       defenseStage:
+        createdData?.defenseStage ||
         input.defenseStage ||
         (input.attempt && input.attempt > 1
           ? `Re-defense (Attempt ${input.attempt})`
           : 'Title Defense'),
       createdAt: createdData?.createdAt || now,
-      updatedAt: now,
+      updatedAt: createdData?.updatedAt || now,
     };
 
-    try {
-      await setDoc(doc(db, COLLECTION_NAME, scheduleData.id), scheduleData, { merge: true });
-    } catch (fsErr) {
-      console.warn('[scheduleService] Firestore sync error:', fsErr);
-    }
     return scheduleData;
   },
 
@@ -66,29 +53,19 @@ export const scheduleService = {
    * Fetch all defense schedules.
    */
   async getAllSchedules(): Promise<DefenseSchedule[]> {
-    try {
-      const { data } = await api.get('/schedules');
-      if (Array.isArray(data?.data)) {
-        return data.data;
-      }
-      return [];
-    } catch (apiErr) {
-      console.warn('[scheduleService] API error fetching schedules:', apiErr);
-      return [];
+    const { data } = await api.get('/schedules');
+    if (!Array.isArray(data?.data)) {
+      throw new Error('The schedules API returned an invalid response.');
     }
+    return data.data;
   },
 
   /**
    * Fetch defense schedules for a specific project.
    */
   async getSchedulesByProject(projectId: string): Promise<DefenseSchedule[]> {
-    try {
-      const allSchedules = await this.getAllSchedules();
-      return allSchedules.filter(s => s.projectId === projectId || s.groupId === projectId);
-    } catch (err) {
-      console.error('[scheduleService] getSchedulesByProject error:', err);
-      return [];
-    }
+    const allSchedules = await this.getAllSchedules();
+    return allSchedules.filter(s => s.projectId === projectId || s.groupId === projectId);
   },
 
   /**
@@ -100,38 +77,28 @@ export const scheduleService = {
     studentName?: string | null,
     projectTitle?: string | null
   ): Promise<DefenseSchedule[]> {
-    try {
-      const allSchedules = await this.getAllSchedules();
-      return allSchedules.filter(s => {
-        if (studentId && s.studentId === studentId) return true;
-        if (groupId && (s.projectId === groupId || s.groupId === groupId)) return true;
-        if (studentName && s.studentName === studentName) return true;
-        if (projectTitle && s.projectTitle === projectTitle) return true;
-        return false;
-      });
-    } catch (err) {
-      console.error('[scheduleService] getSchedulesForStudent error:', err);
-      return [];
-    }
+    const allSchedules = await this.getAllSchedules();
+    return allSchedules.filter(s => {
+      if (studentId && s.memberIds?.includes(studentId)) return true;
+      if (groupId && (s.projectId === groupId || s.groupId === groupId)) return true;
+      if (studentName && s.studentName === studentName) return true;
+      if (projectTitle && s.projectTitle === projectTitle) return true;
+      return false;
+    });
   },
 
   /**
    * Fetch defense schedules for an adviser dashboard.
    */
   async getSchedulesForAdviser(adviserId: string, groupIds: string[] = []): Promise<DefenseSchedule[]> {
-    try {
-      const allSchedules = await this.getAllSchedules();
-      return allSchedules.filter(s => {
-        if (adviserId && s.adviserId === adviserId) return true;
-        if (groupIds && groupIds.length > 0) {
-          if (groupIds.includes(s.projectId) || groupIds.includes(s.groupId)) return true;
-        }
-        return false;
-      });
-    } catch (err) {
-      console.error('[scheduleService] getSchedulesForAdviser error:', err);
-      return [];
-    }
+    const allSchedules = await this.getAllSchedules();
+    return allSchedules.filter(s => {
+      if (adviserId && s.adviserId === adviserId) return true;
+      if (groupIds && groupIds.length > 0) {
+        if (groupIds.includes(s.projectId) || (s.groupId && groupIds.includes(s.groupId))) return true;
+      }
+      return false;
+    });
   },
 
   /**
@@ -142,37 +109,18 @@ export const scheduleService = {
       throw new Error('Invalid Panelist Assignment: The assigned adviser of this research group cannot serve as a panelist for the same group.');
     }
 
-    let result: any = null;
-    try {
-      const { data } = await api.put(`/schedules/${scheduleId}`, updates);
-      result = data.data;
-    } catch (apiErr) {
-      console.warn('[scheduleService] API update warning, saving to Firestore:', apiErr);
+    const { data } = await api.put(`/schedules/${scheduleId}`, updates);
+    if (!data?.data || data.data.id !== scheduleId) {
+      throw new Error('The schedules API returned an invalid updated schedule.');
     }
-
-    try {
-      await setDoc(doc(db, COLLECTION_NAME, scheduleId), updates, { merge: true });
-    } catch (fsErr) {
-      console.warn('[scheduleService] Firestore update error:', fsErr);
-    }
-
-    return result || ({ id: scheduleId, ...updates } as DefenseSchedule);
+    return data.data;
   },
 
   /**
    * Update schedule status (Admin & Adviser)
    */
   async updateScheduleStatus(id: string, status: ScheduleStatus): Promise<void> {
-    try {
-      await api.patch(`/schedules/${id}/status`, { status });
-    } catch (apiErr) {
-      console.warn('[scheduleService] API updateStatus warning:', apiErr);
-    }
-    try {
-      await updateDoc(doc(db, COLLECTION_NAME, id), { status });
-    } catch (fsErr) {
-      console.warn('[scheduleService] Firestore status update error:', fsErr);
-    }
+    await api.patch(`/schedules/${id}/status`, { status });
   },
 
   /**
@@ -191,7 +139,7 @@ export const scheduleService = {
   },
 
   /**
-   * Bulk create schedules using Node API with validation and Firestore sync
+   * Bulk create schedules through the authoritative Node API.
    */
   async bulkCreateSchedules(schedules: any[]) {
     // Validate that no group's adviser is in its panelists
@@ -201,26 +149,12 @@ export const scheduleService = {
       }
     }
 
-    let responseData: any = null;
-    try {
-      const response = await api.post('/schedules/bulk', { schedules });
-      responseData = response.data;
-    } catch (apiErr) {
-      console.warn('[scheduleService] API bulkCreate error, writing to Firestore:', apiErr);
+    const response = await api.post('/schedules/bulk', { schedules });
+    if (!response.data?.success || !Array.isArray(response.data.data)) {
+      throw new Error('The schedules API returned an invalid bulk-create response.');
     }
-
-    try {
-      await Promise.all(schedules.map(async (s) => {
-        const id = s.id || `sch-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        await setDoc(doc(db, COLLECTION_NAME, id), { ...s, id }, { merge: true });
-      }));
-    } catch (fsErr) {
-      console.warn('[scheduleService] Firestore bulk sync error:', fsErr);
-    }
-
-    return responseData || { success: true, message: `${schedules.length} schedules created.` };
+    return response.data;
   }
 };
 
 export default scheduleService;
-
