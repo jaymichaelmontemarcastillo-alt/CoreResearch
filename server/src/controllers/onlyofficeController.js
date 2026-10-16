@@ -113,7 +113,10 @@ export const generateConfig = async (req, res) => {
     }
 
     // The document URL must be reachable by the ONLYOFFICE server (which runs in Docker)
-    const backendHost = process.env.BACKEND_PUBLIC_URL || `http://host.docker.internal:5000`;
+    const hostHeader = req.get('host') || '';
+    const isLocal = hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1');
+    const defaultHost = isLocal ? 'http://host.docker.internal:5000' : `${req.protocol}://${hostHeader}`;
+    const backendHost = process.env.BACKEND_PUBLIC_URL || defaultHost;
     const documentUrl = `${backendHost}/api/onlyoffice/download/${documentId}`;
     const callbackUrl = `${backendHost}/api/onlyoffice/callback?id=${documentId}`;
 

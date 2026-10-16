@@ -2,6 +2,7 @@
 import express from 'express';
 import multer from 'multer';
 import { importDocument, serveStorageAsset, updatePageSettings } from '../controllers/documentController.js';
+import { optionalVerifyToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 30 * 1024 * 1024, // 30MB max
+    fileSize: 50 * 1024 * 1024, // 50MB max
   },
   fileFilter: (req, file, cb) => {
     const ext = file.originalname.split('.').pop()?.toLowerCase();
@@ -40,7 +41,7 @@ router.post('/import', (req, res, next) => {
 }, importDocument);
 
 // Storage Asset Access Endpoint: GET /api/storage/assets/*
-router.get('/assets/*', serveStorageAsset);
+router.get('/assets/*', optionalVerifyToken, serveStorageAsset);
 
 // Update Page Settings: PUT /api/documents/:id/page-settings
 router.put('/:id/page-settings', express.json(), updatePageSettings);

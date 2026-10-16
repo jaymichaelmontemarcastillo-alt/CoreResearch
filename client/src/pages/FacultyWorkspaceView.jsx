@@ -19,7 +19,10 @@ import {
   HiArchiveBox,
   HiArrowPath,
   HiShieldCheck,
+  HiDocumentText,
+  HiClock,
 } from 'react-icons/hi2';
+import manuscriptService from '../services/manuscript.service';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
 import researchFeedbackService from '../services/researchFeedback.service';
@@ -52,6 +55,7 @@ export const FacultyWorkspaceView = () => {
   const [finalEvals, setFinalEvals] = useState([]);
   const [selectedEval, setSelectedEval] = useState(null);
   const [gradingModalType, setGradingModalType] = useState(null);
+  const [reviewingRevision, setReviewingRevision] = useState(false);
 
   const effectiveRole = role === 'faculty' ? currentFacultyMode : role;
   const isAdviser = effectiveRole === 'adviser';
@@ -62,6 +66,57 @@ export const FacultyWorkspaceView = () => {
   );
   const canApprove = isAdviser || isAssignedAdviser || isAdmin;
   const canRequestRevision = isAdviser || isAssignedAdviser || isPanelist || role === 'research_coordinator' || isAdmin;
+
+  const requiresPostDefenseRevisions =
+    Boolean(workspace?.postDefenseRevisionRequired) ||
+    finalEvals.some(
+      (ev) =>
+        ev.verdict === 'PASSED_WITH_MINOR_REVISIONS' ||
+        ev.verdict === 'PASSED_WITH_MAJOR_REVISIONS' ||
+        ev.verdict === 'REDEFENSE'
+    );
+
+  const postDefenseStatus = workspace?.postDefenseRevisionStatus || (requiresPostDefenseRevisions ? 'revision_required' : 'none');
+
+  const handleApprovePostDefenseRevisions = async () => {
+    if (!workspace?.id) return;
+    const confirmed = window.confirm('Are you sure you want to approve this group\'s post-defense revisions and unlock Institutional Repository publication?');
+    if (!confirmed) return;
+
+    setReviewingRevision(true);
+    try {
+      const res = await manuscriptService.reviewPostDefenseRevision(workspace.id, {
+        decision: 'approved',
+        reviewNotes: 'Post-defense revisions and point-by-point matrix verified and approved.'
+      });
+      setToast(res.message || 'Post-defense revisions formally approved! Repository publication unlocked.');
+      if (res.data) setWorkspace(res.data);
+    } catch (err) {
+      alert(`Approval error: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setReviewingRevision(false);
+    }
+  };
+
+  const handleRequestFurtherRevisions = async () => {
+    if (!workspace?.id) return;
+    const notes = window.prompt('Enter specific directives or further revisions required from the students:');
+    if (!notes || !notes.trim()) return;
+
+    setReviewingRevision(true);
+    try {
+      const res = await manuscriptService.reviewPostDefenseRevision(workspace.id, {
+        decision: 'revision_required',
+        reviewNotes: notes.trim()
+      });
+      setToast(res.message || 'Returned to students for further revisions.');
+      if (res.data) setWorkspace(res.data);
+    } catch (err) {
+      alert(`Review error: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setReviewingRevision(false);
+    }
+  };
 
   useEffect(() => {
     let unsubscribeWs = () => {};
@@ -720,7 +775,177 @@ export const FacultyWorkspaceView = () => {
               })}
             </div>
           </Card>
-          
+
+          {/* Defense Ratings Summary */}
+          {finalEvals.length > 0 && (
+            <Card className="p-5 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#222433] pb-2.5">
+                <h3 className="text-xs font-bold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider">
+                  Final Defense Ratings &amp; Verdicts
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {finalEvals.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="p-3 border border-gray-100 dark:border-[#222433] rounded-lg bg-gray-50 dark:bg-[#1c1d28] flex justify-between items-center"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{ev.panelistName}</p>
+                      <p className="text-xs text-gray-500">Verdict: {ev.verdict.replace(/_/g, ' ')}</p>
+                      {ev.revisionDirectives && (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 italic">
+                          "{ev.revisionDirectives}"
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        setSelectedEval(ev);
+                        setGradingModalType('final');
+                      }}
+                    >
+                      View Rubrics
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Post-Defense Revision & Matrix Review Card */}
+          {requiresPostDefenseRevisions && (
+            <Card className="p-5 bg-gradient-to-br from-white to-amber-50/30 dark:from-[#15161e] dark:to-amber-950/10 border border-amber-200/90 dark:border-amber-900/40 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 dark:border-amber-900/40 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                    <HiDocumentText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                      Post-Defense Revision Review &amp; Clearance
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Verify point-by-point matrix against panel directives before approving repository publication
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {postDefenseStatus === 'approved' ? (
+                    <Badge variant="emerald" className="py-1 px-3 text-xs flex items-center gap-1.5 font-bold">
+                      <HiShieldCheck className="w-4 h-4" /> Revisions Approved
+                    </Badge>
+                  ) : postDefenseStatus === 'under_review' ? (
+                    <Badge variant="blue" className="py-1 px-3 text-xs flex items-center gap-1.5 font-bold">
+                      <HiClock className="w-4 h-4" /> Submitted - Verification Needed
+                    </Badge>
+                  ) : (
+                    <Badge variant="amber" className="py-1 px-3 text-xs flex items-center gap-1.5 font-bold">
+                      <HiExclamationCircle className="w-4 h-4" /> Awaiting Student Submission
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Point-by-point matrix preview */}
+              {workspace?.latestPostDefenseRevision?.revisionMatrix?.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    <span>Submitted Point-by-Point Revision Matrix:</span>
+                    <span className="text-[11px] font-normal text-gray-500">
+                      Submitted on {new Date(workspace.latestPostDefenseRevision.submittedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-[#222433]">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 font-bold">
+                        <tr>
+                          <th className="p-2.5">#</th>
+                          <th className="p-2.5">Panel Directive</th>
+                          <th className="p-2.5">Changes Made by Students</th>
+                          <th className="p-2.5">Ref</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-800 bg-white dark:bg-[#1a1b26]">
+                        {workspace.latestPostDefenseRevision.revisionMatrix.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-800/40">
+                            <td className="p-2.5 font-bold text-gray-400">{idx + 1}</td>
+                            <td className="p-2.5 text-gray-800 dark:text-gray-200">{row.directive}</td>
+                            <td className="p-2.5 text-gray-600 dark:text-gray-300">{row.actionTaken}</td>
+                            <td className="p-2.5 font-mono text-[11px] text-primary">{row.sectionOrPage || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {workspace.latestPostDefenseRevision.summaryNotes && (
+                    <p className="text-xs text-gray-600 dark:text-gray-300 italic pt-1">
+                      <strong>Notes from students:</strong> "{workspace.latestPostDefenseRevision.summaryNotes}"
+                    </p>
+                  )}
+
+                  {workspace.latestPostDefenseRevision.fileName && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 pt-1">
+                      Attached Revised Document: <strong>{workspace.latestPostDefenseRevision.fileName}</strong>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                  The defense panel has specified revisions. The student group has not yet submitted their revised manuscript and point-by-point revision matrix. Institutional repository publication is locked until approval.
+                </div>
+              )}
+
+              {/* Faculty Decision & Action Buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-slate-800">
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {postDefenseStatus === 'approved' ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <HiCheckCircle className="w-4 h-4" />
+                      Approved by {workspace.postDefenseRevisionApprovedByName || 'Faculty'} on {new Date(workspace.postDefenseRevisionApprovedAt).toLocaleDateString()}. Repository publication unlocked.
+                    </span>
+                  ) : (
+                    <span>
+                      Verifying and approving these revisions unlocks repository publication for the student research group.
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {postDefenseStatus !== 'approved' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRequestFurtherRevisions}
+                        disabled={reviewingRevision}
+                        className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                      >
+                        Request Further Revisions
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleApprovePostDefenseRevisions}
+                        isLoading={reviewingRevision}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        <HiShieldCheck className="w-4 h-4 mr-1.5" />
+                        Approve Post-Defense Revisions
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Tasks Overview (Hidden in Admin view) */}
           {!isAdmin && (
             <Card className="p-6">

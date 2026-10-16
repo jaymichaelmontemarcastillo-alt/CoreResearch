@@ -30,7 +30,13 @@ export const Layout = () => {
   const isDocumentEditor = location.pathname.startsWith('/documents/') && location.pathname.length > 11;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c10] flex flex-row">
+    <div
+      className={`bg-gray-50 dark:bg-[#0b0c10] flex flex-row ${
+        // Editor route: lock the shell to the *dynamic* viewport (excludes mobile browser chrome)
+        // so the editor below the header fills exactly the remaining space. 100vh is the fallback.
+        isDocumentEditor ? "h-screen supports-[height:100dvh]:h-dvh overflow-hidden" : "min-h-screen"
+      }`}
+    >
       {/* Sidebar in Flexbox flow — actively resizes & pushes the main viewport */}
       <Sidebar
         mobileOpen={mobileOpen}
@@ -40,17 +46,17 @@ export const Layout = () => {
       />
 
       {/* Main Viewport Column (Header + Page Body) — dynamically shrinks/shifts in real time */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-150 ease-in-out">
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-150 ease-in-out ${isDocumentEditor ? "min-h-0" : ""}`}>
         <Header
           onOpenMobileMenu={() => setMobileOpen(true)}
         />
 
         <main
           className={`flex-1 transition-all duration-150 ease-in-out ${
-            isDocumentEditor ? "p-0" : "px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+            isDocumentEditor ? "p-0 flex flex-col min-h-0" : "px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
           }`}
         >
-          <div className={isDocumentEditor ? "w-full h-full" : "w-full"}>
+          <div className={isDocumentEditor ? "w-full flex-1 flex flex-col min-h-0" : "w-full"}>
             <Suspense fallback={<PageLoadingFallback />}>
               <Outlet />
             </Suspense>

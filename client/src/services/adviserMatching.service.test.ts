@@ -42,10 +42,10 @@ describe('AdviserMatchingService', () => {
     );
 
     // 3. Verify that one adviser result is returned
-    expect(results).toHaveLength(1);
+    expect(results.matches).toHaveLength(1);
 
     // 4. Verify specific fields
-    const result = results[0];
+    const result = results.matches[0];
     expect(result.adviserId).toBe('adv-001');
     expect(result.adviserName).toBe('Dr. Juan Dela Cruz');
     expect(result.department).toBe('Computer Science');
@@ -59,5 +59,21 @@ describe('AdviserMatchingService', () => {
       title: 'CoreResearch',
       description: 'Research management system using NLP'
     });
+  });
+
+  it('preserves an in-progress matching session response', async () => {
+    (api.post as any).mockResolvedValue({
+      data: {
+        status: 'processing',
+        sessionId: 'session-123',
+        message: 'Matching is already in progress.',
+      },
+    });
+
+    const result = await adviserMatchingService.getRecommendations('CoreResearch', 'Description');
+
+    expect(result.status).toBe('processing');
+    expect(result.sessionId).toBe('session-123');
+    expect(result.matches).toEqual([]);
   });
 });

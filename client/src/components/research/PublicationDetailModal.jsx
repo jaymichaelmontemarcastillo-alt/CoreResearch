@@ -17,16 +17,20 @@ import {
   HiArrowTopRightOnSquare,
 } from 'react-icons/hi2';
 import { PdfViewer } from '../ui/PdfViewer';
+import { useAuth } from '../../context/AuthContext';
 
 export const PublicationDetailModal = ({
   isOpen,
   onClose,
   publication,
 }) => {
+  const { role } = useAuth();
   const [activeTab, setActiveTab] = useState('highlights'); // 'highlights' | 'fullContent'
   const [copied, setCopied] = useState(false);
 
   if (!publication) return null;
+
+  const isStudent = role === 'student' || publication.hasFullAccess === false || publication.accessLevel === 'abstract_only';
 
   const authorsList = Array.isArray(publication.authors)
     ? publication.authors.join(', ')
@@ -90,6 +94,11 @@ export const PublicationDetailModal = ({
             <Badge variant="blue">
               {publication.department || 'Computer Studies'}
             </Badge>
+            {isStudent && (
+              <Badge variant="orange">
+                Abstract Only (Student View)
+              </Badge>
+            )}
             {publication.publicationYear && (
               <Badge variant="gray">
                 <HiCalendar className="w-3.5 h-3.5 mr-1 inline" />
@@ -146,17 +155,19 @@ export const PublicationDetailModal = ({
             Abstract &amp; Highlights
           </button>
 
-          <button
-            onClick={() => setActiveTab('fullContent')}
-            className={`pb-2.5 text-xs sm:text-sm font-semibold transition border-b-2 flex items-center gap-2 ${
-              activeTab === 'fullContent'
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            <HiDocumentText className="w-4 h-4" />
-            View Full Content
-          </button>
+          {!isStudent && (
+            <button
+              onClick={() => setActiveTab('fullContent')}
+              className={`pb-2.5 text-xs sm:text-sm font-semibold transition border-b-2 flex items-center gap-2 ${
+                activeTab === 'fullContent'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              <HiDocumentText className="w-4 h-4" />
+              View Full Content
+            </button>
+          )}
         </div>
 
         {/* Tab 1: Abstract & Highlights */}
@@ -279,28 +290,36 @@ export const PublicationDetailModal = ({
           </Button>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActiveTab(activeTab === 'highlights' ? 'fullContent' : 'highlights')}
-            >
-              {activeTab === 'highlights' ? (
-                <>
-                  <HiEye className="w-4 h-4 mr-1.5" /> View Full Content
-                </>
-              ) : (
-                <>
-                  <HiSparkles className="w-4 h-4 mr-1.5" /> View Highlights
-                </>
-              )}
-            </Button>
+            {!isStudent && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab(activeTab === 'highlights' ? 'fullContent' : 'highlights')}
+              >
+                {activeTab === 'highlights' ? (
+                  <>
+                    <HiEye className="w-4 h-4 mr-1.5" /> View Full Content
+                  </>
+                ) : (
+                  <>
+                    <HiSparkles className="w-4 h-4 mr-1.5" /> View Highlights
+                  </>
+                )}
+              </Button>
+            )}
 
-            {documentUrl && (
+            {!isStudent && documentUrl && (
               <a href={documentUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="primary" size="sm">
                   <HiArrowDownTray className="w-4 h-4 mr-1.5" /> Download PDF
                 </Button>
               </a>
+            )}
+
+            {isStudent && (
+              <span className="text-xs text-gray-400 italic">
+                Full manuscript download is reserved for authorized faculty and panel members.
+              </span>
             )}
           </div>
         </div>

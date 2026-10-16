@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
 import { Document as MongoDocument } from '../models/Document.js';
+import { User } from '../models/User.js';
 
 // Pre-seed mock research projects if store is empty
 const seedMockProjectsIfEmpty = () => {
@@ -209,6 +210,7 @@ export const createProject = async (req, res) => {
 
 /**
  * Assign or update Adviser for a project (Admin only)
+ * Enforces configurable maximum adviser handling capacity and updates activeGroupsCount.
  */
 export const assignAdviser = async (req, res) => {
   try {
@@ -221,52 +223,162 @@ export const assignAdviser = async (req, res) => {
 
     let adviserName = 'Adviser';
     let adviserEmail = '';
+    let maxCapacity = 5;
 
-    if (isDevMockMode) {
-      const adv = mockUsersDb.get(adviserId);
-      if (adv) {
-        adviserName = adv.fullName;
-        adviserEmail = adv.email;
-      }
-    } else {
-      const doc = await db.collection('users').doc(adviserId).get();
-      if (doc.exists) {
-        adviserName = doc.data().fullName;
-        adviserEmail = doc.data().email;
+    // Fetch adviser profile to verify existence and capacity limit
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const userDoc = await User.findOne({ uid: adviserId }).lean();
+        if (userDoc) {
+          adviserName = userDoc.fullName || `${userDoc.first_name || ''} ${userDoc.last_name || ''}`.trim() || userDoc.email;
+          adviserEmail = userDoc.email || '';
+          maxCapacity = Number(userDoc.maxCapacity ?? userDoc.maxAdvisees ?? 5);
+        }
+      } catch (userErr) {
+        console.warn('[ProjectController] User query fallback:', userErr.message);
       }
     }
 
-    let updated = null;
+    if (adviserName === 'Adviser') {
+      if (isDevMockMode) {
+        const adv = mockUsersDb.get(adviserId);
+        if (adv) {
+          adviserName = adv.fullName;
+          adviserEmail = adv.email;
+          maxCapacity = Number(adv.maxCapacity ?? adv.maxAdvisees ?? 5);
+        }
+      } else if (db) {
+        const doc = await db.collection('users').doc(adviserId).get();
+        if (doc.exists) {
+          const d = doc.data();
+          adviserName = d.fullName || `${d.first_name || ''} ${d.last_name || ''}`.trim();
+          adviserEmail = d.email || '';
+          maxCapacity = Number(d.maxCapacity ?? d.maxAdvisees ?? 5);
+        }
+      }
+    }
 
+    // Determine current project's existing adviser
+    let existingProject = null;
     if (isDevMockMode) {
       seedMockProjectsIfEmpty();
       const map = mockFirestoreDb.get('projects');
-      const proj = map.get(id);
-      if (!proj) {
-        return res.status(404).json({ success: false, error: 'Project not found' });
+      existingProject = map.get(id);
+    } else if (db) {
+      const ref = db.collection('research_projects').doc(id);
+      const docSnap = await ref.get();
+      if (docSnap.exists) {
+        existingProject = { id: docSnap.id, ...docSnap.data() };
       }
-      proj.adviserId = adviserId;
-      proj.adviserName = adviserName;
-      proj.adviserEmail = adviserEmail;
-      proj.updatedAt = new Date().toISOString();
-      map.set(id, proj);
-      updated = proj;
+    }
+
+    if (!existingProject) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const previousAdviserId = existingProject.adviserId;
+    const isSameAdviser = previousAdviserId === adviserId;
+
+    // Compute adviser's current active groups workload
+    let currentWorkload = 0;
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('projects');
+      if (map) {
+        currentWorkload = Array.from(map.values()).filter(
+          (p) => p.adviserId === adviserId && p.id !== id && p.status !== 'archived'
+        ).length;
+      }
+    } else if (db) {
+      const snapshot = await db.collection('research_projects')
+        .where('adviserId', '==', adviserId)
+        .get();
+      currentWorkload = snapshot.docs.filter(
+        (d) => d.id !== id && d.data().status !== 'archived'
+      ).length;
+    }
+
+    // Validate capacity: prevent assignment if adding this group exceeds the configured limit
+    if (!isSameAdviser && currentWorkload >= maxCapacity) {
+      return res.status(400).json({
+        success: false,
+        error: 'Capacity Exceeded',
+        message: `Assignment Rejected: Adviser '${adviserName}' has reached maximum advising capacity (${currentWorkload}/${maxCapacity} groups). Cannot assign additional groups.`,
+        currentWorkload,
+        maxCapacity,
+      });
+    }
+
+    // Persist assignment to project
+    let updated = null;
+    const updatedAt = new Date().toISOString();
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('projects');
+      existingProject.adviserId = adviserId;
+      existingProject.adviserName = adviserName;
+      existingProject.adviserEmail = adviserEmail;
+      existingProject.updatedAt = updatedAt;
+      map.set(id, existingProject);
+      updated = existingProject;
     } else {
       const ref = db.collection('research_projects').doc(id);
       await ref.update({
         adviserId,
         adviserName,
         adviserEmail,
-        updatedAt: new Date().toISOString()
+        updatedAt,
       });
       const doc = await ref.get();
       updated = { id: doc.id, ...doc.data() };
     }
 
+    // Synchronize activeGroupsCount on both new and previous advisers
+    const newActiveCount = currentWorkload + 1;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        await User.findOneAndUpdate({ uid: adviserId }, { activeGroupsCount: newActiveCount });
+        if (previousAdviserId && previousAdviserId !== adviserId) {
+          await User.findOneAndUpdate(
+            { uid: previousAdviserId },
+            { $inc: { activeGroupsCount: -1 } }
+          );
+        }
+      } catch (syncErr) {
+        console.warn('[ProjectController] sync activeGroupsCount warning:', syncErr.message);
+      }
+    }
+
+    if (isDevMockMode) {
+      const newAdv = mockUsersDb.get(adviserId);
+      if (newAdv) newAdv.activeGroupsCount = newActiveCount;
+      if (previousAdviserId && previousAdviserId !== adviserId) {
+        const prevAdv = mockUsersDb.get(previousAdviserId);
+        if (prevAdv) prevAdv.activeGroupsCount = Math.max(0, (prevAdv.activeGroupsCount || 1) - 1);
+      }
+    } else if (db) {
+      try {
+        await db.collection('users').doc(adviserId).set({ activeGroupsCount: newActiveCount }, { merge: true });
+        if (previousAdviserId && previousAdviserId !== adviserId) {
+          const prevRef = db.collection('users').doc(previousAdviserId);
+          const prevDoc = await prevRef.get();
+          if (prevDoc.exists) {
+            const prevCount = Math.max(0, (prevDoc.data().activeGroupsCount || 1) - 1);
+            await prevRef.update({ activeGroupsCount: prevCount });
+          }
+        }
+      } catch (fsSyncErr) {
+        console.warn('[ProjectController] Firestore users activeGroupsCount sync warning:', fsSyncErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      message: `Adviser '${adviserName}' assigned to project successfully.`,
-      data: updated
+      message: `Adviser '${adviserName}' assigned to project successfully (${newActiveCount}/${maxCapacity} groups).`,
+      data: updated,
+      workload: {
+        activeGroupsCount: newActiveCount,
+        maxCapacity,
+      },
     });
   } catch (error) {
     console.error('[ProjectController] assignAdviser error:', error);

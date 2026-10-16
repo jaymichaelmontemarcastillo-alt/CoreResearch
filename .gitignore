@@ -39,3 +39,10 @@ Thumbs.db
 # Python
 .venv/
 __pycache__/
+
+# Local Storage / Uploads
+server/uploads/
+uploads/
+
+# Vite temporary build cache
+*.timestamp-*.mjs

@@ -249,7 +249,7 @@ export const EditorTaskSidebar = ({
 
   if (isPanelist) {
     return (
-      <div className="absolute md:static inset-y-0 right-0 w-full md:w-[340px] md:min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-40 md:z-30 shadow-2xl md:shadow-xl">
+      <div className="absolute lg:static inset-y-0 right-0 w-full sm:w-[340px] lg:min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-40 lg:z-30 shadow-2xl lg:shadow-xl">
         <div className="px-4 py-3 flex items-center justify-between bg-gray-50 dark:bg-[#12131b] shrink-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">Panelist Review</h3>
@@ -422,7 +422,7 @@ export const EditorTaskSidebar = ({
   }
 
   return (
-    <div className="absolute md:static inset-y-0 right-0 w-full md:w-[340px] md:min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-40 md:z-30 shadow-2xl md:shadow-xl">
+    <div className="absolute lg:static inset-y-0 right-0 w-full sm:w-[340px] lg:min-w-[340px] h-full bg-white dark:bg-[#0e0f15] border-l border-gray-200 dark:border-[#1c1d28] flex flex-col overflow-hidden z-40 lg:z-30 shadow-2xl lg:shadow-xl">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-[#1c1d28] flex items-center justify-between bg-gray-50 dark:bg-[#12131b] shrink-0">
         <div className="flex items-center gap-2">

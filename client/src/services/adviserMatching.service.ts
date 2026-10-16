@@ -47,6 +47,15 @@ export interface RecommendationResponse {
   allTopMatchesFull: boolean;
   totalAvailableAdvisers: number;
   meta?: any;
+  status?: 'processing' | 'completed' | 'failed';
+  statusMessage?: string;
+  sessionId?: string;
+}
+
+export interface AdviserMatchingSession extends RecommendationResponse {
+  id: string;
+  title: string;
+  description: string;
 }
 
 export interface MatchMeta {
@@ -72,7 +81,19 @@ class AdviserMatchingService {
         description,
       });
 
-      const { data: results, availableAlternatives = [], meta } = response.data;
+      const { data: results, availableAlternatives = [], meta, status, statusMessage, sessionId } = response.data;
+
+      if (status === 'processing' || status === 'failed') {
+        return {
+          matches: [],
+          availableAlternatives: [],
+          allTopMatchesFull: false,
+          totalAvailableAdvisers: 0,
+          status,
+          statusMessage,
+          sessionId,
+        };
+      }
 
       const normalizeAdviser = (r: any): AdviserMatchResult => ({
         adviserId: r.adviserId,
@@ -109,6 +130,7 @@ class AdviserMatchingService {
         allTopMatchesFull: Boolean(meta?.allTopMatchesFull || (matches.length > 0 && matches.every(m => m.isFull))),
         totalAvailableAdvisers: meta?.totalAvailableAdvisers ?? alternatives.length,
         meta,
+        status: 'completed',
       };
     } catch (error: any) {
       // Re-throw with user-friendly messages based on status
@@ -132,6 +154,16 @@ class AdviserMatchingService {
 
       console.error('Error fetching adviser recommendations:', error);
       throw new Error('Failed to generate adviser recommendations.');
+    }
+  }
+
+  async getLatestMatchingSession(): Promise<AdviserMatchingSession | null> {
+    try {
+      const response = await api.get('/adviser-matching/session');
+      return response.data?.data || null;
+    } catch (error: any) {
+      const message = error.response?.data?.message;
+      throw new Error(message || 'Unable to restore your previous adviser matching session.');
     }
   }
 

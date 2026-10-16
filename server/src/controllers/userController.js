@@ -324,8 +324,14 @@ export const updateUserProfile = async (req, res) => {
       updates.role = 'adviser';
       updates.role_id = 'adviser';
       if (updates.isAvailable === undefined) updates.isAvailable = true;
-      if (updates.maxCapacity === undefined) updates.maxCapacity = 5;
+      if (updates.maxCapacity === undefined && updates.maxAdvisees === undefined) updates.maxCapacity = 5;
       if (updates.activeGroupsCount === undefined) updates.activeGroupsCount = 0;
+    }
+
+    if (updates.maxAdvisees !== undefined || updates.maxCapacity !== undefined) {
+      const capacityVal = Math.max(1, parseInt(updates.maxCapacity ?? updates.maxAdvisees, 10) || 5);
+      updates.maxCapacity = capacityVal;
+      updates.maxAdvisees = capacityVal;
     }
 
     if (updates.status === 'approved' || updates.is_approved === true) {

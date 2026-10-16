@@ -120,6 +120,8 @@ export interface FinalDefenseEvaluation {
   scores: FinalDefenseRubricScores;
   subTotals: FinalDefenseSubTotals;
   verdict: FinalDefenseVerdict;
+  revisionDirectives?: string;
+  revisionDeadline?: string;
   submittedAt: string;
 }
 
@@ -132,4 +134,6 @@ export interface SubmitFinalDefenseEvaluationInput {
   scores: FinalDefenseRubricScores;
   subTotals: FinalDefenseSubTotals;
   verdict: FinalDefenseVerdict;
+  revisionDirectives?: string;
+  revisionDeadline?: string;
 }

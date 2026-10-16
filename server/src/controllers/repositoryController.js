@@ -4,7 +4,9 @@ import { RepositoryPublication } from '../models/RepositoryPublication.js';
 
 // Pre-seed mock repository publications if empty
 export const seedMockRepositoryIfEmpty = () => {
-  // Not used for MongoDB, keeping for legacy compatibility if needed
+  if (!mockFirestoreDb.has('repository')) {
+    mockFirestoreDb.set('repository', new Map());
+  }
 };
 
 /**
@@ -37,41 +39,90 @@ export const publishToRepository = async (req, res) => {
     }
 
     const isStudent = req.user?.role === 'student';
+    const acceptedTerms = req.body.acceptedTerms === true || req.body.acceptedTerms === 'true';
+
+    // Strict validation: Students MUST explicitly accept repository publication conditions
+    if (isStudent && !acceptedTerms) {
+      return res.status(400).json({
+        success: false,
+        error: 'Terms Acceptance Required',
+        message: 'Institutional repository publication conditions and author warranty terms must be explicitly accepted before publishing.'
+      });
+    }
+
+    // Verify post-defense revisions clearance if applicable
+    const postDefenseRevisionRequired = req.body.postDefenseRevisionRequired === true || req.body.postDefenseRevisionRequired === 'true';
+    const postDefenseRevisionStatus = req.body.postDefenseRevisionStatus;
+    if (postDefenseRevisionRequired && postDefenseRevisionStatus !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Post-Defense Revisions Required',
+        message: 'Publication blocked: Post-defense revisions must be formally reviewed and approved by faculty panel before repository publication.'
+      });
+    }
+
     const finalPublicationStatus = isStudent
       ? 'pending_publication'
       : (requestedStatus || 'approved');
 
     let finalPdfUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
 
-    if (pdfUrl && pdfUrl.startsWith('data:application/pdf;base64,')) {
-      const base64Data = pdfUrl.split(',')[1];
-      const buffer = Buffer.from(base64Data, 'base64');
-      const storage = getStorageProvider();
-      const storageKey = `repository/repo-${Date.now()}.pdf`;
-      const uploadResult = await storage.upload(storageKey, buffer, 'application/pdf');
-      finalPdfUrl = uploadResult.url;
+    // Preferred: multipart upload (req.file via multer). Legacy: base64 data URL in JSON.
+    let pdfBuffer = null;
+    if (req.file?.buffer) {
+      pdfBuffer = req.file.buffer;
+    } else if (pdfUrl && pdfUrl.startsWith('data:application/pdf;base64,')) {
+      pdfBuffer = Buffer.from(pdfUrl.split(',')[1], 'base64');
     } else if (pdfUrl) {
       finalPdfUrl = pdfUrl;
     }
+
+    if (pdfBuffer) {
+      const storage = getStorageProvider();
+      const storageKey = `repository/repo-${Date.now()}.pdf`;
+      const startedAt = Date.now();
+      try {
+        const uploadResult = await storage.upload(storageKey, pdfBuffer, 'application/pdf');
+        finalPdfUrl = uploadResult.url;
+        console.log(`[RepositoryController] Stored ${(pdfBuffer.length / 1048576).toFixed(1)}MB PDF via ${storage.constructor.name} in ${Date.now() - startedAt}ms`);
+      } catch (storageErr) {
+        console.error(`[RepositoryController] PDF storage failed after ${Date.now() - startedAt}ms via ${storage.constructor.name}:`, storageErr.message);
+        return res.status(502).json({
+          success: false,
+          error: 'StorageError',
+          message: `Could not save the PDF (${(pdfBuffer.length / 1048576).toFixed(1)}MB) to file storage: ${storageErr.message}. Please try again.`
+        });
+      }
+    }
+
+    const toList = (v) => Array.isArray(v)
+      ? v.map(s => String(s).trim()).filter(Boolean)
+      : (v ? String(v).split(',').map(s => s.trim()).filter(Boolean) : []);
+    const authorList = toList(authors);
 
     const newDoc = {
       id: `repo-${Date.now()}`,
       projectId: projectId || 'proj-501',
       manuscriptId: manuscriptId || '',
       title,
-      authors: Array.isArray(authors) ? authors : (authors ? [authors] : ['Student Researcher']),
+      authors: authorList.length ? authorList : ['Student Researcher'],
       adviserName: adviserName || 'Faculty Adviser',
       department: department || 'Computer Science',
       publicationYear: Number(publicationYear) || new Date().getFullYear(),
       abstract,
-      keywords: Array.isArray(keywords) ? keywords : (keywords ? keywords.split(',').map(k => k.trim()) : []),
+      keywords: toList(keywords),
       pdfUrl: finalPdfUrl,
       citation: citation || `${title}. (${new Date().getFullYear()}). Institutional Repository.`,
       publicationStatus: finalPublicationStatus,
       rejectionReason: '',
       viewsCount: 1,
       downloadsCount: 0,
-      publishedAt: new Date()
+      publishedAt: new Date(),
+      acceptedTerms: Boolean(acceptedTerms),
+      acceptedBy: req.user?.uid || '',
+      acceptedByName: req.user?.fullName || req.user?.email || 'Student Researcher',
+      acceptedAt: acceptedTerms ? new Date() : null,
+      termsVersion: req.body.termsVersion || '1.0'
     };
 
     const newPublication = await RepositoryPublication.create(newDoc);
@@ -161,9 +212,30 @@ export const getRepositoryPublications = async (req, res) => {
 
     const list = await RepositoryPublication.find(filter).sort({ publishedAt: -1 }).lean();
 
+    // Check if requester has student role
+    const isStudent = (req.user?.role === 'student') || (req.headers['x-user-role'] === 'student');
+
+    // For student accounts, redact full document url and content to enforce Abstract Only access
+    const sanitizedList = list.map((pub) => {
+      if (isStudent) {
+        const { pdfUrl, fileUrl, content, ...abstractOnlyPub } = pub;
+        return {
+          ...abstractOnlyPub,
+          hasFullAccess: false,
+          accessLevel: 'abstract_only',
+        };
+      }
+      return {
+        ...pub,
+        hasFullAccess: true,
+        accessLevel: 'full_document',
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: list
+      data: sanitizedList,
+      accessLevel: isStudent ? 'abstract_only' : 'full_document',
     });
   } catch (error) {
     console.error('[RepositoryController] getRepositoryPublications error:', error);

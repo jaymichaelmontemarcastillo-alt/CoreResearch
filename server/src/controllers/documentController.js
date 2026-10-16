@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import mongoose from 'mongoose';
 import { documentImportService } from '../services/import/DocumentImportService.js';
-import { getStorageProvider, localStorageProvider } from '../services/storage/storageManager.js';
+import { getStorageProvider, getReadProviders, localStorageProvider } from '../services/storage/storageManager.js';
 
 export const importDocument = async (req, res) => {
   try {
@@ -75,7 +75,18 @@ export const serveStorageAsset = async (req, res) => {
     // Normalize path but ensure we use forward slashes for MongoDB GridFS match
     let cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
     cleanKey = cleanKey.replace(/\\/g, '/'); // Crucial fix for Windows
-    const storageProvider = getStorageProvider();
+
+    // Role-based Access Control: Restrict students from directly accessing/downloading repository manuscripts
+    if (cleanKey.startsWith('repository/') || cleanKey.includes('/repository/')) {
+      const userRole = req.user?.role || req.headers['x-user-role'];
+      if (userRole === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          message: 'Access Restricted: Student access to repository manuscripts is limited to abstracts and metadata only. Full document access requires faculty or administrative authorization.',
+        });
+      }
+    }
 
     // Determine Content-Type
     const ext = path.extname(cleanKey).toLowerCase();
@@ -88,7 +99,15 @@ export const serveStorageAsset = async (req, res) => {
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
 
-    const stream = await storageProvider.downloadStream(cleanKey);
+    let stream = null;
+    for (const provider of getReadProviders()) {
+      try {
+        stream = await provider.downloadStream(cleanKey);
+      } catch (e) {
+        stream = null;
+      }
+      if (stream) break;
+    }
     
     if (!stream) {
       return res.status(404).json({

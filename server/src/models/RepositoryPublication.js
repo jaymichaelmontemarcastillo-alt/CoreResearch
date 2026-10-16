@@ -25,7 +25,14 @@ const RepositoryPublicationSchema = new mongoose.Schema({
   reviewedAt: { type: Date },
   viewsCount: { type: Number, default: 0 },
   downloadsCount: { type: Number, default: 0 },
-  publishedAt: { type: Date, default: Date.now }
+  publishedAt: { type: Date, default: Date.now },
+  
+  // Student Publication Acceptance Audit Fields
+  acceptedTerms: { type: Boolean, default: false },
+  acceptedBy: { type: String },
+  acceptedByName: { type: String },
+  acceptedAt: { type: Date },
+  termsVersion: { type: String }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });

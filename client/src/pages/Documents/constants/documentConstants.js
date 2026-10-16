@@ -39,7 +39,7 @@ export const UPLOAD_STAGES = {
   ERROR: 'error',
 };
 
-export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 export const ALLOWED_EXTENSIONS = ['.pdf', '.docx'];
 export const ALLOWED_MIME_TYPES = [
   'application/pdf',
