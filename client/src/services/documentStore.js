@@ -13,6 +13,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
+import api from './api';
 
 const COLLECTION_NAME = 'documents';
 const COMMENTS_SUBCOLLECTION = 'comments';
@@ -243,12 +244,7 @@ export const documentStore = {
 
     try {
       // 1. Save to MongoDB (Authoritative Source of Truth)
-      const res = await fetch(`/api/documents/${id}/page-settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageSettings: newPageSettings }),
-      });
-      if (!res.ok) throw new Error('Failed to update page settings in MongoDB');
+      await api.put(`/documents/${id}/page-settings`, { pageSettings: newPageSettings });
       
       // 2. Also save to Firestore to notify active clients via subscription
       const docRef = doc(db, COLLECTION_NAME, id);
@@ -723,4 +719,3 @@ export const documentStore = {
     }
   }
 };
-

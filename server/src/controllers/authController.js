@@ -105,7 +105,8 @@ const buildUserProfileDoc = (data) => {
  */
 export const registerUserSync = async (req, res) => {
   try {
-    const { uid, email } = req.body;
+    const uid = req.user?.uid;
+    const email = req.user?.email;
 
     if (!uid || !email) {
       return res.status(400).json({
@@ -115,17 +116,32 @@ export const registerUserSync = async (req, res) => {
       });
     }
 
+    if (req.body.uid !== uid) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'A user may only register their own authenticated account.'
+      });
+    }
+
     const role = req.body.role || req.body.role_id || 'student';
-    const validRoles = ['student', 'adviser', 'panelist', 'admin'];
+    const validRoles = ['student', 'adviser', 'panelist'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
-        message: `Invalid role '${role}'. Allowed roles: ${validRoles.join(', ')}`
+        message: `Invalid self-registration role '${role}'. Allowed: ${validRoles.join(', ')}`
       });
     }
 
-    const userProfile = buildUserProfileDoc(req.body);
+    const userProfile = buildUserProfileDoc({
+      ...req.body,
+      uid,
+      email,
+      role,
+      status: 'pending',
+      is_approved: false
+    });
 
     // Update in-memory mock cache
     mockUsersDb.set(uid, userProfile);
@@ -445,4 +461,3 @@ export const checkRegistrationStatus = async (req, res) => {
     });
   }
 };
-

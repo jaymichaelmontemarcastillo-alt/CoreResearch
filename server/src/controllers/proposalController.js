@@ -1,4 +1,5 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
+import { canAccessProject } from '../middleware/resourceAuthorization.js';
 
 // Pre-seed mock proposals if store is empty
 const seedMockProposalsIfEmpty = () => {
@@ -88,6 +89,10 @@ export const createProposal = async (req, res) => {
 
     const initialStatus = status === 'draft' ? 'draft' : 'submitted';
     const now = new Date().toISOString();
+
+    if (groupId && !(await canAccessProject(user, groupId))) {
+      return res.status(403).json({ success: false, error: 'Forbidden', message: 'You must belong to the selected research group.' });
+    }
 
     // Duplicate Active Proposal Check on submission
     if (initialStatus === 'submitted') {
@@ -187,14 +192,19 @@ export const getProposals = async (req, res) => {
     }
 
     // Role-based filtering
-    if (user.role === 'student') {
-      proposalsList = proposalsList.filter(p => p.studentId === user.uid || p.submittedByUid === user.uid || (user.groupId && p.groupId === user.groupId));
-    } else if (user.role === 'adviser') {
-      // Advisers see submitted, under_review, approved proposals for their groups or department
-      proposalsList = proposalsList.filter(p => p.status !== 'draft');
+    if (user.role === 'student' || user.role === 'adviser') {
+      const accessResults = await Promise.all(proposalsList.map((proposal) =>
+        canAccessProject(user, proposal.groupId || proposal.id, proposal)
+      ));
+      proposalsList = proposalsList.filter((_, index) => accessResults[index]);
+      if (user.role === 'adviser') {
+        proposalsList = proposalsList.filter(p => p.status !== 'draft');
+      }
     } else if (['research_coordinator', 'admin'].includes(user.role)) {
       // Coordinators & Admins see all non-draft proposals (or drafts if querying directly)
       proposalsList = proposalsList.filter(p => p.status !== 'draft' || req.query.includeDrafts === 'true');
+    } else {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
     }
 
     // Sort newest first
@@ -235,12 +245,8 @@ export const getProposalById = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Proposal not found' });
     }
 
-    // Authorization check: Students can only view their own drafts
-    if (user.role === 'student' && proposal.status === 'draft') {
-      const isOwner = proposal.studentId === user.uid || proposal.submittedByUid === user.uid || (user.groupId && proposal.groupId === user.groupId);
-      if (!isOwner) {
-        return res.status(403).json({ success: false, error: 'Forbidden', message: 'You are not authorized to view this draft proposal.' });
-      }
+    if (!(await canAccessProject(user, proposal.groupId || proposal.id, proposal))) {
+      return res.status(403).json({ success: false, error: 'Forbidden', message: 'You are not authorized to view this proposal.' });
     }
 
     return res.status(200).json({ success: true, data: proposal });
@@ -276,8 +282,7 @@ export const updateProposal = async (req, res) => {
     }
 
     // Ownership check
-    const isOwner = existing.studentId === user.uid || existing.submittedByUid === user.uid || (user.groupId && existing.groupId === user.groupId);
-    if (!isOwner) {
+    if (!(await canAccessProject(user, existing.groupId || existing.id, existing))) {
       return res.status(403).json({ success: false, error: 'Forbidden', message: 'You can only edit your own proposals.' });
     }
 
@@ -347,8 +352,7 @@ export const submitExistingProposal = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Proposal not found' });
     }
 
-    const isOwner = existing.studentId === user.uid || existing.submittedByUid === user.uid || (user.groupId && existing.groupId === user.groupId);
-    if (!isOwner) {
+    if (!(await canAccessProject(user, existing.groupId || existing.id, existing))) {
       return res.status(403).json({ success: false, error: 'Forbidden', message: 'You can only submit your own proposals.' });
     }
 
@@ -428,8 +432,7 @@ export const deleteProposal = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Proposal not found' });
     }
 
-    const isOwner = existing.studentId === user.uid || existing.submittedByUid === user.uid || (user.groupId && existing.groupId === user.groupId);
-    if (!isOwner) {
+    if (!(await canAccessProject(user, existing.groupId || existing.id, existing))) {
       return res.status(403).json({ success: false, error: 'Forbidden', message: 'You can only delete your own proposals.' });
     }
 
@@ -481,28 +484,34 @@ export const updateProposalStatus = async (req, res) => {
       ...(status === 'approved' ? { approvedAt: now } : {})
     };
 
-    let updated = null;
+    let existing = null;
+    let proposalRef = null;
 
     if (isDevMockMode) {
       seedMockProposalsIfEmpty();
       const proposalsMap = mockFirestoreDb.get('proposals');
-      const existing = proposalsMap.get(id);
+      existing = proposalsMap.get(id);
       if (!existing) {
         return res.status(404).json({ success: false, error: 'Proposal not found' });
       }
-
-      const merged = { ...existing, ...updateData };
-      proposalsMap.set(id, merged);
-      updated = merged;
     } else {
-      const ref = db.collection('proposals').doc(id);
-      const doc = await ref.get();
+      proposalRef = db.collection('proposals').doc(id);
+      const doc = await proposalRef.get();
       if (!doc.exists) {
         return res.status(404).json({ success: false, error: 'Proposal not found' });
       }
+      existing = { id, ...doc.data() };
+    }
 
-      await ref.update(updateData);
-      updated = { id, ...doc.data(), ...updateData };
+    if (!(await canAccessProject(reviewer, existing.groupId || id, existing))) {
+      return res.status(403).json({ success: false, error: 'Forbidden', message: 'You are not assigned to review this proposal.' });
+    }
+
+    updated = { ...existing, ...updateData };
+    if (isDevMockMode) {
+      mockFirestoreDb.get('proposals').set(id, updated);
+    } else {
+      await proposalRef.update(updateData);
     }
 
     return res.status(200).json({

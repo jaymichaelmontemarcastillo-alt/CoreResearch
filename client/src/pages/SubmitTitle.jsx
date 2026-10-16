@@ -69,7 +69,7 @@ export const SubmitTitle = () => {
           }
         }
 
-        if (ws) {
+        if (ws && ws.status !== 'archived' && !ws.isArchived) {
           if (isMounted) {
             setExistingWorkspace(ws);
             setLoading(false);
@@ -95,7 +95,9 @@ export const SubmitTitle = () => {
           currentUser.uid,
           (requests) => {
             if (!isMounted) return;
-            const activeRequest = requests.find(r => r.status === 'pending' || r.status === 'accepted');
+            const activeRequest = requests.find(
+              r => !r.isArchived && (r.status === 'pending' || r.status === 'accepted')
+            );
             
             if (activeRequest) {
               if (activeRequest.status === 'accepted') {
@@ -108,7 +110,7 @@ export const SubmitTitle = () => {
               setPendingRequest(null);
               // Handle rejected/declined
               // Sort to get the most recent declined request if any
-              const declinedRequests = requests.filter(r => r.status === 'declined');
+              const declinedRequests = requests.filter(r => r.status === 'declined' && !r.isArchived);
               declinedRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               
               setDeclinedAdviserIds(declinedRequests.map(r => r.adviserId));

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { seedMockRepositoryIfEmpty } from './repositoryController.js';
 import { Comment as MongoComment } from '../models/Comment.js';
+import { canAccessProject, isPrivilegedRole } from '../middleware/resourceAuthorization.js';
 
 // Pre-seed mock manuscript version history & drafts if empty
 const defaultDraftContentHtml = `<h1 style="text-align: center; color: #1e293b;">Smart IoT Moisture & Nutrient Sensing System for Urban Farming</h1>
@@ -125,6 +126,13 @@ export const uploadManuscriptVersion = async (req, res) => {
       publishToRepository = true
     } = req.body;
     const user = req.user;
+
+    if (projectId && !(await canAccessProject(user, projectId))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+    }
+    if (!projectId && !isPrivilegedRole(user.role)) {
+      return res.status(400).json({ success: false, error: 'projectId is required.' });
+    }
 
     if (!fileName && !title && !projectTitle) {
       return res.status(400).json({
@@ -261,20 +269,17 @@ export const getManuscriptVersions = async (req, res) => {
       const map = mockFirestoreDb.get('manuscripts');
       list = Array.from(map.values());
     } else {
-      try {
-        const snapshot = await db.collection('manuscript_versions').get();
-        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (err) {
-        console.warn('[ManuscriptController] Firestore read fallback to mock mode:', err.message);
-        seedMockManuscriptsIfEmpty();
-        const map = mockFirestoreDb.get('manuscripts');
-        list = Array.from(map.values());
-      }
+      const snapshot = await db.collection('manuscript_versions').get();
+      list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
     if (projectId && projectId !== 'all') {
       list = list.filter(m => m.projectId === projectId);
     }
+    const accessResults = await Promise.all(list.map((manuscript) =>
+      canAccessProject(req.user, manuscript.projectId || manuscript.id, manuscript)
+    ));
+    list = list.filter((_, index) => accessResults[index]);
 
     // Sort descending by date
     list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -304,22 +309,29 @@ export const updateManuscriptStatus = async (req, res) => {
     }
 
     let updated = null;
+    let existing = null;
 
     if (isDevMockMode) {
       seedMockManuscriptsIfEmpty();
       const map = mockFirestoreDb.get('manuscripts');
-      const ms = map.get(id);
-      if (!ms) {
+      existing = map.get(id);
+      if (!existing) {
         return res.status(404).json({ success: false, error: 'Manuscript not found' });
       }
-      ms.status = status;
-      map.set(id, ms);
-      updated = ms;
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
-      await ref.update({ status });
       const doc = await ref.get();
-      updated = { id: doc.id, ...doc.data() };
+      if (!doc.exists) return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      existing = { id: doc.id, ...doc.data() };
+    }
+    if (!(await canAccessProject(req.user, existing.projectId || existing.id, existing))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to review this manuscript.' });
+    }
+    updated = { ...existing, status };
+    if (isDevMockMode) {
+      mockFirestoreDb.get('manuscripts').set(id, updated);
+    } else {
+      await db.collection('manuscript_versions').doc(id).update({ status });
     }
 
     return res.status(200).json({
@@ -389,13 +401,15 @@ export const getAdvisories = async (req, res) => {
       }
     ];
 
-    let advisoriesList = initialAdvisories;
+    let advisoriesList = isDevMockMode ? initialAdvisories : [];
 
     if (!isDevMockMode) {
       try {
-        const snapshot = await db.collection('research_projects')
-          .where('adviserId', '==', user.uid)
-          .get();
+        let query = db.collection('research_projects');
+        if (!isPrivilegedRole(user.role)) {
+          query = query.where('adviserId', '==', user.uid);
+        }
+        const snapshot = await query.get();
         if (!snapshot.empty) {
           advisoriesList = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -416,7 +430,8 @@ export const getAdvisories = async (req, res) => {
           });
         }
       } catch (err) {
-        console.warn('[ManuscriptController] getAdvisories Firestore query fallback:', err.message);
+        console.error('[ManuscriptController] getAdvisories Firestore error:', err);
+        return res.status(503).json({ success: false, error: 'Unable to load assigned advisories.' });
       }
     }
 
@@ -444,6 +459,9 @@ export const getManuscriptDraft = async (req, res) => {
     if (isDevMockMode) {
       const draftsMap = mockFirestoreDb.get('manuscript_drafts');
       draft = draftsMap.get(projectId);
+      if (!(await canAccessProject(req.user, projectId, draft))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+      }
       if (!draft) {
         draft = {
           projectId,
@@ -460,7 +478,11 @@ export const getManuscriptDraft = async (req, res) => {
       const docSnap = await docRef.get();
       if (docSnap.exists) {
         draft = { projectId: docSnap.id, ...docSnap.data() };
-      } else {
+      }
+      if (!(await canAccessProject(req.user, projectId, draft))) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+      }
+      if (!docSnap.exists) {
         draft = {
           projectId,
           projectTitle: 'Research Project Manuscript',
@@ -491,6 +513,18 @@ export const saveManuscriptDraft = async (req, res) => {
     const { projectId } = req.params;
     const { contentHtml, projectTitle } = req.body;
     const user = req.user;
+
+    let existingDraft = null;
+    if (isDevMockMode) {
+      seedMockManuscriptsIfEmpty();
+      existingDraft = mockFirestoreDb.get('manuscript_drafts').get(projectId) || null;
+    } else {
+      const snapshot = await db.collection('manuscript_drafts').doc(projectId).get();
+      existingDraft = snapshot.exists ? { projectId, ...snapshot.data() } : null;
+    }
+    if (!(await canAccessProject(user, projectId, existingDraft))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+    }
 
     if (!contentHtml && contentHtml !== '') {
       return res.status(400).json({ success: false, error: 'contentHtml is required' });
@@ -531,6 +565,9 @@ export const getManuscriptComments = async (req, res) => {
   try {
     const { projectId } = req.params;
     seedMockManuscriptsIfEmpty();
+    if (!(await canAccessProject(req.user, projectId))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+    }
 
     let comments = [];
     let fetchedFromMongo = false;
@@ -599,6 +636,9 @@ export const addManuscriptComment = async (req, res) => {
     const { text, selectedText, section, page } = req.body;
     const user = req.user;
 
+    if (!(await canAccessProject(user, projectId))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+    }
     if (!text) {
       return res.status(400).json({ success: false, error: 'Comment text is required.' });
     }
@@ -671,6 +711,9 @@ export const updateManuscriptComment = async (req, res) => {
     const { resolved, replyText } = req.body;
     const user = req.user;
 
+    if (!(await canAccessProject(user, projectId))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
+    }
     let mongoSuccess = false;
     let updatedComment = null;
 
@@ -896,6 +939,20 @@ export const updateManuscriptGrade = async (req, res) => {
     const { id } = req.params;
     const { score, letter, remarks, criteria } = req.body;
     seedMockManuscriptsIfEmpty();
+    let existing = null;
+
+    if (isDevMockMode) {
+      existing = mockFirestoreDb.get('manuscripts').get(id) || null;
+    } else {
+      const snapshot = await db.collection('manuscript_versions').doc(id).get();
+      existing = snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+    }
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Manuscript not found' });
+    }
+    if (!(await canAccessProject(req.user, existing.projectId || id, existing))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to grade this manuscript.' });
+    }
 
     const numericScore = Number(score) || 0;
     let computedLetter = letter;
@@ -1054,6 +1111,20 @@ export const addManuscriptFeedback = async (req, res) => {
     const { text, section } = req.body;
     const user = req.user;
     seedMockManuscriptsIfEmpty();
+
+    let existing = null;
+    if (isDevMockMode) {
+      existing = mockFirestoreDb.get('manuscripts').get(id) || null;
+    } else {
+      const snapshot = await db.collection('manuscript_versions').doc(id).get();
+      existing = snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+    }
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Manuscript not found' });
+    }
+    if (!(await canAccessProject(user, existing.projectId || id, existing))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to comment on this manuscript.' });
+    }
 
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, error: 'Feedback text is required' });
@@ -1346,4 +1417,3 @@ export const updateManuscriptPublicationStatus = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
-

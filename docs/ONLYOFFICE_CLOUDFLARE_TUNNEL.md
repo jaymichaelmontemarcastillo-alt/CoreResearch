@@ -10,7 +10,7 @@ The Firebase-hosted frontend requires a public HTTPS URL to reach the ONLYOFFICE
 - `cloudflared` installed on your machine. (We have downloaded `cloudflared.exe` into the `CoreResearch` root folder).
 
 ## 3. Starting the ONLYOFFICE Server
-To ensure your local ONLYOFFICE server is running, execute:
+Set the same strong, private `ONLYOFFICE_JWT_SECRET` value in the Docker Compose environment and the backend environment before starting the server. Do not use a checked-in or example secret. Then run:
 ```powershell
 cd poc/onlyoffice
 docker-compose up -d
@@ -49,7 +49,10 @@ firebase deploy
 ## 8. Backend Configuration (Render)
 For ONLYOFFICE to successfully save documents back to MongoDB, your backend server on Render must have the correct callback URL configuration. Ensure these variables are set in the Render Dashboard:
 - `BACKEND_PUBLIC_URL=https://coreresearch-api-lspu-40301844.onrender.com`
-- `ONLYOFFICE_JWT_SECRET=super_secret_key_123`
+- `ONLYOFFICE_JWT_SECRET=<same strong secret configured for ONLYOFFICE>`
+- `ONLYOFFICE_DOCUMENT_SERVER_URL=https://<your-new-random-words>.trycloudflare.com`
+
+The backend rejects editor configuration and callbacks if the JWT secret is missing. Callback download links are accepted only from the configured ONLYOFFICE server origin.
 
 ## 9. Important Limitations
 > [!WARNING]

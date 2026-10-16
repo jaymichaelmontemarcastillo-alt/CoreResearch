@@ -5,7 +5,7 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 // Public registration & verification endpoints
-router.post('/register', registerUserSync);
+router.post('/register', verifyToken, registerUserSync);
 router.post('/seed-db', seedDatabaseEndpoint);
 router.get('/check-id', checkIdentifierAvailability);
 router.get('/check-email', checkIdentifierAvailability);

@@ -1,8 +1,8 @@
-import fs from 'fs';
 import path from 'path';
-import mongoose from 'mongoose';
 import { documentImportService } from '../services/import/DocumentImportService.js';
-import { getStorageProvider, localStorageProvider } from '../services/storage/storageManager.js';
+import { getStorageProvider } from '../services/storage/storageManager.js';
+import { canAccessProject } from '../middleware/resourceAuthorization.js';
+import { Document } from '../models/Document.js';
 
 export const importDocument = async (req, res) => {
   try {
@@ -16,23 +16,32 @@ export const importDocument = async (req, res) => {
     }
 
     const file = req.file;
-    const userProfile = req.user || {
-      uid: req.headers['x-user-id'] || 'guest-user',
-      fullName: req.headers['x-user-name'] || 'Researcher',
-      role: req.headers['x-user-role'] || 'student',
-      groupId: req.headers['x-group-id'] || '',
-    };
+    const userProfile = req.user;
 
     let groupInfo = null;
     if (req.body?.groupInfo) {
       try {
         groupInfo = typeof req.body.groupInfo === 'string' ? JSON.parse(req.body.groupInfo) : req.body.groupInfo;
-      } catch (e) {
-        // ignore
+      } catch {
+        return res.status(400).json({ success: false, message: 'groupInfo must be valid JSON.' });
       }
     }
 
     const existingDocumentId = req.body?.documentId || null;
+    if (existingDocumentId) {
+      const existingDocument = await Document.findOne({ id: existingDocumentId }).lean();
+      if (!existingDocument) {
+        return res.status(404).json({ success: false, message: 'Document not found.' });
+      }
+      if (!(await canAccessProject(userProfile, existingDocument.id, existingDocument))) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to update this document.' });
+      }
+    }
+
+    const groupId = groupInfo?.groupId || groupInfo?.id;
+    if (groupId && !(await canAccessProject(userProfile, groupId))) {
+      return res.status(403).json({ success: false, message: 'You are not a member of this research group.' });
+    }
 
     const documentRecord = await documentImportService.importDocument({
       fileBuffer: file.buffer,
@@ -40,7 +49,7 @@ export const importDocument = async (req, res) => {
       mimeType: file.mimetype,
       fileSize: file.size,
       userProfile,
-      groupInfo,
+      groupInfo: groupInfo ? { ...groupInfo, groupId } : null,
       existingDocumentId,
     });
 
@@ -71,10 +80,28 @@ export const importDocument = async (req, res) => {
 
 export const serveStorageAsset = async (req, res) => {
   try {
-    const rawPath = decodeURIComponent(req.params[0] || '');
-    // Normalize path but ensure we use forward slashes for MongoDB GridFS match
-    let cleanKey = path.normalize(rawPath).replace(/^(\.\.[\/\\])+/, '');
-    cleanKey = cleanKey.replace(/\\/g, '/'); // Crucial fix for Windows
+    let rawPath;
+    try {
+      rawPath = decodeURIComponent(req.params[0] || '');
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid asset path.' });
+    }
+    const cleanKey = path.posix.normalize(rawPath.replace(/\\/g, '/'));
+    if (cleanKey.startsWith('../') || cleanKey === '..' || path.posix.isAbsolute(cleanKey)) {
+      return res.status(400).json({ success: false, message: 'Invalid asset path.' });
+    }
+    const pathParts = cleanKey.split('/');
+    if (pathParts.length < 3 || pathParts[0] !== 'documents' || !pathParts[1]) {
+      return res.status(400).json({ success: false, message: 'Invalid asset path.' });
+    }
+    const document = await Document.findOne({ id: pathParts[1] }).lean();
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Asset not found.' });
+    }
+    if (!(await canAccessProject(req.user, document.id, document))) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to access this asset.' });
+    }
+
     const storageProvider = getStorageProvider();
 
     // Determine Content-Type
@@ -100,7 +127,8 @@ export const serveStorageAsset = async (req, res) => {
 
     const contentType = mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
 
     stream.pipe(res);
   } catch (err) {
@@ -117,11 +145,41 @@ export const updatePageSettings = async (req, res) => {
     if (!documentId || !pageSettings) {
       return res.status(400).json({ success: false, message: 'Missing documentId or pageSettings' });
     }
+    const allowedSettings = new Set([
+      'size',
+      'orientation',
+      'marginTop',
+      'marginBottom',
+      'marginLeft',
+      'marginRight',
+    ]);
+    if (
+      typeof pageSettings !== 'object' ||
+      Array.isArray(pageSettings) ||
+      Object.keys(pageSettings).length === 0 ||
+      Object.keys(pageSettings).some((key) => !allowedSettings.has(key))
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid page settings.' });
+    }
+    if (
+      (pageSettings.size !== undefined && !['letter', 'a4', 'legal'].includes(pageSettings.size)) ||
+      (pageSettings.orientation !== undefined && !['portrait', 'landscape'].includes(pageSettings.orientation)) ||
+      Object.entries(pageSettings).some(([key, value]) =>
+        key.startsWith('margin') && (typeof value !== 'string' || !/^\d+(?:\.\d+)?(?:in|cm|mm|pt)$/.test(value))
+      )
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid page settings.' });
+    }
 
-    const DocumentModel = mongoose.model('Document');
-    
-    // Find the document and update pageSettings
-    const updatedDoc = await DocumentModel.findOneAndUpdate(
+    const document = await Document.findOne({ id: documentId }).lean();
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+    if (!(await canAccessProject(req.user, documentId, document))) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to update this document.' });
+    }
+
+    const updatedDoc = await Document.findOneAndUpdate(
       { id: documentId },
       { $set: { pageSettings: pageSettings } },
       { new: true } // Return updated doc

@@ -1,4 +1,5 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
+import { canAccessProject, isPrivilegedRole } from '../middleware/resourceAuthorization.js';
 
 const SEED_DEFAULT_SECTIONS = [
   { id: 'chapter_1', name: 'Chapter 1: Introduction & Background', order: 1, status: 'not_started', progress: 0 },
@@ -34,6 +35,9 @@ export const getWorkspace = async (req, res) => {
     if (!workspace) {
       return res.status(404).json({ success: false, error: 'Workspace not found' });
     }
+    if (!(await canAccessProject(req.user, id, workspace))) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
 
     return res.status(200).json({ success: true, data: workspace });
   } catch (error) {
@@ -48,6 +52,9 @@ export const getWorkspace = async (req, res) => {
 export const getWorkspacesByAdviser = async (req, res) => {
   try {
     const { adviserId } = req.params;
+    if (adviserId !== req.user.uid && !isPrivilegedRole(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     let list = [];
 
     if (isDevMockMode) {
@@ -63,6 +70,10 @@ export const getWorkspacesByAdviser = async (req, res) => {
       list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }
 
+    const accessResults = await Promise.all(list.map((workspace) =>
+      canAccessProject(req.user, workspace.id || workspace.groupId, workspace)
+    ));
+    list = list.filter((_, index) => accessResults[index]);
     return res.status(200).json({ success: true, count: list.length, data: list });
   } catch (error) {
     console.error('[workspaceController] getWorkspacesByAdviser error:', error);
@@ -78,8 +89,35 @@ export const createTask = async (req, res) => {
     const user = req.user;
     const { workspaceId, studentId, title, description, priority, dueDate, sectionId } = req.body;
 
+    if (!workspaceId) {
+      return res.status(400).json({ success: false, error: 'workspaceId is required.' });
+    }
     if (!title || !dueDate) {
       return res.status(400).json({ success: false, error: 'Title and Due Date are required.' });
+    }
+
+    let resolvedWorkspace = null;
+    if (isDevMockMode) {
+      resolvedWorkspace = mockFirestoreDb.get('manuscript_workspaces')?.get(workspaceId) || null;
+    } else {
+      const snapshot = await db.collection('manuscript_workspaces').doc(workspaceId).get();
+      resolvedWorkspace = snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+    }
+    if (!resolvedWorkspace) {
+      return res.status(404).json({ success: false, error: 'Workspace not found.' });
+    }
+    if (!(await canAccessProject(user, workspaceId, resolvedWorkspace))) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to this workspace.' });
+    }
+    const workspaceMemberIds = new Set([
+      resolvedWorkspace.studentId,
+      ...(Array.isArray(resolvedWorkspace.memberIds) ? resolvedWorkspace.memberIds : []),
+      ...(Array.isArray(resolvedWorkspace.members)
+        ? resolvedWorkspace.members.map((member) => member?.uid || member?.id)
+        : []),
+    ].filter(Boolean));
+    if (studentId && !workspaceMemberIds.has(studentId)) {
+      return res.status(403).json({ success: false, error: 'Student is not a member of this workspace.' });
     }
 
     const taskId = `task-${Date.now()}`;
@@ -125,7 +163,33 @@ export const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, submissionNote } = req.body;
+    const user = req.user;
     const now = new Date().toISOString();
+
+    const existing = isDevMockMode
+      ? mockFirestoreDb.get('research_tasks')?.get(id)
+      : await db.collection('research_tasks').doc(id).get().then((snap) =>
+          snap.exists ? { id: snap.id, ...snap.data() } : null
+        );
+    if (!existing) return res.status(404).json({ success: false, error: 'Task not found' });
+    if (!(await canAccessProject(user, existing.workspaceId, existing))) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    if (
+      !isPrivilegedRole(user.role) &&
+      !(
+        (user.role === 'adviser' && existing.adviserId === user.uid) ||
+        (user.role === 'student' && existing.studentId === user.uid)
+      )
+    ) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const allowedStatuses = user.role === 'student'
+      ? ['in_progress', 'submitted']
+      : ['todo', 'in_progress', 'completed', 'revision_required'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid task status for this user.' });
+    }
 
     const updates = {
       status,
@@ -161,6 +225,30 @@ export const createFeedback = async (req, res) => {
   try {
     const user = req.user;
     const { workspaceId, studentId, sectionId, taskId, comment } = req.body;
+
+    if (!workspaceId) {
+      return res.status(400).json({ success: false, error: 'workspaceId is required.' });
+    }
+    const workspaceSnap = isDevMockMode
+      ? null
+      : await db.collection('manuscript_workspaces').doc(workspaceId).get();
+    const workspace = isDevMockMode
+      ? mockFirestoreDb.get('manuscript_workspaces')?.get(workspaceId)
+      : workspaceSnap?.exists ? { id: workspaceSnap.id, ...workspaceSnap.data() } : null;
+    if (!workspace) return res.status(404).json({ success: false, error: 'Workspace not found.' });
+    if (!(await canAccessProject(user, workspaceId, workspace))) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const workspaceMemberIds = new Set([
+      workspace.studentId,
+      ...(Array.isArray(workspace.memberIds) ? workspace.memberIds : []),
+      ...(Array.isArray(workspace.members)
+        ? workspace.members.map((member) => member?.uid || member?.id)
+        : []),
+    ].filter(Boolean));
+    if (studentId && !workspaceMemberIds.has(studentId)) {
+      return res.status(403).json({ success: false, error: 'Student is not a member of this workspace.' });
+    }
 
     if (!comment || !comment.trim()) {
       return res.status(400).json({ success: false, error: 'Feedback comment is required.' });
@@ -208,7 +296,30 @@ export const updateFeedbackStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const user = req.user;
     const now = new Date().toISOString();
+
+    const existing = isDevMockMode
+      ? mockFirestoreDb.get('research_feedback')?.get(id)
+      : await db.collection('research_feedback').doc(id).get().then((snap) =>
+          snap.exists ? { id: snap.id, ...snap.data() } : null
+        );
+    if (!existing) return res.status(404).json({ success: false, error: 'Feedback not found' });
+    if (!(await canAccessProject(user, existing.workspaceId, existing))) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const validStatuses = ['open', 'addressed', 'resolved'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid feedback status.' });
+    }
+    if (
+      !isPrivilegedRole(user.role) &&
+      existing.authorId !== user.uid &&
+      !(user.role === 'student' && existing.studentId === user.uid) &&
+      !['adviser', 'panelist'].includes(user.role)
+    ) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
 
     if (isDevMockMode) {
       const map = mockFirestoreDb.get('research_feedback');

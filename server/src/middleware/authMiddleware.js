@@ -1,22 +1,6 @@
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
-import { auth, db, mockUsersDb } from '../config/firebaseAdmin.js';
-
-/**
- * Helper to safely decode JWT payload when offline or in dev fallback
- */
-const decodeJwtPayload = (token) => {
-  try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      const payloadBuf = Buffer.from(parts[1], 'base64').toString('utf8');
-      return JSON.parse(payloadBuf);
-    }
-  } catch (err) {
-    return null;
-  }
-  return null;
-};
+import { auth, db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 
 /**
  * Middleware to verify Firebase Authorization token or dev bearer token.
@@ -36,7 +20,7 @@ export const verifyToken = async (req, res, next) => {
 
   try {
     // 1. Dev token handling (format: dev-token-{uid}-{role})
-    if (token.startsWith('dev-token-')) {
+    if (token.startsWith('dev-token-') && isDevMockMode && process.env.NODE_ENV !== 'production') {
       let uid = 'dev-user-id';
       let role = 'student';
 
@@ -79,9 +63,12 @@ export const verifyToken = async (req, res, next) => {
         decodedToken = await auth.verifyIdToken(token);
       }
     } catch (verifyErr) {
-      console.warn('[AuthMiddleware] Firebase verifyIdToken warning:', verifyErr.message);
-      // Attempt safe payload decoding if verifyIdToken fails in offline/dev environments
-      decodedToken = decodeJwtPayload(token);
+      console.warn('[AuthMiddleware] Firebase verifyIdToken failed:', verifyErr.message);
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Invalid or expired authentication token.'
+      });
     }
 
     if (!decodedToken || (!decodedToken.uid && !decodedToken.user_id)) {
@@ -122,8 +109,29 @@ export const verifyToken = async (req, res, next) => {
       }
     }
 
-    if (!userData) {
+    if (!userData && isDevMockMode) {
       userData = mockUsersDb.get(uid) || null;
+    }
+
+    const isRegistrationRequest = req.originalUrl.split('?')[0] === '/api/auth/register';
+    if (!userData && !isDevMockMode && !isRegistrationRequest) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'A registered user profile is required.'
+      });
+    }
+
+    if (
+      userData &&
+      !isRegistrationRequest &&
+      (userData.status === 'pending' || userData.status === 'rejected' || userData.is_approved === false)
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'This account is not approved to access the application.'
+      });
     }
 
     const nameParts = (userData?.fullName || name).trim().split(' ');
@@ -141,8 +149,8 @@ export const verifyToken = async (req, res, next) => {
       department: userData?.department || 'Computer Studies',
       department_id: userData?.department_id || userData?.department || 'Computer Studies',
       studentIdOrEmployeeId: userData?.studentIdOrEmployeeId || '',
-      status: userData?.status || 'active',
-      is_approved: userData?.is_approved !== undefined ? userData.is_approved : true,
+      status: userData?.status || (isDevMockMode ? 'active' : 'pending'),
+      is_approved: userData?.is_approved !== undefined ? userData.is_approved : isDevMockMode,
       profile_image: userData?.profile_image || picture || '',
       created_at: userData?.created_at || userData?.createdAt || new Date().toISOString(),
       updated_at: userData?.updated_at || userData?.updatedAt || new Date().toISOString()

@@ -2,10 +2,15 @@ import jwt from 'jsonwebtoken';
 import { getStorageProvider } from '../services/storage/storageManager.js';
 import { Document } from '../models/Document.js';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
-import path from 'path';
+import { canAccessProject, isPrivilegedRole } from '../middleware/resourceAuthorization.js';
 
-// MUST be configured in environment variables, fallback for dev only
-const getJwtSecret = () => process.env.ONLYOFFICE_JWT_SECRET || 'mysecret';
+const getJwtSecret = () => {
+  if (!process.env.ONLYOFFICE_JWT_SECRET) {
+    throw new Error('ONLYOFFICE_JWT_SECRET must be configured.');
+  }
+  return process.env.ONLYOFFICE_JWT_SECRET;
+};
+const isValidDocumentId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,200}$/.test(value);
 
 /**
  * Generate configuration token for frontend ONLYOFFICE component
@@ -13,118 +18,51 @@ const getJwtSecret = () => process.env.ONLYOFFICE_JWT_SECRET || 'mysecret';
 export const generateConfig = async (req, res) => {
   try {
     const { documentId } = req.params;
-    console.log(`[onlyofficeController] generateConfig called for documentId: "${documentId}"`);
-    let document = await Document.findOne({ id: documentId });
-
-    const user = req.user || {
-      uid: req.headers['x-user-id'] || 'guest-user',
-      fullName: req.headers['x-user-name'] || 'Researcher',
-      role: req.headers['x-user-role'] || 'student'
-    };
+    if (!isValidDocumentId(documentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid document ID.' });
+    }
+    const document = await Document.findOne({ id: documentId });
+    const user = req.user;
 
     const isExplicitPanelistMode = req.query.mode === 'panelist';
     const isExplicitReadMode = req.query.mode === 'read';
-    const isAdmin = user.role === 'admin' || user.role === 'coordinator' || user.role === 'research_coordinator' || user.role === 'dean';
-    const isAdviserOrPanelist = user.role === 'adviser' || user.role === 'panelist' || isExplicitPanelistMode;
-
-    // Auto-initialize document in GridFS and MongoDB if missing
+    const isAdmin = isPrivilegedRole(user.role);
+    const jwtSecret = getJwtSecret();
     if (!document) {
-      console.log(`[onlyofficeController] Document not found in DB for id: "${documentId}". Auto-initializing document...`);
-      try {
-        const { Document: DocxDocument, Packer, Paragraph, TextRun } = await import('docx');
-        const doc = new DocxDocument({
-          styles: { default: { document: { run: { font: "Inter" } } } },
-          sections: [{ properties: {}, children: [new Paragraph({ children: [new TextRun('Research Manuscript')] })] }]
-        });
-        const b64 = await Packer.toBase64String(doc);
-        const fileBuffer = Buffer.from(b64, 'base64');
-        const storageProvider = getStorageProvider();
-        const storageKey = `documents/${documentId}/original/manuscript.docx`;
-        await storageProvider.upload(storageKey, fileBuffer, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', { documentId, uploadedBy: user.uid });
-        document = await Document.findOneAndUpdate(
-          { id: documentId },
-          { id: documentId, title: 'Research Manuscript', onlyofficeFileKey: storageKey, editorType: 'onlyoffice' },
-          { upsert: true, new: true }
-        );
-      } catch (initErr) {
-        console.error('[onlyofficeController] Auto-initialization error:', initErr);
-        return res.status(404).json({ success: false, message: 'Document not found and could not be initialized.' });
-      }
+      return res.status(404).json({ success: false, message: 'Document not found.' });
     }
 
     if (!document.onlyofficeFileKey) {
       return res.status(400).json({ success: false, message: 'Document has no ONLYOFFICE file key. Not migrated.' });
     }
 
-    // Authorization Check: Admins and Research Coordinators have system-wide access to all manuscripts.
-    // For students: ensure ownership or group membership.
-    if (!isAdmin && !isAdviserOrPanelist && user.role === 'student' && user.uid !== 'guest-user') {
-      const docAuthors = document.authors || [];
-      const isAuthor = docAuthors.includes(user.uid) || document.ownerId === user.uid;
-      let isGroupMember = false;
-      if (document.groupId && user.groupId) {
-        isGroupMember = document.groupId === user.groupId;
-      }
-      if (!isAuthor && !isGroupMember && (docAuthors.length > 0 || document.ownerId || document.groupId)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access Restricted: You do not have permission to view other research groups\' private manuscripts.'
-        });
-      }
-    }
-
-    // Authorization Check for Panelists/Advisers (if document or schedule has assigned personnel)
-    if (!isAdmin && isAdviserOrPanelist && user.uid !== 'guest-user') {
-      const docAuthors = document.authors || [];
-      const docPanelists = document.panelists || [];
-      const docAdviser = document.adviser || '';
-
-      const isAuthor = docAuthors.includes(user.uid);
-      const isDocAdviser = docAdviser === user.uid;
-      const isDocPanelist = docPanelists.includes(user.uid);
-
-      if (!isAuthor && !isDocAdviser && !isDocPanelist && (docAuthors.length > 0 || docPanelists.length > 0 || docAdviser)) {
-        // Also check Schedule model to see if assigned in defense schedule
-        try {
-          const { Schedule } = await import('../models/Schedule.js');
-          const schedule = await Schedule.findOne({
-            $or: [
-              { projectId: document.id },
-              { projectId: document.groupId },
-              { projectTitle: document.title }
-            ]
-          }).lean();
-
-          if (schedule) {
-            const inSchedulePanelists = (schedule.panelists || []).some(p => p.id === user.uid || p.uid === user.uid);
-            const inScheduleAdviser = schedule.adviserId === user.uid;
-
-            if (!inSchedulePanelists && !inScheduleAdviser) {
-              return res.status(403).json({
-                success: false,
-                message: 'Access Restricted: You do not have permission to access this manuscript. Only officially assigned personnel can review this document.'
-              });
-            }
-          }
-        } catch (authErr) {
-          console.warn('[onlyofficeController] Schedule auth check warning:', authErr.message);
-        }
-      }
+    if (!(await canAccessProject(user, document.id, document.toObject()))) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to access this document.' });
     }
 
     // The document URL must be reachable by the ONLYOFFICE server (which runs in Docker)
     const backendHost = process.env.BACKEND_PUBLIC_URL || `http://host.docker.internal:5000`;
-    const documentUrl = `${backendHost}/api/onlyoffice/download/${documentId}`;
-    const callbackUrl = `${backendHost}/api/onlyoffice/callback?id=${documentId}`;
+    const documentKey = `${documentId}-${Date.now()}`;
+    await Document.updateOne({ id: documentId }, { $set: { onlyofficeKey: documentKey } });
+    const downloadToken = jwt.sign(
+      { scope: 'onlyoffice:download', documentId, key: documentKey },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
+    const documentUrl = `${backendHost}/api/onlyoffice/download/${encodeURIComponent(documentId)}?token=${encodeURIComponent(downloadToken)}`;
+    const callbackUrl = `${backendHost}/api/onlyoffice/callback?id=${encodeURIComponent(documentId)}`;
 
     // Inspection is read-only by default for Admins, Coordinators, Advisers, and Panelists.
     // Explicit edit mode must be permitted and requested.
-    const isReadOnly = isAdviserOrPanelist || isExplicitReadMode || (isAdmin && req.query.mode !== 'edit');
+    const isReadOnly = ['adviser', 'panelist'].includes(user.role) ||
+      isExplicitPanelistMode ||
+      isExplicitReadMode ||
+      (isAdmin && req.query.mode !== 'edit');
 
     const config = {
       document: {
         fileType: 'docx',
-        key: `${documentId}-${new Date(document.updated_at || Date.now()).getTime()}`, // cache buster
+        key: documentKey,
         title: document.title || 'Untitled Document',
         url: documentUrl,
         permissions: {
@@ -155,7 +93,7 @@ export const generateConfig = async (req, res) => {
     };
 
     // Sign the config
-    const token = jwt.sign(config, getJwtSecret(), { expiresIn: '1h' });
+    const token = jwt.sign(config, jwtSecret, { expiresIn: '1h' });
     
     return res.status(200).json({
       success: true,
@@ -174,9 +112,21 @@ export const generateConfig = async (req, res) => {
 export const downloadDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
+    if (!isValidDocumentId(documentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid document ID.' });
+    }
+    const token = req.query.token;
+    if (typeof token !== 'string') {
+      return res.status(401).json({ success: false, message: 'A valid download token is required.' });
+    }
+    const claims = jwt.verify(token, getJwtSecret());
+    if (claims.scope !== 'onlyoffice:download' || claims.documentId !== documentId || typeof claims.key !== 'string') {
+      return res.status(403).json({ success: false, message: 'Download token does not authorize this document.' });
+    }
+
     const document = await Document.findOne({ id: documentId });
 
-    if (!document || !document.onlyofficeFileKey) {
+    if (!document || !document.onlyofficeFileKey || document.onlyofficeKey !== claims.key) {
       return res.status(404).json({ success: false, message: 'Document or file not found' });
     }
 
@@ -193,6 +143,9 @@ export const downloadDocument = async (req, res) => {
     stream.pipe(res);
   } catch (error) {
     console.error('[onlyofficeController] downloadDocument error:', error);
+    if (['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name)) {
+      return res.status(401).json({ success: false, message: 'Download token is invalid or expired.' });
+    }
     return res.status(500).json({ success: false, message: 'Failed to download document' });
   }
 };
@@ -203,33 +156,55 @@ export const downloadDocument = async (req, res) => {
 export const callbackHandler = async (req, res) => {
   try {
     const documentId = req.query.id;
-    let payload = req.body;
+    const body = req.body;
+    const bearer = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : null;
+    const token = typeof body?.token === 'string' ? body.token : bearer;
+    if (!isValidDocumentId(documentId) || !token) {
+      return res.status(401).json({ error: 1, message: 'A signed callback token and document ID are required.' });
+    }
 
-    // If ONLYOFFICE sends the payload wrapped in a token field, we decode it
-    if (payload.token) {
-      payload = jwt.verify(payload.token, getJwtSecret());
-    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-      const token = req.headers.authorization.substring(7);
-      const decodedToken = jwt.verify(token, getJwtSecret());
-      payload = decodedToken.payload || decodedToken; // ONLYOFFICE puts body in payload sometimes
+    const verified = jwt.verify(token, getJwtSecret());
+    const payload = verified.payload || verified;
+    if (!payload || typeof payload !== 'object' || !Number.isInteger(payload.status) || typeof payload.key !== 'string') {
+      return res.status(400).json({ error: 1, message: 'Invalid ONLYOFFICE callback payload.' });
     }
 
     const status = payload.status;
     console.log(`[ONLYOFFICE] Callback received for document ${documentId}, status: ${status}`);
 
+    const document = await Document.findOne({ id: documentId });
+    if (!document || !document.onlyofficeFileKey || document.onlyofficeKey !== payload.key) {
+      return res.status(403).json({ error: 1, message: 'Callback is not bound to this document.' });
+    }
+
     // Status 2: Document is ready for saving
     // Status 6: Force save
     if (status === 2 || status === 6) {
-      const document = await Document.findOne({ id: documentId });
-      if (!document || !document.onlyofficeFileKey) {
-        console.error(`[ONLYOFFICE] Document ${documentId} not found for saving.`);
-        return res.status(404).json({ error: 1, message: 'Document not found' });
+      if (typeof payload.url !== 'string') {
+        return res.status(400).json({ error: 1, message: 'Callback download URL is missing.' });
       }
 
-      // Download the updated DOCX from ONLYOFFICE
-      const downloadUrl = payload.url;
-      const fetch = (await import('node-fetch')).default || global.fetch; // fallback if global fetch is not available in node version
-      const fileResponse = await fetch(downloadUrl);
+      const configuredServer = process.env.ONLYOFFICE_DOCUMENT_SERVER_URL || process.env.ONLYOFFICE_URL;
+      if (!configuredServer) {
+        throw new Error('ONLYOFFICE_DOCUMENT_SERVER_URL must be configured to validate callback URLs.');
+      }
+      let downloadUrl;
+      let allowedOrigin;
+      try {
+        downloadUrl = new URL(payload.url);
+        allowedOrigin = new URL(configuredServer).origin;
+      } catch {
+        return res.status(400).json({ error: 1, message: 'Callback download URL is invalid.' });
+      }
+      if (downloadUrl.origin !== allowedOrigin || downloadUrl.username || downloadUrl.password) {
+        return res.status(403).json({ error: 1, message: 'Callback download URL is not from the configured ONLYOFFICE server.' });
+      }
+      if (typeof fetch !== 'function') {
+        throw new Error('Fetch API is unavailable in this Node.js runtime.');
+      }
+      const fileResponse = await fetch(downloadUrl, { redirect: 'error' });
       
       if (!fileResponse.ok) {
         throw new Error(`Failed to download updated document from ONLYOFFICE. Status: ${fileResponse.status}`);
@@ -253,6 +228,9 @@ export const callbackHandler = async (req, res) => {
     return res.status(200).json({ error: 0 });
   } catch (error) {
     console.error('[onlyofficeController] callbackHandler error:', error);
+    if (['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name)) {
+      return res.status(401).json({ error: 1, message: 'Callback token is invalid or expired.' });
+    }
     // ONLYOFFICE considers any error > 0 as a failure.
     return res.status(500).json({ error: 1, message: error.message });
   }
@@ -265,13 +243,22 @@ export const createDocument = async (req, res) => {
   try {
     const { documentId, title } = req.body;
     
-    if (!documentId) {
+    if (!isValidDocumentId(documentId)) {
       return res.status(400).json({ success: false, message: 'documentId is required' });
+    }
+
+    const user = req.user;
+    const projectId = req.body.projectId || req.body.groupId;
+    if (projectId && !(await canAccessProject(user, projectId))) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to create a document for this project.' });
     }
 
     // Check if document already exists
     let document = await Document.findOne({ id: documentId });
     if (document) {
+      if (!(await canAccessProject(user, document.id, document.toObject()))) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to access this document.' });
+      }
       if (document.onlyofficeFileKey) {
         return res.status(200).json({ success: true, message: 'Document already exists', document });
       } else {
@@ -325,7 +312,12 @@ export const createDocument = async (req, res) => {
         id: documentId,
         title: title || 'Untitled Document',
         onlyofficeFileKey: storageKey,
-        editorType: 'onlyoffice'
+        editorType: 'onlyoffice',
+        ownerId: user.uid,
+        ownerRole: user.role,
+        authors: [user.uid],
+        groupId: req.body.groupId || '',
+        projectId: req.body.projectId || ''
       },
       { upsert: true, new: true }
     );
@@ -333,6 +325,6 @@ export const createDocument = async (req, res) => {
     return res.status(201).json({ success: true, document });
   } catch (error) {
     console.error('[onlyofficeController] createDocument error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to create ONLYOFFICE document', error: error.message, stack: error.stack });
+    return res.status(500).json({ success: false, message: 'Failed to create ONLYOFFICE document' });
   }
 };

@@ -28,6 +28,9 @@ import { notificationService } from './notification.service';
 
 const COLLECTION_NAME = 'manuscript_workspaces';
 
+const isActiveWorkspace = (workspace: ManuscriptWorkspace) =>
+  workspace.status !== 'archived' && !workspace.isArchived;
+
 function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined)
@@ -238,8 +241,13 @@ export const researchWorkspaceService = {
     // 1. Check if workspace already exists for this groupId
     const q = query(collection(db, COLLECTION_NAME), where('groupId', '==', group.id));
     const snap = await getDocs(q);
-    if (!snap.empty) {
-      const existing = snap.docs[0].data() as ManuscriptWorkspace;
+    const groupWorkspaces = snap.docs.map((workspaceDoc) => ({
+      ...workspaceDoc.data(),
+      id: workspaceDoc.id,
+    } as ManuscriptWorkspace));
+    let hasArchivedWorkspace = groupWorkspaces.some((workspace) => !isActiveWorkspace(workspace));
+    const existing = groupWorkspaces.find(isActiveWorkspace);
+    if (existing) {
       // Ensure all current group members are in memberIds
       const gMemberIds = Array.isArray(group.memberIds) ? group.memberIds : [];
       const currentIds = Array.isArray(existing.memberIds) ? existing.memberIds : [existing.studentId];
@@ -274,7 +282,12 @@ export const researchWorkspaceService = {
         where('studentId', '==', resolvedLeaderUid)
       );
       const leaderSnap = await getDocs(leaderQ);
-      let leaderWs = leaderSnap.empty ? null : (leaderSnap.docs[0].data() as ManuscriptWorkspace);
+      const leaderWorkspaces = leaderSnap.docs.map((workspaceDoc) => ({
+        ...workspaceDoc.data(),
+        id: workspaceDoc.id,
+      } as ManuscriptWorkspace));
+      let leaderWs = leaderWorkspaces.find(isActiveWorkspace) || null;
+      hasArchivedWorkspace ||= leaderWorkspaces.some((workspace) => !isActiveWorkspace(workspace));
 
       if (!leaderWs) {
         const leaderMemberQ = query(
@@ -282,9 +295,12 @@ export const researchWorkspaceService = {
           where('memberIds', 'array-contains', resolvedLeaderUid)
         );
         const leaderMemberSnap = await getDocs(leaderMemberQ);
-        if (!leaderMemberSnap.empty) {
-          leaderWs = leaderMemberSnap.docs[0].data() as ManuscriptWorkspace;
-        }
+        const leaderMemberWorkspaces = leaderMemberSnap.docs.map((workspaceDoc) => ({
+          ...workspaceDoc.data(),
+          id: workspaceDoc.id,
+        } as ManuscriptWorkspace));
+        leaderWs = leaderMemberWorkspaces.find(isActiveWorkspace) || null;
+        hasArchivedWorkspace ||= leaderMemberWorkspaces.some((workspace) => !isActiveWorkspace(workspace));
       }
 
       if (leaderWs) {
@@ -323,8 +339,11 @@ export const researchWorkspaceService = {
       if (propSnap.empty && resolvedLeaderUid) {
         propSnap = await getDocs(query(collection(db, 'proposals'), where('submittedByUid', '==', resolvedLeaderUid)));
       }
-      if (!propSnap.empty) {
-        const prop = propSnap.docs[0].data();
+      const activeProposals = propSnap.docs
+        .map((proposalDoc) => proposalDoc.data() as TitleProposal)
+        .filter((proposal) => proposal.status === 'approved' && !(proposal as TitleProposal & { isArchived?: boolean }).isArchived);
+      if (activeProposals.length > 0) {
+        const prop = activeProposals[0];
         if (!resolvedTitle && prop.title) resolvedTitle = prop.title;
         if (prop.id) proposalId = prop.id;
       }
@@ -334,8 +353,12 @@ export const researchWorkspaceService = {
       if (reqSnap.empty && resolvedLeaderUid) {
         reqSnap = await getDocs(query(collection(db, 'adviser_requests'), where('studentId', '==', resolvedLeaderUid)));
       }
-      if (!reqSnap.empty) {
-        const req = reqSnap.docs[0].data();
+      const activeRequests = reqSnap.docs
+        .map((requestDoc) => requestDoc.data() as AdviserRequest)
+        .filter((request) => (request.status === 'pending' || request.status === 'accepted') && !request.isArchived);
+      const acceptedRequest = activeRequests.find((request) => request.status === 'accepted');
+      if (acceptedRequest) {
+        const req = acceptedRequest;
         if (!resolvedTitle && req.researchTitle) resolvedTitle = req.researchTitle;
         if (!resolvedAdviserId && req.adviserId) {
           resolvedAdviserId = req.adviserId;
@@ -347,7 +370,13 @@ export const researchWorkspaceService = {
       console.warn('[researchWorkspaceService] Fallback reading group research assets:', e);
     }
 
-    const workspaceId = `ws-group-${group.id}`;
+    if (!resolvedTitle && !resolvedAdviserId) {
+      throw new Error('The group does not have an active research title or adviser request.');
+    }
+
+    const workspaceId = hasArchivedWorkspace
+      ? doc(collection(db, COLLECTION_NAME)).id
+      : `ws-group-${group.id}`;
     const docRef = doc(db, COLLECTION_NAME, workspaceId);
     const now = new Date().toISOString();
 
@@ -457,7 +486,7 @@ export const researchWorkspaceService = {
         where('groupId', '==', groupId)
       );
       const snap = await getDocs(q);
-      const activeDocs = snap.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      const activeDocs = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace);
       if (activeDocs.length > 0) {
         const ws = activeDocs[0];
         // Ensure studentUid is included in memberIds if missing
@@ -492,7 +521,7 @@ export const researchWorkspaceService = {
         where('studentId', '==', leaderUid)
       );
       const snapLeader = await getDocs(qLeader);
-      const activeLeaderDocs = snapLeader.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      const activeLeaderDocs = snapLeader.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace);
       let leaderWs = activeLeaderDocs.length === 0 ? null : activeLeaderDocs[0];
 
       if (!leaderWs) {
@@ -501,7 +530,7 @@ export const researchWorkspaceService = {
           where('memberIds', 'array-contains', leaderUid)
         );
         const snapLeaderMember = await getDocs(qLeaderMember);
-        const activeLeaderMemberDocs = snapLeaderMember.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+        const activeLeaderMemberDocs = snapLeaderMember.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace);
         if (activeLeaderMemberDocs.length > 0) {
           leaderWs = activeLeaderMemberDocs[0];
         }
@@ -537,7 +566,7 @@ export const researchWorkspaceService = {
         where('memberIds', 'array-contains', studentUid)
       );
       const snapMember = await getDocs(qMember);
-      const activeMemberDocs = snapMember.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      const activeMemberDocs = snapMember.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace);
       if (activeMemberDocs.length > 0) {
         return activeMemberDocs[0];
       }
@@ -548,7 +577,7 @@ export const researchWorkspaceService = {
         where('studentId', '==', studentUid)
       );
       const snap = await getDocs(q);
-      const activeDocs = snap.docs.map(doc => doc.data() as ManuscriptWorkspace).filter(w => w.status !== 'archived' && !w.isArchived);
+      const activeDocs = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace);
       if (activeDocs.length > 0) {
         return activeDocs[0];
       }

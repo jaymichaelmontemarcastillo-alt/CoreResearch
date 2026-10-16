@@ -231,8 +231,11 @@ export const groupService = {
       try {
         const wsQuery = query(collection(db, 'manuscript_workspaces'), where('groupId', '==', group.id));
         const wsSnap = await getDocs(wsQuery);
-        if (!wsSnap.empty && wsSnap.docs[0].data().title) {
-          group.title = wsSnap.docs[0].data().title;
+        const activeWorkspace = wsSnap.docs
+          .map((workspaceDoc) => workspaceDoc.data())
+          .find((workspace) => workspace.status !== 'archived' && !workspace.isArchived);
+        if (activeWorkspace?.title) {
+          group.title = activeWorkspace.title;
         } else {
           const propQuery = query(collection(db, 'proposals'), where('groupId', '==', group.id));
           const propSnap = await getDocs(propQuery);

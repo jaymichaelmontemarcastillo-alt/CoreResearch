@@ -6,6 +6,6 @@ services:
     ports:
       - "8080:80"
     environment:
-      - JWT_SECRET=super_secret_key_123
+      - JWT_SECRET=${ONLYOFFICE_JWT_SECRET:?Set ONLYOFFICE_JWT_SECRET before starting ONLYOFFICE}
       - JWT_ENABLED=true
     restart: always
