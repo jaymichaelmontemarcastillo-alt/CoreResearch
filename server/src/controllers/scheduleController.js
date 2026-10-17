@@ -242,6 +242,18 @@ export const createSchedule = async (req, res) => {
       createdAt: createdSchedule.createdAt
     };
 
+    // Sync to Firestore schedules and defense_schedules
+    if (db) {
+      try {
+        await Promise.all([
+          db.collection('schedules').doc(newScheduleId).set(responseData, { merge: true }),
+          db.collection('defense_schedules').doc(newScheduleId).set(responseData, { merge: true })
+        ]);
+      } catch (e) {
+        console.warn('[ScheduleController] Firestore create sync warning:', e.message);
+      }
+    }
+
     // Dispatch notifications to Students, Adviser, and Panelists
     sendDefenseNotifications([responseData]).catch(err => {
       console.error('[ScheduleController] Failed to dispatch notifications:', err.message);
@@ -360,6 +372,17 @@ export const updateScheduleStatus = async (req, res) => {
       });
     }
 
+    if (db) {
+      try {
+        await Promise.all([
+          db.collection('schedules').doc(id).set({ status, updatedAt: new Date().toISOString() }, { merge: true }),
+          db.collection('defense_schedules').doc(id).set({ status, updatedAt: new Date().toISOString() }, { merge: true })
+        ]);
+      } catch (e) {
+        console.warn('[ScheduleController] Firestore status sync warning:', e.message);
+      }
+    }
+
     // Map back for response compatibility
     const updated = {
       id: updatedSchedule.id,
@@ -431,7 +454,7 @@ export const updateSchedule = async (req, res) => {
     // Sync to Firestore / Dev store
     try {
       if (db) {
-        await db.collection('schedules').doc(id).set({
+        const updatePayload = {
           date,
           time: startTime,
           startTime,
@@ -444,7 +467,11 @@ export const updateSchedule = async (req, res) => {
           panelistIds: (panelists || []).map(p => p.id || p.uid).filter(Boolean),
           panelistNames: (panelists || []).map(p => p.name || p.fullName).filter(Boolean),
           updatedAt: new Date().toISOString()
-        }, { merge: true });
+        };
+        await Promise.all([
+          db.collection('schedules').doc(id).set(updatePayload, { merge: true }),
+          db.collection('defense_schedules').doc(id).set(updatePayload, { merge: true })
+        ]);
         mongoSuccess = true;
       } else if (isDevMockMode) {
         seedMockSchedulesIfEmpty();
@@ -586,8 +613,10 @@ export const bulkCreateSchedules = async (req, res) => {
       if (db) {
         const batch = db.batch();
         docsToInsert.forEach(d => {
-          const docRef = db.collection('schedules').doc(d.id);
-          batch.set(docRef, d);
+          const docRef1 = db.collection('schedules').doc(d.id);
+          const docRef2 = db.collection('defense_schedules').doc(d.id);
+          batch.set(docRef1, d, { merge: true });
+          batch.set(docRef2, d, { merge: true });
         });
         await batch.commit();
         mongoSuccess = true;
@@ -638,6 +667,16 @@ export const deleteSchedule = async (req, res) => {
     
     if (mongoose.connection.readyState === 1) {
       const result = await MongoSchedule.findOneAndDelete({ id: id });
+      if (db) {
+        try {
+          await Promise.all([
+            db.collection('schedules').doc(id).delete(),
+            db.collection('defense_schedules').doc(id).delete()
+          ]);
+        } catch (e) {
+          console.warn('[ScheduleController] Firestore delete sync warning:', e.message);
+        }
+      }
       if (!result) {
         return res.status(404).json({ success: false, message: 'Schedule not found in MongoDB' });
       }

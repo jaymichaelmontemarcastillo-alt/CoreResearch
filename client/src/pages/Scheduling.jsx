@@ -245,7 +245,14 @@ export const Scheduling = () => {
        showToast("Please select a specific section to clear times.", "info");
        return;
     }
-    const sectionGroups = groups.filter((g) => g.sectionId === selectedSection);
+    const curSecObj = relevantSections.find(sec => sec.id === selectedSection);
+    const cleanCurSec = (curSecObj?.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
+    const sectionGroups = groups.filter((g) => {
+      if (g.sectionId === selectedSection) return true;
+      const cleanGSec = (g.sectionName || '').replace(/^section\s+/i, '').trim().toLowerCase();
+      if (cleanGSec && cleanCurSec && cleanGSec === cleanCurSec) return true;
+      return false;
+    });
     const currentViewGroups = sectionGroups.filter((g) => {
       const q = searchQuery.toLowerCase();
       if (!q) return true;
@@ -486,7 +493,19 @@ export const Scheduling = () => {
               return (
                 <div key={course.id} className="space-y-8">
                   {displaySections.map((section) => {
-                    const sectionGroups = groups.filter((g) => g.sectionId === section.id);
+                    const sectionGroups = groups.filter((g) => {
+                      if (g.sectionId === section.id) return true;
+                      if (g.specializationId && section.specializationId && g.specializationId.toLowerCase() !== section.specializationId.toLowerCase()) {
+                        return false;
+                      }
+                      const sameCourse = g.courseId?.toLowerCase() === course.id?.toLowerCase() || g.courseId?.toLowerCase() === section.courseId?.toLowerCase();
+                      const cleanGSec = (g.sectionName || g.section || '').replace(/^section\s+/i, '').trim().toLowerCase();
+                      const cleanSec = (section.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
+                      if (sameCourse && cleanGSec && cleanSec && (cleanGSec === cleanSec || cleanGSec.replace(/^3/i, '') === cleanSec.replace(/^3/i, ''))) return true;
+                      if (g.sectionId === `${section.courseId}-sec-${cleanSec}`) return true;
+                      return false;
+                    });
+
                     const filteredSectionGroups = sectionGroups.filter((g) => {
                       const q = searchQuery.toLowerCase();
                       if (!q) return true;
@@ -495,7 +514,8 @@ export const Scheduling = () => {
                         (m?.fullName || "").toLowerCase().includes(q)
                       );
                       const proposal = getProposalForGroup(g.id);
-                      const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
+                      const groupTitle = proposal?.title || g.title || "";
+                      const matchTitle = groupTitle.toLowerCase().includes(q);
                       return matchName || matchMember || matchTitle;
                     });
 
@@ -605,9 +625,9 @@ export const Scheduling = () => {
                                   {/* Title & Defense Stage */}
                                   <TableCell>
                                     <div className="flex flex-col gap-1.5">
-                                      {proposal ? (
-                                        <div className="font-semibold text-gray-900 dark:text-white line-clamp-2" title={proposal.title}>
-                                          {proposal.title}
+                                      {proposal?.title || group.title ? (
+                                        <div className="font-semibold text-gray-900 dark:text-white line-clamp-2" title={proposal?.title || group.title}>
+                                          {proposal?.title || group.title}
                                         </div>
                                       ) : (
                                         <span className="text-sm text-gray-400 italic">No approved title yet</span>
@@ -796,7 +816,14 @@ export const Scheduling = () => {
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
           groups={groups
-            .filter((g) => g.sectionId === selectedSection)
+            .filter((g) => {
+              if (g.sectionId === selectedSection) return true;
+              const curSecObj = relevantSections.find(sec => sec.id === selectedSection);
+              const cleanCurSec = (curSecObj?.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
+              const cleanGSec = (g.sectionName || '').replace(/^section\s+/i, '').trim().toLowerCase();
+              if (cleanGSec && cleanCurSec && cleanGSec === cleanCurSec) return true;
+              return false;
+            })
             .map((g) => {
               const schedule = getScheduleForGroup(g.id);
               const panelists =

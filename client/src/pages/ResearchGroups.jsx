@@ -87,9 +87,17 @@ export const ResearchGroups = () => {
 
   useEffect(() => {
     if (selectedCourse && selectedSection) {
-      const sectionStudents = students.filter(
-        s => s.courseId === selectedCourse && s.sectionId === selectedSection
-      );
+      const curSecObj = relevantSections.find(sec => sec.id === selectedSection);
+      const cleanCurSec = (curSecObj?.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
+
+      const sectionStudents = students.filter(s => {
+        const matchCourse = s.courseId?.toLowerCase() === selectedCourse?.toLowerCase();
+        const matchSecId = s.sectionId === selectedSection;
+        const cleanSSec = (s.sectionName || s.section || '').replace(/^section\s+/i, '').trim().toLowerCase();
+        const matchSecName = cleanSSec && cleanCurSec && cleanSSec === cleanCurSec;
+        return matchCourse && (matchSecId || matchSecName);
+      });
+
       const assignedIds = new Set();
       groups.forEach(g => {
         (g.memberIds || []).forEach(uid => assignedIds.add(uid));
@@ -100,7 +108,7 @@ export const ResearchGroups = () => {
       setUnassignedStudents([]);
       setSelectedStudentIds([]);
     }
-  }, [selectedCourse, selectedSection, students, groups]);
+  }, [selectedCourse, selectedSection, students, groups, relevantSections]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -262,8 +270,8 @@ export const ResearchGroups = () => {
       if (prev.includes(uid)) {
         return prev.filter(id => id !== uid);
       } else {
-        if (prev.length >= 3) {
-          showToast("A research group can only contain up to 3 members.", "error");
+        if (prev.length >= 4) {
+          showToast("A research group can only contain up to 4 members.", "error");
           return prev;
         }
         return [...prev, uid];
@@ -272,31 +280,41 @@ export const ResearchGroups = () => {
   };
 
   const handleCreateGroup = async () => {
-    if (selectedStudentIds.length === 0 || selectedStudentIds.length > 3) {
-      showToast("Please select 1 to 3 students.", "error");
+    if (selectedStudentIds.length === 0 || selectedStudentIds.length > 4) {
+      showToast("Please select 1 to 4 students.", "error");
       return;
     }
 
     setCreating(true);
     try {
+      const curSecObj = relevantSections.find(sec => sec.id === selectedSection);
+      const curCourseObj = courses.find(c => c.id === selectedCourse);
+
       const members = selectedStudentIds.map(uid => {
-        const student = unassignedStudents.find(s => s.uid === uid);
+        const student = unassignedStudents.find(s => s.uid === uid) || students.find(s => s.uid === uid);
         return {
-          uid: student.uid,
-          fullName: student.fullName,
-          email: student.email
+          uid: student?.uid || uid,
+          fullName: student?.fullName || student?.name || 'Student',
+          email: student?.email || '',
+          studentNumber: student?.studentId || student?.studentIdOrEmployeeId || ''
         };
       });
 
-      await groupService.createGroup({
+      const newGrp = await groupService.createGroup({
         courseId: selectedCourse,
+        courseName: curCourseObj?.name || curCourseObj?.code || '',
         sectionId: selectedSection,
+        sectionName: curSecObj?.name || '',
+        specializationId: selectedSpecialization || curSecObj?.specializationId || '',
+        specialization: curSecObj?.specializationId?.toUpperCase() || '',
         memberIds: selectedStudentIds,
         members
       });
 
       showToast("Research Group created successfully!");
       setIsCreateModalOpen(false);
+      setSelectedStudentIds([]);
+      setGroups(prev => [newGrp, ...prev]);
       await refreshGroupsData();
     } catch (error) {
       console.error("Error creating group:", error);
@@ -588,8 +606,13 @@ export const ResearchGroups = () => {
             .map((course) => {
               const courseSections = allSectionsByCourse[course.id] || [];
               const displaySections = courseSections.filter((s) => {
-                if (selectedSpecialization) return s.specializationId === selectedSpecialization;
-                if (selectedSection) return s.id === selectedSection;
+                if (selectedSpecialization) {
+                  const matchSpec =
+                    s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+                    (!s.specializationId && s.courseId?.toLowerCase() === course.id?.toLowerCase());
+                  if (!matchSpec) return false;
+                }
+                if (selectedSection && s.id !== selectedSection) return false;
                 return true;
               });
 
@@ -598,7 +621,19 @@ export const ResearchGroups = () => {
               return (
                 <div key={course.id} className="space-y-8">
                   {displaySections.map((section) => {
-                    const sectionGroups = groups.filter((g) => g.sectionId === section.id);
+                    const sectionGroups = groups.filter((g) => {
+                      if (g.sectionId === section.id) return true;
+                      if (g.specializationId && section.specializationId && g.specializationId.toLowerCase() !== section.specializationId.toLowerCase()) {
+                        return false;
+                      }
+                      const sameCourse = g.courseId?.toLowerCase() === course.id?.toLowerCase() || g.courseId?.toLowerCase() === section.courseId?.toLowerCase();
+                      const cleanGSec = (g.sectionName || g.section || '').replace(/^section\s+/i, '').trim().toLowerCase();
+                      const cleanSec = (section.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
+                      if (sameCourse && cleanGSec && cleanSec && (cleanGSec === cleanSec || cleanGSec.replace(/^3/i, '') === cleanSec.replace(/^3/i, ''))) return true;
+                      if (g.sectionId === `${section.courseId}-sec-${cleanSec}`) return true;
+                      return false;
+                    });
+
                     const filteredSectionGroups = sectionGroups.filter((g) => {
                       const q = searchQuery.toLowerCase();
                       if (!q) return true;
@@ -607,7 +642,8 @@ export const ResearchGroups = () => {
                         (m?.fullName || "").toLowerCase().includes(q)
                       );
                       const proposal = getProposalForGroup(g.id);
-                      const matchTitle = (proposal?.title || "").toLowerCase().includes(q);
+                      const groupTitle = proposal?.title || g.title || "";
+                      const matchTitle = groupTitle.toLowerCase().includes(q);
                       return matchName || matchMember || matchTitle;
                     });
 
@@ -652,9 +688,9 @@ export const ResearchGroups = () => {
                                   </TableCell>
 
                                   <TableCell>
-                                    {proposal ? (
-                                      <div className="font-semibold text-gray-900 dark:text-white line-clamp-3">
-                                        {proposal.title}
+                                    {proposal?.title || group.title ? (
+                                      <div className="font-semibold text-gray-900 dark:text-white line-clamp-3" title={proposal?.title || group.title}>
+                                        {proposal?.title || group.title}
                                       </div>
                                     ) : (
                                       <span className="text-sm text-gray-400 dark:text-[#6b6f84] italic">
@@ -710,7 +746,7 @@ export const ResearchGroups = () => {
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9396a8]">
               Unassigned Students ({unassignedStudents.length})
             </h3>
-            <Badge variant="gray">{selectedStudentIds.length} / 3 Selected</Badge>
+            <Badge variant="gray">{selectedStudentIds.length} / 4 Selected</Badge>
           </div>
 
           {unassignedStudents.length === 0 ? (

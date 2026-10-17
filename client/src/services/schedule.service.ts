@@ -48,6 +48,7 @@ export const scheduleService = {
 
     try {
       await setDoc(doc(db, COLLECTION_NAME, scheduleData.id), scheduleData, { merge: true });
+      await setDoc(doc(db, 'defense_schedules', scheduleData.id), scheduleData, { merge: true });
     } catch (fsErr) {
       console.warn('[scheduleService] Firestore sync error:', fsErr);
     }
@@ -68,12 +69,23 @@ export const scheduleService = {
   async getAllSchedules(): Promise<DefenseSchedule[]> {
     try {
       const { data } = await api.get('/schedules');
-      if (Array.isArray(data?.data)) {
+      if (Array.isArray(data?.data) && data.data.length > 0) {
         return data.data;
       }
-      return [];
     } catch (apiErr) {
       console.warn('[scheduleService] API error fetching schedules:', apiErr);
+    }
+
+    // Resilient fallback to Firestore
+    try {
+      const snap = await getDocs(collection(db, COLLECTION_NAME));
+      if (!snap.empty) {
+        return snap.docs.map(d => d.data() as DefenseSchedule);
+      }
+      const defSnap = await getDocs(collection(db, 'defense_schedules'));
+      return defSnap.docs.map(d => d.data() as DefenseSchedule);
+    } catch (fsErr) {
+      console.warn('[scheduleService] Firestore fallback error:', fsErr);
       return [];
     }
   },
@@ -152,6 +164,7 @@ export const scheduleService = {
 
     try {
       await setDoc(doc(db, COLLECTION_NAME, scheduleId), updates, { merge: true });
+      await setDoc(doc(db, 'defense_schedules', scheduleId), updates, { merge: true });
     } catch (fsErr) {
       console.warn('[scheduleService] Firestore update error:', fsErr);
     }

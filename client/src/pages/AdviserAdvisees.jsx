@@ -54,6 +54,11 @@ export const AdviserAdvisees = () => {
   const initialTab = searchParams.get('tab') === 'archived' ? 'archived' : 'active';
   const [tabFilter, setTabFilter] = useState(initialTab); // 'active' | 'archived' | 'all'
 
+  // Admin / Coordinator supervisory filtering
+  const isPrivileged = role === 'admin' || role === 'research_coordinator';
+  const [selectedAdviserFilter, setSelectedAdviserFilter] = useState('all');
+  const [adviserOptions, setAdviserOptions] = useState([]);
+
   // Archive Modal State
   const [archiveModalGroup, setArchiveModalGroup] = useState(null);
   const [selectedReasonId, setSelectedReasonId] = useState('defense_passed');
@@ -67,13 +72,31 @@ export const AdviserAdvisees = () => {
   const fetchAdviseeData = async () => {
     setLoading(true);
     try {
-      const [fetchedGroups, allCourses, allSections, allSchedules, allWorkspaces] = await Promise.all([
+      const isPriv = role === 'admin' || role === 'research_coordinator';
+      const [myGroups, allAdviserGroups, allCourses, allSections, allSchedules, allWorkspaces] = await Promise.all([
         facultyService.getAdviserGroups(currentUser.uid),
+        isPriv ? facultyService.getAllAdviserGroups().catch(() => []) : Promise.resolve([]),
         courseService.getAllCourses(),
         sectionService.getAllSections(),
         scheduleService.getAllSchedules().catch(() => []),
         researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid).catch(() => []),
       ]);
+
+      if (isPriv) {
+        const advMap = new Map();
+        (allAdviserGroups || []).forEach((g) => {
+          if (g.adviserId && g.adviserName) {
+            if (!advMap.has(g.adviserId)) {
+              advMap.set(g.adviserId, { id: g.adviserId, name: g.adviserName, count: 1 });
+            } else {
+              advMap.get(g.adviserId).count++;
+            }
+          }
+        });
+        setAdviserOptions(Array.from(advMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+
+      const fetchedGroups = isPriv ? (allAdviserGroups.length > 0 ? allAdviserGroups : myGroups) : myGroups;
 
       const wsMap = {};
       (allWorkspaces || []).forEach((w) => {
@@ -156,14 +179,22 @@ export const AdviserAdvisees = () => {
     }
   }, [currentUser?.uid]);
 
+  // Groups filtered by selected adviser (for Admins / Coordinators)
+  const groupsByAdviser = useMemo(() => {
+    if (!isPrivileged) return groups;
+    if (selectedAdviserFilter === 'all') return groups;
+    if (selectedAdviserFilter === 'mine') return groups.filter((g) => g.adviserId === currentUser?.uid);
+    return groups.filter((g) => g.adviserId === selectedAdviserFilter);
+  }, [groups, isPrivileged, selectedAdviserFilter, currentUser?.uid]);
+
   // Tab counts
-  const activeCount = useMemo(() => groups.filter((g) => !g.isArchived).length, [groups]);
-  const archivedCount = useMemo(() => groups.filter((g) => g.isArchived).length, [groups]);
-  const totalCount = groups.length;
+  const activeCount = useMemo(() => groupsByAdviser.filter((g) => !g.isArchived).length, [groupsByAdviser]);
+  const archivedCount = useMemo(() => groupsByAdviser.filter((g) => g.isArchived).length, [groupsByAdviser]);
+  const totalCount = groupsByAdviser.length;
 
   // Filtered Advisees
   const filteredGroups = useMemo(() => {
-    return groups.filter((g) => {
+    return groupsByAdviser.filter((g) => {
       // 1. Tab check
       if (tabFilter === 'active' && g.isArchived) return false;
       if (tabFilter === 'archived' && !g.isArchived) return false;
@@ -174,15 +205,16 @@ export const AdviserAdvisees = () => {
 
       const nameMatch = (g.name || '').toLowerCase().includes(query);
       const titleMatch = (g.title || '').toLowerCase().includes(query);
+      const adviserMatch = (g.adviserName || '').toLowerCase().includes(query);
       const programMatch = (g.programCode || '').toLowerCase().includes(query);
       const reasonMatch = (g.archiveReason || '').toLowerCase().includes(query);
       const memberMatch = (g.members || []).some((m) =>
         (m.fullName || m.name || '').toLowerCase().includes(query)
       );
 
-      return nameMatch || titleMatch || programMatch || reasonMatch || memberMatch;
+      return nameMatch || titleMatch || adviserMatch || programMatch || reasonMatch || memberMatch;
     });
-  }, [groups, tabFilter, searchQuery]);
+  }, [groupsByAdviser, tabFilter, searchQuery]);
 
   // Handle Tab Switch
   const handleTabChange = (newTab) => {
@@ -354,16 +386,43 @@ export const AdviserAdvisees = () => {
             </div>
           </div>
 
-          {/* Search Input */}
-          <div className="relative max-w-xs w-full">
-            <HiMagnifyingGlass className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, title, or program..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full text-xs sm:text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            />
+          {/* Controls: Adviser Filter (for Privileged) & Search Input */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            {isPrivileged && (
+              <div className="w-full sm:w-64">
+                <select
+                  value={selectedAdviserFilter}
+                  onChange={(e) => setSelectedAdviserFilter(e.target.value)}
+                  className="w-full h-9 px-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full text-xs font-semibold text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+                  title="Filter by Faculty Adviser"
+                >
+                  <option value="all">All Faculty Advisees ({groups.length})</option>
+                  <option value="mine">
+                    My Personal Advisees ({groups.filter((g) => g.adviserId === currentUser?.uid).length})
+                  </option>
+                  {adviserOptions.length > 0 && (
+                    <optgroup label="Filter by Faculty Adviser">
+                      {adviserOptions.map((adv) => (
+                        <option key={adv.id} value={adv.id}>
+                          {adv.name} ({adv.count})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <div className="relative w-full sm:w-64">
+              <HiMagnifyingGlass className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, title, or program..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full text-xs sm:text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
           </div>
         </div>
 
@@ -484,6 +543,14 @@ export const AdviserAdvisees = () => {
                         <div className="text-gray-500 dark:text-gray-400">
                           {group.majorDisplay ? `${group.majorDisplay} • ` : ''}Section {group.sectionName}
                         </div>
+                        {group.adviserName && (
+                          <div className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                            <span className="text-gray-400">Adv:</span>
+                            <span className="truncate max-w-[130px]" title={group.adviserName}>
+                              {group.adviserName}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Manuscript Status */}
