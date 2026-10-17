@@ -53,10 +53,12 @@ service cloud.firestore {
         || data.get('authorUid', '') == request.auth.uid
         || data.get('authorId', '') == request.auth.uid
         || data.get('adviserId', '') == request.auth.uid
+        || data.get('adviser', '') == request.auth.uid
         || data.get('reviewerId', '') == request.auth.uid
         || request.auth.uid in data.get('memberIds', [])
         || request.auth.uid in data.get('authors', [])
         || request.auth.uid in data.get('panelistIds', [])
+        || request.auth.uid in data.get('panelists', [])
         || groupMember(data.get('groupId', ''))
       );
     }

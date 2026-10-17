@@ -36,22 +36,73 @@ const COLLEGES_DATA = {
   ]
 };
 
+const IT_SPECIALIZATIONS = {
+  WMAD: {
+    label: "WMAD (Web and Mobile Application Development)",
+    shortName: "WMAD",
+    fullName: "Web and Mobile Application Development",
+    tags: [
+      "Web Development",
+      "Mobile Application Development",
+      "Database Management",
+      "Cloud Computing",
+      "Networking",
+      "Cybersecurity",
+      "Software Engineering",
+      "Information Systems",
+      "IT Project Management",
+    ],
+  },
+  SMP: {
+    label: "SMP (Service Management Program)",
+    shortName: "SMP",
+    fullName: "Service Management Program",
+    tags: [
+      "IT Service Management (ITSM)",
+      "Business Process Management",
+      "ITIL Framework & Governance",
+      "Help Desk & Incident Support",
+      "Enterprise Resource Planning (ERP)",
+      "Customer Relationship Management (CRM)",
+      "Quality Assurance & Auditing",
+      "IT Operations & Infrastructure",
+      "Service Level Agreement (SLA) Management",
+    ],
+  },
+  AMG: {
+    label: "AMG (Animation and Motion Graphics)",
+    shortName: "AMG",
+    fullName: "Animation and Motion Graphics",
+    tags: [
+      "2D Animation",
+      "3D Modeling & Animation",
+      "Motion Graphics",
+      "Visual Effects (VFX)",
+      "Video Editing & Post-Production",
+      "Storyboarding & Concept Art",
+      "Digital Rendering & Compositing",
+      "Character Design & Rigging",
+      "Game Asset Design",
+    ],
+  },
+};
+
+const CS_EXPERTISE_TAGS = [
+  "Machine Learning",
+  "Algorithms & Data Structures",
+  "Computer Vision",
+  "Natural Language Processing",
+  "Human-Computer Interaction",
+  "Computer Graphics",
+  "Distributed Computing",
+  "Artificial Intelligence",
+  "Data Science",
+  "Deep Learning",
+];
+
 const EXPERTISE_CATEGORIES = {
-  "Information Technology": [
-    "Web Development", "Mobile Application Development", "Database Management", 
-    "Cloud Computing", "Networking", "Cybersecurity", 
-    "Software Engineering", "Information Systems", "IT Project Management"
-  ],
-  "Computer Science": [
-    "Machine Learning", "Algorithms & Data Structures", "Computer Vision", 
-    "Natural Language Processing", "Human-Computer Interaction", 
-    "Computer Graphics", "Distributed Computing", "Artificial Intelligence", 
-    "Data Science", "Deep Learning"
-  ],
-  "Information Systems": [
-    "Enterprise Systems", "Business Intelligence", "Data Mining",
-    "Information Security Management", "E-Commerce", "Digital Transformation"
-  ]
+  "Information Technology": IT_SPECIALIZATIONS.WMAD.tags,
+  "Computer Science": CS_EXPERTISE_TAGS,
 };
 
 export const ProfileSettings = () => {
@@ -78,6 +129,7 @@ export const ProfileSettings = () => {
   // Academic Profile States (Adviser Only)
   const [selectedExpertise, setSelectedExpertise] = useState([]);
   const [expertiseSearchTerm, setExpertiseSearchTerm] = useState("");
+  const [selectedItTrack, setSelectedItTrack] = useState("WMAD");
 
   // Interactive Photo Cropping / Adjusting Modal States
   const [rawImageForCrop, setRawImageForCrop] = useState(null);
@@ -149,6 +201,15 @@ export const ProfileSettings = () => {
         ]);
       }
       setSelectedExpertise(Array.from(existingExpertise));
+
+      // Auto-select IT track based on user's specialization if available
+      if (userProfile?.programSpecialization?.includes("SMP") || userProfile?.majorCode === "SMP") {
+        setSelectedItTrack("SMP");
+      } else if (userProfile?.programSpecialization?.includes("AMG") || userProfile?.majorCode === "AMG") {
+        setSelectedItTrack("AMG");
+      } else {
+        setSelectedItTrack("WMAD");
+      }
 
       // Store initial values for comparison
       setInitialFormData({
@@ -1390,17 +1451,138 @@ export const ProfileSettings = () => {
                 </div>
 
                 <div className="space-y-8">
-                  {Object.entries(EXPERTISE_CATEGORIES).map(([category, tags]) => {
-                    const filteredTags = tags.filter(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase()));
-                    if (filteredTags.length === 0) return null;
-                    
-                    return (
-                      <div key={category} className="space-y-3">
+                  {/* Information Technology Section with Specialization Dropdown */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-gray-100 dark:border-[#222433]">
+                      <div>
                         <h4 className="text-xs font-semibold tracking-wider text-gray-400 dark:text-[#6b6f84] uppercase">
-                          {category}
+                          Information Technology
+                        </h4>
+                        <p className="text-[11px] text-gray-500 dark:text-[#9396a8] mt-0.5">
+                          Select a specialization track to view specialized expertise tags
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <label htmlFor="it-track-select" className="text-xs font-medium text-gray-500 dark:text-[#9396a8] whitespace-nowrap">
+                          Specialization:
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="it-track-select"
+                            value={selectedItTrack}
+                            onChange={(e) => setSelectedItTrack(e.target.value)}
+                            className="h-8 pl-3 pr-8 rounded-xl bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-xs font-semibold text-gray-900 dark:text-[#f3f4f8] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition shadow-2xs cursor-pointer appearance-none"
+                          >
+                            <option value="WMAD">WMAD (Web and Mobile Application Development)</option>
+                            <option value="SMP">SMP (Service Management Program)</option>
+                            <option value="AMG">AMG (Animation and Motion Graphics)</option>
+                            <option value="ALL">All Specializations</option>
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 dark:text-[#6b6f84]">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* IT Tags Rendering */}
+                    {selectedItTrack === "ALL" ? (
+                      <div className="space-y-4 pt-1">
+                        {Object.entries(IT_SPECIALIZATIONS).map(([trackKey, track]) => {
+                          const filteredTags = track.tags.filter(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase()));
+                          if (filteredTags.length === 0) return null;
+                          return (
+                            <div key={trackKey} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                  {track.shortName}
+                                </span>
+                                <span className="text-xs text-gray-600 dark:text-[#9396a8] font-medium">
+                                  {track.fullName}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {filteredTags.map((tag) => {
+                                  const isSelected = selectedExpertise.includes(tag);
+                                  return (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      onClick={() => toggleExpertise(tag)}
+                                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                        isSelected
+                                          ? "bg-blue-600 text-white shadow-xs"
+                                          : "bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8] hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                                      }`}
+                                    >
+                                      {tag}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      (() => {
+                        const track = IT_SPECIALIZATIONS[selectedItTrack] || IT_SPECIALIZATIONS.WMAD;
+                        const filteredTags = track.tags.filter(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase()));
+                        
+                        if (filteredTags.length === 0) {
+                          return (
+                            <div className="text-xs text-gray-500 dark:text-[#9396a8] py-2 italic flex flex-wrap items-center gap-2">
+                              <span>No tags matching "{expertiseSearchTerm}" in {track.shortName}.</span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedItTrack("ALL")}
+                                className="text-blue-600 dark:text-blue-400 hover:underline font-medium not-italic"
+                              >
+                                View across all specializations
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="flex flex-wrap gap-2">
+                            {filteredTags.map((tag) => {
+                              const isSelected = selectedExpertise.includes(tag);
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => toggleExpertise(tag)}
+                                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                    isSelected
+                                      ? "bg-blue-600 text-white shadow-xs"
+                                      : "bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#222433] text-gray-700 dark:text-[#9396a8] hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                                  }`}
+                                >
+                                  {tag}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+
+                  {/* Computer Science Section */}
+                  {(() => {
+                    const filteredCsTags = CS_EXPERTISE_TAGS.filter(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase()));
+                    if (filteredCsTags.length === 0) return null;
+                    return (
+                      <div className="space-y-3 pt-2">
+                        <h4 className="text-xs font-semibold tracking-wider text-gray-400 dark:text-[#6b6f84] uppercase">
+                          Computer Science
                         </h4>
                         <div className="flex flex-wrap gap-2">
-                          {filteredTags.map((tag) => {
+                          {filteredCsTags.map((tag) => {
                             const isSelected = selectedExpertise.includes(tag);
                             return (
                               <button
@@ -1420,12 +1602,24 @@ export const ProfileSettings = () => {
                         </div>
                       </div>
                     );
-                  })}
-                  {Object.values(EXPERTISE_CATEGORIES).every(tags => tags.filter(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase())).length === 0) && (
-                    <div className="text-center py-8 text-sm text-gray-500 dark:text-[#9396a8]">
-                      No expertise found matching "{expertiseSearchTerm}".
-                    </div>
-                  )}
+                  })()}
+
+                  {/* Empty Search Result Feedback */}
+                  {(() => {
+                    const allAvailableTags = [
+                      ...Object.values(IT_SPECIALIZATIONS).flatMap(s => s.tags),
+                      ...CS_EXPERTISE_TAGS
+                    ];
+                    const hasGlobalMatch = allAvailableTags.some(t => t.toLowerCase().includes(expertiseSearchTerm.toLowerCase()));
+                    if (!hasGlobalMatch && expertiseSearchTerm.trim()) {
+                      return (
+                        <div className="text-center py-8 text-sm text-gray-500 dark:text-[#9396a8]">
+                          No expertise found matching "{expertiseSearchTerm}".
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
 

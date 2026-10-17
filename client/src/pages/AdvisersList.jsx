@@ -9,6 +9,8 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PublicationDetailModal } from '../components/research/PublicationDetailModal';
 import userService from '../services/user.service';
+import { researchWorkspaceService } from '../services/researchWorkspace.service';
+import { FacultyDirectoryCard } from '../components/adviser/FacultyDirectoryCard';
 import api from '../services/api';
 import {
   HiAcademicCap,
@@ -22,6 +24,8 @@ import {
   HiTag,
   HiSparkles,
   HiArrowTopRightOnSquare,
+  HiFunnel,
+  HiChevronDown,
 } from 'react-icons/hi2';
 
 export const AdvisersList = () => {
@@ -41,8 +45,11 @@ export const AdvisersList = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1. Fetch advisers from user service
-        const adviserUsers = await userService.getUsersByRole('adviser');
+        // 1. Fetch advisers from user service and workspaces for workload
+        const [adviserUsers, allWorkspaces] = await Promise.all([
+          userService.getUsersByRole('adviser'),
+          researchWorkspaceService.getAllWorkspaces().catch(() => []),
+        ]);
 
         // 2. Fetch publications from repository
         let repoPubs = [];
@@ -170,10 +177,21 @@ export const AdvisersList = () => {
             ])
           ).filter(Boolean);
 
+          const activeGroups = (allWorkspaces || []).filter(
+            (ws) => (ws.adviserId === adv.uid || ws.adviserId === adv.id) && ws.status !== 'archived'
+          );
+
           return {
             ...adv,
             displayName: nameMatch || 'Faculty Adviser',
+            fullName: nameMatch || 'Faculty Adviser',
+            activeAdviseeCount: activeGroups.length,
+            maxAdvisees: adv.maxCapacity || adv.maxAdvisees || 5,
+            maxCapacity: adv.maxCapacity || adv.maxAdvisees || 5,
+            academicRank: adv.academicRank || 'Assistant Professor',
+            status: adv.status || 'active',
             allExpertise,
+            expertise: allExpertise,
             matchedPublications: uniquePubs,
           };
         });
@@ -213,34 +231,51 @@ export const AdvisersList = () => {
         description="Explore faculty research advisers, inspect their areas of specialization and published works."
       />
 
-      {/* Filter and Search Bar */}
-      <Card className="p-3 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
-        <div className="flex-1 w-full flex items-center gap-2">
-          <Input
-            placeholder="Search advisers by name or expertise..."
-            icon={HiMagnifyingGlass}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full"
-          />
+      {/* Search and Filter (No container, justified) */}
+      <div className="flex flex-col sm:flex-row items-end justify-between gap-4 pb-1">
+        <div className="w-full sm:flex-1 sm:max-w-xl">
+          <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
+            Search Faculty
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+              <HiMagnifyingGlass className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search advisers by name or expertise..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] text-gray-900 dark:text-[#f3f4f8] placeholder:text-gray-400 dark:placeholder:text-[#6b6f84] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all duration-200 rounded-full text-sm pl-10 pr-4 shadow-xs"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto pb-1 sm:pb-0 hide-scrollbar shrink-0">
-          {['all', 'Computer Science', 'Information Technology'].map((dept) => (
-            <button
-              key={dept}
-              onClick={() => setDepartmentFilter(dept)}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition whitespace-nowrap ${
-                departmentFilter === dept
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              {dept === 'all' ? 'All Departments' : dept}
-            </button>
-          ))}
+        <div className="flex items-end gap-3 w-full sm:w-auto">
+          <div className="hidden sm:flex h-10 items-center px-1">
+            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-[#6b6f84]" />
+          </div>
+
+          <div className="w-full sm:w-64">
+            <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
+              Department
+            </label>
+            <div className="relative">
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-full text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] pl-4 pr-9 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer appearance-none"
+              >
+                <option value="all">All Departments</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Information Technology">Information Technology</option>
+                <option value="Information Systems">Information Systems</option>
+              </select>
+              <HiChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+            </div>
+          </div>
         </div>
-      </Card>
+      </div>
 
       {/* Advisers Grid */}
       {loading ? (
@@ -256,113 +291,15 @@ export const AdvisersList = () => {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {filteredAdvisers.map((adv) => (
-            <Card
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredAdvisers.map((adv, index) => (
+            <FacultyDirectoryCard
               key={adv.uid || adv.id}
-              hover
-              className="flex flex-col justify-between p-4 sm:p-5 space-y-3 sm:space-y-4 border border-gray-200 dark:border-[#222433] bg-white dark:bg-[#15161e] transition-all"
-            >
-              <div className="space-y-3 sm:space-y-4">
-                {/* Header: Photo & Name */}
-                <div className="flex items-start gap-3 sm:gap-3.5">
-                  <div className="relative shrink-0">
-                    {adv.profile_image ? (
-                      <img
-                        src={adv.profile_image}
-                        alt={adv.displayName}
-                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-blue-500/20 shadow-sm"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-sm sm:text-base items-center justify-center shadow-sm ${
-                        adv.profile_image ? 'hidden' : 'flex'
-                      }`}
-                    >
-                      {adv.displayName
-                        ?.split(' ')
-                        .map((n) => n[0])
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase() || 'AD'}
-                    </div>
-                  </div>
-
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                    <h3 className="text-[13px] sm:text-base font-bold text-gray-900 dark:text-white truncate">
-                      {adv.displayName}
-                    </h3>
-                    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {adv.department || 'Faculty Adviser'}
-                    </p>
-                    <div className="pt-1 flex items-center gap-2">
-                      <Badge variant="emerald" size="sm" className="text-[9px] sm:text-[10px] px-1.5 py-0 sm:px-2 sm:py-0.5">
-                        Available for Advising
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* College / Academic Unit */}
-                {adv.college && (
-                  <div className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
-                    <HiBuildingOffice2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary shrink-0" />
-                    <span className="truncate">{adv.college}</span>
-                  </div>
-                )}
-
-                {/* Expertise Badges */}
-                <div className="space-y-1 sm:space-y-1.5">
-                  <div className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    Core Expertise
-                  </div>
-                  {adv.allExpertise && adv.allExpertise.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 sm:gap-1.5">
-                      {adv.allExpertise.slice(0, 4).map((exp, i) => (
-                        <span
-                          key={i}
-                          className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-medium bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/40"
-                        >
-                          {exp}
-                        </span>
-                      ))}
-                      {adv.allExpertise.length > 4 && (
-                        <span className="px-1.5 py-0.5 sm:py-1 rounded text-[9px] sm:text-[10px] font-semibold text-gray-400 bg-gray-100 dark:bg-slate-800 flex items-center">
-                          +{adv.allExpertise.length - 4}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] sm:text-xs text-gray-400 italic">No expertise tags listed.</p>
-                  )}
-                </div>
-
-                {/* Published Works Count */}
-                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-gray-600 dark:text-gray-300 pt-0.5 sm:pt-1">
-                  <HiBookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" />
-                  <span>
-                    <strong>{adv.matchedPublications.length}</strong> published{' '}
-                    {adv.matchedPublications.length === 1 ? 'work' : 'works'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Card Footer Action */}
-              <div className="pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-[#222433] flex justify-end mt-2 sm:mt-0">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="w-full sm:w-auto shadow-sm justify-center text-xs"
-                  onClick={() => setSelectedAdviser(adv)}
-                >
-                  <HiEye className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-1.5" /> View Profile <span className="hidden sm:inline">&amp; Works</span>
-                </Button>
-              </div>
-            </Card>
+              adviser={adv}
+              index={index}
+              mode="directory"
+              onViewProfile={(adviser) => setSelectedAdviser(adviser)}
+            />
           ))}
         </div>
       )}

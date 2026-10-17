@@ -17,7 +17,10 @@ import {
   addManuscriptFeedback,
   publishManuscriptToRepository,
   deleteAdminManuscripts,
-  updateManuscriptPublicationStatus
+  updateManuscriptPublicationStatus,
+  submitPostDefenseRevision,
+  reviewPostDefenseRevision,
+  getPostDefenseRevisions
 } from '../controllers/manuscriptController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
@@ -46,6 +49,11 @@ router.post('/:id/feedback', verifyToken, requireRole(['admin', 'research_coordi
 
 // Admin: Publish manuscript to Institutional Repository
 router.post('/:id/publish-repository', verifyToken, requireRole(['admin', 'research_coordinator']), publishManuscriptToRepository);
+
+// Post-Defense Revisions Workflow
+router.get('/:id/post-defense-revisions', verifyToken, getPostDefenseRevisions);
+router.post('/:id/post-defense-revisions', verifyToken, requireRole(['student', 'admin']), submitPostDefenseRevision);
+router.post('/:id/post-defense-revisions/review', verifyToken, requireRole(['adviser', 'panelist', 'admin', 'research_coordinator']), reviewPostDefenseRevision);
 
 // Admin / Coordinator: Approve or reject manuscript publication
 router.patch('/:id/publication-status', verifyToken, requireRole(['admin', 'research_coordinator']), updateManuscriptPublicationStatus);

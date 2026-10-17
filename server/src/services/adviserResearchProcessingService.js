@@ -70,8 +70,8 @@ class AdviserResearchProcessingService {
       throw new Error('No file data received.');
     }
 
-    if (fileSize > 12 * 1024 * 1024) {
-      throw new Error('File size exceeds the 10MB limit.');
+    if (fileSize > 50 * 1024 * 1024) {
+      throw new Error('File size exceeds the 50MB limit.');
     }
 
     const ext = (fileName || '').split('.').pop()?.toLowerCase();

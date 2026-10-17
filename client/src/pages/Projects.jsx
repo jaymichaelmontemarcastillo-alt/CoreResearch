@@ -50,12 +50,13 @@ export const Projects = () => {
     if (!selectedAdviserId) return alert("Please select an adviser from the list.");
 
     try {
-      await api.patch(`/projects/${projectId}/adviser`, { adviserId: selectedAdviserId });
-      setToast("Adviser assigned successfully!");
+      const res = await api.patch(`/projects/${projectId}/adviser`, { adviserId: selectedAdviserId });
+      setToast(res.data?.message || "Adviser assigned successfully!");
       setAssigningId(null);
       await fetchData();
     } catch (err) {
-      alert(`Assignment failed: ${err.message}`);
+      const errorMsg = err.response?.data?.message || err.message;
+      alert(`Assignment failed: ${errorMsg}`);
     }
   };
 
@@ -128,11 +129,16 @@ export const Projects = () => {
                           onChange={(e) => setSelectedAdviserId(e.target.value)}
                         >
                           <option value="">Select Faculty Adviser...</option>
-                          {advisers.map((adv) => (
-                            <option key={adv.uid} value={adv.uid}>
-                              {adv.fullName} ({adv.department})
-                            </option>
-                          ))}
+                          {advisers.map((adv) => {
+                            const cap = Number(adv.maxCapacity ?? adv.maxAdvisees ?? 5);
+                            const active = Number(adv.activeGroupsCount ?? 0);
+                            const isFull = active >= cap;
+                            return (
+                              <option key={adv.uid} value={adv.uid} disabled={isFull}>
+                                {adv.fullName} ({adv.department}) — {isFull ? `[FULL: ${active}/${cap} groups]` : `[${cap - active} slots left (${active}/${cap})]`}
+                              </option>
+                            );
+                          })}
                         </Select>
                       </div>
                       <Button size="sm" variant="success" onClick={() => handleAssignAdviserSubmit(p.id)}>

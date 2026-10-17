@@ -37,7 +37,13 @@ import {
   HiEye,
   HiArrowDownTray,
   HiTrash,
-  HiCheckBadge
+  HiCheckBadge,
+  HiOutlineDocument,
+  HiBuildingLibrary,
+  HiUser,
+  HiChevronDown,
+  HiAdjustmentsHorizontal,
+  HiEllipsisVertical
 } from 'react-icons/hi2';
 
 export const AdminManuscripts = () => {
@@ -101,6 +107,20 @@ export const AdminManuscripts = () => {
   // Reject publication form
   const [rejectionReason, setRejectionReason] = useState('');
   const [submittingReject, setSubmittingReject] = useState(false);
+
+  // Active three-dot action dropdown menu
+  const [activeMenuId, setActiveMenuId] = useState(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // Load programs from Admin Settings (single source of truth)
   useEffect(() => {
@@ -723,37 +743,14 @@ export const AdminManuscripts = () => {
         <Toast message={toastMessage} variant={toastVariant} onClose={() => setToastMessage('')} />
       )}
 
-      {/* Page Header */}
-      <PageHeader
-        icon={HiDocumentText}
-        title={isAuthorizedManager ? "Manuscript Management & Research Repository Hub" : "Manuscript Repository"}
-        description="Oversee university research manuscripts: review publication submissions, inspect panelist defense grades, award official Best Thesis honors, and manage institutional archives."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={fetchManuscripts} isLoading={loading}>
-              <HiArrowPath className="w-4 h-4 mr-1.5" /> Refresh
-            </Button>
-            <Button
-              variant={selectedTab === 'ranking' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => handleTabChange('ranking')}
-              className={selectedTab === 'ranking' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'border-amber-400 text-amber-700 dark:text-amber-400'}
-            >
-              <HiTrophy className="w-4 h-4 mr-1.5" /> Top 5 Ranking
-            </Button>
-          </div>
-        }
-      />
-
       {/* Clean Filter Navigation Bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-gray-200/80 dark:border-[#222433]">
+      <div className="flex items-center gap-8 border-b border-gray-200/80 dark:border-[#222433] overflow-x-auto scrollbar-none">
         {[
-          { id: 'all', label: 'All Active Manuscripts', count: counts.all },
+          { id: 'all', label: 'All Manuscripts', count: counts.all },
           {
             id: 'publication_review',
             label: 'Publication Review',
             count: counts.pendingPublication,
-            badgeVariant: counts.pendingPublication > 0 ? 'purple' : 'gray',
           },
           { id: 'ranking', label: 'Top 5 Leaderboard', icon: HiTrophy, count: counts.rankedEligible },
           { id: 'archived', label: 'Institutional Archive', icon: HiArchiveBox, count: counts.archived },
@@ -764,22 +761,20 @@ export const AdminManuscripts = () => {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl font-medium text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
+              className={`flex items-center gap-2 pb-3.5 pt-1 border-b-2 text-sm font-medium transition-colors whitespace-nowrap -mb-px ${
                 isActive
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10 font-semibold'
-                  : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-[#9396a8] dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#1c1d28]'
+                  ? 'border-blue-600 text-blue-600 font-semibold'
+                  : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
             >
-              {Icon && <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-amber-500'}`} />}
+              {Icon && <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400 dark:text-gray-500'}`} />}
               <span>{tab.label}</span>
               {typeof tab.count === 'number' && (
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${
                     isActive
                       ? 'bg-blue-600 text-white'
-                      : tab.badgeVariant === 'purple'
-                      ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
-                      : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8]'
+                      : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-500 dark:text-gray-400'
                   }`}
                 >
                   {tab.count}
@@ -790,30 +785,29 @@ export const AdminManuscripts = () => {
         })}
       </div>
 
-      {/* Dynamic Controls & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161e] p-4 rounded-2xl border border-gray-200/80 dark:border-[#222433] space-y-3 shadow-xs">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by manuscript title, student/group, authors, keywords, or adviser..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+      {/* Floating Controls Row (No outer container - Controls float directly on the page) */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 w-full">
+        {/* Pill-shaped Search Bar */}
+        <div className="relative flex-1 min-w-[280px]">
+          <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by title, author, or program..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-full text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-xs transition-all"
+          />
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <HiFunnel className="w-4 h-4 text-gray-400 shrink-0 hidden sm:block" />
-
-            {/* Dynamic Program Filter */}
+        {/* Dropdowns & Filters Button */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Dropdown 1: All Programs - Pill Shaped */}
+          <div className="relative">
             <select
               value={programFilter}
               onChange={(e) => handleProgramFilterChange(e.target.value)}
-              className="text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="Filter by Program configured in Admin Settings"
+              className="appearance-none pl-4 pr-9 py-2.5 text-xs sm:text-sm bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-full text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-xs cursor-pointer transition-all"
+              title="Filter by Program"
             >
               <option value="all">All Programs</option>
               {programsList.map((prog) => (
@@ -822,13 +816,16 @@ export const AdminManuscripts = () => {
                 </option>
               ))}
             </select>
+            <HiChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
 
-            {/* Dynamic Major / Specialization Filter */}
+          {/* Dropdown 2: All Majors / Specializations - Pill Shaped */}
+          <div className="relative">
             <select
               value={majorFilter}
               onChange={(e) => setMajorFilter(e.target.value)}
-              className="text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="Filter by Major or Specialization configured in Admin Settings"
+              className="appearance-none pl-4 pr-9 py-2.5 text-xs sm:text-sm bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-full text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-xs cursor-pointer transition-all"
+              title="Filter by Major or Specialization"
             >
               <option value="all">
                 {programFilter === 'all' ? 'All Majors / Specializations' : `All ${programFilter} Majors`}
@@ -839,13 +836,16 @@ export const AdminManuscripts = () => {
                 </option>
               ))}
             </select>
+            <HiChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
 
-            {/* Academic Status Filter */}
-            {selectedTab !== 'archived' && (
+          {/* Dropdown 3: All Academic Statuses - Pill Shaped */}
+          {selectedTab !== 'archived' && (
+            <div className="relative">
               <select
                 value={academicStatusFilter}
                 onChange={(e) => setAcademicStatusFilter(e.target.value)}
-                className="text-xs sm:text-sm bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl px-3 py-2 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="appearance-none pl-4 pr-9 py-2.5 text-xs sm:text-sm bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-full text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-xs cursor-pointer transition-all"
               >
                 <option value="all">All Academic Statuses</option>
                 <option value="new_upload">New Upload</option>
@@ -853,55 +853,58 @@ export const AdminManuscripts = () => {
                 <option value="ongoing_revision">Ongoing Revision</option>
                 <option value="approved">Academic Approved</option>
                 <option value="accepted">Accepted</option>
+                <option value="published">Published</option>
               </select>
-            )}
+              <HiChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+          )}
 
-            {(programFilter !== 'all' || majorFilter !== 'all' || academicStatusFilter !== 'all' || searchQuery) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setProgramFilter('all');
-                  setMajorFilter('all');
-                  setAcademicStatusFilter('all');
-                  setSearchQuery('');
-                  setSelectedIds([]);
-                }}
-                className="text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white"
-              >
-                Reset
-              </Button>
-            )}
-          </div>
+          {/* Filters Button - EXCLUDED from rounded pill styling */}
+          <button
+            type="button"
+            onClick={() => {
+              if (programFilter !== 'all' || majorFilter !== 'all' || academicStatusFilter !== 'all' || searchQuery) {
+                setProgramFilter('all');
+                setMajorFilter('all');
+                setAcademicStatusFilter('all');
+                setSearchQuery('');
+                setSelectedIds([]);
+              }
+            }}
+            className="flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-xl text-gray-700 dark:text-gray-200 shadow-xs hover:bg-gray-50 dark:hover:bg-[#1c1d28] transition-colors"
+          >
+            <HiAdjustmentsHorizontal className="w-4 h-4 text-gray-500" />
+            <span>Filters</span>
+          </button>
         </div>
-
-        {/* Publication Review Sub-filter Pills (When on publication_review tab) */}
-        {selectedTab === 'publication_review' && (
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-[#222433] flex-wrap">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-1">
-              Publication Review Stage:
-            </span>
-            {[
-              { id: 'all', label: 'All Submissions' },
-              { id: 'pending_publication', label: `Pending Review (${counts.pendingPublication})` },
-              { id: 'approved', label: `Approved in Repo (${counts.approvedPublication})` },
-              { id: 'rejected', label: `Publication Rejected (${counts.rejectedPublication})` },
-            ].map((sub) => (
-              <button
-                key={sub.id}
-                onClick={() => setPubSubFilter(sub.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  pubSubFilter === sub.id
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8] hover:bg-gray-200 dark:hover:bg-gray-800'
-                }`}
-              >
-                {sub.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Publication Review Sub-filter Pills (When on publication_review tab) */}
+      {selectedTab === 'publication_review' && (
+        <div className="flex items-center gap-2 pt-1 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-1">
+            Publication Review Stage:
+          </span>
+          {[
+            { id: 'all', label: 'All Submissions' },
+            { id: 'pending_publication', label: `Pending Review (${counts.pendingPublication})` },
+            { id: 'approved', label: `Approved in Repo (${counts.approvedPublication})` },
+            { id: 'rejected', label: `Publication Rejected (${counts.rejectedPublication})` },
+          ].map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => setPubSubFilter(sub.id)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                pubSubFilter === sub.id
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] text-gray-600 dark:text-[#9396a8] hover:bg-gray-50'
+              }`}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Floating / Sticky Bulk Action Bar */}
       {selectedIds.length > 0 && isAuthorizedManager && (
@@ -1119,25 +1122,24 @@ export const AdminManuscripts = () => {
       ) : (
         /* VIEW: REGULAR MANUSCRIPT LIST (ALL, PUBLICATION REVIEW, ARCHIVED) */
         <div className="space-y-4">
-          {/* Select All Bar */}
-          {isAuthorizedManager && filteredManuscripts.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-[#181924] rounded-xl border border-gray-200/80 dark:border-[#222433]">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-gray-700 dark:text-gray-300">
+          {/* Header Row: Showing X of Y manuscripts */}
+          <div className="flex items-center justify-between">
+            {selectedIds.length > 0 && isAuthorizedManager ? (
+              <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-600 dark:text-gray-300">
                 <input
                   ref={selectAllRef}
                   type="checkbox"
-                  className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                  checked={selectedIds.length > 0 && selectedIds.length === filteredManuscripts.length}
+                  className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  checked={selectedIds.length === filteredManuscripts.length}
                   onChange={toggleAllSelection}
                 />
-                <span>Select All ({filteredManuscripts.length} manuscripts)</span>
+                <span>Select All ({filteredManuscripts.length})</span>
               </label>
-
-              <span className="text-xs text-gray-500">
-                Showing {filteredManuscripts.length} of {manuscripts.length} records
-              </span>
+            ) : <div />}
+            <div className="text-xs text-gray-400 dark:text-gray-500">
+              Showing {filteredManuscripts.length} of {manuscripts.length} manuscripts
             </div>
-          )}
+          </div>
 
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center space-y-3">
@@ -1168,261 +1170,311 @@ export const AdminManuscripts = () => {
               />
             </Card>
           ) : (
-            filteredManuscripts.map((m) => (
-              <Card
-                key={m.id}
-                className={`p-5 transition-all hover:border-gray-300 dark:hover:border-gray-600 ${
-                  m.isBestThesis
-                    ? 'border-amber-300 dark:border-amber-500/40 bg-gradient-to-r from-amber-50/20 dark:from-amber-950/10 to-transparent'
-                    : ''
-                }`}
-              >
-                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                  {/* Selection Checkbox */}
-                  {isAuthorizedManager && (
-                    <div className="pt-1">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                        checked={selectedIds.includes(m.id)}
-                        onChange={() => toggleSelection(m.id)}
-                      />
+            filteredManuscripts.map((m, index) => {
+              const iconThemes = [
+                { bg: 'bg-[#eff6ff] dark:bg-blue-950/30', text: 'text-[#3b82f6] dark:text-blue-400' },
+                { bg: 'bg-[#f5f3ff] dark:bg-purple-950/30', text: 'text-[#8b5cf6] dark:text-purple-400' },
+                { bg: 'bg-[#fffbeb] dark:bg-amber-950/30', text: 'text-[#f59e0b] dark:text-amber-400' },
+              ];
+              const theme = iconThemes[index % iconThemes.length];
+              const isPub = m.publicationStatus === 'approved' || m.status === 'published' || m.status === 'completed';
+              const isEval =
+                m.status === 'under_review' ||
+                m.status === 'revisions_requested' ||
+                m.status === 'revisions_required' ||
+                m.status === 'ongoing_revision' ||
+                m.publicationStatus === 'pending_publication';
+              const isRepoPub = m.publicationStatus === 'approved' || m.status === 'published';
+
+              return (
+                <div
+                  key={m.id}
+                  className={`bg-white dark:bg-[#15161e] border rounded-2xl p-5 shadow-xs transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-5 ${
+                    m.isBestThesis
+                      ? 'border-amber-300 dark:border-amber-500/40'
+                      : 'border-gray-100 dark:border-[#222433] hover:border-gray-200 dark:hover:border-gray-700'
+                  }`}
+                >
+                  {/* Left: Document Icon & Details */}
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div
+                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl ${theme.bg} ${theme.text} flex items-center justify-center shrink-0`}
+                    >
+                      <HiOutlineDocument className="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.8]" />
                     </div>
-                  )}
 
-                  {/* Left: Metadata */}
-                  <div className="space-y-2 flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Academic status badge */}
-                      {getAcademicStatusBadge(m)}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-gray-900 dark:text-white text-[15px] sm:text-base leading-snug line-clamp-2">
+                        {m.title || m.projectTitle}
+                      </h3>
 
-                      {/* Separate Publication workflow status badge */}
-                      {getPublicationStatusBadge(m)}
-
-                      {/* Best Thesis distinction badge */}
-                      {m.isBestThesis && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
-                          <HiTrophy className="w-3.5 h-3.5" /> Best Thesis Awardee
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-2 flex-wrap">
+                        <HiAcademicCap className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="font-medium text-gray-600 dark:text-gray-300">
+                          {m.program || 'BSIT'}
                         </span>
-                      )}
-
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8]">
-                        {m.versionNumber || 'v1.0'}
-                      </span>
-
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {m.program || 'BSIT'} {m.major ? `• ${m.major}` : ''} {m.section ? `(${m.section})` : ''}
-                      </span>
-                    </div>
-
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-snug">
-                      {m.title || m.projectTitle}
-                    </h3>
-
-                    {m.abstract && (
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-[#9396a8] line-clamp-2 leading-relaxed">
-                        {m.abstract}
-                      </p>
-                    )}
-
-                    {/* Best Thesis citation if present */}
-                    {m.bestThesisNotes && m.isBestThesis && (
-                      <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                        <HiSparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="font-semibold">Best Thesis Citation:</strong> {m.bestThesisNotes}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Publication rejection reason note if rejected */}
-                    {m.publicationStatus === 'rejected' && m.publicationRejectionReason && (
-                      <div className="p-2.5 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 flex items-start gap-2">
-                        <HiXCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="font-semibold">Publication Reviewer Feedback:</strong>{' '}
-                          {m.publicationRejectionReason}
-                          {m.publicationReviewerName && (
-                            <span className="block text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
-                              Reviewed by {m.publicationReviewerName} on{' '}
-                              {m.publicationReviewedAt ? new Date(m.publicationReviewedAt).toLocaleDateString() : 'recent'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Authors, Adviser & Defense Grade Info */}
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-xs text-gray-500 dark:text-[#9396a8]">
-                      <div className="flex items-center gap-1.5">
-                        <HiAcademicCap className="w-4 h-4 text-gray-400" />
-                        <span>
-                          Authors:{' '}
-                          <strong className="font-semibold text-gray-800 dark:text-gray-200">
-                            {Array.isArray(m.authors) ? m.authors.join(', ') : m.uploaderName || 'Student Group'}
-                          </strong>
+                        <span>·</span>
+                        <span className="truncate">
+                          {Array.isArray(m.authors)
+                            ? m.authors.join(', ')
+                            : m.uploaderName || 'Student Group'}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <HiUserGroup className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <HiUser className="w-4 h-4 text-gray-400 shrink-0" />
                         <span>
                           Adviser:{' '}
-                          <strong className="font-semibold text-gray-800 dark:text-gray-200">
-                            {m.adviserName || 'Assigned Adviser'}
-                          </strong>
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {m.adviserName || 'Michael Admin Castillo'}
+                          </span>
                         </span>
                       </div>
+                    </div>
+                  </div>
 
-                      {m.grade && m.grade.score ? (
-                        <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 px-2.5 py-1 rounded-lg">
-                          <HiCalculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                          <span>
-                            Defense Grade:{' '}
-                            <strong className="font-bold text-emerald-700 dark:text-emerald-300">
-                              {m.grade.score}/100
-                            </strong>{' '}
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">({m.grade.letter})</span>
-                          </span>
+                  {/* Vertical Divider 1 */}
+                  <div className="hidden lg:block w-px h-14 bg-gray-100 dark:bg-[#222433] shrink-0 self-center" />
+
+                  {/* Middle Column 1: Status & Publication Info */}
+                  <div className="w-48 shrink-0 flex flex-col justify-center gap-1.5">
+                    <div>
+                      {isPub ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#059669] dark:bg-emerald-950/40 dark:text-emerald-300 w-fit">
+                          <span className="w-2 h-2 rounded-full bg-[#059669]" />
+                          Published
+                        </span>
+                      ) : isEval ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#fffbeb] text-[#d97706] dark:bg-amber-950/40 dark:text-amber-300 w-fit">
+                          <span className="w-2 h-2 rounded-full bg-[#d97706]" />
+                          For Evaluation
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#2563eb] dark:bg-blue-950/40 dark:text-blue-300 w-fit">
+                          <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
+                          In Progress
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {isRepoPub ? (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                          <HiBuildingLibrary className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>Published in repository</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-[#1c1d28] px-2.5 py-1 rounded-lg text-gray-500 dark:text-gray-400">
-                          <HiClock className="w-4 h-4 text-amber-500" />
-                          <span>
-                            Defense Grade:{' '}
-                            <strong className="font-medium text-amber-600 dark:text-amber-400">Pending Evaluation</strong>
-                          </span>
+                        <div className="text-xs text-gray-400">Not published</div>
+                      )}
+                      <div className="text-xs text-gray-400 font-normal">
+                        {m.versionNumber || 'v1.0'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vertical Divider 2 */}
+                  <div className="hidden lg:block w-px h-14 bg-gray-100 dark:bg-[#222433] shrink-0 self-center" />
+
+                  {/* Middle Column 2: Defense Grade */}
+                  <div className="w-32 shrink-0 flex flex-col justify-center">
+                    {m.grade && m.grade.score ? (
+                      <div>
+                        <div className="flex items-baseline">
+                          <span className="text-xl font-bold text-[#16a34a]">{m.grade.score}</span>
+                          <span className="text-xs text-gray-400 font-normal ml-0.5">/100</span>
+                        </div>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 font-normal">
+                          Defense Grade
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-xl font-normal text-gray-400 leading-none">—</div>
+                        <div className="text-[11px] text-gray-400 mt-1.5 font-normal">
+                          Pending Evaluation
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Actions (View Paper button + 3-dot dropdown menu) */}
+                  <div className="flex items-center gap-3 shrink-0 relative">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPaper(m)}
+                      className="px-6 py-2.5 bg-[#2563eb] hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      View Paper
+                    </button>
+
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(activeMenuId === m.id ? null : m.id);
+                        }}
+                        className="p-2.5 rounded-xl border border-gray-200 dark:border-[#2b2d3f] hover:bg-gray-50 dark:hover:bg-[#1c1d28] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+                        title="More actions"
+                      >
+                        <HiEllipsisVertical className="w-5 h-5 text-gray-400" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {activeMenuId === m.id && (
+                        <div
+                          ref={menuRef}
+                          className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#181924] rounded-xl shadow-xl border border-gray-100 dark:border-[#2b2d3f] py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Defense Grade */}
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              handleOpenGrade(m);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#222433] text-left transition-colors"
+                          >
+                            <HiCalculator className="w-4 h-4 text-emerald-500" />
+                            <span>
+                              {m.grade?.score
+                                ? `Defense Grade (${m.grade.score}/100)`
+                                : 'Defense Evaluation'}
+                            </span>
+                          </button>
+
+                          {/* Inspect / AI Analysis */}
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              handleInspectDocument(m);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#222433] text-left transition-colors"
+                          >
+                            <HiEye className="w-4 h-4 text-blue-500" />
+                            <span>Inspect Document & AI</span>
+                          </button>
+
+                          {/* Research Workspace */}
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              handleOpenWorkspace(m);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#222433] text-left transition-colors"
+                          >
+                            <HiBookOpen className="w-4 h-4 text-indigo-500" />
+                            <span>Open Workspace</span>
+                          </button>
+
+                          {/* Manager Options */}
+                          {isAuthorizedManager && (
+                            <>
+                              <div className="my-1 border-t border-gray-100 dark:border-[#222433]" />
+
+                              {/* Best Thesis toggle */}
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  handleOpenBestThesis(m);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-left transition-colors"
+                              >
+                                <HiStar className="w-4 h-4 text-amber-500" />
+                                <span>
+                                  {m.isBestThesis
+                                    ? 'Manage Best Thesis Award'
+                                    : 'Designate Best Thesis'}
+                                </span>
+                              </button>
+
+                              {/* Publication Review Options */}
+                              {(m.publicationStatus === 'pending_publication' ||
+                                selectedTab === 'publication_review') && (
+                                <>
+                                  {m.publicationStatus !== 'approved' && (
+                                    <button
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        handleApprovePublication(m);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/20 text-left transition-colors"
+                                    >
+                                      <HiCheckCircle className="w-4 h-4 text-purple-600" />
+                                      <span>Approve Publication</span>
+                                    </button>
+                                  )}
+                                  {m.publicationStatus !== 'rejected' && (
+                                    <button
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        handleOpenRejectPublication(m);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left transition-colors"
+                                    >
+                                      <HiXCircle className="w-4 h-4 text-rose-500" />
+                                      <span>Reject Publication</span>
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Archive / Restore */}
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  handleToggleArchive(m);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#222433] text-left transition-colors"
+                              >
+                                {m.isArchived ? (
+                                  <>
+                                    <HiArchiveBoxArrowDown className="w-4 h-4 text-blue-500" />
+                                    <span>Restore Manuscript</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <HiArchiveBox className="w-4 h-4 text-gray-500" />
+                                    <span>Move to Archive</span>
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
+
+                          {/* Admin Only: Edit & Delete */}
+                          {isAdmin && (
+                            <>
+                              <div className="my-1 border-t border-gray-100 dark:border-[#222433]" />
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  handleOpenEdit(m);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#222433] text-left transition-colors"
+                              >
+                                <HiPencilSquare className="w-4 h-4 text-gray-500" />
+                                <span>Edit Details</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  handleDeleteSingle(m);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left transition-colors"
+                              >
+                                <HiTrash className="w-4 h-4 text-rose-500" />
+                                <span>Delete Manuscript</span>
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {/* Right: Actions Hub (Comments button removed per Requirement 6!) */}
-                  <div className="flex flex-wrap lg:flex-col gap-2 shrink-0 items-end justify-start">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* View Paper Button */}
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleOpenPaper(m)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
-                        title="Read manuscript chapters, paper overview, and abstract"
-                      >
-                        <HiBookOpen className="w-4 h-4 mr-1.5" />
-                        View Paper
-                      </Button>
-
-                      {/* Defense Grade Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenGrade(m)}
-                        title="View panelist defense evaluations and rubric scores"
-                        className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-                      >
-                        <HiCalculator className="w-4 h-4 mr-1 text-emerald-500" />
-                        {m.grade?.score ? `Grade (${m.grade.score}/100)` : 'Defense Grade'}
-                      </Button>
-
-                      {/* Best Thesis Button (For Authorized Coordinators / Admins) */}
-                      {isAuthorizedManager && (
-                        <Button
-                          variant={m.isBestThesis ? 'primary' : 'outline'}
-                          size="sm"
-                          onClick={() => handleOpenBestThesis(m)}
-                          className={
-                            m.isBestThesis
-                              ? 'bg-amber-500 hover:bg-amber-600 border-none text-white'
-                              : 'border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20'
-                          }
-                          title="Assign or remove official Best Thesis distinction"
-                        >
-                          <HiStar className="w-4 h-4 mr-1" />
-                          {m.isBestThesis ? 'Best Thesis ★' : 'BEST'}
-                        </Button>
-                      )}
-
-                      {/* Edit Details Button */}
-                      {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEdit(m)}
-                          title="Edit manuscript metadata"
-                        >
-                          <HiPencilSquare className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Publication Review Workflow Actions */}
-                    {isAuthorizedManager && (m.publicationStatus === 'pending_publication' || selectedTab === 'publication_review') && (
-                      <div className="flex items-center gap-1.5 pt-1">
-                        {m.publicationStatus !== 'approved' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleApprovePublication(m)}
-                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
-                            title="Approve manuscript for public repository publication"
-                          >
-                            <HiCheckCircle className="w-4 h-4 mr-1" /> Approve Pub
-                          </Button>
-                        )}
-
-                        {m.publicationStatus !== 'rejected' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenRejectPublication(m)}
-                            className="border-rose-300 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs"
-                            title="Reject repository publication with feedback"
-                          >
-                            <HiXCircle className="w-4 h-4 mr-1 text-rose-500" /> Reject Pub
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Archive / Restore Action (Requirement 3) */}
-                    {isAuthorizedManager && (
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleArchive(m)}
-                          className={m.isArchived ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'}
-                          title={m.isArchived ? 'Restore to active list' : 'Move to institutional archive'}
-                        >
-                          {m.isArchived ? (
-                            <>
-                              <HiArchiveBoxArrowDown className="w-4 h-4 mr-1 text-blue-600" /> Restore
-                            </>
-                          ) : (
-                            <>
-                              <HiArchiveBox className="w-4 h-4 mr-1 text-gray-500" /> Archive
-                            </>
-                          )}
-                        </Button>
-
-                        {/* Delete Single Button (Admin only) */}
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSingle(m)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            title="Delete Manuscript Permanently"
-                          >
-                            <HiTrash className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </Card>
-            ))
+              );
+            })
           )}
         </div>
       )}

@@ -5,6 +5,7 @@ import { ResearchGroup } from '../types/group.types';
 import { DefenseSchedule } from '../types/schedule.types';
 import { groupService } from './group.service';
 import progressService from './progress.service';
+import { scheduleService } from './schedule.service';
 
 const FACULTY_COLLECTION = 'faculty_assignments'; // Abstract collection, we might query groups directly
 
@@ -31,6 +32,27 @@ export const facultyService = {
   },
 
   /**
+   * Get all research groups that have an assigned adviser (for Admin & Coordinator review)
+   */
+  async getAllAdviserGroups(): Promise<ResearchGroup[]> {
+    try {
+      const groupsRef = collection(db, 'research_groups');
+      const snapshot = await getDocs(groupsRef);
+      const groups: ResearchGroup[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.adviserId && data.adviserId !== 'undefined' && data.adviserName && data.adviserName !== 'undefined') {
+          groups.push({ id: docSnap.id, ...data } as ResearchGroup);
+        }
+      });
+      return groups.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } catch (error) {
+      console.error('Error fetching all adviser groups:', error);
+      return [];
+    }
+  },
+
+  /**
    * Get all research groups where the faculty is assigned as a panelist
    */
   async getPanelistGroups(facultyId: string): Promise<ResearchGroup[]> {
@@ -43,27 +65,26 @@ export const facultyService = {
       const groupIds = new Set<string>();
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.projectId) {
-          groupIds.add(data.projectId); // Assuming projectId points to the research group ID
+        const gId = data.groupId || data.projectId;
+        if (gId) {
+          groupIds.add(gId);
         }
       });
 
       if (groupIds.size === 0) return [];
 
-      // Fetch the actual groups
+      // Fetch the actual groups directly by doc reference
       const groups: ResearchGroup[] = [];
-      // Firestore 'in' query supports up to 10 items.
-      const groupIdArray = Array.from(groupIds);
-      
-      // Batch fetch groups
-      for (let i = 0; i < groupIdArray.length; i += 10) {
-        const chunk = groupIdArray.slice(i, i + 10);
-        const groupQuery = query(collection(db, 'research_groups'), where('id', 'in', chunk));
-        const groupSnapshot = await getDocs(groupQuery);
-        groupSnapshot.forEach(docSnap => {
-          groups.push({ id: docSnap.id, ...docSnap.data() } as ResearchGroup);
-        });
-      }
+      await Promise.all(
+        Array.from(groupIds).map(async (gId) => {
+          try {
+            const gSnap = await getDoc(doc(db, 'research_groups', gId));
+            if (gSnap.exists()) {
+              groups.push({ id: gSnap.id, ...gSnap.data() } as ResearchGroup);
+            }
+          } catch (e) {}
+        })
+      );
 
       return groups;
     } catch (error) {
@@ -73,25 +94,34 @@ export const facultyService = {
   },
 
   /**
-   * Get upcoming defense schedules for a faculty member
+   * Get upcoming defense schedules for a faculty member (as panelist or adviser)
    */
   async getUpcomingDefenses(facultyId: string): Promise<DefenseSchedule[]> {
     try {
-      const schedulesRef = collection(db, 'defense_schedules');
-      // Query for schedules where this faculty is a panelist
-      const q = query(schedulesRef, where('panelistIds', 'array-contains', facultyId));
-      const snapshot = await getDocs(q);
-      
-      const schedules: DefenseSchedule[] = [];
-      snapshot.forEach(docSnap => {
-        schedules.push({ id: docSnap.id, ...docSnap.data() } as DefenseSchedule);
-      });
+      let schedules: DefenseSchedule[] = [];
+      try {
+        schedules = await scheduleService.getAllSchedules();
+      } catch (e) {
+        schedules = [];
+      }
 
-      // Filter for upcoming dates and sort
-      const now = new Date().toISOString();
+      if (schedules.length === 0) {
+        const schedulesRef = collection(db, 'defense_schedules');
+        const q = query(schedulesRef, where('panelistIds', 'array-contains', facultyId));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(docSnap => {
+          schedules.push({ id: docSnap.id, ...docSnap.data() } as DefenseSchedule);
+        });
+      }
+
+      const now = new Date().toISOString().split('T')[0];
       return schedules
-        .filter(s => s.date >= now.split('T')[0] && s.status !== 'completed' && s.status !== 'cancelled')
-        .sort((a, b) => a.date.localeCompare(b.date));
+        .filter(s => {
+          const isPanelist = Array.isArray(s.panelistIds) && s.panelistIds.includes(facultyId);
+          const isAdviser = s.adviserId === facultyId;
+          return (isPanelist || isAdviser) && (s.date ? s.date >= now : true) && s.status !== 'completed' && s.status !== 'cancelled';
+        })
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     } catch (error) {
       console.error('Error fetching upcoming defenses:', error);
       return [];

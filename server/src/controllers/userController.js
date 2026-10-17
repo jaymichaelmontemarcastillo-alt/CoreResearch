@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { db, isDevMockMode, mockUsersDb, auth } from '../config/firebaseAdmin.js';
 import { updateUserProfileStores } from '../services/userProfilePersistence.service.js';
+import { buildUserListCandidateFilter } from '../services/userListQuery.js';
 
 const sendUserProfileUpdateError = (res, error, action) => {
   console.error(`[UserController] ${action} error:`, error);
@@ -90,10 +91,43 @@ export const getAllUsers = async (req, res) => {
     const { role, status, search, page, limit, program, courseId, specialization, major } = req.query;
     let usersList = [];
     let fetchedFromMongo = false;
+    let mongoPaginated = false;
+    let total;
+    let pageNum = page ? parseInt(page, 10) : 1;
+    let limitNum = limit ? parseInt(limit, 10) : 10;
+    const targetProgram = (program || courseId || '').trim();
+    const targetSpec = (specialization || major || '').trim();
+    const hasPostQueryFilters = Boolean(
+      (search && search.trim()) ||
+      (targetProgram && targetProgram.toLowerCase() !== 'all') ||
+      (targetSpec && targetSpec.toLowerCase() !== 'all')
+    );
+
+    if (!Number.isInteger(pageNum) || pageNum < 1) pageNum = 1;
+    if (!Number.isInteger(limitNum) || limitNum < 1) limitNum = 10;
 
     try {
       if (mongoose.connection.readyState === 1) {
-        usersList = await User.find().lean();
+        const mongoFilter = buildUserListCandidateFilter({
+          role,
+          status,
+          ...(hasPostQueryFilters ? { search, program, courseId, specialization, major } : {})
+        });
+        if (!hasPostQueryFilters && (page || limit)) {
+          const [count, pageUsers] = await Promise.all([
+            User.countDocuments(mongoFilter),
+            User.find(mongoFilter)
+              .sort({ _id: 1 })
+              .skip((pageNum - 1) * limitNum)
+              .limit(limitNum)
+              .lean()
+          ]);
+          total = count;
+          usersList = pageUsers;
+          mongoPaginated = true;
+        } else {
+          usersList = await User.find(mongoFilter).lean();
+        }
         fetchedFromMongo = true;
       }
     } catch (mongoErr) {
@@ -175,39 +209,39 @@ export const getAllUsers = async (req, res) => {
     }
 
     // 3. Program / Course Filter (BSIT / BSCS)
-    const targetProgram = (program || courseId || '').toUpperCase().trim();
-    if (targetProgram && targetProgram !== 'ALL') {
+    const normalizedTargetProgram = targetProgram.toUpperCase();
+    if (normalizedTargetProgram && normalizedTargetProgram !== 'ALL') {
       usersList = usersList.filter(u => {
         const uProg = (u.programCode || u.courseId || '').toUpperCase();
-        if (targetProgram === 'BSIT') {
+        if (normalizedTargetProgram === 'BSIT') {
           return uProg === 'BSIT' || u.program?.toUpperCase().includes('INFORMATION TECHNOLOGY');
         }
-        if (targetProgram === 'BSCS') {
+        if (normalizedTargetProgram === 'BSCS') {
           return uProg === 'BSCS' || u.program?.toUpperCase().includes('COMPUTER SCIENCE');
         }
-        return uProg.includes(targetProgram) || u.program?.toUpperCase().includes(targetProgram);
+        return uProg.includes(normalizedTargetProgram) || u.program?.toUpperCase().includes(normalizedTargetProgram);
       });
     }
 
     // 4. Specialization / Major Filter (BSIT: WMAD, SMP, AMG | BSCS: IS)
-    const targetSpec = (specialization || major || '').toUpperCase().trim();
-    if (targetSpec && targetSpec !== 'ALL') {
+    const normalizedTargetSpec = targetSpec.toUpperCase();
+    if (normalizedTargetSpec && normalizedTargetSpec !== 'ALL') {
       usersList = usersList.filter(u => {
         const uMajorCode = (u.majorCode || '').toUpperCase();
         const uSpec = (u.programSpecialization || u.major || '').toUpperCase();
-        if (targetSpec === 'WMAD') {
+        if (normalizedTargetSpec === 'WMAD') {
           return uMajorCode === 'WMAD' || uSpec.includes('WMAD') || uSpec.includes('WEB AND MOBILE');
         }
-        if (targetSpec === 'SMP') {
+        if (normalizedTargetSpec === 'SMP') {
           return uMajorCode === 'SMP' || uSpec.includes('SMP') || uSpec.includes('SERVICE MANAGEMENT');
         }
-        if (targetSpec === 'AMG') {
+        if (normalizedTargetSpec === 'AMG') {
           return uMajorCode === 'AMG' || uSpec.includes('AMG') || uSpec.includes('ANIMATION');
         }
-        if (targetSpec === 'IS') {
+        if (normalizedTargetSpec === 'IS') {
           return uMajorCode === 'IS' || uSpec.includes('IS') || uSpec.includes('INTELLIGENT SYSTEMS');
         }
-        return uMajorCode === targetSpec || uSpec.includes(targetSpec);
+        return uMajorCode === normalizedTargetSpec || uSpec.includes(normalizedTargetSpec);
       });
     }
 
@@ -226,15 +260,11 @@ export const getAllUsers = async (req, res) => {
       );
     }
 
-    const total = usersList.length;
+    if (total === undefined) total = usersList.length;
     let paginatedList = usersList;
-    let pageNum = page ? parseInt(page, 10) : 1;
-    let limitNum = limit ? parseInt(limit, 10) : (page ? 10 : total);
+    if (!page && !limit) limitNum = total || 10;
 
-    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
-    if (isNaN(limitNum) || limitNum < 1) limitNum = 10;
-
-    if (page || limit) {
+    if ((page || limit) && !mongoPaginated) {
       const startIndex = (pageNum - 1) * limitNum;
       paginatedList = usersList.slice(startIndex, startIndex + limitNum);
     }
@@ -311,8 +341,14 @@ export const updateUserProfile = async (req, res) => {
       updates.role = 'adviser';
       updates.role_id = 'adviser';
       if (updates.isAvailable === undefined) updates.isAvailable = true;
-      if (updates.maxCapacity === undefined) updates.maxCapacity = 5;
+      if (updates.maxCapacity === undefined && updates.maxAdvisees === undefined) updates.maxCapacity = 5;
       if (updates.activeGroupsCount === undefined) updates.activeGroupsCount = 0;
+    }
+
+    if (updates.maxAdvisees !== undefined || updates.maxCapacity !== undefined) {
+      const capacityVal = Math.max(1, parseInt(updates.maxCapacity ?? updates.maxAdvisees, 10) || 5);
+      updates.maxCapacity = capacityVal;
+      updates.maxAdvisees = capacityVal;
     }
 
     if (updates.status === 'approved' || updates.is_approved === true) {

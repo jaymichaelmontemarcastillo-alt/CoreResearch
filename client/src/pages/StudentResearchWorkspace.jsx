@@ -19,7 +19,16 @@ import {
   HiExclamationCircle,
   HiPlay,
   HiPaperAirplane,
+  HiDocumentText,
+  HiTrash,
+  HiPlus,
+  HiLockClosed,
+  HiShieldCheck,
 } from 'react-icons/hi2';
+import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
+import { Textarea } from '../components/ui/Textarea';
+import manuscriptService from '../services/manuscript.service';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import researchTaskService from '../services/researchTask.service';
 import researchFeedbackService from '../services/researchFeedback.service';
@@ -62,9 +71,92 @@ export const StudentResearchWorkspace = () => {
   const [isRestarting, setIsRestarting] = useState(false);
   const restartInProgressRef = useRef(false);
 
+  // Post-Defense Revision Workflow state
+  const [revisionModalOpen, setRevisionModalOpen] = useState(false);
+  const [revisionMatrix, setRevisionMatrix] = useState([
+    { directive: '', actionTaken: '', sectionOrPage: '' }
+  ]);
+  const [revisionSummary, setRevisionSummary] = useState('');
+  const [revisedFile, setRevisedFile] = useState(null);
+  const [submittingRevision, setSubmittingRevision] = useState(false);
+
   const isStudent = role === 'student';
   const isAdviser = role === 'adviser';
   const isCoordinator = role === 'research_coordinator' || role === 'admin';
+
+  const requiresPostDefenseRevisions =
+    Boolean(workspace?.postDefenseRevisionRequired) ||
+    finalEvals.some(
+      (ev) =>
+        ev.verdict === 'PASSED_WITH_MINOR_REVISIONS' ||
+        ev.verdict === 'PASSED_WITH_MAJOR_REVISIONS' ||
+        ev.verdict === 'REDEFENSE'
+    );
+
+  const postDefenseStatus = workspace?.postDefenseRevisionStatus || (requiresPostDefenseRevisions ? 'revision_required' : 'none');
+
+  const handleOpenRevisionModal = () => {
+    if (workspace?.latestPostDefenseRevision?.revisionMatrix?.length > 0) {
+      setRevisionMatrix(workspace.latestPostDefenseRevision.revisionMatrix);
+      setRevisionSummary(workspace.latestPostDefenseRevision.summaryNotes || '');
+    } else {
+      const directivesList = finalEvals
+        .filter((ev) => ev.revisionDirectives)
+        .map((ev) => ev.revisionDirectives);
+
+      if (directivesList.length > 0) {
+        setRevisionMatrix(
+          directivesList.map((dir) => ({
+            directive: dir,
+            actionTaken: '',
+            sectionOrPage: ''
+          }))
+        );
+      } else {
+        setRevisionMatrix([{ directive: '', actionTaken: '', sectionOrPage: '' }]);
+      }
+    }
+    setRevisionModalOpen(true);
+  };
+
+  const handleSubmitRevision = async (e) => {
+    e.preventDefault();
+    if (!workspace?.id) return;
+
+    const invalid = revisionMatrix.some((row) => !row.directive.trim() || !row.actionTaken.trim());
+    if (invalid) {
+      alert('Please fill out all directives and corresponding actions taken in the revision matrix.');
+      return;
+    }
+
+    if (revisedFile && revisedFile.size > 50 * 1024 * 1024) {
+      alert('File size exceeds the 50MB limit.');
+      return;
+    }
+
+    setSubmittingRevision(true);
+    try {
+      const payload = {
+        revisionMatrix: revisionMatrix.map((r) => ({
+          directive: r.directive.trim(),
+          actionTaken: r.actionTaken.trim(),
+          sectionOrPage: r.sectionOrPage.trim()
+        })),
+        summaryNotes: revisionSummary.trim(),
+        fileName: revisedFile?.name || '',
+        fileSize: revisedFile?.size || 0
+      };
+
+      const res = await manuscriptService.submitPostDefenseRevision(workspace.id, payload);
+      setToast(res.message || 'Post-defense revisions & revision matrix submitted for faculty verification!');
+      setRevisionModalOpen(false);
+      if (res.data) setWorkspace(res.data);
+    } catch (err) {
+      alert(`Submission error: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setSubmittingRevision(false);
+    }
+  };
 
   // 1. Initial Load
   useEffect(() => {
@@ -704,6 +796,135 @@ export const StudentResearchWorkspace = () => {
             </div>
           )}
 
+          {/* Post-Defense Manuscript Revision & Matrix Tracker Card */}
+          {requiresPostDefenseRevisions && (
+            <Card className="p-5 bg-gradient-to-br from-white to-amber-50/40 dark:from-[#15161e] dark:to-amber-950/10 border border-amber-200/90 dark:border-amber-900/40 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 dark:border-amber-900/40 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                    <HiDocumentText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                      Post-Defense Revision &amp; Matrix Tracker
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Traceable workflow addressing final defense directives before repository publication
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {postDefenseStatus === 'approved' ? (
+                    <Badge variant="emerald" className="py-1 px-3 text-xs flex items-center gap-1.5 font-bold">
+                      <HiShieldCheck className="w-4 h-4" /> Revisions Approved
+                    </Badge>
+                  ) : postDefenseStatus === 'under_review' ? (
+                    <Badge variant="blue" className="py-1 px-3 text-xs flex items-center gap-1.5 font-bold">
+                      <HiClock className="w-4 h-4" /> Under Faculty Review
+                    </Badge>
+                  ) : (
+                    <Badge variant="amber" className="py-1 px-3 text-xs flex items-center gap-1.5 font-bold">
+                      <HiExclamationCircle className="w-4 h-4" /> Revision &amp; Matrix Required
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Defense Directives Section */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                  <span>Panel Directives &amp; Required Recommendations:</span>
+                </div>
+                <div className="space-y-1.5">
+                  {finalEvals
+                    .filter((ev) => ev.revisionDirectives)
+                    .map((ev, i) => (
+                      <div
+                        key={i}
+                        className="p-3 rounded-lg bg-white/80 dark:bg-[#1c1d28]/80 border border-amber-100 dark:border-amber-900/30 text-xs text-gray-700 dark:text-gray-300 space-y-1"
+                      >
+                        <span className="font-semibold text-amber-800 dark:text-amber-300">
+                          {ev.panelistName} ({ev.verdict.replace(/_/g, ' ')}):
+                        </span>
+                        <p className="whitespace-pre-line pl-2 text-gray-600 dark:text-gray-400 leading-relaxed">
+                          {ev.revisionDirectives}
+                        </p>
+                      </div>
+                    ))}
+                  {finalEvals.filter((ev) => ev.revisionDirectives).length === 0 && (
+                    <div className="p-3 rounded-lg bg-white dark:bg-[#1c1d28] border border-gray-100 dark:border-slate-800 text-xs text-gray-500 italic">
+                      Directives specified during final defense. Address corrections in your point-by-point matrix.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Latest Submission Summary */}
+              {workspace?.latestPostDefenseRevision && (
+                <div className="p-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs space-y-1">
+                  <div className="flex justify-between items-center text-blue-900 dark:text-blue-200 font-semibold">
+                    <span>Submitted Revision Package ({workspace.latestPostDefenseRevision.revisionMatrix?.length || 0} Matrix Points)</span>
+                    <span className="text-[11px] font-normal text-blue-700 dark:text-blue-300">
+                      {new Date(workspace.latestPostDefenseRevision.submittedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  {workspace.latestPostDefenseRevision.summaryNotes && (
+                    <p className="text-gray-600 dark:text-gray-300 italic">
+                      "{workspace.latestPostDefenseRevision.summaryNotes}"
+                    </p>
+                  )}
+                  {workspace.latestPostDefenseRevision.fileName && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      Attached Document: <strong>{workspace.latestPostDefenseRevision.fileName}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Status & Repository Publication Gate Message */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                  {postDefenseStatus === 'approved' ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                      <HiCheckCircle className="w-4 h-4" />
+                      Post-defense revisions formally approved by {workspace.postDefenseRevisionApprovedByName || 'Faculty Panel'}. Publication to digital repository unlocked!
+                    </span>
+                  ) : (
+                    <span className="text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
+                      <HiLockClosed className="w-4 h-4" />
+                      Repository publication remains locked until revisions and matrix are verified and approved by faculty.
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {postDefenseStatus !== 'approved' ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleOpenRevisionModal}
+                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+                    >
+                      <HiPencilSquare className="w-4 h-4 mr-1.5" />
+                      {postDefenseStatus === 'under_review' ? 'Update Revision & Matrix' : 'Submit Revisions & Matrix'}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => navigate('/repository')}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                    >
+                      <HiBookOpen className="w-4 h-4 mr-1.5" />
+                      Publish to Institutional Repository
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
 
           {/* Manuscript Chapters */}
           <div className="grid grid-cols-1 gap-4 sm:gap-5 items-stretch">
@@ -896,6 +1117,159 @@ export const StudentResearchWorkspace = () => {
           readOnly={true}
         />
       )}
+
+      {/* Student Post-Defense Revision & Matrix Modal */}
+      <Modal
+        isOpen={revisionModalOpen}
+        onClose={() => setRevisionModalOpen(false)}
+        title="Submit Post-Defense Revisions & Matrix"
+        icon={HiDocumentText}
+      >
+        <form onSubmit={handleSubmitRevision} className="space-y-4">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Address all committee directives from your final defense presentation. Provide a point-by-point matrix detailing the exact adjustments made in the manuscript.
+          </p>
+
+          {/* Point-by-point Matrix Rows */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Point-by-Point Revision Matrix
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setRevisionMatrix((prev) => [
+                    ...prev,
+                    { directive: '', actionTaken: '', sectionOrPage: '' },
+                  ])
+                }
+              >
+                <HiPlus className="w-3.5 h-3.5 mr-1" /> Add Row
+              </Button>
+            </div>
+
+            <div className="space-y-3 max-h-[35vh] overflow-y-auto pr-1">
+              {revisionMatrix.map((row, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-800/60 space-y-2"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-500">Item #{idx + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRevisionMatrix((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      disabled={revisionMatrix.length <= 1}
+                      className="text-rose-500 hover:text-rose-700 disabled:opacity-30"
+                      title="Remove Row"
+                    >
+                      <HiTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <Input
+                    label="Panel Directive / Correction Required"
+                    value={row.directive}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRevisionMatrix((prev) => {
+                        const copy = [...prev];
+                        copy[idx].directive = val;
+                        return copy;
+                      });
+                    }}
+                    required
+                    placeholder="e.g. Include ANOVA test and significance values in Chapter 3"
+                  />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <Input
+                        label="Action Taken / Changes Made"
+                        value={row.actionTaken}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRevisionMatrix((prev) => {
+                            const copy = [...prev];
+                            copy[idx].actionTaken = val;
+                            return copy;
+                          });
+                        }}
+                        required
+                        placeholder="e.g. Performed one-way ANOVA with p < 0.05 tabulated in Table 3.4"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        label="Section / Page Ref"
+                        value={row.sectionOrPage}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRevisionMatrix((prev) => {
+                            const copy = [...prev];
+                            copy[idx].sectionOrPage = val;
+                            return copy;
+                          });
+                        }}
+                        placeholder="e.g. Ch. 3, p. 48"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Revised Document File (Up to 50MB) */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Revised Manuscript Document (PDF or DOCX, max 50MB)
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.docx,.doc"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 50 * 1024 * 1024) {
+                  alert(`File size exceeds 50MB limit.`);
+                  e.target.value = '';
+                  return;
+                }
+                setRevisedFile(file);
+              }}
+              className="block w-full text-xs text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-xs file:font-semibold
+                file:bg-primary/10 file:text-primary
+                hover:file:bg-primary/20"
+            />
+          </div>
+
+          <Textarea
+            label="Summary of Amendments & Response to Defense Panel"
+            rows={2}
+            value={revisionSummary}
+            onChange={(e) => setRevisionSummary(e.target.value)}
+            placeholder="Briefly summarize the revisions implemented across the document..."
+          />
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-gray-100 dark:border-slate-800">
+            <Button type="button" variant="outline" onClick={() => setRevisionModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" isLoading={submittingRevision}>
+              Submit Revision &amp; Matrix for Verification
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

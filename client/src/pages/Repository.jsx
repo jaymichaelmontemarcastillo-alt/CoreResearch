@@ -48,8 +48,10 @@ export const Repository = () => {
   const [toast, setToast] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [pdfBase64, setPdfBase64] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const MAX_PDF_MB = 50;
 
   // Admin Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -62,26 +64,32 @@ export const Repository = () => {
   const [pubToDelete, setPubToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const resetFile = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setPreviewLoading(false);
+    setAcceptedTerms(false);
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file && file.type === "application/pdf") {
-      setSelectedFile(file);
-      setPreviewLoading(true);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPdfBase64(reader.result);
-      };
-      reader.readAsDataURL(file);
-    } else {
+    if (!file) return;
+    if (file.type !== "application/pdf") {
       alert("Please select a valid PDF file.");
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setPdfBase64("");
-      setPreviewLoading(false);
+      resetFile();
+      return;
     }
+    if (file.size > MAX_PDF_MB * 1024 * 1024) {
+      alert(`PDF is ${(file.size / 1048576).toFixed(1)}MB. Maximum allowed is ${MAX_PDF_MB}MB.`);
+      e.target.value = "";
+      resetFile();
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(file);
+    setPreviewLoading(true);
+    setPreviewUrl(URL.createObjectURL(file));
   };
 
   const fetchPublications = async () => {
@@ -116,33 +124,50 @@ export const Repository = () => {
   const handlePublishSubmit = async (e) => {
     e.preventDefault();
     if (!pubTitle || !pubAbstract) return alert("Title and Abstract are required.");
+    if (role === "student" && !acceptedTerms) {
+      return alert("You must review and agree to the Institutional Digital Repository terms and open-access distribution license before submitting.");
+    }
 
     setPublishing(true);
+    setUploadProgress(0);
     try {
-      await api.post("/repository/publish", {
-        title: pubTitle,
-        authors: pubAuthors.split(",").map((a) => a.trim()),
-        adviserName: pubAdviser,
-        department: pubDept,
-        publicationYear: pubYear,
-        abstract: pubAbstract,
-        keywords: pubKeywords,
-        pdfUrl: pdfBase64 || undefined,
-        citation: `${pubAuthors} (${pubYear}). ${pubTitle}. CoreResearch University Repository.`,
+      const formData = new FormData();
+      formData.append("title", pubTitle);
+      formData.append("authors", pubAuthors);
+      formData.append("adviserName", pubAdviser);
+      formData.append("department", pubDept);
+      formData.append("publicationYear", pubYear);
+      formData.append("abstract", pubAbstract);
+      formData.append("keywords", pubKeywords);
+      formData.append("citation", `${pubAuthors} (${pubYear}). ${pubTitle}. CoreResearch University Repository.`);
+      formData.append("acceptedTerms", acceptedTerms ? "true" : "false");
+      if (selectedFile) formData.append("pdfFile", selectedFile);
+
+      // axios drops the default JSON Content-Type for FormData so the browser sets the multipart boundary.
+      const res = await api.post("/repository/publish", formData, {
+        timeout: 10 * 60 * 1000,
+        onUploadProgress: (evt) => {
+          if (evt.total) setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+        },
       });
 
-      setToast("Research paper published to Institutional Repository successfully!");
+      setToast(res.data?.message || "Research paper published to Institutional Repository successfully!");
       setPublishModalOpen(false);
       setPubTitle("");
       setPubAbstract("");
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setPdfBase64("");
+      resetFile();
       await fetchPublications();
     } catch (err) {
-      alert(`Publishing error: ${err.message}`);
+      const serverMsg = err.response?.data?.message || err.response?.data?.error;
+      const msg = serverMsg
+        || (err.code === "ECONNABORTED" ? "Upload timed out. Check your connection and try again." : null)
+        || (err.code === "ERR_NETWORK" ? "Cannot reach the server. Is the backend running?" : null)
+        || err.message;
+      console.error("[Repository] publish error:", err);
+      alert(`Publishing error: ${msg}`);
     } finally {
       setPublishing(false);
+      setUploadProgress(0);
     }
   };
 
@@ -209,7 +234,11 @@ export const Repository = () => {
       }
 
       // Department filter
-      if (department !== "all" && pub.department !== department) return false;
+      if (department !== "all") {
+        const matchesDept = pub.department === department ||
+          (department === "Information Technology" && (pub.department === "Information Technology" || pub.department === "Information Technology Department"));
+        if (!matchesDept) return false;
+      }
       
       // Date filter
       if (yearFilter !== "any") {
@@ -237,33 +266,43 @@ export const Repository = () => {
       )}
 
       {/* Top Header / Search Area */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 bg-white dark:bg-[#202124] z-30 shadow-sm relative">
-        <div className="flex-1 w-full flex justify-center">
-          <form onSubmit={handleSearchSubmit} className="w-full max-w-2xl">
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search articles, theses, authors..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-11 pl-5 pr-12 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#303134] focus:outline-none focus:shadow-md dark:text-white transition-shadow text-base"
-              />
-              <button 
-                type="submit" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary dark:text-[#8ab4f8] p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <HiMagnifyingGlass className="w-5 h-5" />
-              </button>
-            </div>
-          </form>
-        </div>
+      <div className="border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-[#202124] z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+          {/* Spacer to align search bar with the main results column */}
+          <div className="hidden md:block w-44 shrink-0" />
 
-        {/* Publish Action */}
-        {(role === "admin" || role === "student") && (
-          <Button variant="primary" onClick={() => setPublishModalOpen(true)} className="w-full md:w-auto shrink-0 shadow-sm md:absolute md:right-4 md:top-1/2 md:-translate-y-1/2">
-            <HiPlusCircle className="w-5 h-5 mr-2" /> Publish Paper
-          </Button>
-        )}
+          {/* Search Bar + Action Button aligned with results */}
+          <div className="flex-1 w-full flex items-center justify-start gap-4">
+            <form onSubmit={handleSearchSubmit} className="w-full max-w-2xl">
+              <div className="relative w-full">
+                <input
+                  type="text"
+                  placeholder="Search articles, theses, authors..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full h-11 pl-5 pr-12 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#303134] focus:outline-none focus:shadow-md dark:text-white transition-shadow text-base"
+                />
+                <button 
+                  type="submit" 
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-primary dark:text-[#8ab4f8] p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <HiMagnifyingGlass className="w-5 h-5" />
+                </button>
+              </div>
+            </form>
+
+            {/* Upload Action */}
+            {(role === "admin" || role === "student") && (
+              <Button 
+                variant="primary" 
+                onClick={() => setPublishModalOpen(true)} 
+                className="w-full md:w-auto shrink-0 shadow-sm whitespace-nowrap"
+              >
+                <HiPlusCircle className="w-5 h-5 mr-2" /> Upload Manuscript
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row max-w-7xl mx-auto px-4 py-8 gap-8 md:gap-12 relative">
@@ -332,17 +371,8 @@ export const Repository = () => {
               onClick={() => setDepartment("Information Technology")} 
               className={`block hover:underline text-left w-full ${department === "Information Technology" ? "font-bold text-[#d93025] dark:text-[#f28b82]" : ""}`}
             >
-              Information Tech.
+              Information Technology
             </button>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200">
-              <input type="checkbox" className="rounded text-[#1a73e8]" /> include patents
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200">
-              <input type="checkbox" defaultChecked className="rounded text-[#1a73e8]" /> include citations
-            </label>
           </div>
         </div>
 
@@ -417,8 +447,8 @@ export const Repository = () => {
                     </div>
                   </div>
                   
-                  {/* Right side PDF Link */}
-                  {pub.pdfUrl && (
+                  {/* Right side Document Access Indicator */}
+                  {pub.pdfUrl && role !== 'student' ? (
                     <div className="w-full md:w-36 flex flex-col md:items-end shrink-0 mt-2 md:mt-0 pt-1">
                       <button
                         onClick={() => {
@@ -427,11 +457,25 @@ export const Repository = () => {
                         }}
                         className="group flex flex-col md:items-end text-left"
                       >
-                        <span className="text-[13px] text-[#1a0dab] dark:text-[#8ab4f8] group-hover:underline inline-flex items-center gap-1">
+                        <span className="text-[13px] text-[#1a0dab] dark:text-[#8ab4f8] group-hover:underline inline-flex items-center gap-1 font-medium">
                           [PDF] coreresearch.edu
                         </span>
                         <span className="inline-flex items-center gap-1 mt-0.5 text-[#70757a] dark:text-[#9aa0a6] text-[12px]">
                           <HiOutlineSparkles className="w-3.5 h-3.5 text-[#1a0dab] dark:text-[#8ab4f8]" /> Quick read
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full md:w-36 flex flex-col md:items-end shrink-0 mt-2 md:mt-0 pt-1">
+                      <button
+                        onClick={() => setSelectedPub(pub)}
+                        className="group flex flex-col md:items-end text-left"
+                      >
+                        <span className="text-[12px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                          Abstract Only
+                        </span>
+                        <span className="mt-0.5 text-[11px] text-gray-400 group-hover:underline">
+                          Read abstract
                         </span>
                       </button>
                     </div>
@@ -454,7 +498,7 @@ export const Repository = () => {
       <Modal
         isOpen={publishModalOpen}
         onClose={() => setPublishModalOpen(false)}
-        title="Publish Paper to Repository"
+        title="Upload Manuscript to Repository"
         icon={HiBookOpen}
         maxWidth="max-w-4xl"
       >
@@ -560,12 +604,42 @@ export const Repository = () => {
             </div>
           </div>
 
+          {/* Institutional Repository Terms & Author Agreement */}
+          <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-4 space-y-3">
+            <div className="flex items-start gap-2.5">
+              <HiOutlineDocumentText className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                <p className="font-semibold text-gray-900 dark:text-white mb-1">
+                  Institutional Digital Repository Terms &amp; Open-Access License Agreement
+                </p>
+                <p>
+                  By submitting this research work, you grant the University a non-exclusive, perpetual, worldwide license to archive, preserve, catalog, and make the abstract and metadata publicly discoverable through the Institutional Digital Repository. Authors retain all primary copyright and intellectual property rights. You warrant that this submission represents original scholarly work that conforms to university academic integrity standards and does not infringe on third-party copyrights or privacy rights.
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/50 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="accept-repository-terms"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-slate-800"
+                required={role === "student"}
+              />
+              <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                I hereby accept and confirm the Institutional Repository Terms and Open-Access Distribution License.
+              </span>
+            </label>
+          </div>
+
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
             <Button type="button" variant="outline" onClick={() => setPublishModalOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={publishing}>
-              {role === "student" ? "Upload to Repository" : "Publish Paper"}
+              {publishing && uploadProgress > 0
+                ? (uploadProgress < 100 ? `Uploading ${uploadProgress}%` : "Saving...")
+                : (role === "student" ? "Upload to Repository" : "Upload Manuscript")}
             </Button>
           </div>
         </form>

@@ -240,6 +240,18 @@ export const createSchedule = async (req, res) => {
       });
     }
 
+    // Sync to Firestore schedules and defense_schedules
+    if (db) {
+      try {
+        await Promise.all([
+          db.collection('schedules').doc(newScheduleId).set(responseData, { merge: true }),
+          db.collection('defense_schedules').doc(newScheduleId).set(responseData, { merge: true })
+        ]);
+      } catch (e) {
+        console.warn('[ScheduleController] Firestore create sync warning:', e.message);
+      }
+    }
+
     // Dispatch notifications to Students, Adviser, and Panelists
     sendDefenseNotifications([responseData]).catch(err => {
       console.error('[ScheduleController] Failed to dispatch notifications:', err.message);
@@ -355,7 +367,6 @@ export const updateScheduleStatus = async (req, res) => {
         scheduleId: updatedSchedule.id
       });
     }
-
     return res.status(200).json({
       success: true,
       message: `Schedule status updated to '${status}'.`,
@@ -436,7 +447,6 @@ export const updateSchedule = async (req, res) => {
         scheduleId: updatedSchedule.id
       });
     }
-
     return res.status(200).json({
       success: true,
       message: `Schedule updated successfully.`,

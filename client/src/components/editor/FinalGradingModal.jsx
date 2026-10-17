@@ -60,6 +60,7 @@ export const FinalGradingModal = ({
   const [scores, setScores] = useState(INITIAL_SCORES);
   const [totals, setTotals] = useState({ manuscript: 0, oral: 0, project: 0, overall: 0 });
   const [verdict, setVerdict] = useState(null);
+  const [revisionDirectives, setRevisionDirectives] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -93,6 +94,7 @@ export const FinalGradingModal = ({
   // Pre-fill scores if we have an existing evaluation
   useEffect(() => {
     if (existingEval) {
+      setRevisionDirectives(existingEval.revisionDirectives || '');
       const s = existingEval.scores || {};
       setScores({
         format: s.format ?? '',
@@ -108,6 +110,7 @@ export const FinalGradingModal = ({
         reliability: s.reliability ?? '',
       });
     } else {
+      setRevisionDirectives('');
       setScores(INITIAL_SCORES);
     }
     setSubmitted(false);
@@ -152,11 +155,18 @@ export const FinalGradingModal = ({
     }
   };
 
-  const allFilled = Object.keys(INITIAL_SCORES).every((k) => scores[k] !== '');
+  const isRevisionVerdict =
+    verdict === 'PASSED_WITH_MINOR_REVISIONS' ||
+    verdict === 'PASSED_WITH_MAJOR_REVISIONS' ||
+    verdict === 'REDEFENSE';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!allFilled || !verdict) return;
+    if (isRevisionVerdict && !revisionDirectives.trim()) {
+      setSubmitError('Please specify the required panel revision directives for this defense verdict.');
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError('');
     try {
@@ -179,6 +189,7 @@ export const FinalGradingModal = ({
         },
         subTotals: totals,
         verdict,
+        revisionDirectives: revisionDirectives.trim(),
         workspaceId: groupDetails?.workspaceId,
         projectId: groupDetails?.projectId,
       });
@@ -513,6 +524,35 @@ export const FinalGradingModal = ({
               </div>
             </div>
 
+            {/* Panel Directives & Required Revisions */}
+            {isRevisionVerdict && (
+              <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50/70 dark:bg-amber-950/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <label className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
+                      Panel Directives &amp; Required Revisions
+                    </label>
+                  </div>
+                  <span className="text-[10px] bg-amber-200 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                    Required for {verdict.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                  Specify the required revisions, chapter corrections, and directives students must address in their Post-Defense Revision Matrix prior to repository publication.
+                </p>
+                <textarea
+                  rows={4}
+                  value={revisionDirectives}
+                  onChange={(e) => setRevisionDirectives(e.target.value)}
+                  disabled={readOnly}
+                  required={isRevisionVerdict}
+                  placeholder="e.g.&#10;1. Chapter 3: Include ANOVA statistical validation for sensor accuracy readings.&#10;2. Chapter 4: Provide complete schematic diagram and component bill of materials.&#10;3. Format references according to IEEE / APA 7th standards."
+                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700/60 bg-white dark:bg-[#12131b] p-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 leading-relaxed"
+                />
+              </div>
+            )}
+
             {/* Evaluator Line */}
             <div className="pt-4 border-t border-gray-200 dark:border-[#1c1d28] flex items-center justify-between text-sm">
               <div>
@@ -546,7 +586,7 @@ export const FinalGradingModal = ({
             type="submit"
             variant="primary"
             className="px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 flex items-center gap-2 disabled:opacity-50"
-            disabled={!allFilled || !verdict || (readOnly || isSubmitting)}
+            disabled={!allFilled || !verdict || (isRevisionVerdict && !revisionDirectives.trim()) || (readOnly || isSubmitting)}
           >
             {isSubmitting ? (
               <>

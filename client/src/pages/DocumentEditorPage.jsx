@@ -41,6 +41,8 @@ export const DocumentEditorPage = () => {
   const titleSaveTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
   const containerRef = useRef(null);
+  // Element fullscreen is unavailable on some platforms (e.g. iPhone Safari); hide the no-op button there.
+  const isFullscreenSupported = typeof document !== 'undefined' && !!document.fullscreenEnabled;
 
   // Load authoritative document metadata
   useEffect(() => {
@@ -574,9 +576,10 @@ export const DocumentEditorPage = () => {
         className={`flex flex-col flex-1 w-auto bg-white dark:bg-slate-900 overflow-hidden transition-all relative ${
         isMaximized 
           ? 'w-screen h-screen m-0 p-0 rounded-none border-none' 
-          : isHeightMaximized
-            ? 'h-[calc(100vh-1.5rem)] m-3 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-xl shadow-gray-200/50 dark:shadow-black/60'
-            : 'h-[calc(100vh-4rem-1.5rem)] m-3 rounded-2xl border border-gray-200/90 dark:border-[#222433] shadow-xl shadow-gray-200/50 dark:shadow-black/60'
+          // Height comes from the parent flex column (Layout), so the real header height is
+          // subtracted automatically and hiding the header (height-maximize) simply frees space.
+          // Edge-to-edge on phones; card styling from the sm breakpoint upwards.
+          : 'min-h-0 m-0 sm:m-3 rounded-none sm:rounded-2xl border-0 sm:border border-gray-200/90 dark:border-[#222433] sm:shadow-xl shadow-gray-200/50 dark:shadow-black/60'
       }`}>
         
         {/* Hidden file input for import */}
@@ -589,8 +592,8 @@ export const DocumentEditorPage = () => {
         />
 
         {/* Top Header Row - always visible */}
-        <div className="relative flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 z-20 shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
+        <div className="relative flex items-center justify-between gap-2 px-2 sm:px-4 py-2 bg-white dark:bg-slate-900 z-20 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -601,19 +604,19 @@ export const DocumentEditorPage = () => {
                 <HiChevronLeft className="w-5 h-5" />
               </Button>
               
-              <div className="w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 shadow-sm">
+              <div className="hidden sm:flex w-9 h-9 rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-900/30 items-center justify-center shrink-0 shadow-sm">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
                 </svg>
               </div>
               
-              <div className="flex flex-col min-w-0">
+              <div className="flex flex-col min-w-0 flex-1">
                 {isPanelistMode || isExplicitReadOnly ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate min-w-0 sm:max-w-xs">
                       {title || 'Research Manuscript'}
                     </span>
-                    <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                    <span className={`shrink-0 whitespace-nowrap text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
                       isAdminOrCoordinator
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
                         : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
@@ -627,13 +630,13 @@ export const DocumentEditorPage = () => {
                     value={title}
                     onChange={handleTitleChange}
                     placeholder="Document Title"
-                    className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate max-w-[200px] sm:max-w-xs transition-colors"
+                    className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 bg-transparent border border-transparent hover:border-gray-200 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-gray-50 dark:focus:bg-slate-800 rounded px-1.5 py-0.5 -ml-1.5 outline-none truncate w-full min-w-0 sm:max-w-xs transition-colors"
                   />
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               <div className="hidden md:flex items-center text-xs text-gray-500">
                 <span className="flex items-center gap-1 text-gray-400">
                   <HiCheckCircle className="w-3.5 h-3.5 text-emerald-500" />
@@ -680,9 +683,12 @@ export const DocumentEditorPage = () => {
                 </svg>
               </Button>
 
+              {isFullscreenSupported && (
               <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1"></div>
+              )}
 
-              {/* Maximize / Minimize Fullscreen Toggle Button */}
+              {/* Maximize / Minimize Fullscreen Toggle Button (only where the Fullscreen API exists) */}
+              {isFullscreenSupported && (
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -698,6 +704,7 @@ export const DocumentEditorPage = () => {
                   <HiArrowsPointingOut className="w-4 h-4" />
                 )}
               </Button>
+              )}
             </div>
           </div>
 
@@ -765,7 +772,7 @@ export const DocumentEditorPage = () => {
             </div>
 
             {/* Actions: Comments & Revisions / Flag for Revision / Approve Chapter */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
               {toastMessage && (
                 <span className="text-xs font-medium text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-md border border-emerald-500/30 animate-fade-in">
                   ✓ {toastMessage}
@@ -1065,7 +1072,7 @@ export const DocumentEditorPage = () => {
         )}
 
         {/* Main Document Workspace */}
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 min-h-0 flex overflow-hidden relative">
           <div className="flex-1 w-full h-full p-0">
             <OnlyOfficeEditor 
               documentId={documentId} 

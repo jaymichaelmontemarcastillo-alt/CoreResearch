@@ -618,6 +618,39 @@ export const manuscriptService = {
         await this.deleteManuscript(id);
       }
     }
+  },
+
+  /**
+   * Submit post-defense revision and revision matrix
+   */
+  async submitPostDefenseRevision(id: string, payload: {
+    revisionMatrix: Array<{ directive: string; actionTaken: string; sectionOrPage: string }>;
+    summaryNotes?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+  }): Promise<any> {
+    const res = await api.post(`/manuscripts/${id}/post-defense-revisions`, payload);
+    return res.data;
+  },
+
+  /**
+   * Review post-defense revision (approve or request further revision)
+   */
+  async reviewPostDefenseRevision(id: string, payload: {
+    decision: 'approved' | 'revision_required';
+    reviewNotes?: string;
+  }): Promise<any> {
+    const res = await api.post(`/manuscripts/${id}/post-defense-revisions/review`, payload);
+    return res.data;
+  },
+
+  /**
+   * Get post-defense revision status and history
+   */
+  async getPostDefenseRevisions(id: string): Promise<any> {
+    const res = await api.get(`/manuscripts/${id}/post-defense-revisions`);
+    return res.data?.data;
   }
 };
 

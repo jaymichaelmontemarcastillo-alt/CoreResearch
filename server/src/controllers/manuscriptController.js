@@ -1199,6 +1199,15 @@ export const publishManuscriptToRepository = async (req, res) => {
       if (!manuscript) {
         return res.status(404).json({ success: false, error: 'Manuscript not found' });
       }
+
+      // Enforce post-defense revision clearance before repository publication
+      if (manuscript.postDefenseRevisionRequired && manuscript.postDefenseRevisionStatus !== 'approved') {
+        return res.status(400).json({
+          success: false,
+          message: 'Publication locked: Post-defense revisions must be formally reviewed and approved by faculty panel before repository publication.'
+        });
+      }
+
       manuscript.publicationStatus = 'approved';
       manuscript.publicationReviewedAt = new Date().toISOString();
       manuscript.publicationReviewerName = req.user?.fullName || 'Research Coordinator';
@@ -1207,6 +1216,9 @@ export const publishManuscriptToRepository = async (req, res) => {
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
       const doc = await ref.get();
+      let targetData = null;
+      let targetRef = null;
+
       if (!doc.exists) {
         // Check workspace
         const wsRef = db.collection('manuscript_workspaces').doc(id);
@@ -1214,22 +1226,28 @@ export const publishManuscriptToRepository = async (req, res) => {
         if (!wsDoc.exists) {
           return res.status(404).json({ success: false, error: 'Manuscript not found' });
         }
-        await wsRef.update({
-          publicationStatus: 'approved',
-          publicationReviewedAt: new Date().toISOString(),
-          publicationReviewerName: req.user?.fullName || 'Research Coordinator',
-          updatedAt: new Date().toISOString()
-        });
-        manuscript = { id: wsDoc.id, ...wsDoc.data(), publicationStatus: 'approved' };
+        targetData = wsDoc.data();
+        targetRef = wsRef;
       } else {
-        await ref.update({
-          publicationStatus: 'approved',
-          publicationReviewedAt: new Date().toISOString(),
-          publicationReviewerName: req.user?.fullName || 'Research Coordinator',
-          updatedAt: new Date().toISOString()
-        });
-        manuscript = { id: doc.id, ...doc.data(), publicationStatus: 'approved' };
+        targetData = doc.data();
+        targetRef = ref;
       }
+
+      // Enforce post-defense revision clearance before repository publication
+      if (targetData.postDefenseRevisionRequired && targetData.postDefenseRevisionStatus !== 'approved') {
+        return res.status(400).json({
+          success: false,
+          message: 'Publication locked: Post-defense revisions must be formally reviewed and approved by faculty panel before repository publication.'
+        });
+      }
+
+      await targetRef.update({
+        publicationStatus: 'approved',
+        publicationReviewedAt: new Date().toISOString(),
+        publicationReviewerName: req.user?.fullName || 'Research Coordinator',
+        updatedAt: new Date().toISOString()
+      });
+      manuscript = { id: targetRef.id, ...targetData, publicationStatus: 'approved' };
     }
 
     let finalPdfUrl = manuscript.fileUrl || '';
@@ -1274,6 +1292,9 @@ export const publishManuscriptToRepository = async (req, res) => {
     };
 
     if (isDevMockMode) {
+      if (!mockFirestoreDb.has('repository')) {
+        mockFirestoreDb.set('repository', new Map());
+      }
       const repoMap = mockFirestoreDb.get('repository');
       repoMap.set(repoPub.id, repoPub);
     } else {
@@ -1414,6 +1435,271 @@ export const updateManuscriptPublicationStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('[ManuscriptController] updateManuscriptPublicationStatus error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Submit Post-Defense Revised Manuscript & Point-by-Point Revision Matrix (Students)
+ */
+export const submitPostDefenseRevision = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      revisionMatrix,
+      summaryNotes,
+      fileUrl,
+      fileName,
+      fileSize
+    } = req.body;
+
+    if (!Array.isArray(revisionMatrix) || revisionMatrix.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'A point-by-point revision matrix addressing panel directives is required.'
+      });
+    }
+
+    const revisionSubmission = {
+      submissionId: `rev-${Date.now()}`,
+      submittedAt: new Date().toISOString(),
+      submittedBy: req.user?.uid || '',
+      submittedByName: req.user?.fullName || 'Student Researcher',
+      revisionMatrix,
+      summaryNotes: summaryNotes || '',
+      fileUrl: fileUrl || '',
+      fileName: fileName || '',
+      fileSize: fileSize || 0,
+      status: 'under_review'
+    };
+
+    seedMockManuscriptsIfEmpty();
+
+    let manuscript = null;
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      manuscript = map.get(id);
+      if (!manuscript) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      manuscript.postDefenseRevisionRequired = true;
+      manuscript.postDefenseRevisionStatus = 'under_review';
+      manuscript.postDefenseRevisions = manuscript.postDefenseRevisions || [];
+      manuscript.postDefenseRevisions.push(revisionSubmission);
+      manuscript.latestPostDefenseRevision = revisionSubmission;
+      manuscript.updatedAt = new Date().toISOString();
+      map.set(id, manuscript);
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (!wsDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+        const prevRevisions = wsDoc.data().postDefenseRevisions || [];
+        await wsRef.update({
+          postDefenseRevisionRequired: true,
+          postDefenseRevisionStatus: 'under_review',
+          postDefenseRevisions: [...prevRevisions, revisionSubmission],
+          latestPostDefenseRevision: revisionSubmission,
+          updatedAt: new Date().toISOString()
+        });
+        manuscript = { id: wsDoc.id, ...wsDoc.data(), postDefenseRevisionStatus: 'under_review' };
+      } else {
+        const prevRevisions = doc.data().postDefenseRevisions || [];
+        await ref.update({
+          postDefenseRevisionRequired: true,
+          postDefenseRevisionStatus: 'under_review',
+          postDefenseRevisions: [...prevRevisions, revisionSubmission],
+          latestPostDefenseRevision: revisionSubmission,
+          updatedAt: new Date().toISOString()
+        });
+        manuscript = { id: doc.id, ...doc.data(), postDefenseRevisionStatus: 'under_review' };
+      }
+    }
+
+    // Trigger in-app notifications to panel and adviser
+    try {
+      const notifUsers = [manuscript.adviserId, ...(manuscript.panelistIds || [])].filter(Boolean);
+      for (const recipientId of notifUsers) {
+        await db.collection('notifications').add({
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          userId: recipientId,
+          type: 'post_defense_revision',
+          title: 'Post-Defense Revisions Submitted',
+          message: `${manuscript.studentName || 'Student Group'} has submitted revised manuscript and point-by-point revision matrix for "${manuscript.title || manuscript.projectTitle || 'Research Project'}".`,
+          linkUrl: `/workspace?id=${id}&tab=revisions`,
+          read: false,
+          createdAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+    } catch (notifErr) {
+      console.warn('[ManuscriptController] Error sending revision notifications:', notifErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Post-defense revised manuscript and revision matrix submitted successfully for faculty verification.',
+      data: manuscript
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] submitPostDefenseRevision error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Review Post-Defense Revisions & Record Approval or Request Further Revisions (Faculty / Panelist / Adviser)
+ */
+export const reviewPostDefenseRevision = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { decision, reviewNotes } = req.body;
+
+    if (!decision || (decision !== 'approved' && decision !== 'revision_required')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid decision. Must be "approved" or "revision_required".'
+      });
+    }
+
+    seedMockManuscriptsIfEmpty();
+
+    const reviewerUid = req.user?.uid || '';
+    const reviewerName = req.user?.fullName || 'Faculty Reviewer';
+    const reviewedAt = new Date().toISOString();
+
+    const reviewRecord = {
+      reviewId: `rev-review-${Date.now()}`,
+      reviewedBy: reviewerUid,
+      reviewedByName: reviewerName,
+      reviewedAt,
+      decision,
+      reviewNotes: reviewNotes || ''
+    };
+
+    let manuscript = null;
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      manuscript = map.get(id);
+      if (!manuscript) {
+        return res.status(404).json({ success: false, error: 'Manuscript not found' });
+      }
+      manuscript.postDefenseRevisionStatus = decision;
+      manuscript.postDefenseReviews = manuscript.postDefenseReviews || [];
+      manuscript.postDefenseReviews.push(reviewRecord);
+      if (decision === 'approved') {
+        manuscript.postDefenseRevisionApprovedBy = reviewerUid;
+        manuscript.postDefenseRevisionApprovedByName = reviewerName;
+        manuscript.postDefenseRevisionApprovedAt = reviewedAt;
+      }
+      manuscript.updatedAt = reviewedAt;
+      map.set(id, manuscript);
+    } else {
+      const ref = db.collection('manuscript_versions').doc(id);
+      const doc = await ref.get();
+      const updateData = {
+        postDefenseRevisionStatus: decision,
+        postDefenseReviews: [...(doc.data()?.postDefenseReviews || []), reviewRecord],
+        updatedAt: reviewedAt
+      };
+      if (decision === 'approved') {
+        updateData.postDefenseRevisionApprovedBy = reviewerUid;
+        updateData.postDefenseRevisionApprovedByName = reviewerName;
+        updateData.postDefenseRevisionApprovedAt = reviewedAt;
+      }
+
+      if (!doc.exists) {
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (!wsDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+        await wsRef.update(updateData);
+        manuscript = { id: wsDoc.id, ...wsDoc.data(), ...updateData };
+      } else {
+        await ref.update(updateData);
+        manuscript = { id: doc.id, ...doc.data(), ...updateData };
+      }
+    }
+
+    // Send notification to students
+    try {
+      const studentRecipients = manuscript.memberIds || [manuscript.studentId, manuscript.userId].filter(Boolean);
+      for (const stId of studentRecipients) {
+        await db.collection('notifications').add({
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          userId: stId,
+          type: 'post_defense_review',
+          title: decision === 'approved' ? 'Post-Defense Revisions Approved!' : 'Further Revisions Required',
+          message: decision === 'approved'
+            ? `${reviewerName} has verified and approved your post-defense revisions. You may now publish to the Institutional Repository.`
+            : `${reviewerName} reviewed your post-defense revisions and requested additional corrections: ${reviewNotes || 'Check feedback.'}`,
+          linkUrl: `/workspace?id=${id}`,
+          read: false,
+          createdAt: reviewedAt
+        }).catch(() => {});
+      }
+    } catch (notifErr) {
+      console.warn('[ManuscriptController] Error sending student review notifications:', notifErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: decision === 'approved'
+        ? 'Post-defense revisions successfully approved. Institutional repository publication is now unlocked.'
+        : 'Revisions returned to student group for further adjustments.',
+      data: manuscript
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] reviewPostDefenseRevision error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Get Post-Defense Revisions & Approval Status for a manuscript
+ */
+export const getPostDefenseRevisions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    seedMockManuscriptsIfEmpty();
+
+    let manuscript = null;
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscripts');
+      manuscript = map.get(id);
+    } else {
+      const doc = await db.collection('manuscript_versions').doc(id).get();
+      if (doc.exists) {
+        manuscript = { id: doc.id, ...doc.data() };
+      } else {
+        const wsDoc = await db.collection('manuscript_workspaces').doc(id).get();
+        if (wsDoc.exists) manuscript = { id: wsDoc.id, ...wsDoc.data() };
+      }
+    }
+
+    if (!manuscript) {
+      return res.status(404).json({ success: false, error: 'Manuscript not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        manuscriptId: id,
+        postDefenseRevisionRequired: Boolean(manuscript.postDefenseRevisionRequired),
+        postDefenseRevisionStatus: manuscript.postDefenseRevisionStatus || 'none',
+        postDefenseRevisions: manuscript.postDefenseRevisions || [],
+        latestPostDefenseRevision: manuscript.latestPostDefenseRevision || null,
+        postDefenseReviews: manuscript.postDefenseReviews || [],
+        approvedBy: manuscript.postDefenseRevisionApprovedByName || null,
+        approvedAt: manuscript.postDefenseRevisionApprovedAt || null
+      }
+    });
+  } catch (error) {
+    console.error('[ManuscriptController] getPostDefenseRevisions error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

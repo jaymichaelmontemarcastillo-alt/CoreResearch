@@ -35,4 +35,6 @@ const UserSchema = new mongoose.Schema({
   strict: false // Allow dynamic fields to be saved if any were missed
 });
 
+UserSchema.index({ role: 1, status: 1 });
+
 export const User = mongoose.model('User', UserSchema);

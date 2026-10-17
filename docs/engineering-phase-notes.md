@@ -8,10 +8,11 @@ below to resume a trace without rescanning unrelated parts of the codebase.
 
 ## Current phase
 
-**Priority 1 — Data integrity.** Priority 0 security changes and Firestore Rules
-Emulator regression tests were completed before this inventory. Priority 1 is
-still in progress; the schedule projection and user-profile synchronization
-changes recorded below are bounded fixes, not a complete data migration.
+**Priority 2 — Performance and reliability.** Priority 0 security changes and
+Firestore Rules Emulator regression tests are complete. Priority 1 remains
+partially open for the user/project consistency follow-ups below; its schedule
+projection and user-profile synchronization changes are bounded fixes, not a
+complete data migration.
 
 ## Store ownership inventory
 
@@ -27,6 +28,10 @@ changes recorded below are bounded fixes, not a complete data migration.
 
 ## Areas inspected
 
+- **Priority 2 user directory path:** `server/src/controllers/userController.js`,
+  `server/src/services/userListQuery.js`, `server/src/models/User.js`,
+  `server/src/routes/userRoutes.js`, `client/src/services/user.service.ts`,
+  `client/src/pages/UserDirectory.jsx`, and `client/src/pages/UserRequests.jsx`.
 - **Authentication and profiles:** `server/src/controllers/authController.js`,
   `server/src/controllers/userController.js`, `server/src/models/User.js`,
   `server/src/routes/userRoutes.js`, `server/src/routes/authRoutes.js`,
@@ -84,6 +89,28 @@ changes recorded below are bounded fixes, not a complete data migration.
   instead of returning success-shaped responses. Firebase Auth is deleted
   first; retry/recovery for partial cleanup still needs an explicit policy.
 
+## Priority 2 progress
+
+### User directory query path
+
+- MongoDB receives candidate filters for role, approval status, program,
+  specialization, and search before user documents are materialized in
+  `getAllUsers`. Candidate filters include legacy specialization-name aliases
+  and the legacy WMAD student default so profile normalization does not exclude
+  matching records before the existing filters run.
+- For requests without search/program/specialization filters, role/status
+  pagination uses `countDocuments`, stable `_id` ordering, and MongoDB
+  `skip`/`limit`, rather than loading and slicing the full matching result set
+  in Node.
+- Added a compound `{ role, status }` index and unit coverage for role/status
+  constraints, escaped search strings, and legacy program/specialization
+  aliases.
+- Search regex input is escaped so user-provided punctuation is treated
+  literally rather than as regex syntax.
+- This is the first bounded performance improvement. More profiling is needed
+  to identify which remaining broad Firestore reads are hot before changing
+  additional query paths.
+
 ## Priority 1 remaining work
 
 1. Validate the profile update/registration paths in an environment with
@@ -99,6 +126,24 @@ changes recorded below are bounded fixes, not a complete data migration.
    proposal/workspace linking and status transitions.
 5. Record decisions here before changing persistence behavior for another
    entity.
+
+## Priority 2 remaining work
+
+1. Benchmark paginated user-list requests against representative data and
+   inspect MongoDB explain plans to confirm the `{ role, status }` index is
+   selected.
+2. Measure remaining broad Firestore reads, starting with manuscript,
+   proposal, evaluation, and workspace list operations; add pagination only
+   where callers and ordering requirements are understood.
+3. Investigate client bundle splitting: the latest production build emits a
+   1,172.67 kB main JavaScript chunk (310.50 kB gzip) and reports mixed
+   static/dynamic imports for system activity, research workspace, and group
+   services.
+4. Review repository publication search/aggregation and notification fan-out
+   for query count and payload size.
+5. Check Firestore composite-index requirements and add only indexes that
+   match measured query shapes.
+6. Capture before/after latency and document results here.
 
 ## Later phases
 
@@ -129,4 +174,16 @@ changes recorded below are bounded fixes, not a complete data migration.
   earlier schedule phase could not run server integration checks because
   server runtime packages were not installed. Repeat runtime/integration
   checks when dependencies and services are available.
+- Merge conflicts from the user's `master` pull are resolved in
+  `server/package.json`, `server/src/controllers/scheduleController.js`, and
+  `client/src/services/schedule.service.ts`. Both server package scripts were
+  retained; schedule writes continue through the API with MongoDB authority
+  and a `defense_schedules` projection. No merge commit was created.
+- User-list query builder tests pass with
+  `node --test server/src/services/userListQuery.test.js
+  server/src/services/scheduleProjection.test.js`; the client schedule and
+  user service tests pass. Changed server files pass `node --check`.
+- The post-merge client production build passes; Vite reports the main bundle
+  size and mixed static/dynamic imports noted above. No live benchmark or
+  MongoDB explain plan has been run yet.
 - Windows environment: workspace path is `C:\CoreResearch-backend`.

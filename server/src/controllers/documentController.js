@@ -1,6 +1,6 @@
 import path from 'path';
 import { documentImportService } from '../services/import/DocumentImportService.js';
-import { getStorageProvider } from '../services/storage/storageManager.js';
+import { getStorageProvider, getReadProviders, localStorageProvider } from '../services/storage/storageManager.js';
 import { canAccessProject } from '../middleware/resourceAuthorization.js';
 import { Document } from '../models/Document.js';
 
@@ -86,23 +86,30 @@ export const serveStorageAsset = async (req, res) => {
     } catch {
       return res.status(400).json({ success: false, message: 'Invalid asset path.' });
     }
-    const cleanKey = path.posix.normalize(rawPath.replace(/\\/g, '/'));
+    const cleanKey = path.posix.normalize(rawPath.replace(/\\/g, '/')).replace(/^(\.\.[\/\\])+/, '');
     if (cleanKey.startsWith('../') || cleanKey === '..' || path.posix.isAbsolute(cleanKey)) {
       return res.status(400).json({ success: false, message: 'Invalid asset path.' });
     }
+
     const pathParts = cleanKey.split('/');
-    if (pathParts.length < 3 || pathParts[0] !== 'documents' || !pathParts[1]) {
-      return res.status(400).json({ success: false, message: 'Invalid asset path.' });
-    }
-    const document = await Document.findOne({ id: pathParts[1] }).lean();
-    if (!document) {
-      return res.status(404).json({ success: false, message: 'Asset not found.' });
-    }
-    if (!(await canAccessProject(req.user, document.id, document))) {
-      return res.status(403).json({ success: false, message: 'You are not authorized to access this asset.' });
+    if (pathParts[0] === 'documents' && pathParts[1]) {
+      const document = await Document.findOne({ id: pathParts[1] }).lean();
+      if (document && !(await canAccessProject(req.user, document.id, document))) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to access this asset.' });
+      }
     }
 
-    const storageProvider = getStorageProvider();
+    // Role-based Access Control: Restrict students from directly accessing/downloading repository manuscripts
+    if (cleanKey.startsWith('repository/') || cleanKey.includes('/repository/')) {
+      const userRole = req.user?.role || req.headers['x-user-role'];
+      if (userRole === 'student') {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          message: 'Access Restricted: Student access to repository manuscripts is limited to abstracts and metadata only. Full document access requires faculty or administrative authorization.',
+        });
+      }
+    }
 
     // Determine Content-Type
     const ext = path.extname(cleanKey).toLowerCase();
@@ -115,7 +122,15 @@ export const serveStorageAsset = async (req, res) => {
       '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
 
-    const stream = await storageProvider.downloadStream(cleanKey);
+    let stream = null;
+    for (const provider of getReadProviders()) {
+      try {
+        stream = await provider.downloadStream(cleanKey);
+      } catch (e) {
+        stream = null;
+      }
+      if (stream) break;
+    }
     
     if (!stream) {
       return res.status(404).json({
