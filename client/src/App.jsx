@@ -4,10 +4,11 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Layout } from './components/Layout';
 import { NetworkStatus } from './components/NetworkStatus';
 import { PageLoadingFallback } from './components/ui/PageLoadingFallback';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+const Layout = React.lazy(() => import('./components/Layout'));
 
 // Lazy loaded pages
 const Login = React.lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));

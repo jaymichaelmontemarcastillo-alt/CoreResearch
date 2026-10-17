@@ -48,12 +48,16 @@ export const dataCache = {
    * @param {string} key     - Cache key
    * @param {Function} fetchFn - Async function that returns the data
    * @param {number} ttl     - Time-to-live in milliseconds
+   * @param {{ cacheNull?: boolean }} options - Whether null results should be cached
    * @returns {Promise<*>}
    */
-  async getOrFetch(key, fetchFn, ttl = CACHE_TTL.SEMI_STABLE) {
-    // 1. Return from cache if fresh
-    const cached = this.get(key);
-    if (cached !== null) return cached;
+  async getOrFetch(key, fetchFn, ttl = CACHE_TTL.SEMI_STABLE, { cacheNull = false } = {}) {
+    // 1. Return fresh cached values; negative lookups are opt-in.
+    const entry = cache.get(key);
+    if (entry && Date.now() <= entry.expiresAt && (entry.data !== null || cacheNull)) {
+      return entry.data;
+    }
+    if (entry) cache.delete(key);
 
     // 2. If the same key is already being fetched, piggyback on that request
     if (pending.has(key)) {
@@ -65,7 +69,7 @@ export const dataCache = {
     promise = fetchFn()
       .then((data) => {
         if (pending.get(key) === promise) {
-          this.set(key, data, ttl);
+          if (data !== null || cacheNull) this.set(key, data, ttl);
           pending.delete(key);
         }
         return data;

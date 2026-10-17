@@ -29,6 +29,7 @@ import { courseService } from '../../services/course.service';
 import { sectionService } from '../../services/section.service';
 import adviserRequestService from '../../services/adviserRequest.service';
 import titleProposalService from '../../services/titleProposal.service';
+import dataCache, { CACHE_TTL } from '../../services/dataCache';
 
 /* ─── Dashboard Card Shell ─── */
 const DashboardCard = ({ children, className = '' }) => (
@@ -64,16 +65,37 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     const initData = async () => {
       setLoading(true);
       try {
-        const { default: dataCache, CACHE_TTL } = await import('../../services/dataCache');
-
-        // 1. Fetch group first because schedules depends on it
-        const studentGroup = await dataCache.getOrFetch(`group_${studentUid}`, () => groupService.getGroupByStudentId(studentUid), CACHE_TTL.MODERATE);
-
-        // 2. Parallel Fetching for independent data
-        const [courses, allSchedules, docs] = await Promise.all([
-          userProfile?.courseId ? dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE) : Promise.resolve([]),
-          dataCache.getOrFetch(`schedules_${studentUid}`, () => scheduleService.getSchedulesForStudent(studentUid, studentGroup?.id, userProfile?.fullName), CACHE_TTL.MODERATE),
-          dataCache.getOrFetch('user_docs', () => documentStore.fetchDocuments(userProfile), CACHE_TTL.SHORT).catch(() => [])
+        // Start independent requests alongside the group lookup; schedules need the group ID.
+        const studentGroupPromise = dataCache.getOrFetch(
+          `group_${studentUid}`,
+          () => groupService.getGroupByStudentId(studentUid),
+          CACHE_TTL.MODERATE,
+          { cacheNull: true }
+        );
+        const coursesPromise = userProfile?.courseId
+          ? dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE)
+          : Promise.resolve([]);
+        const docsPromise = dataCache.getOrFetch(
+          'user_docs',
+          () => documentStore.fetchDocuments(userProfile),
+          CACHE_TTL.SHORT
+        ).catch(() => []);
+        const schedulesPromise = studentGroupPromise.then((studentGroup) =>
+          dataCache.getOrFetch(
+            `schedules_${studentUid}`,
+            () => scheduleService.getSchedulesForStudent(
+              studentUid,
+              studentGroup?.id,
+              userProfile?.fullName
+            ),
+            CACHE_TTL.MODERATE
+          )
+        );
+        const [studentGroup, courses, allSchedules, docs] = await Promise.all([
+          studentGroupPromise,
+          coursesPromise,
+          schedulesPromise,
+          docsPromise
         ]);
 
         const leaderUid = studentGroup?.memberIds?.[0] || studentGroup?.members?.[0]?.uid;
@@ -124,7 +146,18 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
             let sharedAdviser = studentGroup.adviserName || '';
             let sharedStatus = 'Group Formed';
 
-            const reqs = await adviserRequestService.getRequestsForStudentOrGroup(studentUid, studentGroup.id, leaderUid);
+            const [reqs, props] = await Promise.all([
+              dataCache.getOrFetch(
+                `adviser_requests_${studentUid}_${studentGroup.id || 'none'}`,
+                () => adviserRequestService.getRequestsForStudentOrGroup(
+                  studentUid,
+                  studentGroup.id,
+                  leaderUid
+                ),
+                CACHE_TTL.SHORT
+              ),
+              titleProposalService.getProposalsByGroup(studentGroup.id, leaderUid)
+            ]);
             const activeReq = reqs.find((r) => r.status === 'pending' || r.status === 'accepted');
             if (activeReq) {
               if (!sharedTitle) sharedTitle = activeReq.researchTitle;
@@ -132,7 +165,6 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
               sharedStatus = activeReq.status === 'accepted' ? 'Adviser Accepted' : 'Adviser Request Pending';
             }
 
-            const props = await titleProposalService.getProposalsByGroup(studentGroup.id, leaderUid);
             if (props && props.length > 0) {
               const latestProp = props[0];
               if (!sharedTitle) sharedTitle = latestProp.title;

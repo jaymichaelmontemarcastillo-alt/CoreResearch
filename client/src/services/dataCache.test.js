@@ -28,4 +28,30 @@ describe('dataCache', () => {
     await expect(staleResult).resolves.toEqual({ id: 'archived-workspace' });
     expect(dataCache.get(key)).toEqual(freshValue);
   });
+
+  it('caches null results when negative caching is enabled', async () => {
+    let fetchCount = 0;
+    const fetchGroup = async () => {
+      fetchCount += 1;
+      return null;
+    };
+
+    await expect(dataCache.getOrFetch('group_student', fetchGroup, undefined, { cacheNull: true })).resolves.toBeNull();
+    await expect(dataCache.getOrFetch('group_student', fetchGroup, undefined, { cacheNull: true })).resolves.toBeNull();
+
+    expect(fetchCount).toBe(1);
+  });
+
+  it('preserves refetch behavior for null results unless negative caching is enabled', async () => {
+    let fetchCount = 0;
+    const fetchGroup = async () => {
+      fetchCount += 1;
+      return null;
+    };
+
+    await dataCache.getOrFetch('group_student', fetchGroup);
+    await dataCache.getOrFetch('group_student', fetchGroup);
+
+    expect(fetchCount).toBe(2);
+  });
 });

@@ -8,6 +8,7 @@ import { adviserRequestService } from "../services/adviserRequest.service";
 import researchWorkspaceService from "../services/researchWorkspace.service";
 import groupService from "../services/group.service";
 import api from "../services/api";
+import dataCache, { CACHE_TTL } from "../services/dataCache";
 import {
   HiSquares2X2,
   HiDocumentText,
@@ -65,7 +66,12 @@ export const Sidebar = ({
     const checkWorkspace = async () => {
       if (effectiveRole === "student" && currentUser?.uid) {
         try {
-          const group = await groupService.getGroupByStudentId(currentUser.uid);
+          const group = await dataCache.getOrFetch(
+            `group_${currentUser.uid}`,
+            () => groupService.getGroupByStudentId(currentUser.uid),
+            CACHE_TTL.MODERATE,
+            { cacheNull: true }
+          );
           const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
             currentUser.uid,
             group?.id
@@ -74,8 +80,13 @@ export const Sidebar = ({
           if (ws) {
             setHasWorkspace(true);
           } else {
-            const requests = await adviserRequestService.getRequestsForStudentOrGroup(
-              currentUser.uid
+            const requests = await dataCache.getOrFetch(
+              `adviser_requests_${currentUser.uid}_${group?.id || 'none'}`,
+              () => adviserRequestService.getRequestsForStudentOrGroup(
+                currentUser.uid,
+                group?.id
+              ),
+              CACHE_TTL.SHORT
             );
             if (requests.some((r) => r.status === "accepted")) {
               setHasWorkspace(true);

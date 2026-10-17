@@ -1,6 +1,6 @@
 # Engineering Phase Notes
 
-Last updated: 2026-10-16
+Last updated: 2026-10-17
 
 This is the working handoff for the CoreResearch remediation phases. Update the
 inventory and validation notes as each phase progresses; use the file references
@@ -107,9 +107,70 @@ complete data migration.
   aliases.
 - Search regex input is escaped so user-provided punctuation is treated
   literally rather than as regex syntax.
-- This is the first bounded performance improvement. More profiling is needed
-  to identify which remaining broad Firestore reads are hot before changing
-  additional query paths.
+- This is a bounded improvement; representative-data latency and MongoDB
+  `explain("executionStats")` are still needed to confirm index selection.
+
+### Mobile web and PWA baseline
+
+- The deployed public login page was measured at
+  `https://coreresearch-33a17.web.app/login` using a 390x844 viewport, 4x CPU
+  throttling, 150 ms simulated latency, and 1.6 Mbps download throughput with
+  the browser cache and service worker bypassed. Before the local changes,
+  `DOMContentLoaded` was 2,081 ms, `load` was 2,083 ms, total transferred
+  resources were 285,412 bytes, and the entry bundle transferred 260,351 bytes.
+  This is a browser simulation, not a physical-device or field Web Vitals
+  measurement.
+- A same-preview before/after comparison under the same viewport and
+  throttling measured 2,201 ms to `DOMContentLoaded`, 2,204 ms to `load`, and
+  343,066 transferred bytes before; after the changes it measured 2,098 ms,
+  2,120 ms, and 284,074 bytes. This is an 84 ms (3.8%) load-time reduction and
+  17.2% fewer transferred bytes in that local comparison.
+- The final production build entry JavaScript is 972,877 bytes (251.49 kB
+  gzip), down from 1,172,687 bytes (310.50 kB gzip), a 17.0% reduction in
+  minified bytes and
+  19.0% in gzip size. The protected app shell now loads on demand, and the
+  global connectivity indicator no longer pulls in Framer Motion.
+- The entry chunk still exceeds Vite's 500 kB warning threshold. The
+  `html2pdf` chunk is 982.47 kB and remains route/action-lazy. The build's PWA
+  service worker precaches 93 entries (3,643.94 KiB); full offline precaching
+  was retained to avoid changing offline route availability.
+
+### Client data-loading improvements
+
+- The student dashboard starts independent course and document reads while
+  the group lookup is in flight; the schedule query starts as soon as its
+  group dependency resolves. The reads are awaited together to keep errors
+  observed while requests are pending.
+- Sidebar and dashboard share group lookups and adviser-request results
+  through the existing in-memory cache, including opt-in caching of a missing
+  group. The shared cache defaults retain their previous behavior for other
+  null-valued results.
+- Adviser requests and group proposals load concurrently when the dashboard
+  has no workspace. The protected dashboard and its real authenticated data
+  could not be measured without a test account, so request savings are
+  source-traced and build validated, not live-profiled. Focused data-cache,
+  schedule-service, and user-service tests pass (7 total).
+
+### Firebase delivery checks
+
+- Live Hosting returned `Cache-Control: max-age=3600` for `index.html` and
+  `sw.js`, and `public, max-age=31536000, immutable` for hashed assets.
+  `firebase.json` now requests revalidation for unversioned responses while
+  preserving long-lived immutable caching for `/assets/**`. This has not been
+  deployed; recheck response headers after the next Hosting deployment.
+- The current service-worker precache behavior was intentionally preserved;
+  reducing the 3.64 MiB precache would trade first-install transfer for
+  reduced offline availability and should be a separate product decision.
+
+### Backend sampling
+
+- The public `/api/health` endpoint returned HTTP 200 for two unauthenticated
+  probes; measured total times were 1,486 ms and 740 ms. These are health
+  endpoint samples, not protected page/API timings or proof of a Render cold
+  start.
+- Authenticated endpoint profiling and a representative-data MongoDB explain
+  plan remain blocked until a safe test account and database test environment
+  are available.
 
 ## Priority 1 remaining work
 
@@ -135,15 +196,15 @@ complete data migration.
 2. Measure remaining broad Firestore reads, starting with manuscript,
    proposal, evaluation, and workspace list operations; add pagination only
    where callers and ordering requirements are understood.
-3. Investigate client bundle splitting: the latest production build emits a
-   1,172.67 kB main JavaScript chunk (310.50 kB gzip) and reports mixed
-   static/dynamic imports for system activity, research workspace, and group
-   services.
-4. Review repository publication search/aggregation and notification fan-out
+3. Continue reducing the 972.88 kB entry chunk while retaining route-level
+   loading and offline behavior.
+4. Capture real-device LCP/INP/CLS and protected-page timings after the current
+   build is deployed; compare the Firebase Hosting headers after deployment.
+5. Review repository publication search/aggregation and notification fan-out
    for query count and payload size.
-5. Check Firestore composite-index requirements and add only indexes that
+6. Check Firestore composite-index requirements and add only indexes that
    match measured query shapes.
-6. Capture before/after latency and document results here.
+7. Capture and document remaining before/after API and database timings.
 
 ## Later phases
 
@@ -174,16 +235,22 @@ complete data migration.
   earlier schedule phase could not run server integration checks because
   server runtime packages were not installed. Repeat runtime/integration
   checks when dependencies and services are available.
-- Merge conflicts from the user's `master` pull are resolved in
+- Merge conflicts from the user's `master` pull were resolved in
   `server/package.json`, `server/src/controllers/scheduleController.js`, and
   `client/src/services/schedule.service.ts`. Both server package scripts were
   retained; schedule writes continue through the API with MongoDB authority
-  and a `defense_schedules` projection. No merge commit was created.
+  and a `defense_schedules` projection. At this snapshot the merge is no
+  longer active; `main` is at `ef33b62` (`merge resolve`).
 - User-list query builder tests pass with
   `node --test server/src/services/userListQuery.test.js
   server/src/services/scheduleProjection.test.js`; the client schedule and
   user service tests pass. Changed server files pass `node --check`.
-- The post-merge client production build passes; Vite reports the main bundle
-  size and mixed static/dynamic imports noted above. No live benchmark or
-  MongoDB explain plan has been run yet.
+- The production client build passes with the measured optimized sizes above.
+  Focused data-cache, schedule-service, and user-service tests pass (7 total);
+  browser testing confirmed the offline and back-online status messages still
+  work. Scoped diagnostics and `git diff --check` pass.
+- Live user-directory timings and MongoDB query plans have not been measured.
+- The local performance changes and Hosting header rule have not been deployed
+  to Firebase; deployment and protected-route measurement remain follow-up
+  steps.
 - Windows environment: workspace path is `C:\CoreResearch-backend`.
