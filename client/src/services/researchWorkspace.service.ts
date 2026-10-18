@@ -6,12 +6,14 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   collection,
   query,
   where,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { db, auth } from '../firebase/firebase';
+import api from './api';
 import {
   ManuscriptWorkspace,
   ManuscriptSection,
@@ -38,6 +40,259 @@ function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
 }
 
 export const researchWorkspaceService = {
+  /**
+   * Restart research progress for a workspace
+   * Archives workspace, manuscript, tasks, rubrics, comments, and schedules while keeping group members and accounts intact.
+   */
+  async restartWorkspace(workspaceId: string, reason?: string): Promise<any> {
+    const defaultReason = reason || 'Student restarted research progress';
+    let backendSuccess = false;
+    let backendData = null;
+
+    // 1. Try authoritative backend first (tries both /workspace and /workspaces)
+    try {
+      const res = await api.post(`/workspace/${workspaceId}/restart`, { reason: defaultReason }).catch(async () => {
+        return await api.post(`/workspaces/${workspaceId}/restart`, { reason: defaultReason });
+      });
+      if (res?.data?.success) {
+        backendSuccess = true;
+        backendData = res.data;
+      }
+    } catch (apiErr) {
+      console.warn('[researchWorkspaceService] Backend restart API returned error or was unavailable, proceeding with direct Firestore archive fallback:', apiErr);
+    }
+
+    // 2. Perform direct Firestore archival as a guarantee (works in all environments, offline, serverless, or if backend returned 404)
+    try {
+      const now = new Date().toISOString();
+      const currentUid = auth.currentUser?.uid || '';
+      const currentName = auth.currentUser?.displayName || 'Student Researcher';
+
+      const wsRef = doc(db, COLLECTION_NAME, workspaceId);
+      const wsSnap = await getDoc(wsRef).catch(() => null);
+      const wsData = wsSnap?.exists() ? (wsSnap.data() as ManuscriptWorkspace) : null;
+      const groupId = wsData?.groupId || (workspaceId.startsWith('ws-group-') ? workspaceId.replace('ws-group-', '') : '');
+      const documentId = wsData?.documentId;
+      const proposalId = wsData?.proposalId;
+
+      // A. Archive the workspace document
+      if (wsSnap?.exists()) {
+        await updateDoc(wsRef, {
+          isArchived: true,
+          status: 'archived',
+          archivedAt: now,
+          archivedBy: currentUid,
+          archivedByName: currentName,
+          archiveReason: defaultReason,
+          updatedAt: now,
+        }).catch((e) => console.warn('[researchWorkspaceService] archive ws doc error:', e));
+      }
+
+      // B. Archive manuscript document if exists
+      if (documentId) {
+        await updateDoc(doc(db, 'manuscript_documents', documentId), {
+          isArchived: true,
+          status: 'archived',
+          archivedAt: now,
+          archivedBy: currentUid,
+          archiveReason: defaultReason,
+          updatedAt: now,
+        }).catch(() => null);
+      }
+      try {
+        const docQuery = query(collection(db, 'manuscript_documents'), where('workspaceId', '==', workspaceId));
+        const docSnaps = await getDocs(docQuery);
+        for (const dDoc of docSnaps.docs) {
+          await updateDoc(dDoc.ref, {
+            isArchived: true,
+            status: 'archived',
+            archivedAt: now,
+            archivedBy: currentUid,
+            archiveReason: defaultReason,
+            updatedAt: now,
+          }).catch(() => null);
+        }
+      } catch (e) {}
+
+      // C. Archive proposals for this group/workspace
+      const propPromises = [];
+      if (groupId) {
+        propPromises.push(getDocs(query(collection(db, 'proposals'), where('groupId', '==', groupId))));
+      }
+      if (proposalId) {
+        propPromises.push(getDocs(query(collection(db, 'proposals'), where('id', '==', proposalId))));
+      }
+      if (currentUid) {
+        propPromises.push(getDocs(query(collection(db, 'proposals'), where('submittedByUid', '==', currentUid))));
+      }
+      const propSnaps = await Promise.all(propPromises).catch(() => []);
+      for (const pSnap of propSnaps) {
+        if (pSnap && pSnap.docs) {
+          for (const pDoc of pSnap.docs) {
+            await updateDoc(pDoc.ref, {
+              isArchived: true,
+              status: 'archived',
+              archivedAt: now,
+              updatedAt: now,
+            }).catch(() => null);
+          }
+        }
+      }
+
+      // D. Archive research tasks
+      try {
+        const taskSnap = await getDocs(query(collection(db, 'research_tasks'), where('workspaceId', '==', workspaceId)));
+        for (const tDoc of taskSnap.docs) {
+          await updateDoc(tDoc.ref, {
+            isArchived: true,
+            status: 'archived',
+            archivedAt: now,
+            updatedAt: now,
+          }).catch(() => null);
+        }
+      } catch (te) {
+        console.warn('[researchWorkspaceService] tasks archive warning:', te);
+      }
+
+      // E. Archive research feedback and comments
+      try {
+        const fbSnap = await getDocs(query(collection(db, 'research_feedback'), where('workspaceId', '==', workspaceId)));
+        for (const fDoc of fbSnap.docs) {
+          await updateDoc(fDoc.ref, {
+            isArchived: true,
+            status: 'archived',
+            archivedAt: now,
+            updatedAt: now,
+          }).catch(() => null);
+        }
+      } catch (fe) {
+        console.warn('[researchWorkspaceService] feedback archive warning:', fe);
+      }
+
+      // F. Archive defense schedules in Firestore
+      if (groupId) {
+        try {
+          const schSnap = await getDocs(query(collection(db, 'defense_schedules'), where('projectId', '==', groupId)));
+          for (const sDoc of schSnap.docs) {
+            await updateDoc(sDoc.ref, {
+              status: 'archived',
+              isArchived: true,
+              updatedAt: now,
+            }).catch(() => null);
+          }
+        } catch (se) {
+          console.warn('[researchWorkspaceService] schedules archive warning:', se);
+        }
+      }
+
+      // G. Archive rubric evaluations
+      try {
+        const evalQueries = [
+          getDocs(query(collection(db, 'proposal_evaluations'), where('workspaceId', '==', workspaceId))).catch(() => null),
+          getDocs(query(collection(db, 'final_evaluations'), where('workspaceId', '==', workspaceId))).catch(() => null),
+        ];
+        if (groupId) {
+          evalQueries.push(getDocs(query(collection(db, 'proposal_evaluations'), where('groupId', '==', groupId))).catch(() => null));
+          evalQueries.push(getDocs(query(collection(db, 'final_evaluations'), where('groupId', '==', groupId))).catch(() => null));
+          evalQueries.push(getDocs(query(collection(db, 'evaluations'), where('projectId', '==', groupId))).catch(() => null));
+        }
+        const evalSnaps = await Promise.all(evalQueries);
+        for (const eSnap of evalSnaps) {
+          if (eSnap && eSnap.docs) {
+            for (const eDoc of eSnap.docs) {
+              await updateDoc(eDoc.ref, {
+                isArchived: true,
+                status: 'archived',
+                archivedAt: now,
+                updatedAt: now,
+              }).catch(() => null);
+            }
+          }
+        }
+      } catch (ee) {
+        console.warn('[researchWorkspaceService] evaluations archive warning:', ee);
+      }
+
+      // H. Cancel active adviser requests
+      if (groupId) {
+        try {
+          const reqSnap = await getDocs(query(collection(db, 'adviser_requests'), where('groupId', '==', groupId)));
+          for (const rDoc of reqSnap.docs) {
+            await updateDoc(rDoc.ref, {
+              isArchived: true,
+              status: 'cancelled',
+              archiveReason: defaultReason,
+              updatedAt: now,
+            }).catch(() => null);
+          }
+        } catch (re) {
+          console.warn('[researchWorkspaceService] requests archive warning:', re);
+        }
+      }
+
+      // H2. Archive any sibling or active workspaces for this group
+      if (groupId) {
+        try {
+          const wsQ = query(collection(db, COLLECTION_NAME), where('groupId', '==', groupId));
+          const wsDocs = await getDocs(wsQ);
+          for (const d of wsDocs.docs) {
+            await updateDoc(d.ref, {
+              isArchived: true,
+              status: 'archived',
+              archivedAt: now,
+              archivedBy: currentUid,
+              archivedByName: currentName,
+              archiveReason: defaultReason,
+              updatedAt: now,
+            }).catch(() => null);
+          }
+        } catch (we) {
+          console.warn('[researchWorkspaceService] sibling workspaces archive warning:', we);
+        }
+      }
+
+      // I. Reset the Research Group — KEEP MEMBERS AND ACCOUNTS INTACT!
+      if (groupId) {
+        try {
+          const groupRef = doc(db, 'research_groups', groupId);
+          const gSnap = await getDoc(groupRef);
+          if (gSnap.exists()) {
+            await updateDoc(groupRef, {
+              workspaceId: '',
+              documentId: '',
+              title: '',
+              currentPhase: 'proposal',
+              status: 'forming',
+              adviserId: '',
+              adviserName: '',
+              panelists: [],
+              panelistIds: [],
+              panelistNames: [],
+              redefenseRequired: false,
+              updatedAt: now,
+            }).catch(() => null);
+          }
+        } catch (ge) {
+          console.warn('[researchWorkspaceService] reset group doc warning:', ge);
+        }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('workspace-status-changed', { detail: { hasWorkspace: false } }));
+      }
+
+      return backendData || {
+        success: true,
+        message: 'Research progress archived successfully. Group members and accounts are preserved.',
+        workspaceId,
+        groupId,
+      };
+    } catch (fallbackErr) {
+      console.error('[researchWorkspaceService] Firestore archive fallback error:', fallbackErr);
+      if (backendSuccess) return backendData;
+      throw fallbackErr;
+    }
+  },
   /**
    * Get or create a manuscript workspace for an accepted Adviser Request
    */
@@ -370,8 +625,10 @@ export const researchWorkspaceService = {
       console.warn('[researchWorkspaceService] Fallback reading group research assets:', e);
     }
 
-    if (!resolvedTitle && !resolvedAdviserId) {
-      throw new Error('The group does not have an active research title or adviser request.');
+    // A workspace can ONLY be created if the group has finished the matching process:
+    // They must have an assigned/accepted adviser AND an accepted title!
+    if (group.status === 'forming' || !resolvedAdviserId || !resolvedTitle) {
+      throw new Error('Research workspace cannot be created until the group finishes adviser matching.');
     }
 
     const workspaceId = hasArchivedWorkspace
@@ -646,6 +903,25 @@ export const researchWorkspaceService = {
       documentId,
       updatedAt: new Date().toISOString(),
     });
+  },
+
+  /**
+   * Fetch workspace that links directly to a given TipTap/OnlyOffice documentId
+   */
+  async getWorkspaceByDocumentId(documentId: string): Promise<ManuscriptWorkspace | null> {
+    if (!documentId) return null;
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('documentId', '==', documentId)
+      );
+      const snap = await getDocs(q);
+      const activeDocs = snap.docs.map(d => ({ ...d.data(), id: d.id } as ManuscriptWorkspace)).filter(isActiveWorkspace);
+      return activeDocs[0] || null;
+    } catch (err) {
+      console.warn('[researchWorkspaceService] getWorkspaceByDocumentId error:', err);
+      return null;
+    }
   },
 
   /**

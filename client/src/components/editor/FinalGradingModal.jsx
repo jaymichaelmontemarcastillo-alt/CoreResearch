@@ -2,6 +2,29 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, AlertTriangle, XCircle, Calculator, Loader2, ClipboardCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { scheduleService } from '../../services/schedule.service';
+
+const formatTime12Hour = (time) => {
+  if (!time) return '';
+  const parts = time.split(':');
+  if (parts.length < 2) return time;
+  const h = parseInt(parts[0], 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const formattedHour = h % 12 || 12;
+  return `${formattedHour}:${parts[1]} ${ampm}`;
+};
+
+const resolveProponentsString = (details) => {
+  if (!details) return '';
+  if (typeof details.proponents === 'string' && details.proponents.trim()) return details.proponents;
+  if (Array.isArray(details.proponents) && details.proponents.length > 0) return details.proponents.join(', ');
+  if (Array.isArray(details.members) && details.members.length > 0) {
+    return details.members.map((m) => m.fullName || m.name || m.email || '').filter(Boolean).join(', ');
+  }
+  if (Array.isArray(details.studentNames) && details.studentNames.length > 0) return details.studentNames.join(', ');
+  if (details.studentName && details.studentName !== 'Student Researcher') return details.studentName;
+  return '';
+};
 
 const MAX_SCORES = {
   format: 5,
@@ -76,20 +99,78 @@ export const FinalGradingModal = ({
     time: '',
   });
 
-  // Sync metadata when groupDetails or isOpen changes
+  // Sync metadata when groupDetails, existingEval, or isOpen changes
   useEffect(() => {
+    if (!isOpen) return;
+
+    // 1. Initial extraction from existingEval.meta or groupDetails
+    const evalMeta = existingEval?.meta || {};
+    const initialAdviser = evalMeta.adviser || existingEval?.adviser || existingEval?.adviserName || groupDetails?.adviser || groupDetails?.adviserName || groupDetails?.adviser?.name || '';
+    const initialTitle = evalMeta.title || existingEval?.title || existingEval?.projectTitle || groupDetails?.title || groupDetails?.projectTitle || groupDetails?.proposalTitle || '';
+    const initialProponents = evalMeta.proponents || existingEval?.proponents || resolveProponentsString(groupDetails) || '';
+    const initialGroupNo = evalMeta.groupNo || existingEval?.groupNo || groupDetails?.groupNo || groupDetails?.groupName || (groupDetails?.name || '') || '';
+    const initialDate = evalMeta.date || existingEval?.date || groupDetails?.date || '';
+    const initialTime = evalMeta.time || existingEval?.time || groupDetails?.time || '';
+    const initialExpert = evalMeta.expert || existingEval?.expert || existingEval?.panelistRole || groupDetails?.expert || groupDetails?.panelistRole || (groupDetails?.specialization ? `${groupDetails.specialization} Specialist` : '');
+
     setMeta({
-      adviser: groupDetails?.adviser || '',
-      expert: groupDetails?.expert || '',
-      title: groupDetails?.title || '',
-      proponents: Array.isArray(groupDetails?.proponents)
-        ? groupDetails.proponents.join(', ')
-        : groupDetails?.proponents || '',
-      groupNo: groupDetails?.groupNo || '',
-      date: groupDetails?.date || '',
-      time: groupDetails?.time || '',
+      adviser: initialAdviser,
+      expert: initialExpert,
+      title: initialTitle,
+      proponents: initialProponents,
+      groupNo: initialGroupNo,
+      date: initialDate,
+      time: initialTime,
     });
-  }, [groupDetails, isOpen]);
+
+    // 2. Async fallback lookup: query defense schedule if date/time/adviser/expert/groupNo/proponents are missing
+    let isCancelled = false;
+    const fetchScheduleDetails = async () => {
+      try {
+        const candidateId = defenseId || groupDetails?.defenseId || groupDetails?.id || groupDetails?.workspaceId || groupDetails?.groupId || groupDetails?.projectId;
+        if (!candidateId) return;
+
+        const allSchedules = await scheduleService.getAllSchedules();
+        if (isCancelled) return;
+
+        const matched = allSchedules.find((s) =>
+          s.id === candidateId ||
+          s.projectId === candidateId ||
+          s.groupId === candidateId ||
+          (groupDetails?.groupId && (s.projectId === groupDetails.groupId || s.groupId === groupDetails.groupId)) ||
+          (groupDetails?.projectId && (s.projectId === groupDetails.projectId || s.groupId === groupDetails.projectId))
+        );
+
+        if (matched) {
+          const matchedPanelist = (matched.panelists || []).find((p) =>
+            (p.id && p.id === panelistId) ||
+            (p.uid && p.uid === panelistId) ||
+            (panelistName && (p.name === panelistName || p.fullName === panelistName))
+          );
+          const panelistRole = matchedPanelist?.role || '';
+          const timeDisplay = matched.startTime ? formatTime12Hour(matched.startTime) + (matched.endTime ? ` - ${formatTime12Hour(matched.endTime)}` : '') : '';
+
+          setMeta((prev) => ({
+            adviser: prev.adviser || matched.adviserName || '',
+            expert: prev.expert || panelistRole || (panelistName ? 'Subject Specialist' : ''),
+            title: prev.title || matched.projectTitle || matched.title || '',
+            proponents: prev.proponents || (matched.studentNames?.length ? matched.studentNames.join(', ') : (matched.studentName && matched.studentName !== 'Student Researcher' ? matched.studentName : '')),
+            groupNo: prev.groupNo || matched.groupName || (matched.projectId ? matched.projectId : ''),
+            date: prev.date || matched.date || '',
+            time: prev.time || timeDisplay,
+          }));
+        }
+      } catch (err) {
+        console.warn('[FinalGradingModal] Schedule auto-populate warning:', err);
+      }
+    };
+
+    fetchScheduleDetails();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [groupDetails, existingEval, isOpen, defenseId, panelistId, panelistName]);
 
   // Pre-fill scores if we have an existing evaluation
   useEffect(() => {
@@ -174,6 +255,7 @@ export const FinalGradingModal = ({
         defenseId,
         panelistId,
         panelistName,
+        meta,
         scores: {
           format: Number(scores.format),
           researchProblems: Number(scores.researchProblems),
@@ -190,8 +272,10 @@ export const FinalGradingModal = ({
         subTotals: totals,
         verdict,
         revisionDirectives: revisionDirectives.trim(),
-        workspaceId: groupDetails?.workspaceId,
-        projectId: groupDetails?.projectId,
+        workspaceId: groupDetails?.workspaceId || groupDetails?.id,
+        projectId: groupDetails?.projectId || groupDetails?.id,
+        groupId: groupDetails?.groupId,
+        documentId: groupDetails?.documentId,
       });
       onClose();
     } catch (err) {
@@ -281,7 +365,8 @@ export const FinalGradingModal = ({
                   value={meta.adviser}
                   onChange={e => setMeta(m => ({ ...m, adviser: e.target.value }))}
                   placeholder="Adviser name"
-                  className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                  readOnly={readOnly}
+                  className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
                 />
               </div>
               <div>
@@ -291,14 +376,16 @@ export const FinalGradingModal = ({
                     value={meta.date}
                     onChange={e => setMeta(m => ({ ...m, date: e.target.value }))}
                     placeholder="YYYY-MM-DD"
-                    className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                    readOnly={readOnly}
+                    className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
                   />
                   <span className="text-gray-300 dark:text-gray-600 shrink-0">|</span>
                   <input type="text"
                     value={meta.time}
                     onChange={e => setMeta(m => ({ ...m, time: e.target.value }))}
                     placeholder="--:-- AM"
-                    className="w-32 text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                    readOnly={readOnly}
+                    className="w-32 text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
                   />
                 </div>
               </div>
@@ -312,7 +399,8 @@ export const FinalGradingModal = ({
                   value={meta.expert}
                   onChange={e => setMeta(m => ({ ...m, expert: e.target.value }))}
                   placeholder="e.g. Statistician, Subject Specialist, Technical"
-                  className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                  readOnly={readOnly}
+                  className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
                 />
               </div>
               <div>
@@ -321,7 +409,8 @@ export const FinalGradingModal = ({
                   value={meta.groupNo}
                   onChange={e => setMeta(m => ({ ...m, groupNo: e.target.value }))}
                   placeholder="Group number"
-                  className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                  readOnly={readOnly}
+                  className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
                 />
               </div>
             </div>
@@ -333,7 +422,8 @@ export const FinalGradingModal = ({
                 value={meta.title}
                 onChange={e => setMeta(m => ({ ...m, title: e.target.value }))}
                 placeholder="Enter the research study title"
-                className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                readOnly={readOnly}
+                className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
               />
             </div>
 
@@ -344,7 +434,8 @@ export const FinalGradingModal = ({
                 value={meta.proponents}
                 onChange={e => setMeta(m => ({ ...m, proponents: e.target.value }))}
                 placeholder="Name1, Name2, Name3"
-                className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                readOnly={readOnly}
+                className="w-full text-sm font-medium text-gray-900 dark:text-gray-100 bg-transparent border-0 border-b border-gray-200 dark:border-[#2a2c3d] focus:border-blue-400 focus:outline-none py-1 placeholder:text-gray-300 dark:placeholder:text-gray-600 disabled:opacity-80"
               />
               <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">Auto-filled from group members. You may edit if needed.</p>
             </div>

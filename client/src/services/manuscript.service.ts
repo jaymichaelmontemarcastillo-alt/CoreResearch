@@ -156,7 +156,7 @@ export const manuscriptService = {
       const finalEvalsByWs = new Map<string, any[]>();
       finalSnap.docs.forEach((d: any) => {
         const ev = d.data();
-        const keys = [ev.workspaceId, ev.projectId, ev.defenseId].filter(Boolean);
+        const keys = [ev.workspaceId, ev.projectId, ev.groupId, ev.documentId, ev.defenseId].filter(Boolean);
         keys.forEach((k) => {
           if (!finalEvalsByWs.has(k)) finalEvalsByWs.set(k, []);
           finalEvalsByWs.get(k)!.push(ev);
@@ -166,7 +166,7 @@ export const manuscriptService = {
       const propEvalsByWs = new Map<string, any[]>();
       propSnap.docs.forEach((d: any) => {
         const ev = d.data();
-        const keys = [ev.workspaceId, ev.projectId, ev.defenseId].filter(Boolean);
+        const keys = [ev.workspaceId, ev.projectId, ev.groupId, ev.documentId, ev.defenseId].filter(Boolean);
         keys.forEach((k) => {
           if (!propEvalsByWs.has(k)) propEvalsByWs.set(k, []);
           propEvalsByWs.get(k)!.push(ev);
@@ -176,7 +176,7 @@ export const manuscriptService = {
       const genericEvalsByWs = new Map<string, any[]>();
       evalSnap.docs.forEach((d: any) => {
         const ev = d.data();
-        const keys = [ev.projectId, ev.defenseId].filter(Boolean);
+        const keys = [ev.workspaceId, ev.projectId, ev.groupId, ev.documentId, ev.defenseId].filter(Boolean);
         keys.forEach((k) => {
           if (!genericEvalsByWs.has(k)) genericEvalsByWs.set(k, []);
           genericEvalsByWs.get(k)!.push(ev);
@@ -185,7 +185,7 @@ export const manuscriptService = {
 
       // Attach actual panelist defense evaluations to each manuscript
       combinedList.forEach((m) => {
-        const keysToSearch = [m.id, m.projectId, m.groupId].filter(Boolean) as string[];
+        const keysToSearch = [m.id, m.workspaceId, m.projectId, m.groupId, m.documentId, m.defenseId].filter(Boolean) as string[];
 
         let finals: any[] = [];
         let props: any[] = [];
@@ -209,7 +209,7 @@ export const manuscriptService = {
           m.grade = {
             score: avgScore,
             letter: `${latestVerdict} (Final Defense)`,
-            remarks: finals[0].remarks || `Evaluated by ${finals.length} defense panelist(s).`,
+            remarks: finals[0].revisionDirectives || finals[0].remarks || `Evaluated by ${finals.length} defense panelist(s).`,
             panelistEvaluations: finals,
             defenseType: 'final',
             updatedAt: finals[0].submittedAt || new Date().toISOString(),

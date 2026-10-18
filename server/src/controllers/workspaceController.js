@@ -338,3 +338,257 @@ export const updateFeedbackStatus = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Restart research progress for a workspace
+ * Archives all research workspace artifacts (workspace, manuscripts, rubrics, tasks, schedules, comments)
+ * while PRESERVING group members and accounts.
+ */
+export const restartWorkspace = async (req, res) => {
+  try {
+    const { id: workspaceId } = req.params;
+    const user = req.user;
+    const now = new Date().toISOString();
+    const reason = req.body?.reason || 'Student restarted research progress';
+
+    // 1. Fetch the workspace
+    let workspace = null;
+    if (isDevMockMode) {
+      workspace = mockFirestoreDb.get('manuscript_workspaces')?.get(workspaceId);
+    } else if (db) {
+      const snap = await db.collection('manuscript_workspaces').doc(workspaceId).get();
+      if (snap.exists) workspace = { id: snap.id, ...snap.data() };
+    }
+
+    if (!workspace) {
+      return res.status(404).json({ success: false, error: 'Workspace not found.' });
+    }
+
+    // Permission check: caller must be participant or admin
+    if (!(await canAccessProject(user, workspaceId, workspace))) {
+      return res.status(403).json({ success: false, error: 'Forbidden.' });
+    }
+
+    const groupId = workspace.groupId || workspace.projectId;
+
+    if (db && !isDevMockMode) {
+      const batch = db.batch();
+
+      // A. Archive the workspace and any sibling workspaces for this group
+      batch.set(db.collection('manuscript_workspaces').doc(workspaceId), {
+        isArchived: true,
+        status: 'archived',
+        archivedAt: now,
+        archivedBy: user.uid,
+        archivedByName: user.fullName || 'Student Researcher',
+        archiveReason: reason,
+        updatedAt: now,
+      }, { merge: true });
+
+      if (groupId) {
+        try {
+          const wsSnaps = await db.collection('manuscript_workspaces').where('groupId', '==', groupId).get();
+          wsSnaps.forEach((d) => {
+            batch.set(d.ref, {
+              isArchived: true,
+              status: 'archived',
+              archivedAt: now,
+              archivedBy: user.uid,
+              archivedByName: user.fullName || 'Student Researcher',
+              archiveReason: reason,
+              updatedAt: now,
+            }, { merge: true });
+          });
+        } catch (we) {
+          console.warn('[workspaceController] workspaces archive warning:', we.message);
+        }
+      }
+
+      // B. Archive manuscript document if exists
+      if (workspace.documentId) {
+        try {
+          const docRef = db.collection('manuscript_documents').doc(workspace.documentId);
+          const docSnap = await docRef.get();
+          if (docSnap.exists) {
+            batch.set(docRef, {
+              isArchived: true,
+              status: 'archived',
+              archivedAt: now,
+              archivedBy: user.uid,
+              archiveReason: reason,
+              updatedAt: now,
+            }, { merge: true });
+          }
+        } catch (de) {
+          console.warn('[workspaceController] doc archive warning:', de.message);
+        }
+      }
+
+      // C. Archive proposals for this group/workspace
+      if (groupId) {
+        try {
+          const propSnaps = await db.collection('proposals').where('groupId', '==', groupId).get();
+          propSnaps.forEach((d) => {
+            batch.set(d.ref, {
+              isArchived: true,
+              status: 'archived',
+              archivedAt: now,
+              updatedAt: now,
+            }, { merge: true });
+          });
+        } catch (pe) {
+          console.warn('[workspaceController] proposals archive warning:', pe.message);
+        }
+      }
+
+      // D. Archive research tasks
+      try {
+        const taskSnaps = await db.collection('research_tasks').where('workspaceId', '==', workspaceId).get();
+        taskSnaps.forEach((d) => {
+          batch.set(d.ref, {
+            isArchived: true,
+            status: 'archived',
+            archivedAt: now,
+            updatedAt: now,
+          }, { merge: true });
+        });
+      } catch (te) {
+        console.warn('[workspaceController] tasks archive warning:', te.message);
+      }
+
+      // E. Archive feedback and comments
+      try {
+        const fbSnaps = await db.collection('research_feedback').where('workspaceId', '==', workspaceId).get();
+        fbSnaps.forEach((d) => {
+          batch.set(d.ref, {
+            isArchived: true,
+            status: 'archived',
+            archivedAt: now,
+            updatedAt: now,
+          }, { merge: true });
+        });
+      } catch (fe) {
+        console.warn('[workspaceController] feedback archive warning:', fe.message);
+      }
+
+      // F. Archive rubric evaluations
+      try {
+        const [propEvalSnaps, finalEvalSnaps] = await Promise.all([
+          db.collection('proposal_evaluations').where('workspaceId', '==', workspaceId).get().catch(() => ({ forEach: () => {} })),
+          db.collection('final_evaluations').where('workspaceId', '==', workspaceId).get().catch(() => ({ forEach: () => {} })),
+        ]);
+        propEvalSnaps.forEach((d) => {
+          batch.set(d.ref, { isArchived: true, status: 'archived', archivedAt: now, updatedAt: now }, { merge: true });
+        });
+        finalEvalSnaps.forEach((d) => {
+          batch.set(d.ref, { isArchived: true, status: 'archived', archivedAt: now, updatedAt: now }, { merge: true });
+        });
+      } catch (ee) {
+        console.warn('[workspaceController] evaluations archive warning:', ee.message);
+      }
+
+      // G. Cancel active adviser requests for groupId and caller
+      try {
+        const reqQueries = [];
+        if (groupId) reqQueries.push(db.collection('adviser_requests').where('groupId', '==', groupId).get());
+        if (user.uid) reqQueries.push(db.collection('adviser_requests').where('studentId', '==', user.uid).get());
+        const reqSnaps = await Promise.all(reqQueries);
+        const reqMap = new Map();
+        reqSnaps.forEach(s => s.docs.forEach(d => reqMap.set(d.id, d.ref)));
+        reqMap.forEach((ref) => {
+          batch.set(ref, {
+            isArchived: true,
+            status: 'cancelled',
+            archiveReason: reason,
+            updatedAt: now,
+          }, { merge: true });
+        });
+      } catch (re) {
+        console.warn('[workspaceController] requests archive warning:', re.message);
+      }
+
+      // H. Archive defense schedules in Firestore
+      if (groupId) {
+        try {
+          const schSnaps = await db.collection('defense_schedules').where('projectId', '==', groupId).get();
+          schSnaps.forEach((d) => {
+            batch.set(d.ref, {
+              status: 'archived',
+              isArchived: true,
+              updatedAt: now,
+            }, { merge: true });
+          });
+        } catch (se) {
+          console.warn('[workspaceController] schedules archive warning:', se.message);
+        }
+      }
+
+      // I. Reset the Research Group — KEEP MEMBERS AND ACCOUNTS INTACT!
+      if (groupId) {
+        const groupRef = db.collection('research_groups').doc(groupId);
+        const groupSnap = await groupRef.get();
+        if (groupSnap.exists) {
+          batch.set(groupRef, {
+            workspaceId: '',
+            documentId: '',
+            title: '',
+            adviserId: '',
+            adviserName: '',
+            panelists: [],
+            panelistIds: [],
+            panelistNames: [],
+            redefenseRequired: false,
+            currentPhase: 'proposal',
+            status: 'forming',
+            updatedAt: now,
+          }, { merge: true });
+        }
+      }
+
+      await batch.commit();
+    }
+
+    // Also update MongoDB for authoritative collections
+    if (mongoose.connection.readyState === 1 && groupId) {
+      try {
+        await Promise.all([
+          mongoose.connection.collection('schedules').updateMany(
+            { projectId: groupId },
+            { $set: { status: 'archived', isArchived: true, updatedAt: new Date() } }
+          ),
+          mongoose.connection.collection('researchgroups').updateOne(
+            { $or: [{ id: groupId }, { _id: groupId }] },
+            {
+              $set: {
+                workspaceId: null,
+                documentId: null,
+                title: '',
+                adviserId: null,
+                adviserName: '',
+                panelists: [],
+                panelistIds: [],
+                panelistNames: [],
+                redefenseRequired: false,
+                currentPhase: 'proposal',
+                status: 'forming',
+                updatedAt: new Date(),
+              },
+            }
+          ),
+        ]);
+      } catch (mErr) {
+        console.warn('[workspaceController] MongoDB restart sync warning:', mErr.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Research progress archived successfully. Group members and accounts are preserved.',
+      workspaceId,
+      groupId,
+    });
+  } catch (error) {
+    console.error('[workspaceController] restartWorkspace error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

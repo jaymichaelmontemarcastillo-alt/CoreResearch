@@ -128,6 +128,18 @@ export const userService = {
     } catch (fsErr: any) {
       console.warn('[userService] getUserById Firestore read warning:', fsErr?.message);
     }
+
+    // Fallback: If not in Firestore or read fails, check backend API
+    try {
+      const res = await api.get(`/users?search=${encodeURIComponent(uid)}`);
+      if (res?.data?.success && Array.isArray(res.data.data)) {
+        const found = res.data.data.find((u: any) => u.uid === uid || u._id === uid);
+        if (found) return normalizeUserProfile(found);
+      }
+    } catch (apiErr: any) {
+      console.warn('[userService] getUserById Backend fallback warning:', apiErr?.message);
+    }
+
     return null;
   },
 
@@ -145,13 +157,20 @@ export const userService = {
       console.warn('[userService] getAllUsers Backend query warning (using Firestore fallback):', apiErr?.message);
     }
 
-    // 2. Fallback to Firestore
+    // 2. Fallback to Firestore by role-targeted queries (which adhere to Firestore rules)
     try {
-      const q = query(collection(db, COLLECTION_NAME));
-      const querySnap = await getDocs(q);
-      return querySnap.docs.map((docSnap) =>
-        normalizeUserProfile({ uid: docSnap.id, ...docSnap.data() })
-      );
+      const [advisers, facultyUsers, coords, students, admins] = await Promise.all([
+        this.getUsersByRole('adviser').catch(() => []),
+        this.getUsersByRole('faculty').catch(() => []),
+        this.getUsersByRole('research_coordinator').catch(() => []),
+        this.getUsersByRole('student').catch(() => []),
+        this.getUsersByRole('admin').catch(() => []),
+      ]);
+      const map = new Map<string, UserProfile>();
+      [...advisers, ...facultyUsers, ...coords, ...students, ...admins].forEach((u) => {
+        if (u.uid) map.set(u.uid, u);
+      });
+      return Array.from(map.values());
     } catch (fsErr: any) {
       console.warn('[userService] getAllUsers Firestore read warning:', fsErr?.message);
       return [];
@@ -202,13 +221,21 @@ export const userService = {
       console.warn('[userService] Backend paginated users query warning (using local fallback):', err?.message);
     }
 
-    // Fallback: in-memory query against Firestore
-    const allUsers = await this.getAllUsers();
+    // Fallback: targeted role query against Firestore
+    let allUsers: UserProfile[] = [];
+    if (params.role === 'faculty') {
+      allUsers = await this.getUsersByRole('faculty');
+    } else if (params.role && params.role !== 'all') {
+      allUsers = await this.getUsersByRole(params.role as any);
+    } else {
+      allUsers = await this.getAllUsers();
+    }
+
     let filtered = allUsers;
 
     if (params.role && params.role !== 'all') {
       if (params.role === 'faculty') {
-        const facultyRoles = ['adviser', 'research_coordinator', 'panelist'];
+        const facultyRoles = ['adviser', 'research_coordinator', 'panelist', 'faculty'];
         filtered = filtered.filter((u: any) => facultyRoles.includes(u.role));
       } else {
         filtered = filtered.filter((u: any) => u.role === params.role);
@@ -288,10 +315,24 @@ export const userService = {
   },
 
   /**
-   * Fetch all users matching a specific role (e.g. 'student', 'adviser', 'panelist', 'admin').
+   * Fetch all users matching a specific role (e.g. 'student', 'adviser', 'panelist', 'admin', 'faculty').
    */
-  async getUsersByRole(role: UserRole): Promise<UserProfile[]> {
+  async getUsersByRole(role: string): Promise<UserProfile[]> {
     try {
+      if (role === 'faculty') {
+        const [adviserSnap, facultySnap, coordSnap] = await Promise.all([
+          getDocs(query(collection(db, COLLECTION_NAME), where('role', '==', 'adviser'))).catch(() => ({ docs: [] })),
+          getDocs(query(collection(db, COLLECTION_NAME), where('role', '==', 'faculty'))).catch(() => ({ docs: [] })),
+          getDocs(query(collection(db, COLLECTION_NAME), where('role', '==', 'research_coordinator'))).catch(() => ({ docs: [] })),
+        ]);
+        const map = new Map<string, UserProfile>();
+        [...adviserSnap.docs, ...facultySnap.docs, ...coordSnap.docs].forEach((docSnap) => {
+          const u = normalizeUserProfile({ uid: docSnap.id, ...docSnap.data() });
+          map.set(u.uid, u);
+        });
+        return Array.from(map.values());
+      }
+
       const q = query(
         collection(db, COLLECTION_NAME),
         where('role', '==', role)
@@ -304,6 +345,9 @@ export const userService = {
       console.warn(`[userService] getUsersByRole(${role}) Firestore warning:`, fsErr?.message);
       // Fallback: in-memory filter from getAllUsers
       const all = await this.getAllUsers();
+      if (role === 'faculty') {
+        return all.filter((u) => ['adviser', 'faculty', 'research_coordinator', 'panelist'].includes(u.role));
+      }
       return all.filter((u) => u.role === role);
     }
   },
@@ -528,13 +572,11 @@ export const userService = {
   /**
    * Approve a pending user account.
    */
-  async approveUser(uid: string, adminUid: string): Promise<void> {
+  async approveUser(uid: string, adminUid: string, roleHint?: string): Promise<void> {
     const user = await this.getUserById(uid);
-    if (!user) {
-      throw new Error('User not found.');
-    }
+    const resolvedRole = roleHint || user?.role || 'student';
     const now = new Date().toISOString();
-    const isAdviser = user.role === 'adviser' || (user.role as string) === 'faculty';
+    const isAdviser = resolvedRole === 'adviser' || (resolvedRole as string) === 'faculty';
 
     const updatePayload: any = {
       status: 'approved',
@@ -548,19 +590,23 @@ export const userService = {
       updatePayload.role = 'adviser';
       updatePayload.role_id = 'adviser';
       updatePayload.isAvailable = true;
-      updatePayload.maxCapacity = (user as any).maxCapacity || 5;
-      updatePayload.activeGroupsCount = (user as any).activeGroupsCount || 0;
+      updatePayload.maxCapacity = (user as any)?.maxCapacity || 5;
+      updatePayload.activeGroupsCount = (user as any)?.activeGroupsCount || 0;
     }
 
+    // 1. Send update to authoritative backend (updates MongoDB & syncs Firestore)
     await api.patch(`/users/${uid}`, updatePayload);
+
+    // 2. Also directly update Firestore from client if possible for immediate reactive UI
+    try {
+      const userRef = doc(db, COLLECTION_NAME, uid);
+      await setDoc(userRef, stripUndefined(updatePayload), { merge: true });
+    } catch (fsErr: any) {
+      console.warn('[userService] approveUser direct Firestore write warning:', fsErr?.message);
+    }
   },
 
-
   async rejectUser(uid: string, adminUid: string, reason?: string): Promise<void> {
-    const user = await this.getUserById(uid);
-    if (!user) {
-      throw new Error('User not found.');
-    }
     const now = new Date().toISOString();
     const updatePayload = {
       status: 'rejected' as const,
@@ -570,7 +616,17 @@ export const userService = {
       rejectionReason: reason || 'Registration application was not approved.',
       updated_at: now,
     };
+
+    // 1. Send update to authoritative backend
     await api.patch(`/users/${uid}`, updatePayload);
+
+    // 2. Also directly update Firestore from client if possible
+    try {
+      const userRef = doc(db, COLLECTION_NAME, uid);
+      await setDoc(userRef, updatePayload, { merge: true });
+    } catch (fsErr: any) {
+      console.warn('[userService] rejectUser direct Firestore write warning:', fsErr?.message);
+    }
   },
 
 

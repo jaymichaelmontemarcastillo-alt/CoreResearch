@@ -11,6 +11,7 @@ import { Toast } from '../components/ui/Toast';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth } from '../context/AuthContext';
 import manuscriptService from '../services/manuscript.service';
+import gradingService from '../services/grading.service';
 import courseService from '../services/course.service';
 import researchWorkspaceService from '../services/researchWorkspace.service';
 import manuscriptDocumentAdapter from '../services/manuscriptDocumentAdapter';
@@ -48,8 +49,8 @@ import {
 
 export const AdminManuscripts = () => {
   const { userProfile, role } = useAuth();
-  const isAdmin = role === 'admin' || userProfile?.role === 'admin';
-  const isCoordinator = role === 'research_coordinator' || userProfile?.role === 'research_coordinator';
+  const isAdmin = role === 'admin' || userProfile?.role === 'admin' || role === 'research_coordinator' || userProfile?.role === 'research_coordinator' || role === 'coordinator' || userProfile?.role === 'coordinator';
+  const isCoordinator = role === 'research_coordinator' || userProfile?.role === 'research_coordinator' || role === 'coordinator' || userProfile?.role === 'coordinator';
   const isAuthorizedManager = isAdmin || isCoordinator;
 
   const { confirm } = useConfirm();
@@ -86,6 +87,8 @@ export const AdminManuscripts = () => {
 
   // Modals state
   const [gradeModalOpen, setGradeModalOpen] = useState(false);
+  const [gradeModalLoading, setGradeModalLoading] = useState(false);
+  const [expandedEvalId, setExpandedEvalId] = useState(null);
   const [paperModalOpen, setPaperModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [bestThesisModalOpen, setBestThesisModalOpen] = useState(false);
@@ -365,10 +368,61 @@ export const AdminManuscripts = () => {
     setPaperModalOpen(true);
   };
 
-  // Open Defense Grade Modal
-  const handleOpenGrade = (m) => {
+  // Open Defense Grade Modal & Synchronize Authoritative Evaluations
+  const handleOpenGrade = async (m) => {
     setSelectedManuscript(m);
     setGradeModalOpen(true);
+    setExpandedEvalId(null);
+    setGradeModalLoading(true);
+
+    try {
+      const keys = [m.id, m.workspaceId, m.projectId, m.groupId, m.documentId, m.defenseId].filter(Boolean);
+      const { proposalEvaluations, finalEvaluations } = await gradingService.getEvaluationsForEntity(keys);
+
+      const allEvals = finalEvaluations.length > 0 ? finalEvaluations : proposalEvaluations;
+      const defenseType = finalEvaluations.length > 0 ? 'final' : 'proposal';
+
+      if (allEvals.length > 0) {
+        const avgScore = Math.round(
+          allEvals.reduce((sum, ev) => sum + (Number(ev.totalScore) || 0), 0) / allEvals.length
+        );
+        const letter =
+          avgScore >= 95
+            ? '1.00 (Excellent)'
+            : avgScore >= 90
+            ? '1.25 (Very Good)'
+            : avgScore >= 85
+            ? '1.50 (Good)'
+            : avgScore >= 80
+            ? '1.75 (Satisfactory)'
+            : avgScore >= 75
+            ? '2.00 (Passed)'
+            : '5.00 (Failed / Re-defense)';
+        const remarks =
+          allEvals
+            .map((e) => e.revisionDirectives || e.remarks || e.verdict)
+            .filter(Boolean)
+            .join('; ') || 'Defense Completed';
+
+        setSelectedManuscript((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            grade: {
+              score: avgScore,
+              letter,
+              remarks,
+              panelistEvaluations: allEvals,
+              defenseType,
+            },
+          };
+        });
+      }
+    } catch (err) {
+      console.error('[AdminManuscripts] Error fetching fresh evaluations:', err);
+    } finally {
+      setGradeModalLoading(false);
+    }
   };
 
   // Open Live Research Workspace (Full Workspace View)
@@ -397,8 +451,16 @@ export const AdminManuscripts = () => {
 
       // If no separate workspace document exists, but documentId exists, open in editor directly
       if (m.documentId) {
-        navigate(`/documents/${m.documentId}?mode=read`, {
-          state: { from: location.pathname + location.search },
+        const queryParams = new URLSearchParams({ mode: 'read' });
+        if (m.workspaceId || m.id) queryParams.set('workspaceId', m.workspaceId || m.id);
+        if (m.groupId) queryParams.set('groupId', m.groupId);
+        navigate(`/documents/${m.documentId}?${queryParams.toString()}`, {
+          state: {
+            from: location.pathname + location.search,
+            workspaceId: m.workspaceId || m.id,
+            groupId: m.groupId,
+            projectId: m.projectId,
+          },
         });
         return;
       }
@@ -452,10 +514,22 @@ export const AdminManuscripts = () => {
       }
 
       if (docId) {
-        const targetUrl = chapterId
-          ? `/documents/${docId}?mode=read&workspaceId=${targetWs?.id || m.id}&chapterId=${chapterId}`
-          : `/documents/${docId}?mode=read${targetWs ? `&workspaceId=${targetWs.id}` : ''}`;
-        navigate(targetUrl, { state: { from: location.pathname + location.search } });
+        const resolvedWsId = targetWs?.id || m.workspaceId || m.id || '';
+        const resolvedGroupId = targetWs?.groupId || m.groupId || '';
+        const queryParams = new URLSearchParams({ mode: 'read' });
+        if (resolvedWsId) queryParams.set('workspaceId', resolvedWsId);
+        if (resolvedGroupId) queryParams.set('groupId', resolvedGroupId);
+        if (chapterId) queryParams.set('chapterId', chapterId);
+
+        const targetUrl = `/documents/${docId}?${queryParams.toString()}`;
+        navigate(targetUrl, {
+          state: {
+            from: location.pathname + location.search,
+            workspaceId: resolvedWsId,
+            groupId: resolvedGroupId,
+            projectId: targetWs?.projectId || m.projectId,
+          },
+        });
         return;
       }
 
@@ -1276,15 +1350,19 @@ export const AdminManuscripts = () => {
                   <div className="hidden lg:block w-px h-14 bg-gray-100 dark:bg-[#222433] shrink-0 self-center" />
 
                   {/* Middle Column 2: Defense Grade */}
-                  <div className="w-32 shrink-0 flex flex-col justify-center">
+                  <div
+                    onClick={() => handleOpenGrade(m)}
+                    className="w-32 shrink-0 flex flex-col justify-center cursor-pointer group/grade p-1.5 -ml-1.5 rounded-xl hover:bg-gray-50 dark:hover:bg-[#1f202e] transition-colors"
+                    title="View official panelist defense evaluations & rubrics"
+                  >
                     {m.grade && m.grade.score ? (
                       <div>
                         <div className="flex items-baseline">
-                          <span className="text-xl font-bold text-[#16a34a]">{m.grade.score}</span>
+                          <span className="text-xl font-bold text-[#16a34a] group-hover/grade:underline">{m.grade.score}</span>
                           <span className="text-xs text-gray-400 font-normal ml-0.5">/100</span>
                         </div>
-                        <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 font-normal">
-                          Defense Grade
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 font-normal flex items-center gap-1">
+                          <span>Defense Grade</span>
                         </div>
                       </div>
                     ) : (
@@ -1670,12 +1748,19 @@ export const AdminManuscripts = () => {
               </div>
             </div>
 
-            {selectedManuscript.grade && selectedManuscript.grade.score ? (
+            {gradeModalLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center space-y-2.5">
+                <HiArrowPath className="w-7 h-7 text-blue-500 animate-spin" />
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Fetching authoritative panelist evaluations...</span>
+              </div>
+            ) : selectedManuscript.grade && selectedManuscript.grade.score ? (
               <div className="space-y-4">
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/30 flex items-center justify-between">
                   <div>
                     <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                      Authoritative Defense Grade
+                      {selectedManuscript.grade.defenseType === 'proposal'
+                        ? 'Authoritative Proposal Defense Grade'
+                        : 'Authoritative Final Defense Grade'}
                     </div>
                     <div className="text-base font-extrabold text-emerald-900 dark:text-emerald-200 mt-0.5">
                       {selectedManuscript.grade.letter}
@@ -1699,53 +1784,129 @@ export const AdminManuscripts = () => {
 
                   {Array.isArray(selectedManuscript.grade.panelistEvaluations) &&
                   selectedManuscript.grade.panelistEvaluations.length > 0 ? (
-                    selectedManuscript.grade.panelistEvaluations.map((ev, idx) => (
-                      <div
-                        key={ev.id || idx}
-                        className="p-3.5 rounded-xl border border-gray-200/80 dark:border-[#222433] bg-white dark:bg-[#181924] space-y-2.5 shadow-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <HiAcademicCap className="w-4 h-4 text-blue-500" />
-                            <span className="font-semibold text-xs text-gray-900 dark:text-white">
-                              {ev.panelistName || 'Defense Panelist'}
-                            </span>
+                    selectedManuscript.grade.panelistEvaluations.map((ev, idx) => {
+                      const evalKey = ev.id || `eval_${idx}`;
+                      const isExpanded = expandedEvalId === evalKey;
+                      const isProposal =
+                        ev.rubricType === 'proposal' ||
+                        (!ev.scores?.functionality && (ev.scores?.format || ev.subTotals?.oral === 30 || selectedManuscript.grade.defenseType === 'proposal'));
+
+                      return (
+                        <div
+                          key={evalKey}
+                          className="p-3.5 rounded-xl border border-gray-200/80 dark:border-[#222433] bg-white dark:bg-[#181924] space-y-2.5 shadow-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <HiAcademicCap className="w-4 h-4 text-blue-500" />
+                              <span className="font-semibold text-xs text-gray-900 dark:text-white">
+                                {ev.panelistName || 'Defense Panelist'}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-mono">
+                                ({isProposal ? 'Proposal' : 'Final Defense'})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {ev.scores && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedEvalId(isExpanded ? null : evalKey)}
+                                  className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                                >
+                                  {isExpanded ? 'Hide Criteria' : 'View Criteria'}
+                                </button>
+                              )}
+                              <Badge
+                                variant={
+                                  ev.verdict === 'APPROVED' || ev.verdict === 'PASSED'
+                                    ? 'emerald'
+                                    : ev.verdict === 'APPROVED_WITH_REVISIONS' ||
+                                      ev.verdict === 'PASSED_WITH_MINOR_REVISIONS' ||
+                                      ev.verdict === 'PASSED_WITH_MAJOR_REVISIONS'
+                                    ? 'amber'
+                                    : 'rose'
+                                }
+                                size="sm"
+                              >
+                                {ev.verdict ? String(ev.verdict).replace(/_/g, ' ') : 'PASSED'}
+                              </Badge>
+                            </div>
                           </div>
-                          <Badge variant="emerald" size="sm">
-                            {ev.verdict ? String(ev.verdict).replace(/_/g, ' ') : 'PASSED'}
-                          </Badge>
+
+                          {ev.subTotals && (
+                            <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                              <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
+                                <div className="text-[10px] text-gray-400">Manuscript</div>
+                                <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                  {ev.subTotals.manuscript ?? '-'}/30
+                                </div>
+                              </div>
+                              <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
+                                <div className="text-[10px] text-gray-400">Oral Defense</div>
+                                <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                  {ev.subTotals.oral ?? '-'}/{isProposal ? '30' : '20'}
+                                </div>
+                              </div>
+                              <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
+                                <div className="text-[10px] text-gray-400">Project / System</div>
+                                <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                  {ev.subTotals.project ?? '-'}/{isProposal ? '40' : '50'}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {ev.revisionDirectives && (
+                            <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-200/50 dark:border-amber-900/30">
+                              <span className="font-bold">Revision Directives: </span>
+                              {ev.revisionDirectives}
+                            </div>
+                          )}
+
+                          {ev.remarks && !ev.revisionDirectives && (
+                            <p className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-[#1c1d28] p-2.5 rounded-lg border border-gray-100 dark:border-[#222433] italic">
+                              "{ev.remarks}"
+                            </p>
+                          )}
+
+                          {/* Expandable Criteria Breakdown */}
+                          {isExpanded && ev.scores && (
+                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] space-y-1.5 text-[11px]">
+                              <div className="font-bold text-gray-500 uppercase tracking-wider text-[10px]">
+                                Detailed Criteria Breakdown:
+                              </div>
+                              {isProposal ? (
+                                <div className="grid grid-cols-2 gap-1.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-[#1c1d28] p-2.5 rounded-lg">
+                                  <div>Format: <strong className="text-gray-900 dark:text-white">{ev.scores.format}/7</strong></div>
+                                  <div>Problems: <strong className="text-gray-900 dark:text-white">{ev.scores.researchProblems}/8</strong></div>
+                                  <div>Literature: <strong className="text-gray-900 dark:text-white">{ev.scores.relatedLiterature}/7</strong></div>
+                                  <div>Methodology: <strong className="text-gray-900 dark:text-white">{ev.scores.methodology}/8</strong></div>
+                                  <div>Presentation: <strong className="text-gray-900 dark:text-white">{ev.scores.presentation}/15</strong></div>
+                                  <div>Defense: <strong className="text-gray-900 dark:text-white">{ev.scores.defense}/15</strong></div>
+                                  <div>Innovation: <strong className="text-gray-900 dark:text-white">{ev.scores.innovation}/15</strong></div>
+                                  <div>Application: <strong className="text-gray-900 dark:text-white">{ev.scores.application}/15</strong></div>
+                                  <div>Impact: <strong className="text-gray-900 dark:text-white">{ev.scores.impact}/10</strong></div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-1.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-[#1c1d28] p-2.5 rounded-lg">
+                                  <div>Format: <strong className="text-gray-900 dark:text-white">{ev.scores.format}/5</strong></div>
+                                  <div>Problems: <strong className="text-gray-900 dark:text-white">{ev.scores.researchProblems}/5</strong></div>
+                                  <div>Literature: <strong className="text-gray-900 dark:text-white">{ev.scores.relatedLiterature}/5</strong></div>
+                                  <div>Methodology: <strong className="text-gray-900 dark:text-white">{ev.scores.methodology}/5</strong></div>
+                                  <div>Background: <strong className="text-gray-900 dark:text-white">{ev.scores.technicalBackground}/5</strong></div>
+                                  <div>Conclusions: <strong className="text-gray-900 dark:text-white">{ev.scores.summaryConclusions}/5</strong></div>
+                                  <div>Presentation: <strong className="text-gray-900 dark:text-white">{ev.scores.presentation}/10</strong></div>
+                                  <div>Defense: <strong className="text-gray-900 dark:text-white">{ev.scores.defense}/10</strong></div>
+                                  <div>Functionality: <strong className="text-gray-900 dark:text-white">{ev.scores.functionality}/15</strong></div>
+                                  <div>Usability: <strong className="text-gray-900 dark:text-white">{ev.scores.usability}/20</strong></div>
+                                  <div>Reliability: <strong className="text-gray-900 dark:text-white">{ev.scores.reliability}/15</strong></div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-
-                        {ev.subTotals && (
-                          <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
-                              <div className="text-[10px] text-gray-400">Manuscript</div>
-                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                {ev.subTotals.manuscript ?? '-'}/30
-                              </div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
-                              <div className="text-[10px] text-gray-400">Oral Defense</div>
-                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                {ev.subTotals.oral ?? '-'}/20
-                              </div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-[#1c1d28]">
-                              <div className="text-[10px] text-gray-400">Project / System</div>
-                              <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                {ev.subTotals.project ?? '-'}/50
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {ev.remarks && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-[#1c1d28] p-2.5 rounded-lg border border-gray-100 dark:border-[#222433] italic">
-                            "{ev.remarks}"
-                          </p>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="p-3.5 rounded-xl border border-gray-100 dark:border-[#222433] bg-gray-50 dark:bg-[#1c1d28] text-xs text-gray-600 dark:text-gray-300">
                       Evaluated during defense. Score recorded: {selectedManuscript.grade.score}/100.

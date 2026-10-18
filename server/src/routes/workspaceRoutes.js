@@ -6,13 +6,15 @@ import {
   updateTask,
   createFeedback,
   updateFeedbackStatus,
+  restartWorkspace,
 } from '../controllers/workspaceController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Workspace fetch
+// Workspace fetch & lifecycle
 router.get('/:id', verifyToken, getWorkspace);
+router.post('/:id/restart', verifyToken, restartWorkspace);
 router.get('/adviser/:adviserId', verifyToken, getWorkspacesByAdviser);
 
 // Task Management

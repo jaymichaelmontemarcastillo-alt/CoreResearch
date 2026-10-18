@@ -159,12 +159,17 @@ export const FacultyWorkspaceView = () => {
             (updatedFb) => setFeedbackList(updatedFb)
           );
 
+          const evalOptions = {
+            groupId: targetWorkspace.groupId,
+            projectId: targetWorkspace.projectId,
+            documentId: targetWorkspace.documentId,
+          };
           unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
              setProposalEvals(evals);
-          });
+          }, evalOptions);
           unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
              setFinalEvals(evals);
-          });
+          }, evalOptions);
         } else {
           setToast("Research workspace not found.");
         }
@@ -1041,7 +1046,19 @@ export const FacultyWorkspaceView = () => {
           defenseId={selectedEval.defenseId}
           panelistId={selectedEval.panelistId}
           panelistName={selectedEval.panelistName}
-          groupDetails={workspace}
+          groupDetails={{
+            ...workspace,
+            adviser: workspace?.adviserName || workspace?.adviser || '',
+            adviserName: workspace?.adviserName || workspace?.adviser || '',
+            groupNo: workspace?.groupName || workspace?.groupNo || (workspace?.name || ''),
+            title: workspace?.title || workspace?.projectTitle || workspace?.proposalTitle || '',
+            proponents: Array.isArray(workspace?.members) && workspace.members.length > 0
+              ? workspace.members.map((m) => m.fullName || m.name || m.email).filter(Boolean).join(', ')
+              : (workspace?.proponents || ''),
+            date: selectedEval?.meta?.date || selectedEval?.date || '',
+            time: selectedEval?.meta?.time || selectedEval?.time || '',
+            expert: selectedEval?.meta?.expert || selectedEval?.panelistRole || '',
+          }}
           existingEval={selectedEval}
           readOnly={true}
         />
@@ -1057,7 +1074,19 @@ export const FacultyWorkspaceView = () => {
           defenseId={selectedEval.defenseId}
           panelistId={selectedEval.panelistId}
           panelistName={selectedEval.panelistName}
-          groupDetails={workspace}
+          groupDetails={{
+            ...workspace,
+            adviser: workspace?.adviserName || workspace?.adviser || '',
+            adviserName: workspace?.adviserName || workspace?.adviser || '',
+            groupNo: workspace?.groupName || workspace?.groupNo || (workspace?.name || ''),
+            title: workspace?.title || workspace?.projectTitle || workspace?.proposalTitle || '',
+            proponents: Array.isArray(workspace?.members) && workspace.members.length > 0
+              ? workspace.members.map((m) => m.fullName || m.name || m.email).filter(Boolean).join(', ')
+              : (workspace?.proponents || ''),
+            date: selectedEval?.meta?.date || selectedEval?.date || '',
+            time: selectedEval?.meta?.time || selectedEval?.time || '',
+            expert: selectedEval?.meta?.expert || selectedEval?.panelistRole || '',
+          }}
           existingEval={selectedEval}
           readOnly={true}
         />

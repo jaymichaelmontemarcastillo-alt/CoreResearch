@@ -94,6 +94,7 @@ export const EditorTaskSidebar = ({
 }) => {
   const [filter, setFilter] = useState('active'); // 'active' | 'completed' | 'all'
   const [expandedTaskId, setExpandedTaskId] = useState(null);
+  const [expandedEvalId, setExpandedEvalId] = useState(null);
   const [error, setError] = useState('');
 
   // Creation state
@@ -358,21 +359,30 @@ export const EditorTaskSidebar = ({
               </div>
             </div>
           ) : panelistTab === 'rating_rubrics' ? (
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col space-y-4">
               {existingEval ? (
                 <div className="space-y-4">
-                  <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Rating Summary</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Your Rating Summary</h4>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {defenseType === 'final_defense' ? 'Final Oral Defense' : 'Proposal Defense'}
+                    </span>
+                  </div>
                   <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
                       <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.manuscript?.toFixed(1) || 0}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400 font-semibold">ORAL DEFENSE (30%)</span>
+                      <span className="text-gray-600 dark:text-gray-400 font-semibold">
+                        {defenseType === 'final_defense' ? 'ORAL DEFENSE (20%)' : 'ORAL DEFENSE (30%)'}
+                      </span>
                       <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.oral?.toFixed(1) || 0}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400 font-semibold">CAPSTONE/THESIS PROJECT (40%)</span>
+                      <span className="text-gray-600 dark:text-gray-400 font-semibold">
+                        {defenseType === 'final_defense' ? 'CAPSTONE/THESIS PROJECT (50%)' : 'CAPSTONE/THESIS PROJECT (40%)'}
+                      </span>
                       <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.project?.toFixed(1) || 0}</span>
                     </div>
                     <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
@@ -385,6 +395,17 @@ export const EditorTaskSidebar = ({
                         {getVerdictBadge(existingEval.verdict).text}
                       </span>
                     </div>
+
+                    {existingEval.revisionDirectives && (
+                      <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] text-[11px] text-amber-700 dark:text-amber-400">
+                        <span className="font-bold">Revision Directives: </span>{existingEval.revisionDirectives}
+                      </div>
+                    )}
+                    {existingEval.remarks && !existingEval.revisionDirectives && (
+                      <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] text-[11px] text-gray-600 dark:text-gray-400 italic">
+                        "{existingEval.remarks}"
+                      </div>
+                    )}
                   </div>
                   {(defenseType === 'proposal_defense' || defenseType === 'final_defense') && onGradeProposal && (
                     <button
@@ -652,122 +673,254 @@ export const EditorTaskSidebar = ({
         </div>
       ) : studentTab === 'rating_rubrics' ? (
         <div className="flex-1 overflow-y-auto flex flex-col p-4 bg-gray-50/50 dark:bg-[#0e0f15]">
-              {(isStudent || isAdviser) ? (
-                <div className="space-y-4">
-                  {studentProposalEvals?.map((ev, idx) => (
-                    <div key={'p_'+idx} className="space-y-2 mb-4">
-                      <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Proposal - {ev.panelistName}</h4>
-                      <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.manuscript?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400 font-semibold">ORAL DEFENSE (30%)</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.oral?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400 font-semibold">CAPSTONE/THESIS PROJECT (40%)</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.project?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
-                          <span className="text-gray-800 dark:text-gray-200 font-bold">OVER ALL TOTAL</span>
-                          <span className="font-black text-blue-600 dark:text-blue-400">{ev.subTotals?.overall?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="pt-2 flex justify-between items-center">
-                          <span className="text-gray-800 dark:text-gray-200 font-bold">VERDICT</span>
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${getVerdictBadge(ev.verdict).classes}`}>
-                            {getVerdictBadge(ev.verdict).text}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {studentFinalEvals?.map((ev, idx) => (
-                    <div key={'f_'+idx} className="space-y-2 mb-4">
-                      <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Final - {ev.panelistName}</h4>
-                      <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.manuscript?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400 font-semibold">ORAL DEFENSE (30%)</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.oral?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400 font-semibold">CAPSTONE/THESIS PROJECT (40%)</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.project?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
-                          <span className="text-gray-800 dark:text-gray-200 font-bold">OVER ALL TOTAL</span>
-                          <span className="font-black text-blue-600 dark:text-blue-400">{ev.subTotals?.overall?.toFixed(1) || 0}</span>
-                        </div>
-                        <div className="pt-2 flex justify-between items-center">
-                          <span className="text-gray-800 dark:text-gray-200 font-bold">VERDICT</span>
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${getVerdictBadge(ev.verdict).classes}`}>
-                            {getVerdictBadge(ev.verdict).text}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {(!studentProposalEvals?.length && !studentFinalEvals?.length) && (
-                    <div className="flex flex-col h-full items-center justify-center text-center">
-                      <div className="mb-4 text-gray-400">
-                         <Target className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                         <p className="text-xs">No rating available yet.</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-center mt-2">
-                    <p className="text-[10px] text-gray-400">Return to workspace to view full rubrics or download PDF.</p>
-                  </div>
-                </div>
-              ) : existingEval ? (
-                <div className="space-y-4">
-                  <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Rating Summary</h4>
-                  <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.manuscript?.toFixed(1) || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400 font-semibold">ORAL DEFENSE (30%)</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.oral?.toFixed(1) || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400 font-semibold">CAPSTONE/THESIS PROJECT (40%)</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.project?.toFixed(1) || 0}</span>
-                    </div>
-                    <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
-                      <span className="text-gray-800 dark:text-gray-200 font-bold">OVER ALL TOTAL</span>
-                      <span className="font-black text-blue-600 dark:text-blue-400">{existingEval.subTotals?.overall?.toFixed(1) || 0}</span>
-                    </div>
-                    <div className="pt-2 flex justify-between items-center">
-                      <span className="text-gray-800 dark:text-gray-200 font-bold">VERDICT</span>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${getVerdictBadge(existingEval.verdict).classes}`}>
-                        {getVerdictBadge(existingEval.verdict).text}
+          {(studentProposalEvals?.length > 0 || studentFinalEvals?.length > 0) ? (
+            <div className="space-y-4">
+              {/* Proposal Average Summary Card (if multiple proposal evaluations exist) */}
+              {studentProposalEvals?.length > 1 && (() => {
+                const avgOverall = (studentProposalEvals.reduce((acc, curr) => acc + (curr.subTotals?.overall || 0), 0) / studentProposalEvals.length);
+                const verdicts = studentProposalEvals.map(e => e.verdict).filter(Boolean);
+                const avgVerdict = verdicts.every(v => v === 'APPROVED') ? 'APPROVED' : verdicts.some(v => v === 'DISAPPROVED') ? 'DISAPPROVED' : 'APPROVED_WITH_REVISIONS';
+                return (
+                  <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/40 rounded-xl shadow-xs space-y-1.5 mb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider">
+                        Proposal Average ({studentProposalEvals.length} Panelists)
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${getVerdictBadge(avgVerdict).classes}`}>
+                        {getVerdictBadge(avgVerdict).text}
                       </span>
                     </div>
+                    <div className="flex justify-between items-baseline pt-1 border-t border-blue-200/50 dark:border-blue-800/30">
+                      <span className="text-xs text-blue-700 dark:text-blue-300 font-semibold">Average Overall Score</span>
+                      <span className="text-sm font-black text-blue-700 dark:text-blue-300">{avgOverall.toFixed(1)} / 100</span>
+                    </div>
                   </div>
-                  {onGradeProposal && (
-                    <button
-                      onClick={onGradeProposal}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-[10px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
-                    >
-                      View Rubrics Details
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col h-full items-center justify-center text-center">
-                  <div className="mb-4 text-gray-400">
-                     <Target className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                     <p className="text-xs">No rating available yet.</p>
+                );
+              })()}
+
+              {/* Final Defense Average Summary Card (if multiple final defense evaluations exist) */}
+              {studentFinalEvals?.length > 1 && (() => {
+                const avgOverall = (studentFinalEvals.reduce((acc, curr) => acc + (curr.subTotals?.overall || 0), 0) / studentFinalEvals.length);
+                const verdicts = studentFinalEvals.map(e => e.verdict).filter(Boolean);
+                const avgVerdict = verdicts.every(v => v === 'PASSED') ? 'PASSED' : verdicts.some(v => v === 'DISAPPROVED') ? 'DISAPPROVED' : 'PASSED_WITH_REVISIONS';
+                return (
+                  <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-xl shadow-xs space-y-1.5 mb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wider">
+                        Final Defense Average ({studentFinalEvals.length} Panelists)
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${getVerdictBadge(avgVerdict).classes}`}>
+                        {getVerdictBadge(avgVerdict).text}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline pt-1 border-t border-emerald-200/50 dark:border-emerald-800/30">
+                      <span className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold">Average Overall Score</span>
+                      <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">{avgOverall.toFixed(1)} / 100</span>
+                    </div>
                   </div>
+                );
+              })()}
+
+              {studentProposalEvals?.map((ev, idx) => {
+                const evalKey = ev.id || `prop_${idx}`;
+                const isExpanded = expandedEvalId === evalKey;
+                return (
+                  <div key={evalKey} className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Proposal — {ev.panelistName || 'Panelist'}
+                      </h4>
+                      {ev.scores && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEvalId(isExpanded ? null : evalKey)}
+                          className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                        >
+                          {isExpanded ? 'Hide Criteria' : 'View Criteria'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.manuscript?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">ORAL DEFENSE (30%)</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.oral?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">CAPSTONE/THESIS PROJECT (40%)</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.project?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
+                        <span className="text-gray-800 dark:text-gray-200 font-bold">OVER ALL TOTAL</span>
+                        <span className="font-black text-blue-600 dark:text-blue-400">{ev.subTotals?.overall?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="pt-2 flex justify-between items-center">
+                        <span className="text-gray-800 dark:text-gray-200 font-bold">VERDICT</span>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${getVerdictBadge(ev.verdict).classes}`}>
+                          {getVerdictBadge(ev.verdict).text}
+                        </span>
+                      </div>
+
+                      {ev.remarks && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] text-[11px] text-gray-600 dark:text-gray-400 italic">
+                          "{ev.remarks}"
+                        </div>
+                      )}
+
+                      {/* Expandable Criteria Breakdown */}
+                      {isExpanded && ev.scores && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] space-y-1.5 text-[10px]">
+                          <div className="font-bold text-gray-500 uppercase tracking-wider">Criteria Breakdown:</div>
+                          <div className="grid grid-cols-2 gap-1 text-gray-600 dark:text-gray-400">
+                            <div>Format: <strong className="text-gray-900 dark:text-white">{ev.scores.format}/7</strong></div>
+                            <div>Problems: <strong className="text-gray-900 dark:text-white">{ev.scores.researchProblems}/8</strong></div>
+                            <div>Literature: <strong className="text-gray-900 dark:text-white">{ev.scores.relatedLiterature}/7</strong></div>
+                            <div>Methodology: <strong className="text-gray-900 dark:text-white">{ev.scores.methodology}/8</strong></div>
+                            <div>Presentation: <strong className="text-gray-900 dark:text-white">{ev.scores.presentation}/15</strong></div>
+                            <div>Defense: <strong className="text-gray-900 dark:text-white">{ev.scores.defense}/15</strong></div>
+                            <div>Innovation: <strong className="text-gray-900 dark:text-white">{ev.scores.innovation}/15</strong></div>
+                            <div>Application: <strong className="text-gray-900 dark:text-white">{ev.scores.application}/15</strong></div>
+                            <div>Impact: <strong className="text-gray-900 dark:text-white">{ev.scores.impact}/10</strong></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {studentFinalEvals?.map((ev, idx) => {
+                const evalKey = ev.id || `final_${idx}`;
+                const isExpanded = expandedEvalId === evalKey;
+                return (
+                  <div key={evalKey} className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Final — {ev.panelistName || 'Panelist'}
+                      </h4>
+                      {ev.scores && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEvalId(isExpanded ? null : evalKey)}
+                          className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                        >
+                          {isExpanded ? 'Hide Criteria' : 'View Criteria'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.manuscript?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">ORAL DEFENSE (20%)</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.oral?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">CAPSTONE/THESIS PROJECT (50%)</span>
+                        <span className="font-bold text-gray-900 dark:text-white">{ev.subTotals?.project?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
+                        <span className="text-gray-800 dark:text-gray-200 font-bold">OVER ALL TOTAL</span>
+                        <span className="font-black text-blue-600 dark:text-blue-400">{ev.subTotals?.overall?.toFixed(1) || 0}</span>
+                      </div>
+                      <div className="pt-2 flex justify-between items-center">
+                        <span className="text-gray-800 dark:text-gray-200 font-bold">VERDICT</span>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${getVerdictBadge(ev.verdict).classes}`}>
+                          {getVerdictBadge(ev.verdict).text}
+                        </span>
+                      </div>
+
+                      {ev.revisionDirectives && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] text-[11px] text-amber-700 dark:text-amber-400">
+                          <span className="font-bold">Revision Directives: </span>{ev.revisionDirectives}
+                        </div>
+                      )}
+                      {ev.remarks && !ev.revisionDirectives && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] text-[11px] text-gray-600 dark:text-gray-400 italic">
+                          "{ev.remarks}"
+                        </div>
+                      )}
+
+                      {/* Expandable Criteria Breakdown */}
+                      {isExpanded && ev.scores && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-[#222433] space-y-1.5 text-[10px]">
+                          <div className="font-bold text-gray-500 uppercase tracking-wider">Criteria Breakdown:</div>
+                          <div className="grid grid-cols-2 gap-1 text-gray-600 dark:text-gray-400">
+                            <div>Format: <strong className="text-gray-900 dark:text-white">{ev.scores.format}/5</strong></div>
+                            <div>Problems: <strong className="text-gray-900 dark:text-white">{ev.scores.researchProblems}/5</strong></div>
+                            <div>Literature: <strong className="text-gray-900 dark:text-white">{ev.scores.relatedLiterature}/5</strong></div>
+                            <div>Methodology: <strong className="text-gray-900 dark:text-white">{ev.scores.methodology}/5</strong></div>
+                            <div>Background: <strong className="text-gray-900 dark:text-white">{ev.scores.technicalBackground}/5</strong></div>
+                            <div>Conclusions: <strong className="text-gray-900 dark:text-white">{ev.scores.summaryConclusions}/5</strong></div>
+                            <div>Presentation: <strong className="text-gray-900 dark:text-white">{ev.scores.presentation}/10</strong></div>
+                            <div>Defense: <strong className="text-gray-900 dark:text-white">{ev.scores.defense}/10</strong></div>
+                            <div>Functionality: <strong className="text-gray-900 dark:text-white">{ev.scores.functionality}/15</strong></div>
+                            <div>Usability: <strong className="text-gray-900 dark:text-white">{ev.scores.usability}/20</strong></div>
+                            <div>Reliability: <strong className="text-gray-900 dark:text-white">{ev.scores.reliability}/15</strong></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : existingEval ? (
+            <div className="space-y-4">
+              <h4 className="text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Rating Summary</h4>
+              <div className="p-3 bg-white dark:bg-[#12131b] border border-gray-200 dark:border-[#1c1d28] rounded-xl shadow-sm space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400 font-semibold">MANUSCRIPT (30%)</span>
+                  <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.manuscript?.toFixed(1) || 0}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400 font-semibold">
+                    {defenseType === 'final_defense' ? 'ORAL DEFENSE (20%)' : 'ORAL DEFENSE (30%)'}
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.oral?.toFixed(1) || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400 font-semibold">
+                    {defenseType === 'final_defense' ? 'CAPSTONE/THESIS PROJECT (50%)' : 'CAPSTONE/THESIS PROJECT (40%)'}
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-white">{existingEval.subTotals?.project?.toFixed(1) || 0}</span>
+                </div>
+                <div className="pt-2 border-t border-gray-100 dark:border-[#222433] flex justify-between">
+                  <span className="text-gray-800 dark:text-gray-200 font-bold">OVER ALL TOTAL</span>
+                  <span className="font-black text-blue-600 dark:text-blue-400">{existingEval.subTotals?.overall?.toFixed(1) || 0}</span>
+                </div>
+                <div className="pt-2 flex justify-between items-center">
+                  <span className="text-gray-800 dark:text-gray-200 font-bold">VERDICT</span>
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${getVerdictBadge(existingEval.verdict).classes}`}>
+                    {getVerdictBadge(existingEval.verdict).text}
+                  </span>
+                </div>
+              </div>
+              {onGradeProposal && (
+                <button
+                  onClick={onGradeProposal}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-[10px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[12px] font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                >
+                  View Rubrics Details
+                </button>
               )}
+            </div>
+          ) : (
+            <div className="flex flex-col h-full items-center justify-center text-center py-8">
+              <div className="mb-4 text-gray-400">
+                 <Target className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                 <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">No defense ratings submitted yet</p>
+                 <p className="text-[11px] text-gray-400 mt-1 max-w-xs">
+                   Panelists have not graded this manuscript yet. Once panel members submit their rubrics, scores and criteria will appear here.
+                 </p>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <>

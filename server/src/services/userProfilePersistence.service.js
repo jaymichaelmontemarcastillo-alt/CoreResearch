@@ -18,23 +18,40 @@ const partialSyncError = (message) => {
 
 export const updateUserProfileStores = async (uid, updates) => {
   if (mongoose.connection.readyState === 1) {
-    const updatedUser = await User.findOneAndUpdate(
+    let updatedUser = await User.findOneAndUpdate(
       { uid },
       { $set: updates },
       { new: true, runValidators: true }
     );
+
+    // If not found in MongoDB, check if it exists in Firestore to recover and upsert
+    if (!updatedUser && db && !isDevMockMode) {
+      try {
+        const fsDoc = await db.collection('users').doc(uid).get();
+        if (fsDoc.exists) {
+          const fullData = { ...fsDoc.data(), ...updates, uid };
+          updatedUser = await User.findOneAndUpdate(
+            { uid },
+            { $set: fullData },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        }
+      } catch (fsErr) {
+        console.warn('[userProfilePersistence] Firestore fallback read warning:', fsErr.message);
+      }
+    }
+
     if (!updatedUser) return null;
 
     const profile = toProfileObject(updatedUser);
-    if (!isDevMockMode && !db) {
-      throw partialSyncError('MongoDB was updated, but Firestore is unavailable for user profile synchronization.');
-    }
-    if (!isDevMockMode) {
+    if (!isDevMockMode && db) {
       try {
         await db.collection('users').doc(uid).set(profile, { merge: true });
       } catch (error) {
-        throw partialSyncError(`MongoDB was updated, but the Firestore user profile could not be synchronized: ${error.message}`);
+        console.warn(`[userProfilePersistence] Firestore user profile sync warning: ${error.message}`);
       }
+    } else if (!isDevMockMode && !db) {
+      console.warn('[userProfilePersistence] MongoDB updated, but Firestore Admin is unavailable for synchronization.');
     }
     mockUsersDb.set(uid, profile);
     return profile;

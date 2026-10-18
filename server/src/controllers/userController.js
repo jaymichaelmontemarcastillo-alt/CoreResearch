@@ -179,7 +179,7 @@ export const getAllUsers = async (req, res) => {
     // 1. Role Filter
     if (role && role !== 'all') {
       if (role === 'faculty') {
-        const facultyRoles = ['adviser', 'research_coordinator', 'panelist'];
+        const facultyRoles = ['adviser', 'research_coordinator', 'panelist', 'faculty'];
         usersList = usersList.filter(u => facultyRoles.includes(u.role));
       } else {
         usersList = usersList.filter(u => u.role === role);
@@ -294,7 +294,7 @@ export const updateUserRole = async (req, res) => {
     const { uid } = req.params;
     const { role } = req.body;
 
-    const validRoles = ['student', 'adviser', 'panelist', 'admin'];
+    const validRoles = ['student', 'adviser', 'panelist', 'admin', 'research_coordinator', 'coordinator'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
@@ -578,3 +578,161 @@ export const deleteUser = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Get section classmates for the currently authenticated student
+ * Filters strictly to students in the same program, specialization, and section
+ */
+export const getClassmates = async (req, res) => {
+  try {
+    const callerUid = req.user.uid;
+    let caller = null;
+
+    if (mongoose.connection.readyState === 1) {
+      caller = await User.findOne({ uid: callerUid }).lean();
+      if (!caller && mongoose.isValidObjectId(callerUid)) {
+        caller = await User.findById(callerUid).lean();
+      }
+    }
+    if (!caller && db) {
+      try {
+        const docSnap = await db.collection('users').doc(callerUid).get();
+        if (docSnap.exists) caller = { uid: docSnap.id, ...docSnap.data() };
+      } catch (e) {
+        console.warn('[UserController] getClassmates Firestore lookup warning:', e.message);
+      }
+    }
+
+    if (!caller) {
+      return res.status(404).json({ success: false, message: 'User profile not found.' });
+    }
+
+    // Resolve academic scope for the caller
+    const courseId = (caller.courseId || (caller.program?.toLowerCase().includes('computer science') ? 'bscs' : 'bsit')).toLowerCase();
+    const programCode = caller.programCode || (courseId === 'bscs' ? 'BSCS' : 'BSIT');
+
+    let majorCode = (caller.majorCode || '').toUpperCase();
+    const specStr = (caller.major || caller.programSpecialization || '').toUpperCase();
+    if (!majorCode && specStr) {
+      if (specStr.includes('WMAD') || specStr.includes('WEB AND MOBILE')) majorCode = 'WMAD';
+      else if (specStr.includes('AMG') || specStr.includes('ANIMATION')) majorCode = 'AMG';
+      else if (specStr.includes('SMP') || specStr.includes('SERVICE MANAGEMENT')) majorCode = 'SMP';
+      else if (specStr.includes('IS') || specStr.includes('INTELLIGENT SYSTEMS')) majorCode = 'IS';
+    }
+    if (!majorCode && programCode === 'BSIT') majorCode = 'WMAD';
+
+    const sectionId = caller.sectionId || '';
+    const sectionName = caller.sectionName || caller.section || 'A';
+
+    // Query students from MongoDB & Firestore
+    let rawStudents = [];
+    if (mongoose.connection.readyState === 1) {
+      rawStudents = await User.find({ role: 'student' }).lean();
+    }
+    if ((!rawStudents || rawStudents.length === 0) && db) {
+      const snap = await db.collection('users').where('role', '==', 'student').get();
+      rawStudents = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    }
+
+    // Filter strictly to classmates: only students belonging to the caller's program, specialization, and section
+    const classmates = rawStudents.filter((s) => {
+      // Must be an active / approved student
+      const isApproved = s.is_approved === true || s.status === 'active' || s.status === 'approved';
+      if (!isApproved) return false;
+
+      // 1. Program match
+      const sCourse = (s.courseId || (s.program?.toLowerCase().includes('computer science') ? 'bscs' : 'bsit')).toLowerCase();
+      const sProg = (s.programCode || (sCourse === 'bscs' ? 'BSCS' : 'BSIT')).toUpperCase();
+      const progMatches = sCourse === courseId || sProg === programCode;
+      if (!progMatches) return false;
+
+      // 2. Specialization match
+      let sMajor = (s.majorCode || '').toUpperCase();
+      const sSpec = (s.major || s.programSpecialization || '').toUpperCase();
+      if (!sMajor && sSpec) {
+        if (sSpec.includes('WMAD') || sSpec.includes('WEB AND MOBILE')) sMajor = 'WMAD';
+        else if (sSpec.includes('AMG') || sSpec.includes('ANIMATION')) sMajor = 'AMG';
+        else if (sSpec.includes('SMP') || sSpec.includes('SERVICE MANAGEMENT')) sMajor = 'SMP';
+        else if (sSpec.includes('IS') || sSpec.includes('INTELLIGENT SYSTEMS')) sMajor = 'IS';
+      }
+      if (!sMajor && sProg === 'BSIT') sMajor = 'WMAD';
+      if (majorCode && sMajor && sMajor !== majorCode) return false;
+
+      // 3. Section match
+      const sSecId = s.sectionId || '';
+      const sSecName = (s.sectionName || s.section || '').toUpperCase();
+      const userSecName = (sectionName || '').toUpperCase();
+      const secMatches =
+        (sectionId && sSecId === sectionId) ||
+        (userSecName && sSecName === userSecName);
+      if (!secMatches && (sectionId || userSecName)) return false;
+
+      return true;
+    }).map((s) => ({
+      uid: s.uid || s._id,
+      fullName: s.fullName || `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Student Researcher',
+      studentIdOrEmployeeId: s.studentIdOrEmployeeId || s.studentId || s.studentNumber || '',
+      studentNumber: s.studentIdOrEmployeeId || s.studentId || s.studentNumber || '',
+      courseId,
+      programCode,
+      program: caller.program || (programCode === 'BSCS' ? 'Bachelor of Science in Computer Science' : 'Bachelor of Science in Information Technology'),
+      majorCode,
+      major: caller.major || caller.programSpecialization || majorCode,
+      specializationId: caller.specializationId || majorCode.toLowerCase(),
+      sectionId: s.sectionId || sectionId,
+      sectionName: s.sectionName || s.section || sectionName,
+      status: s.status || 'approved',
+      is_approved: true,
+      enrollmentStatus: s.enrollmentStatus || 'enrolled',
+    }));
+
+    // Query research groups for this section
+    let groups = [];
+    if (mongoose.connection.readyState === 1) {
+      const gFilter = sectionId ? { sectionId } : {};
+      groups = await mongoose.connection.collection('researchgroups').find(gFilter).toArray();
+    }
+    if ((!groups || groups.length === 0) && db) {
+      try {
+        let gQuery = db.collection('research_groups');
+        if (sectionId) {
+          gQuery = gQuery.where('sectionId', '==', sectionId);
+        }
+        const gSnap = await gQuery.get();
+        groups = gSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (ge) {
+        console.warn('[UserController] getClassmates Firestore groups warning:', ge.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: classmates.length,
+      data: classmates,
+      groups: groups.map((g) => ({
+        id: g.id || g._id,
+        name: g.name,
+        sectionId: g.sectionId,
+        memberIds: g.memberIds || [],
+      })),
+      section: {
+        id: sectionId,
+        name: sectionName,
+      },
+      course: {
+        id: courseId,
+        code: programCode,
+        name: caller.program || (programCode === 'BSCS' ? 'Bachelor of Science in Computer Science' : 'Bachelor of Science in Information Technology'),
+      },
+      specialization: {
+        id: majorCode.toLowerCase(),
+        code: majorCode,
+        name: caller.major || majorCode,
+      }
+    });
+  } catch (error) {
+    console.error('[UserController] getClassmates error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+

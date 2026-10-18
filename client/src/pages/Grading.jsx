@@ -67,6 +67,7 @@ const FALLBACK_DEFAULT_RUBRIC = {
 
 export const Grading = () => {
   const { role } = useAuth();
+  const isAdmin = role === "admin" || role === "research_coordinator" || role === "coordinator";
   const [evaluations, setEvaluations] = useState([]);
   const [gradeSummary, setGradeSummary] = useState({ averageScore: 0, gradeLetter: "N/A" });
   const [loading, setLoading] = useState(true);
@@ -294,7 +295,7 @@ export const Grading = () => {
         description="Multi-criteria defense evaluation forms, instant weighted score computation, and configurable institutional rubrics."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {role === "admin" && (
+            {isAdmin && (
               <Button
                 variant="outline"
                 size="md"
@@ -305,7 +306,7 @@ export const Grading = () => {
                 Configure Rubric (v{activeRubric?.version || 1})
               </Button>
             )}
-            {(role === "panelist" || role === "admin") && (
+            {(role === "panelist" || isAdmin) && (
               <Button
                 variant="primary"
                 size="md"

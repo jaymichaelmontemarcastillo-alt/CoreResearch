@@ -59,7 +59,7 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
       setStep(2);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || err.message || 'Failed to generate preview');
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to generate preview');
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
       onSchedulesCreated();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || err.message || 'Failed to save schedules');
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to save schedules');
     } finally {
       setLoading(false);
     }

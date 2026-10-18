@@ -220,7 +220,7 @@ export const Notifications = () => {
 
     // 4. Defense schedule notifications
     if (typeLower === "schedule" || titleLower.includes("defense") || titleLower.includes("schedule")) {
-      if (userProfile?.role === "admin") {
+      if (userProfile?.role === "admin" || userProfile?.role === "research_coordinator" || userProfile?.role === "coordinator") {
         navigate("/admin/calendar");
       } else {
         navigate("/schedules");

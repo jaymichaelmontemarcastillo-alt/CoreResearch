@@ -127,7 +127,18 @@ export const publishToRepository = async (req, res) => {
 
     const newPublication = await RepositoryPublication.create(newDoc);
 
-    // If linked to an existing manuscript, synchronize publicationStatus
+    // Dual-write to Firestore repository_publications for real-time synchronization
+    try {
+      if (!isDevMockMode && db) {
+        await db.collection('repository_publications').doc(newDoc.id).set({
+          ...newDoc,
+          publishedAt: newDoc.publishedAt instanceof Date ? newDoc.publishedAt.toISOString() : newDoc.publishedAt,
+          acceptedAt: newDoc.acceptedAt instanceof Date ? newDoc.acceptedAt.toISOString() : (newDoc.acceptedAt || null),
+        }, { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn('[RepositoryController] Firestore dual-write warning:', fsErr.message);
+    }
     if (manuscriptId) {
       try {
         if (!isDevMockMode) {
@@ -210,7 +221,46 @@ export const getRepositoryPublications = async (req, res) => {
       ];
     }
 
-    const list = await RepositoryPublication.find(filter).sort({ publishedAt: -1 }).lean();
+    let list = [];
+    try {
+      list = await RepositoryPublication.find(filter).sort({ publishedAt: -1 }).lean();
+    } catch (mongoErr) {
+      console.warn('[RepositoryController] MongoDB query failed, falling back to Firestore:', mongoErr.message);
+    }
+
+    // Fallback to Firestore repository_publications if MongoDB returned 0 records
+    if (!list || list.length === 0) {
+      try {
+        if (!isDevMockMode && db) {
+          const snapshot = await db.collection('repository_publications').get();
+          list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+          if (department && department !== 'all') {
+            list = list.filter(r => r.department === department);
+          }
+          if (year && year !== 'any') {
+            list = list.filter(r => Number(r.publicationYear) === Number(year));
+          }
+          if (status && status !== 'all') {
+            list = list.filter(r => r.publicationStatus === status);
+          } else if (!status || status === 'approved') {
+            list = list.filter(r => r.publicationStatus !== 'pending_publication' && r.publicationStatus !== 'rejected');
+          }
+          if (search) {
+            const q = search.toLowerCase();
+            list = list.filter(r =>
+              (r.title && r.title.toLowerCase().includes(q)) ||
+              (r.abstract && r.abstract.toLowerCase().includes(q)) ||
+              (r.keywords && r.keywords.some(k => k.toLowerCase().includes(q))) ||
+              (r.authors && r.authors.some(a => a.toLowerCase().includes(q)))
+            );
+          }
+          list.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+        }
+      } catch (fsErr) {
+        console.warn('[RepositoryController] Firestore fallback read error:', fsErr.message);
+      }
+    }
 
     // Check if requester has student role
     const isStudent = (req.user?.role === 'student') || (req.headers['x-user-role'] === 'student');

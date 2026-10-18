@@ -88,6 +88,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/adviser-matching', adviserMatchingRoutes);
 app.use('/api/adviser-research', adviserResearchRoutes);
 app.use('/api/manuscripts', manuscriptRoutes);

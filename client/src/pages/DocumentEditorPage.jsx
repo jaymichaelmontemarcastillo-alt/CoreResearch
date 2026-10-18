@@ -242,22 +242,50 @@ export const DocumentEditorPage = () => {
       let unsubscribeFEvals = () => {};
       const fetchWorkspace = async () => {
         try {
-          let wsId = urlWorkspaceId;
+          let wsId = urlWorkspaceId || location.state?.workspaceId;
+          const targetGroupId = searchParams.get('groupId') || location.state?.groupId;
+
+          // 1. Direct workspace check by documentId
           if (!wsId && documentId) {
-            const docData = await documentStore.fetchDocument(documentId);
-            if (docData?.groupId) {
+            const directWs = await researchWorkspaceService.getWorkspaceByDocumentId(documentId);
+            if (directWs) {
+              wsId = directWs.id;
+            }
+          }
+
+          // 2. Lookup by targetGroupId
+          if (!wsId && targetGroupId) {
+            const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', targetGroupId);
+            if (ws) wsId = ws.id;
+          }
+
+          // 3. Document store metadata lookup
+          let docData = null;
+          if (documentId) {
+            docData = await documentStore.fetchDocument(documentId).catch(() => null);
+          }
+
+          if (!wsId && docData) {
+            if (docData.workspaceId) {
+              wsId = docData.workspaceId;
+            } else if (docData.groupId) {
               const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', docData.groupId);
+              if (ws) wsId = ws.id;
+            } else if (docData.projectId) {
+              const ws = await researchWorkspaceService.getWorkspaceById('ws-' + docData.projectId).catch(() => null);
               if (ws) wsId = ws.id;
             }
           }
+
+          let loadedWs = null;
           if (wsId) {
-            const ws = await researchWorkspaceService.getWorkspaceById(wsId);
-            if (ws) {
-              setWorkspace(ws);
-              if (!activeChapterId && ws.sections?.length > 0) {
+            loadedWs = await researchWorkspaceService.getWorkspaceById(wsId);
+            if (loadedWs) {
+              setWorkspace(loadedWs);
+              if (!activeChapterId && loadedWs.sections?.length > 0) {
                 const target = urlChapterId 
-                  ? ws.sections.find((s) => s.id === urlChapterId)
-                  : ws.sections.find((s) => s.status === 'submitted' || s.status === 'under_review') || ws.sections[0];
+                  ? loadedWs.sections.find((s) => s.id === urlChapterId)
+                  : loadedWs.sections.find((s) => s.status === 'submitted' || s.status === 'under_review') || loadedWs.sections[0];
                 if (target) setActiveChapterId(target.id);
               }
             }
@@ -267,16 +295,66 @@ export const DocumentEditorPage = () => {
             unsubscribeFb = researchFeedbackService.subscribeWorkspaceFeedback(wsId, (list) => {
               setFeedbackList(list || []);
             });
-
-            if (!isPanelistMode) {
-              unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(wsId, (evals) => {
-                setStudentProposalEvals(evals);
-              });
-              unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(wsId, (evals) => {
-                setStudentFinalEvals(evals);
-              });
-            }
           }
+
+          // Candidate entity keys across workspace, docData, state, and search params
+          const candidateKeys = Array.from(
+            new Set(
+              [
+                wsId,
+                loadedWs?.id,
+                loadedWs?.groupId,
+                loadedWs?.projectId,
+                loadedWs?.proposalId,
+                targetGroupId,
+                docData?.groupId,
+                docData?.workspaceId,
+                docData?.projectId,
+                documentId,
+                urlDefenseId,
+                searchParams.get('defenseId'),
+                location.state?.defenseId,
+                location.state?.groupId,
+                location.state?.projectId,
+                location.state?.workspaceId,
+              ].filter(Boolean)
+            )
+          );
+
+          // 1. Immediate fetch for instant grading rubric display in sidebar
+          if (candidateKeys.length > 0) {
+            gradingService.getEvaluationsForEntity(candidateKeys).then(({ proposalEvaluations, finalEvaluations }) => {
+              if (proposalEvaluations?.length > 0) setStudentProposalEvals(proposalEvaluations);
+              if (finalEvaluations?.length > 0) setStudentFinalEvals(finalEvaluations);
+            }).catch((err) => console.warn('[DocumentEditorPage] immediate evals fetch error:', err));
+          }
+
+          // 2. Realtime subscriptions with all foreign keys passed
+          const subOptions = {
+            groupId: loadedWs?.groupId || targetGroupId || docData?.groupId || location.state?.groupId,
+            projectId: loadedWs?.projectId || docData?.projectId || location.state?.projectId,
+            defenseId: urlDefenseId || searchParams.get('defenseId') || location.state?.defenseId,
+            documentId: documentId,
+          };
+
+          unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(
+            wsId || loadedWs?.id || '',
+            (evals) => {
+              if (evals && evals.length > 0) {
+                setStudentProposalEvals(evals);
+              }
+            },
+            subOptions
+          );
+          unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(
+            wsId || loadedWs?.id || '',
+            (evals) => {
+              if (evals && evals.length > 0) {
+                setStudentFinalEvals(evals);
+              }
+            },
+            subOptions
+          );
         } catch (err) {
           console.warn('[DocumentEditorPage] Error loading workspace:', err);
         }
@@ -1113,6 +1191,7 @@ export const DocumentEditorPage = () => {
             isOpen={isGradingModalOpen}
             onClose={() => setIsGradingModalOpen(false)}
             onSubmit={handleGradeProposalSubmit}
+            readOnly={!isPanelistMode}
             defenseType={urlDefenseType}
             defenseId={urlDefenseId}
             panelistId={currentUser?.uid}
@@ -1123,17 +1202,20 @@ export const DocumentEditorPage = () => {
               'Panelist'
             }
             groupDetails={{
-              adviser: location.state?.adviserName || workspace?.adviserName || '',
-              expert: location.state?.panelistRole || workspace?.specialization || '',
-              title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || '',
-              date: new URLSearchParams(location.search).get('defenseDate') || '',
-              time: new URLSearchParams(location.search).get('defenseTime') || '',
-              groupNo: workspace?.groupNo || '',
+              adviser: location.state?.adviserName || workspace?.adviserName || workspace?.adviser || '',
+              adviserName: location.state?.adviserName || workspace?.adviserName || workspace?.adviser || '',
+              expert: location.state?.panelistRole || workspace?.specialization || workspace?.specializationExpert || '',
+              title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || workspace?.title || title || '',
+              date: new URLSearchParams(location.search).get('defenseDate') || location.state?.defenseDate || '',
+              time: new URLSearchParams(location.search).get('defenseTime') || location.state?.defenseTime || '',
+              groupNo: workspace?.groupNo || workspace?.groupName || location.state?.groupName || '',
               proponents: location.state?.groupMembers?.length
                 ? location.state.groupMembers
-                : workspace?.members?.map(m => m.name || m.fullName || m.email) || [],
-              workspaceId: workspace?.id,
-              projectId: workspace?.projectId,
+                : (workspace?.members || []).map(m => m.fullName || m.name || m.email).filter(Boolean),
+              workspaceId: workspace?.id || urlWorkspaceId || location.state?.workspaceId || '',
+              projectId: workspace?.projectId || location.state?.projectId || '',
+              groupId: workspace?.groupId || searchParams.get('groupId') || location.state?.groupId || '',
+              documentId: documentId || workspace?.documentId || '',
             }}
             existingEval={existingProposalEval}
           />
@@ -1145,6 +1227,7 @@ export const DocumentEditorPage = () => {
             isOpen={isGradingModalOpen}
             onClose={() => setIsGradingModalOpen(false)}
             onSubmit={handleGradeFinalSubmit}
+            readOnly={!isPanelistMode}
             defenseType={urlDefenseType}
             defenseId={urlDefenseId}
             panelistId={currentUser?.uid}
@@ -1155,17 +1238,20 @@ export const DocumentEditorPage = () => {
               'Panelist'
             }
             groupDetails={{
-              adviser: location.state?.adviserName || workspace?.adviserName || '',
-              expert: location.state?.panelistRole || workspace?.specialization || '',
-              title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || '',
-              date: new URLSearchParams(location.search).get('defenseDate') || '',
-              time: new URLSearchParams(location.search).get('defenseTime') || '',
-              groupNo: workspace?.groupNo || '',
+              adviser: location.state?.adviserName || workspace?.adviserName || workspace?.adviser || '',
+              adviserName: location.state?.adviserName || workspace?.adviserName || workspace?.adviser || '',
+              expert: location.state?.panelistRole || workspace?.specialization || workspace?.specializationExpert || '',
+              title: location.state?.researchTitle || workspace?.proposalTitle || workspace?.projectTitle || workspace?.title || title || '',
+              date: new URLSearchParams(location.search).get('defenseDate') || location.state?.defenseDate || '',
+              time: new URLSearchParams(location.search).get('defenseTime') || location.state?.defenseTime || '',
+              groupNo: workspace?.groupNo || workspace?.groupName || location.state?.groupName || '',
               proponents: location.state?.groupMembers?.length
                 ? location.state.groupMembers
-                : workspace?.members?.map(m => m.name || m.fullName || m.email) || [],
-              workspaceId: workspace?.id,
-              projectId: workspace?.projectId,
+                : (workspace?.members || []).map(m => m.fullName || m.name || m.email).filter(Boolean),
+              workspaceId: workspace?.id || urlWorkspaceId || location.state?.workspaceId || '',
+              projectId: workspace?.projectId || location.state?.projectId || '',
+              groupId: workspace?.groupId || searchParams.get('groupId') || location.state?.groupId || '',
+              documentId: documentId || workspace?.documentId || '',
             }}
             existingEval={existingFinalEval}
           />

@@ -7,10 +7,10 @@ const router = express.Router();
 // Get research projects list (filtered by user role)
 router.get('/', verifyToken, getProjects);
 
-// Create project (Admin only)
-router.post('/', verifyToken, requireRole(['admin']), createProject);
+// Create project (Admin & Research Coordinator)
+router.post('/', verifyToken, requireRole(['admin', 'research_coordinator']), createProject);
 
-// Assign Adviser to project (Admin only)
-router.patch('/:id/adviser', verifyToken, requireRole(['admin']), assignAdviser);
+// Assign Adviser to project (Admin & Research Coordinator)
+router.patch('/:id/adviser', verifyToken, requireRole(['admin', 'research_coordinator']), assignAdviser);
 
 export default router;

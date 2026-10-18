@@ -12,11 +12,11 @@ const router = express.Router();
 
 // Rubric configuration endpoints (Must be declared before :projectId parameter)
 router.get('/rubrics/active', verifyToken, getActiveRubric);
-router.get('/rubrics', verifyToken, requireRole(['admin']), getRubrics);
-router.post('/rubrics', verifyToken, requireRole(['admin']), saveRubric);
+router.get('/rubrics', verifyToken, requireRole(['admin', 'research_coordinator']), getRubrics);
+router.post('/rubrics', verifyToken, requireRole(['admin', 'research_coordinator']), saveRubric);
 
 // Panelist submit digital rubric evaluation
-router.post('/', verifyToken, requireRole(['panelist', 'admin']), submitEvaluation);
+router.post('/', verifyToken, requireRole(['panelist', 'admin', 'research_coordinator']), submitEvaluation);
 
 // Get evaluations & composite grade summary for a project
 router.get('/project/:projectId', verifyToken, getEvaluations);

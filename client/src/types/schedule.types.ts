@@ -23,6 +23,15 @@ export interface DefenseSchedule {
   groupId?: string;
   projectTitle: string;
   studentName?: string;
+  studentNames?: string[];
+  members?: Array<{ uid?: string; fullName?: string; name?: string; studentNumber?: string; email?: string }>;
+  courseId?: string;
+  courseName?: string;
+  program?: string;
+  specialization?: string;
+  specializationName?: string;
+  sectionName?: string;
+  type?: 'proposal' | 'final_defense';
   memberIds?: string[];
   defenseType: DefenseType;
   date: string;

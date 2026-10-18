@@ -52,14 +52,14 @@ router.post('/:id/publish-repository', verifyToken, requireRole(['admin', 'resea
 
 // Post-Defense Revisions Workflow
 router.get('/:id/post-defense-revisions', verifyToken, getPostDefenseRevisions);
-router.post('/:id/post-defense-revisions', verifyToken, requireRole(['student', 'admin']), submitPostDefenseRevision);
+router.post('/:id/post-defense-revisions', verifyToken, requireRole(['student', 'admin', 'research_coordinator']), submitPostDefenseRevision);
 router.post('/:id/post-defense-revisions/review', verifyToken, requireRole(['adviser', 'panelist', 'admin', 'research_coordinator']), reviewPostDefenseRevision);
 
 // Admin / Coordinator: Approve or reject manuscript publication
 router.patch('/:id/publication-status', verifyToken, requireRole(['admin', 'research_coordinator']), updateManuscriptPublicationStatus);
 
 // Get list of advisories for Adviser
-router.get('/advisories/all', verifyToken, requireRole(['adviser', 'admin']), getAdvisories);
+router.get('/advisories/all', verifyToken, requireRole(['adviser', 'admin', 'research_coordinator']), getAdvisories);
 
 // Get manuscript live draft for a project
 router.get('/draft/:projectId', verifyToken, getManuscriptDraft);
@@ -79,10 +79,10 @@ router.patch('/comments/:projectId/:commentId', verifyToken, updateManuscriptCom
 // Get manuscript versions for a project
 router.get('/:projectId', verifyToken, getManuscriptVersions);
 
-// Upload manuscript version (Student & Adviser)
-router.post('/', verifyToken, requireRole(['student', 'adviser', 'admin']), uploadManuscriptVersion);
+// Upload manuscript version (Student, Adviser, Admin, Research Coordinator)
+router.post('/', verifyToken, requireRole(['student', 'adviser', 'admin', 'research_coordinator']), uploadManuscriptVersion);
 
-// Update manuscript version status (Adviser & Admin)
-router.patch('/:id/status', verifyToken, requireRole(['adviser', 'admin']), updateManuscriptStatus);
+// Update manuscript version status (Adviser, Admin, Research Coordinator)
+router.patch('/:id/status', verifyToken, requireRole(['adviser', 'admin', 'research_coordinator']), updateManuscriptStatus);
 
 export default router;

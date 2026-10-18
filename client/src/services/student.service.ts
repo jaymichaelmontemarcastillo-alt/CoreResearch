@@ -1,3 +1,4 @@
+import api from './api';
 import { userService } from './user.service';
 import { StudentProfile, UpdateStudentAcademicInput } from '../types/student.types';
 
@@ -97,6 +98,39 @@ export const studentService = {
   async getAllStudents(): Promise<StudentProfile[]> {
     const users = await userService.getUsersByRole('student');
     return users.map((u) => this.normalizeStudent(u));
+  },
+
+  /**
+   * Fetch section classmates for the logged-in student (strictly in the same program, specialization, and section)
+   */
+  async getClassmates(): Promise<{
+    classmates: StudentProfile[];
+    groups: any[];
+    course?: any;
+    section?: any;
+    specialization?: any;
+  }> {
+    try {
+      const res = await api.get('/users/classmates');
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const normalized = res.data.data.map((s: any) => this.normalizeStudent(s));
+        return {
+          classmates: normalized,
+          groups: res.data.groups || [],
+          course: res.data.course,
+          section: res.data.section,
+          specialization: res.data.specialization,
+        };
+      }
+    } catch (err) {
+      console.warn('[studentService] getClassmates API fallback to local:', err);
+    }
+
+    const all = await this.getAllStudents();
+    return {
+      classmates: all,
+      groups: [],
+    };
   },
 
   /**

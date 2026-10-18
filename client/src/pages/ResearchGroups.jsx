@@ -68,10 +68,34 @@ export const ResearchGroups = () => {
   const [saving, setSaving] = useState(false);
 
   // ---------------------------------------------------------------------------
-  // 1. Data Fetching Effects
+  // 1. Derived State & Filter Logic (Declared before effects that reference them)
   // ---------------------------------------------------------------------------
+  const courseObj = courses.find(
+    (c) =>
+      c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
+      c.code?.toLowerCase() === selectedCourse?.toLowerCase()
+  );
+  const specializations = courseObj?.specializations || [];
+  const hasSpecializations = specializations.length > 0;
+
+  const relevantSections = sections.filter((s) => {
+    if (hasSpecializations && selectedSpecialization) {
+      return (
+        s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
+        (!s.specializationId && s.courseId?.toLowerCase() === selectedCourse?.toLowerCase())
+      );
+    }
+    return true;
+  });
+
+  const specHasSections = hasSpecializations && relevantSections.length > 0;
+
+  const showSectionFilter =
+    (!hasSpecializations && selectedCourse) || 
+    (hasSpecializations && (selectedSpecialization ? specHasSections : sections.length > 0));
+
   // ---------------------------------------------------------------------------
-  // 1. Data Fetching Effects
+  // 2. Data Fetching Effects
   // ---------------------------------------------------------------------------
   useEffect(() => {
     fetchInitialData();
@@ -198,33 +222,6 @@ export const ResearchGroups = () => {
       console.error("Failed to load sections:", error);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // 2. Derived State & Filter Logic
-  // ---------------------------------------------------------------------------
-  const courseObj = courses.find(
-    (c) =>
-      c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
-      c.code?.toLowerCase() === selectedCourse?.toLowerCase()
-  );
-  const specializations = courseObj?.specializations || [];
-  const hasSpecializations = specializations.length > 0;
-
-  const relevantSections = sections.filter((s) => {
-    if (hasSpecializations && selectedSpecialization) {
-      return (
-        s.specializationId?.toLowerCase() === selectedSpecialization.toLowerCase() ||
-        (!s.specializationId && s.courseId?.toLowerCase() === selectedCourse?.toLowerCase())
-      );
-    }
-    return true;
-  });
-
-  const specHasSections = hasSpecializations && relevantSections.length > 0;
-
-  const showSectionFilter =
-    (!hasSpecializations && selectedCourse) || 
-    (hasSpecializations && (selectedSpecialization ? specHasSections : sections.length > 0));
 
 
 

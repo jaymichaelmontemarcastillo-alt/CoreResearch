@@ -275,34 +275,123 @@ export const getSchedules = async (req, res) => {
   try {
     let list = [];
 
-    // Auto-archive past defense schedules
-    // If today is Oct 15, schedules for Oct 14 or earlier are automatically marked as archived
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ success: false, error: 'Service Unavailable', message: 'MongoDB is required to read schedules.' });
     }
 
-    const pastSchedules = await MongoSchedule.find({
-      date: { $lt: todayStr },
-      status: { $ne: 'archived' }
-    }).lean();
-    if (pastSchedules.length > 0) {
-      await MongoSchedule.updateMany(
-        { id: { $in: pastSchedules.map(schedule => schedule.id) } },
-        { $set: { status: 'archived' } }
-      );
-      await syncDefenseScheduleProjections(
-        pastSchedules.map(schedule => ({ ...schedule, status: 'archived' }))
-      );
+    // Do not hide active schedules; only exclude deleted ones unless specifically requested
+    const queryFilter = req.query.includeArchived === 'true'
+      ? { status: { $ne: 'deleted' } }
+      : { status: { $nin: ['deleted', 'archived'] } };
+
+    if (req.query.status) {
+      queryFilter.status = req.query.status;
     }
 
-    const queryFilter = req.query.includeArchived === 'true'
-      ? {}
-      : { status: { $ne: 'archived' } };
-    const mongoDocs = await MongoSchedule.find(queryFilter).lean();
-    list = mongoDocs.map(toDefenseScheduleProjection);
+    // If no schedules found because of archive status, allow non-deleted schedules as fallback
+    let mongoDocs = await MongoSchedule.find(queryFilter).lean();
+    if (mongoDocs.length === 0 && !req.query.status) {
+      mongoDocs = await MongoSchedule.find({ status: { $ne: 'deleted' } }).lean();
+    }
+
+    // Load research groups from Mongo and Firestore to enrich schedules with course, specialization, and student members
+    const groupMap = new Map();
+    try {
+      const groups = await mongoose.connection.collection('researchgroups').find({}).toArray();
+      groups.forEach(g => {
+        if (g.id) groupMap.set(g.id, g);
+        if (g._id) groupMap.set(g._id.toString(), g);
+      });
+    } catch (gErr) {
+      console.warn('[ScheduleController] Failed to load mongo groups:', gErr.message);
+    }
+
+    if (db) {
+      try {
+        const fgSnap = await db.collection('research_groups').get();
+        fgSnap.forEach(doc => {
+          const data = doc.data();
+          if (!groupMap.has(doc.id)) {
+            groupMap.set(doc.id, { id: doc.id, ...data });
+          }
+        });
+      } catch (fErr) {
+        console.warn('[ScheduleController] Firestore groups lookup warn:', fErr.message);
+      }
+    }
+
+    const specDisplayNames = {
+      'IS': 'Intelligent Systems',
+      'WMAD': 'Web and Mobile App Development',
+      'AMG': 'Animation and Motion Graphics',
+      'SMP': 'Service Management Program'
+    };
+
+    const enrichedDocs = mongoDocs.map(doc => {
+      const grp = groupMap.get(doc.groupId) || groupMap.get(doc.projectId);
+      
+      let courseId = doc.courseId || (grp && grp.courseId) || '';
+      let courseName = doc.courseName || (grp && grp.courseName) || '';
+      let rawSpec = doc.specialization || (grp && (grp.specialization || grp.specializationId)) || '';
+      let specialization = rawSpec ? rawSpec.toUpperCase() : '';
+      let specializationName = doc.specializationName || (grp && grp.specializationName) || '';
+      let sectionName = doc.sectionName || (grp && grp.sectionName) || '';
+      let members = (Array.isArray(doc.members) && doc.members.length > 0)
+        ? doc.members
+        : (grp && Array.isArray(grp.members) && grp.members.length > 0 ? grp.members : []);
+      let projectTitle = doc.projectTitle || doc.title || (grp && grp.title) || '';
+
+      // Infer program & specialization if unmapped
+      if (!courseId) {
+        const titleLower = (projectTitle || '').toLowerCase();
+        const pId = (doc.projectId || '').toLowerCase();
+        if (titleLower.includes('coreresearch') || pId.includes('coreresearch') || titleLower.includes('aral') || titleLower.includes('skillbridge') || titleLower.includes('intellisched') || titleLower.includes('bundok') || titleLower.includes('aksyonna') || titleLower.includes('automated asset')) {
+          courseId = 'bsit';
+          specialization = specialization || 'WMAD';
+        } else if (doc.id?.startsWith('sch-cs-') || titleLower.includes('plant disease') || titleLower.includes('traffic density') || titleLower.includes('sign language') || titleLower.includes('hydroponics') || titleLower.includes('retention') || titleLower.includes('medical image') || titleLower.includes('graph neural') || titleLower.includes('academic manuscript')) {
+          courseId = 'bscs';
+          specialization = specialization || 'IS';
+        } else {
+          courseId = 'bsit';
+          specialization = specialization || 'WMAD';
+        }
+      }
+
+      courseId = courseId.toLowerCase();
+      if (courseId === 'bscs') {
+        courseName = courseName || 'Bachelor of Science in Computer Science';
+        if (!specialization) specialization = 'IS';
+      } else if (courseId === 'bsit') {
+        courseName = courseName || 'Bachelor of Science in Information Technology';
+        if (!specialization) specialization = 'WMAD';
+      }
+
+      specializationName = specializationName || specDisplayNames[specialization] || specialization;
+
+      const studentNames = members.length > 0 
+        ? members.map(m => m.fullName || m.name).filter(Boolean)
+        : (doc.studentNames || (doc.studentName && doc.studentName !== 'Student Researcher' ? [doc.studentName] : []));
+
+      const isFinal = doc.type === 'final_defense' || doc.defenseType === 'final_defense';
+
+      return {
+        ...doc,
+        projectTitle: projectTitle || 'Untitled Research',
+        courseId,
+        courseName,
+        program: courseId.toUpperCase(),
+        specialization,
+        specializationName,
+        sectionName,
+        members,
+        studentNames,
+        studentName: studentNames[0] || doc.studentName || 'Student Researcher',
+        type: isFinal ? 'final_defense' : 'proposal',
+        defenseType: isFinal ? 'final_defense' : 'proposal_defense'
+      };
+    });
+
+    list = enrichedDocs.map(toDefenseScheduleProjection);
     list.sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
 
     return res.status(200).json({

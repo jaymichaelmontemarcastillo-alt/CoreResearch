@@ -48,21 +48,36 @@ export interface ProposalSubTotals {
   overall: number;    // max 100
 }
 
+export interface DefenseMetadata {
+  adviser?: string;
+  expert?: string;
+  title?: string;
+  proponents?: string;
+  groupNo?: string;
+  date?: string;
+  time?: string;
+}
+
 export type ProposalVerdict =
   | 'APPROVED'               // 86–100
   | 'APPROVED_WITH_REVISIONS' // 75–85
-  | 'DISAPPROVED';           // below 75
+  | 'DISAPPROVED'           // below 75
+  | 'REDEFENSE';
 
 export interface ProposalEvaluation {
   id: string;
   defenseId: string;
   workspaceId?: string;
   projectId?: string;
+  groupId?: string;
+  documentId?: string;
   panelistId: string;
   panelistName: string;
+  meta?: DefenseMetadata;
   scores: ProposalRubricScores;
   subTotals: ProposalSubTotals;
   verdict: ProposalVerdict;
+  remarks?: string;
   submittedAt: string;
 }
 
@@ -70,11 +85,15 @@ export interface SubmitProposalEvaluationInput {
   defenseId: string;
   workspaceId?: string;
   projectId?: string;
+  groupId?: string;
+  documentId?: string;
   panelistId: string;
   panelistName: string;
+  meta?: DefenseMetadata;
   scores: ProposalRubricScores;
   subTotals: ProposalSubTotals;
   verdict: ProposalVerdict;
+  remarks?: string;
 }
 
 // ─── Final Oral Defense Rubric ──────────────────────────────────────────────
@@ -115,13 +134,17 @@ export interface FinalDefenseEvaluation {
   defenseId: string;
   workspaceId?: string;
   projectId?: string;
+  groupId?: string;
+  documentId?: string;
   panelistId: string;
   panelistName: string;
+  meta?: DefenseMetadata;
   scores: FinalDefenseRubricScores;
   subTotals: FinalDefenseSubTotals;
   verdict: FinalDefenseVerdict;
   revisionDirectives?: string;
   revisionDeadline?: string;
+  remarks?: string;
   submittedAt: string;
 }
 
@@ -129,11 +152,15 @@ export interface SubmitFinalDefenseEvaluationInput {
   defenseId: string;
   workspaceId?: string;
   projectId?: string;
+  groupId?: string;
+  documentId?: string;
   panelistId: string;
   panelistName: string;
+  meta?: DefenseMetadata;
   scores: FinalDefenseRubricScores;
   subTotals: FinalDefenseSubTotals;
   verdict: FinalDefenseVerdict;
   revisionDirectives?: string;
   revisionDeadline?: string;
+  remarks?: string;
 }

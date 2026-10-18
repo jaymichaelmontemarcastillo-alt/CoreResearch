@@ -7,7 +7,7 @@ import {
   sendPasswordResetEmail,
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../services/firebase';
 import api from '../services/api';
 import { userService } from '../services/user.service';
@@ -47,7 +47,8 @@ export const AuthProvider = ({ children }) => {
         const profile = userDoc.data();
 
         // Enforce approval for non-admin accounts: pending/rejected cannot remain logged in
-        if (profile.role !== 'admin' && (profile.status === 'pending' || profile.status === 'rejected' || profile.is_approved === false)) {
+        const isPrivilegedRole = profile.role === 'admin' || profile.role === 'research_coordinator' || profile.role === 'coordinator';
+        if (!isPrivilegedRole && (profile.status === 'pending' || profile.status === 'rejected' || profile.is_approved === false)) {
           if (profile.status === 'rejected') {
             console.warn('[AuthContext] Account is rejected. Logging out.');
             await signOut(auth);
@@ -173,11 +174,12 @@ export const AuthProvider = ({ children }) => {
         const profile = userDoc.data();
 
         // 1. Validate Portal Role Separation
-        if (portal === 'admin' && profile.role !== 'admin') {
+        const isCoordinatorRole = profile.role === 'research_coordinator' || profile.role === 'coordinator';
+        if (portal === 'admin' && profile.role !== 'admin' && !isCoordinatorRole) {
           await signOut(auth);
           setCurrentUser(null);
           setUserProfile(null);
-          throw new Error('Access denied. This portal is strictly for System Administrators only.');
+          throw new Error('Access denied. This portal is strictly for System Administrators and Research Coordinators only.');
         }
 
         if (portal === 'student' && profile.role !== 'student') {
@@ -195,7 +197,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         // 2. Validate Approval Status for non-admins
-        if (profile.role !== 'admin') {
+        if (profile.role !== 'admin' && !isCoordinatorRole) {
           if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
             setCurrentUser(result.user);
             setUserProfile(profile);
@@ -336,7 +338,16 @@ export const AuthProvider = ({ children }) => {
       };
 
       // 4. Persist profile document:
-      await api.post('/auth/register', userProfileData);
+      try {
+        await api.post('/auth/register', userProfileData);
+      } catch (apiErr) {
+        console.warn('[AuthContext] Backend register error:', apiErr);
+      }
+      try {
+        await setDoc(doc(db, 'users', result.user.uid), userProfileData, { merge: true });
+      } catch (fsErr) {
+        console.warn('[AuthContext] Client Firestore write error:', fsErr);
+      }
 
       // 6. Keep session & profile active with pending status.
       // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
@@ -415,7 +426,16 @@ export const AuthProvider = ({ children }) => {
         updated_at: new Date().toISOString()
       };
 
-      await api.post('/auth/register', userProfileData);
+      try {
+        await api.post('/auth/register', userProfileData);
+      } catch (apiErr) {
+        console.warn('[AuthContext] Backend register error:', apiErr);
+      }
+      try {
+        await setDoc(doc(db, 'users', result.user.uid), userProfileData, { merge: true });
+      } catch (fsErr) {
+        console.warn('[AuthContext] Client Firestore write error:', fsErr);
+      }
 
       // Keep session & profile active with pending status.
       // ProtectedRoute restricts them to /pending-approval until an administrator approves them.
@@ -468,11 +488,14 @@ export const AuthProvider = ({ children }) => {
         const profile = userDoc.data();
 
         // 1. Role portal separation
-        if (portal === 'admin' && profile.role !== 'admin') {
+        const isCoordinatorRole = profile.role === 'research_coordinator' || profile.role === 'coordinator';
+        const isPrivilegedAdmin = profile.role === 'admin' || isCoordinatorRole;
+
+        if (portal === 'admin' && !isPrivilegedAdmin) {
           await signOut(auth);
           setCurrentUser(null);
           setUserProfile(null);
-          throw new Error('Access denied. This portal is strictly for System Administrators only.');
+          throw new Error('Access denied. This portal is strictly for System Administrators and Research Coordinators only.');
         }
 
         if (portal === 'student' && profile.role !== 'student') {
@@ -490,7 +513,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         // 2. Approval status for non-admins
-        if (profile.role !== 'admin') {
+        if (!isPrivilegedAdmin) {
           if (profile.status === 'pending' || (profile.is_approved === false && profile.status !== 'approved')) {
             await signOut(auth);
             setCurrentUser(null);
@@ -567,8 +590,8 @@ export const AuthProvider = ({ children }) => {
         department: 'Information Technology',
         department_id: 'it',
         studentIdOrEmployeeId: '',
-        status: defaultRole === 'admin' ? 'active' : 'pending',
-        is_approved: defaultRole === 'admin' ? true : false,
+        status: (defaultRole === 'admin' || defaultRole === 'research_coordinator') ? 'active' : 'pending',
+        is_approved: (defaultRole === 'admin' || defaultRole === 'research_coordinator') ? true : false,
         profile_image: result.user.photoURL || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -697,7 +720,9 @@ export const AuthProvider = ({ children }) => {
         fullName: 'Prof. Maria Santos',
         role: 'research_coordinator',
         department: 'Department of Information Technology',
-        studentIdOrEmployeeId: 'EMP-7700'
+        studentIdOrEmployeeId: 'EMP-7700',
+        status: 'active',
+        is_approved: true
       }
     };
 

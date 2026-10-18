@@ -316,7 +316,7 @@ export const FacultyDirectoryCard = ({
               type="button"
               onClick={() => onManageProfile(adviser)}
               className="w-9 h-9 rounded-full flex items-center justify-center text-[#3c4043] dark:text-[#dadce0] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] active:bg-black/[0.12] transition-colors duration-150 cursor-pointer"
-              title="Manage Profile & Capacity"
+              title="Manage Profile"
               aria-label="Manage Profile"
             >
               <SquarePen className="w-[18px] h-[18px]" strokeWidth={2} />
@@ -390,7 +390,7 @@ export const FacultyDirectoryCard = ({
                     className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                   >
                     <SquarePen className="w-4 h-4 text-gray-400" />
-                    <span>Edit Profile & Capacity</span>
+                    <span>Edit Profile</span>
                   </button>
                 )}
 

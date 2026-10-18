@@ -11,7 +11,6 @@ import {
   HiMagnifyingGlass,
   HiFunnel,
   HiPlus,
-  HiPencilSquare,
   HiTrash,
   HiArrowPath,
   HiSparkles,
@@ -22,10 +21,10 @@ import { sectionService } from "../services/section.service";
 import { groupService } from "../services/group.service";
 import { titleProposalService } from "../services/titleProposal.service";
 import { scheduleService } from "../services/schedule.service";
+import { gradingService } from "../services/grading.service";
 import { useAuth } from "../context/AuthContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { GenerateScheduleModal } from "../components/scheduling/GenerateScheduleModal";
-import EditScheduleModal from "../components/scheduling/EditScheduleModal";
 import { ScheduleDefenseModal } from "../components/scheduling/ScheduleDefenseModal";
 
 const formatTime12Hour = (time) => {
@@ -65,8 +64,7 @@ export const Scheduling = () => {
   const [isScheduleDefenseModalOpen, setIsScheduleDefenseModalOpen] = useState(false);
   const [selectedGroupForScheduling, setSelectedGroupForScheduling] = useState(null);
   const [isRedefenseMode, setIsRedefenseMode] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
-  const [editingSchedule, setEditingSchedule] = useState(null);
+  const [evaluations, setEvaluations] = useState({ proposalEvaluations: [], finalEvaluations: [] });
 
   useEffect(() => {
     fetchInitialData();
@@ -83,17 +81,19 @@ export const Scheduling = () => {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [coursesData, groupsData, proposalsData, schedulesData] = await Promise.all([
+      const [coursesData, groupsData, proposalsData, schedulesData, evalsData] = await Promise.all([
         courseService.getAllCourses(),
         groupService.getAllGroups(),
         titleProposalService.getAllProposals(),
-        scheduleService.getAllSchedules()
+        scheduleService.getAllSchedules(),
+        gradingService.getAllEvaluations().catch(() => ({ proposalEvaluations: [], finalEvaluations: [] })),
       ]);
       
       setCourses(coursesData);
       setGroups(groupsData);
       setProposals(proposalsData);
       setSchedules(schedulesData);
+      setEvaluations(evalsData || { proposalEvaluations: [], finalEvaluations: [] });
       
       const sectionMap = {};
       await Promise.all(
@@ -124,14 +124,16 @@ export const Scheduling = () => {
   const refreshData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const [groupsData, proposalsData, schedulesData] = await Promise.all([
+      const [groupsData, proposalsData, schedulesData, evalsData] = await Promise.all([
         groupService.getAllGroups(),
         titleProposalService.getAllProposals(),
-        scheduleService.getAllSchedules()
+        scheduleService.getAllSchedules(),
+        gradingService.getAllEvaluations().catch(() => ({ proposalEvaluations: [], finalEvaluations: [] })),
       ]);
       setGroups(groupsData);
       setProposals(proposalsData);
       setSchedules(schedulesData);
+      setEvaluations(evalsData || { proposalEvaluations: [], finalEvaluations: [] });
     } catch (error) {
       console.error("Failed to load data", error);
     } finally {
@@ -240,6 +242,80 @@ export const Scheduling = () => {
     return groupSchedules[groupSchedules.length - 1];
   };
 
+  const getGroupDefenseState = (groupId) => {
+    const groupSchedules = getAllSchedulesForGroup(groupId);
+    const activeSchedule = getScheduleForGroup(groupId);
+
+    const propEvals = (evaluations.proposalEvaluations || []).filter(
+      (e) => e.groupId === groupId || e.workspaceId === groupId || e.projectId === groupId
+    );
+    const finalEvals = (evaluations.finalEvaluations || []).filter(
+      (e) => e.groupId === groupId || e.workspaceId === groupId || e.projectId === groupId
+    );
+
+    const latestFinal = finalEvals[0];
+    const latestProp = propEvals[0];
+
+    const hasRedefenseFinal = finalEvals.some(
+      (e) => e.verdict === 'REDEFENSE' || e.verdict === 'DISAPPROVED'
+    );
+    const hasRedefenseProp = propEvals.some(
+      (e) => e.verdict === 'REDEFENSE' || e.verdict === 'DISAPPROVED'
+    );
+
+    const hasScheduleRedefense =
+      activeSchedule?.status === 'for_redefense' ||
+      activeSchedule?.resultStatus === 're_defense' ||
+      activeSchedule?.isRedefense ||
+      activeSchedule?.defenseStage?.toLowerCase().includes('re-defense') ||
+      groupSchedules.some((s) => s.status === 'for_redefense' || s.resultStatus === 're_defense');
+
+    const isRedefense = hasRedefenseFinal || hasRedefenseProp || hasScheduleRedefense;
+
+    const isFinalPassed =
+      latestFinal &&
+      (latestFinal.verdict === 'PASSED' ||
+        latestFinal.verdict === 'PASSED_WITH_MINOR_REVISIONS' ||
+        latestFinal.verdict === 'PASSED_WITH_MAJOR_REVISIONS');
+
+    const isPropPassed =
+      latestProp &&
+      (latestProp.verdict === 'APPROVED' || latestProp.verdict === 'APPROVED_WITH_REVISIONS');
+
+    const isSchedulePassed =
+      activeSchedule?.status === 'completed' &&
+      (activeSchedule?.resultStatus === 'passed' || activeSchedule?.resultStatus === 'approved');
+
+    const isDefended =
+      (isFinalPassed || (isPropPassed && !isRedefense) || isSchedulePassed) && !isRedefense;
+
+    let stageLabel = 'Proposal Defense';
+    if (activeSchedule?.defenseStage) {
+      stageLabel = activeSchedule.defenseStage;
+    } else if (activeSchedule?.defenseType === 'final_defense' || latestFinal) {
+      stageLabel = isRedefense ? 'Final Re-defense' : 'Final Defense';
+    } else if (isRedefense) {
+      stageLabel = 'Proposal Re-defense';
+    }
+
+    const needsRedefenseScheduling =
+      isRedefense &&
+      (!activeSchedule ||
+        activeSchedule.status === 'for_redefense' ||
+        !activeSchedule.startTime ||
+        !activeSchedule.date);
+
+    return {
+      isRedefense,
+      isDefended,
+      isFinalPassed,
+      isPropPassed,
+      stageLabel,
+      needsRedefenseScheduling,
+      activeSchedule,
+    };
+  };
+
   const handleClearAllTimes = async () => {
     if (!selectedSection) {
        showToast("Please select a specific section to clear times.", "info");
@@ -322,6 +398,42 @@ export const Scheduling = () => {
       {toastMessage && (
         <Toast message={toastMessage} variant={toastVariant} onClose={() => setToastMessage("")} />
       )}
+
+      {/* System Recommendation for Research Coordinator & Admin on Re-defense Groups */}
+      {(() => {
+        const groupsNeedingRedefense = groups.filter((g) => getGroupDefenseState(g.id).needsRedefenseScheduling);
+        if (groupsNeedingRedefense.length === 0) return null;
+        return (
+          <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-300">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+                <HiSparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  Recommendation: Set Presentation Schedule for Re-defense Groups
+                </h4>
+                <p className="text-xs text-amber-800/90 dark:text-amber-300/80 mt-0.5">
+                  {groupsNeedingRedefense.length} research group{groupsNeedingRedefense.length !== 1 ? 's have' : ' has'} received a Re-defense rubric verdict. Please schedule their defense presentations using the action buttons below.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 bg-white dark:bg-[#111218] border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100/50 font-bold"
+              onClick={() => {
+                setSelectedGroupForScheduling(groupsNeedingRedefense[0]);
+                setIsRedefenseMode(true);
+                setIsScheduleDefenseModalOpen(true);
+              }}
+            >
+              <CalendarPlus className="w-4 h-4 mr-1.5 text-amber-600" />
+              Schedule Re-defense
+            </Button>
+          </div>
+        );
+      })()}
 
       <div className="flex flex-col md:flex-row items-end justify-between gap-4 pb-2">
         <div className="flex flex-col md:flex-row items-end gap-3 flex-1 w-full">
@@ -585,6 +697,7 @@ export const Scheduling = () => {
                               const groupAllSchedules = getAllSchedulesForGroup(group.id);
                               const activePanelists = (schedule?.panelists?.length > 0) ? schedule.panelists : (group.panelists || []);
                               const activeAdviserName = schedule?.adviserName || group.adviserName;
+                              const { isRedefense, isDefended, stageLabel, needsRedefenseScheduling } = getGroupDefenseState(group.id);
                               
                               return (
                                 <TableRow key={group.id}>
@@ -634,13 +747,16 @@ export const Scheduling = () => {
                                       )}
 
                                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                        {schedule?.status === 'for_redefense' ? (
-                                          <Badge variant="amber" className="text-[10px] font-bold">
-                                            For Re-defense
+                                        {isDefended ? (
+                                          <Badge
+                                            variant="green"
+                                            className="text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                                          >
+                                            Thesis/Capstone defended
                                           </Badge>
-                                        ) : schedule && (schedule.defenseStage?.toLowerCase().includes('re-defense') || schedule.defenseType?.includes('redefense')) ? (
+                                        ) : isRedefense ? (
                                           <Badge variant="amber" className="text-[10px] font-bold">
-                                            {schedule.defenseStage || (schedule.defenseType === 'final_defense' ? 'Final Re-defense' : 'Proposal Re-defense')}
+                                            {stageLabel.includes('Re-defense') ? stageLabel : 'For Re-defense'}
                                           </Badge>
                                         ) : schedule && (schedule.defenseType === 'final_defense' || schedule.defenseStage?.toLowerCase().includes('final')) ? (
                                           <Badge variant="purple" className="text-[10px] font-medium">
@@ -656,6 +772,18 @@ export const Scheduling = () => {
                                           </Badge>
                                         )}
                                       </div>
+
+                                      {/* Recommendation for Admin/Coordinator if group is in re-defense */}
+                                      {isRedefense && (
+                                        <div className="mt-1 flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-md text-[11px] font-medium text-amber-800 dark:text-amber-300 w-fit">
+                                          <HiSparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                          <span>
+                                            {needsRedefenseScheduling
+                                              ? "Recommendation: Set re-defense schedule"
+                                              : "Re-defense presentation scheduled"}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   </TableCell>
 
@@ -696,42 +824,38 @@ export const Scheduling = () => {
                                   {/* Actions */}
                                   <TableCell className="align-middle">
                                     <div className="flex items-center justify-center gap-1.5 h-full">
-                                      {/* Quick Action: Schedule Defense / Re-defense button */}
-                                      <button 
-                                        className={`p-1.5 rounded-lg transition-colors ${
-                                          schedule?.status === 'for_redefense'
-                                            ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40'
-                                            : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40'
-                                        }`}
-                                        title={
-                                          schedule?.status === 'for_redefense'
-                                            ? 'Schedule Re-defense'
-                                            : schedule && (schedule.startTime || schedule.date)
-                                            ? 'Schedule Re-defense / Next Stage'
-                                            : 'Schedule Defense Presentation'
-                                        } 
-                                        onClick={() => {
-                                          setSelectedGroupForScheduling(group);
-                                          setIsRedefenseMode(schedule?.status === 'for_redefense');
-                                          setIsScheduleDefenseModalOpen(true);
-                                        }}
-                                      >
-                                        <CalendarPlus className="w-4 h-4" />
-                                      </button>
+                                      {/* Quick Action: Schedule Defense / Re-defense presentation */}
+                                      {isRedefense ? (
+                                        <button 
+                                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1 shadow-sm transition"
+                                          title="Set Re-defense presentation schedule"
+                                          onClick={() => {
+                                            setSelectedGroupForScheduling(group);
+                                            setIsRedefenseMode(true);
+                                            setIsScheduleDefenseModalOpen(true);
+                                          }}
+                                        >
+                                          <CalendarPlus className="w-3.5 h-3.5" />
+                                          <span>Schedule Re-defense</span>
+                                        </button>
+                                      ) : (
+                                        <button 
+                                          className="p-1.5 rounded-lg text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40 transition-colors"
+                                          title={
+                                            schedule && (schedule.startTime || schedule.date)
+                                              ? 'Update / Reschedule Presentation'
+                                              : 'Schedule Defense Presentation'
+                                          } 
+                                          onClick={() => {
+                                            setSelectedGroupForScheduling(group);
+                                            setIsRedefenseMode(false);
+                                            setIsScheduleDefenseModalOpen(true);
+                                          }}
+                                        >
+                                          <CalendarPlus className="w-4 h-4" />
+                                        </button>
+                                      )}
 
-                                      {/* Edit Schedule */}
-                                      <button 
-                                        className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 transition-colors" 
-                                        title="Edit Schedule" 
-                                        onClick={() => {
-                                          setEditingGroup(group);
-                                          setEditingSchedule(schedule || null);
-                                        }}
-                                      >
-                                        <HiPencilSquare className="w-4 h-4" />
-                                      </button>
-
-                                      
                                       {/* Clear Time button */}
                                       {schedule && (schedule.startTime || schedule.date) && (
                                         <button
@@ -846,30 +970,6 @@ export const Scheduling = () => {
             setIsScheduleModalOpen(false);
             showToast("Schedules created successfully!");
             refreshData();
-          }}
-        />
-      )}
-
-      {/* 4. Edit Schedule Modal */}
-      {editingGroup && (
-        <EditScheduleModal
-          isOpen={!!editingGroup}
-          onClose={() => {
-            setEditingGroup(null);
-            setEditingSchedule(null);
-          }}
-          schedule={editingSchedule}
-          group={{
-            ...editingGroup,
-            title:
-              getProposalForGroup(editingGroup.id)?.title ||
-              'No approved title yet',
-          }}
-          onSaved={() => {
-            setEditingGroup(null);
-            setEditingSchedule(null);
-            showToast("Schedule updated successfully!");
-            refreshData(false);
           }}
         />
       )}

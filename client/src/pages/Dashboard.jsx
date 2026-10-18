@@ -49,7 +49,8 @@ export const Dashboard = () => {
 
   const [hasActiveResearch, setHasActiveResearch] = useState(false);
 
-  const isStudent = effectiveRole === "student" || (!effectiveRole && role !== 'admin' && role !== 'faculty');
+  const isAdminOrCoordinator = effectiveRole === "admin" || effectiveRole === "research_coordinator" || effectiveRole === "coordinator" || role === "admin" || role === "research_coordinator" || role === "coordinator";
+  const isStudent = effectiveRole === "student" || (!effectiveRole && !isAdminOrCoordinator && role !== 'faculty');
   const showGreetingCard = !isStudent || !hasActiveResearch;
 
   return (
@@ -108,7 +109,7 @@ export const Dashboard = () => {
                 </Button>
               </Link>
             )}
-            {effectiveRole === "admin" && (
+            {isAdminOrCoordinator && (
               <Link to="/admin/users">
                 <Button variant="primary" size="sm">
                   Manage Users
@@ -127,21 +128,21 @@ export const Dashboard = () => {
       }>
         {effectiveRole === "adviser" ? (
           <AdviserDashboardView />
-        ) : effectiveRole === "student" || (!effectiveRole && role !== 'admin' && role !== 'faculty') ? (
+        ) : isStudent ? (
           <StudentDashboardView onActiveResearchChange={setHasActiveResearch} />
         ) : (
           <>
             {/* Metric Cards Row */}
             {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
-            {effectiveRole === "admin" && <AdminAnalyticsSection />}
+            {isAdminOrCoordinator && <AdminAnalyticsSection />}
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               {/* Left 2 Cols (or 3 for admin) */}
-              <div className={effectiveRole === "admin" ? "lg:col-span-3 space-y-5" : "lg:col-span-2 space-y-5"}>
+              <div className={isAdminOrCoordinator ? "lg:col-span-3 space-y-5" : "lg:col-span-2 space-y-5"}>
 
             {/* ====== ADMIN CONTENT ====== */}
-            {effectiveRole === "admin" && (
+            {isAdminOrCoordinator && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
                   <div className="space-y-1.5">
@@ -222,7 +223,7 @@ export const Dashboard = () => {
           </div>
 
           {/* Right Col: Recent Activity for Non-Admins */}
-          {effectiveRole !== "admin" && (
+          {!isAdminOrCoordinator && (
             <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 h-full">
               <RecentActivityWidget currentUser={currentUser} />
             </div>

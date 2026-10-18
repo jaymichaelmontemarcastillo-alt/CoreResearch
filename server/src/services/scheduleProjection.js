@@ -11,12 +11,25 @@ export const toDefenseScheduleProjection = (schedule) => {
     role: panelist.role || 'panelist'
   }));
 
+  const isFinal = data.type === 'final_defense' || data.defenseType === 'final_defense';
+
   return compactFields({
     id: data.id,
     projectId: data.projectId,
     projectTitle: data.projectTitle || '',
     studentName: data.studentName || 'Student Researcher',
-    defenseType: data.type === 'proposal' ? 'proposal_defense' : 'final_defense',
+    studentNames: Array.isArray(data.members) && data.members.length > 0
+      ? data.members.map(m => m.fullName || m.name).filter(Boolean)
+      : (Array.isArray(data.studentNames) && data.studentNames.length > 0 ? data.studentNames : (data.studentName ? [data.studentName] : [])),
+    members: data.members || [],
+    courseId: data.courseId,
+    courseName: data.courseName,
+    program: data.program || (data.courseId ? data.courseId.toUpperCase() : undefined),
+    specialization: data.specialization,
+    specializationName: data.specializationName,
+    sectionName: data.sectionName,
+    defenseType: isFinal ? 'final_defense' : 'proposal_defense',
+    type: isFinal ? 'final_defense' : 'proposal',
     date: data.date || '',
     startTime: data.time || data.startTime || '',
     endTime: data.endTime || data.time || data.startTime || '',
@@ -29,7 +42,7 @@ export const toDefenseScheduleProjection = (schedule) => {
     memberIds: data.memberIds || [],
     status: data.status || 'scheduled',
     attempt: data.attempt,
-    defenseStage: data.defenseStage,
+    defenseStage: data.defenseStage || (isFinal ? 'Final Defense' : 'Proposal Defense'),
     notes: data.notes,
     resultStatus: data.resultStatus,
     createdAt: data.createdAt instanceof Date ? data.createdAt.toISOString() : data.createdAt,

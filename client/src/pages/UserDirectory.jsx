@@ -9,6 +9,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Toast } from "../components/ui/Toast";
 import { Modal } from "../components/ui/Modal";
 import { Avatar } from "../components/ui/Avatar";
+import { Badge } from "../components/ui/Badge";
 import { Pagination } from "../components/ui/Pagination";
 import { useConfirm } from "../context/ConfirmContext";
 import { useAuth } from "../context/AuthContext";
@@ -32,7 +33,7 @@ import { researchWorkspaceService } from "../services/researchWorkspace.service"
 
 export const UserDirectory = () => {
   const { role, userProfile } = useAuth();
-  const isAdmin = role === "admin" || userProfile?.role === "admin";
+  const isAdmin = role === "admin" || userProfile?.role === "admin" || role === "research_coordinator" || userProfile?.role === "research_coordinator" || role === "coordinator";
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -132,7 +133,7 @@ export const UserDirectory = () => {
     setLoading(true);
     try {
       const isStudentTab = selectedTab === "student";
-      const result = await userService.getPaginatedUsers({
+      let result = await userService.getPaginatedUsers({
         page: targetPage,
         limit: targetLimit,
         role: selectedTab, // "student" | "faculty" | "admin"
@@ -142,9 +143,41 @@ export const UserDirectory = () => {
         specialization: isStudentTab ? selectedSpecialization : undefined,
       });
 
-      setUsers(result.users);
-      setTotalUsers(result.total);
-      setTotalPages(result.totalPages);
+      // Guaranteed fallback for faculty tab if paginated query returns 0 users
+      if (selectedTab === "faculty" && (!result.users || result.users.length === 0)) {
+        try {
+          const directFaculty = await userService.getUsersByRole("faculty");
+          if (directFaculty && directFaculty.length > 0) {
+            let filtered = directFaculty.filter(
+              (u) => u.is_approved !== false && u.status !== "rejected"
+            );
+            if (search.trim()) {
+              const q = search.toLowerCase().trim();
+              filtered = filtered.filter(
+                (u) =>
+                  (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+                  (u.email && u.email.toLowerCase().includes(q)) ||
+                  (u.studentIdOrEmployeeId && u.studentIdOrEmployeeId.toLowerCase().includes(q)) ||
+                  (u.department && u.department.toLowerCase().includes(q))
+              );
+            }
+            const startIndex = (targetPage - 1) * targetLimit;
+            result = {
+              users: filtered.slice(startIndex, startIndex + targetLimit),
+              total: filtered.length,
+              page: targetPage,
+              limit: targetLimit,
+              totalPages: Math.ceil(filtered.length / targetLimit) || 1,
+            };
+          }
+        } catch (directErr) {
+          console.warn("[UserDirectory] Direct faculty fallback warning:", directErr);
+        }
+      }
+
+      setUsers(result.users || []);
+      setTotalUsers(result.total || 0);
+      setTotalPages(result.totalPages || 1);
     } catch (error) {
       console.error("[UserDirectory] fetchActiveUsers error:", error);
       showToast("Error loading active user accounts.", "error");
@@ -420,13 +453,27 @@ export const UserDirectory = () => {
     { label: isAdmin ? "Actions" : "Details", className: "text-right min-w-[100px]" },
   ];
 
-  const facultyAdminColumns = [
-    { label: "Name", className: "w-[300px] min-w-[220px]" },
-    { label: "Email", className: "min-w-[240px]" },
+  const facultyColumns = [
+    { label: "Faculty Name", className: "w-[260px] min-w-[220px]" },
+    { label: "Email", className: "min-w-[220px]" },
+    { label: "Role", className: "min-w-[140px]" },
+    { label: "Department", className: "min-w-[180px]" },
     { label: isAdmin ? "Actions" : "Details", className: "text-right min-w-[100px]" },
   ];
 
-  const activeColumns = selectedTab === "student" ? studentColumns : facultyAdminColumns;
+  const adminColumns = [
+    { label: "Admin Name", className: "w-[260px] min-w-[220px]" },
+    { label: "Email", className: "min-w-[220px]" },
+    { label: "Role", className: "min-w-[120px]" },
+    { label: isAdmin ? "Actions" : "Details", className: "text-right min-w-[100px]" },
+  ];
+
+  const activeColumns =
+    selectedTab === "student"
+      ? studentColumns
+      : selectedTab === "faculty"
+      ? facultyColumns
+      : adminColumns;
 
   const getProgramDisplay = (u) => {
     if (u.programCode) return u.programCode;
@@ -619,7 +666,7 @@ export const UserDirectory = () => {
         ) : (
           users.map((u, index) => (
             <TableRow key={u.uid || u.id || index}>
-              {/* 1. Name & Email */}
+              {/* 1. Name & Subtitle */}
               <TableCell className="w-[260px] min-w-[200px]">
                 <div className="flex items-center gap-3">
                   <Avatar
@@ -632,14 +679,20 @@ export const UserDirectory = () => {
                     <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">
                       {u.fullName || "Unnamed User"}
                     </div>
-                    <div className="text-gray-400 dark:text-gray-500 text-[11px] truncate">
-                      {u.email}
-                    </div>
+                    {u.studentIdOrEmployeeId ? (
+                      <div className="text-gray-400 dark:text-gray-500 text-[11px] font-mono truncate">
+                        {u.studentIdOrEmployeeId}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400 dark:text-gray-500 text-[11px] truncate">
+                        {u.email}
+                      </div>
+                    )}
                   </div>
                 </div>
               </TableCell>
 
-              {/* Student View Specific Columns */}
+              {/* View Specific Columns */}
               {selectedTab === "student" ? (
                 <>
                   {/* Student ID */}
@@ -662,11 +715,56 @@ export const UserDirectory = () => {
                     {getSectionDisplay(u)}
                   </TableCell>
                 </>
+              ) : selectedTab === "faculty" ? (
+                <>
+                  {/* Faculty Email */}
+                  <TableCell className="text-gray-600 dark:text-gray-300 text-xs">
+                    {u.email}
+                  </TableCell>
+
+                  {/* Role Badge */}
+                  <TableCell>
+                    <Badge
+                      variant={
+                        u.role === "research_coordinator"
+                          ? "purple"
+                          : u.role === "adviser"
+                          ? "blue"
+                          : u.role === "panelist"
+                          ? "amber"
+                          : "gray"
+                      }
+                      className="text-[11px] font-medium"
+                    >
+                      {u.role === "research_coordinator"
+                        ? "Coordinator"
+                        : u.role === "adviser"
+                        ? "Adviser"
+                        : u.role === "panelist"
+                        ? "Panelist"
+                        : (u.role || "Faculty")}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Department */}
+                  <TableCell className="text-gray-600 dark:text-gray-300 text-xs">
+                    {u.department || u.college || "College of Computer Studies"}
+                  </TableCell>
+                </>
               ) : (
-                /* Faculty & Admin Views: Streamlined to Name, Email, and Actions */
-                <TableCell className="text-gray-600 dark:text-gray-300 text-xs">
-                  {u.email}
-                </TableCell>
+                <>
+                  {/* Admin Email */}
+                  <TableCell className="text-gray-600 dark:text-gray-300 text-xs">
+                    {u.email}
+                  </TableCell>
+
+                  {/* Role Badge */}
+                  <TableCell>
+                    <Badge variant="blue" className="text-[11px] font-medium">
+                      Administrator
+                    </Badge>
+                  </TableCell>
+                </>
               )}
 
               {/* Actions / Details */}

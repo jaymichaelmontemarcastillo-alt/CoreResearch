@@ -79,8 +79,8 @@ const buildUserProfileDoc = (data) => {
     section: sectionName,
     sectionName,
     sectionId,
-    status: data.status || (role === 'admin' ? 'active' : 'pending'),
-    is_approved: data.is_approved !== undefined ? Boolean(data.is_approved) : (role === 'admin'),
+    status: data.status || (['admin', 'research_coordinator', 'coordinator'].includes(role) ? 'active' : 'pending'),
+    is_approved: data.is_approved !== undefined ? Boolean(data.is_approved) : ['admin', 'research_coordinator', 'coordinator'].includes(role),
     profile_image: data.profile_image || data.photoURL || data.picture || '',
     
     // Adviser fields

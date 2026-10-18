@@ -6,7 +6,7 @@ const UserSchema = new mongoose.Schema({
   first_name: { type: String },
   last_name: { type: String },
   fullName: { type: String },
-  role: { type: String, enum: ['student', 'adviser', 'panelist', 'admin'], default: 'student' },
+  role: { type: String, enum: ['student', 'adviser', 'panelist', 'admin', 'research_coordinator', 'coordinator', 'faculty'], default: 'student' },
   role_id: { type: String },
   department: { type: String, default: 'Computer Studies' },
   department_id: { type: String },

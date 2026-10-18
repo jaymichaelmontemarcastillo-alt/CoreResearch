@@ -171,15 +171,17 @@ export const Panelists = () => {
       }
 
       // Query manuscript_workspaces collection by groupId
-      if (!documentId && groupId) {
+      let resolvedWorkspaceId = null;
+      if (groupId) {
         const wsQuery = query(
           collection(db, "manuscript_workspaces"),
           where("groupId", "==", groupId)
         );
         const snap = await getDocs(wsQuery);
         if (!snap.empty) {
+          resolvedWorkspaceId = snap.docs[0].id;
           const wsData = snap.docs[0].data();
-          if (wsData.documentId) {
+          if (!documentId && wsData.documentId) {
             documentId = wsData.documentId;
           }
         }
@@ -194,6 +196,8 @@ export const Panelists = () => {
           ...(sch.id && { defenseId: sch.id }),
           ...(sch.date && { defenseDate: sch.date }),
           ...(sch.startTime && { defenseTime: formatTime12Hour(sch.startTime) }),
+          ...(groupId && { groupId }),
+          ...(resolvedWorkspaceId && { workspaceId: resolvedWorkspaceId }),
         });
         navigate(`/documents/${documentId}?${params.toString()}`, {
           state: {
@@ -202,6 +206,8 @@ export const Panelists = () => {
             isPanelistReview: true,
             groupId: groupId,
             groupName: sch.groupName,
+            workspaceId: resolvedWorkspaceId,
+            projectId: sch.projectId,
             // Pre-fill grading modal metadata
             panelistRole: sch.roleInPanel || 'Panelist',
             researchTitle: sch.researchTitle || sch.projectTitle || '',

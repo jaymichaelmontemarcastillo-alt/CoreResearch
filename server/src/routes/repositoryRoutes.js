@@ -35,8 +35,8 @@ const handlePdfUpload = (req, res, next) => {
 // Search & Browse Public Research Repository (Public/Authenticated with role-based document access)
 router.get('/', optionalVerifyToken, getRepositoryPublications);
 
-// Publish approved paper to repository (Admin and Student)
-router.post('/publish', verifyToken, requireRole(['admin', 'student']), handlePdfUpload, publishToRepository);
+// Publish approved paper to repository (Admin, Research Coordinator, and Student)
+router.post('/publish', verifyToken, requireRole(['admin', 'research_coordinator', 'student']), handlePdfUpload, publishToRepository);
 
 // Approve repository publication (Admin & Research Coordinator)
 router.patch('/:id/approve', verifyToken, requireRole(['admin', 'research_coordinator']), approveRepositoryPublication);
@@ -44,10 +44,10 @@ router.patch('/:id/approve', verifyToken, requireRole(['admin', 'research_coordi
 // Reject repository publication (Admin & Research Coordinator)
 router.patch('/:id/reject', verifyToken, requireRole(['admin', 'research_coordinator']), rejectRepositoryPublication);
 
-// Update repository publication department (Admin only)
-router.put('/:id', verifyToken, requireRole(['admin']), updateRepositoryPublication);
+// Update repository publication department (Admin & Research Coordinator)
+router.put('/:id', verifyToken, requireRole(['admin', 'research_coordinator']), updateRepositoryPublication);
 
-// Delete repository publication (Admin only)
-router.delete('/:id', verifyToken, requireRole(['admin']), deleteRepositoryPublication);
+// Delete repository publication (Admin & Research Coordinator)
+router.delete('/:id', verifyToken, requireRole(['admin', 'research_coordinator']), deleteRepositoryPublication);
 
 export default router;

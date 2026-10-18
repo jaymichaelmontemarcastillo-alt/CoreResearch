@@ -241,11 +241,14 @@ export const groupService = {
           .find((workspace) => workspace.status !== 'archived' && !workspace.isArchived);
         if (activeWorkspace?.title) {
           group.title = activeWorkspace.title;
-        } else {
+        } else if (group.status !== 'forming') {
           const propQuery = query(collection(db, 'proposals'), where('groupId', '==', group.id));
           const propSnap = await getDocs(propQuery);
-          if (!propSnap.empty && propSnap.docs[0].data().title) {
-            group.title = propSnap.docs[0].data().title;
+          const activeProp = propSnap.docs
+            .map((docSnap) => docSnap.data())
+            .find((proposal) => proposal.status === 'approved' && !proposal.isArchived);
+          if (activeProp?.title) {
+            group.title = activeProp.title;
           }
         }
       } catch (e) {}

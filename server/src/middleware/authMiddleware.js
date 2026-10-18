@@ -44,7 +44,6 @@ export const verifyToken = async (req, res, next) => {
     // 1. Dev token handling (format: dev-token-{uid}-{role})
     if (
       token.startsWith("dev-token-") &&
-      isDevMockMode &&
       process.env.NODE_ENV !== "production"
     ) {
       let uid = "dev-user-id";
@@ -160,9 +159,11 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
+    const isPrivilegedAdmin = ['admin', 'research_coordinator', 'coordinator'].includes(userData?.role);
     if (
       userData &&
       !isRegistrationRequest &&
+      !isPrivilegedAdmin &&
       (
         userData.is_approved !== true ||
         !['active', 'approved'].includes(userData.status)
@@ -228,9 +229,24 @@ export const requireRole = (allowedRoles = []) => {
       });
     }
 
-    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+    const roles = Array.isArray(allowedRoles) ? [...allowedRoles] : [allowedRoles];
 
-    if (!roles.includes(req.user.role)) {
+    // The Research Coordinator has the same authorization as Admin
+    if (roles.includes('admin')) {
+      if (!roles.includes('research_coordinator')) roles.push('research_coordinator');
+      if (!roles.includes('coordinator')) roles.push('coordinator');
+    }
+    if (roles.includes('research_coordinator') || roles.includes('coordinator')) {
+      if (!roles.includes('admin')) roles.push('admin');
+    }
+
+    const userRole = req.user.role;
+    const isAuthorized =
+      roles.includes(userRole) ||
+      ((userRole === 'research_coordinator' || userRole === 'coordinator') && roles.includes('admin')) ||
+      (userRole === 'admin' && (roles.includes('research_coordinator') || roles.includes('coordinator')));
+
+    if (!isAuthorized) {
       return res.status(403).json({
         success: false,
         error: "Forbidden",

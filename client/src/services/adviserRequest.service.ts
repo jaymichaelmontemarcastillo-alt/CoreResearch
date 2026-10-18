@@ -86,10 +86,39 @@ class AdviserRequestService {
    * Fetch all requests for a specific student/group with automatic leader linkage.
    */
   async getRequestsForStudentOrGroup(studentId: string, groupId?: string, leaderId?: string): Promise<AdviserRequest[]> {
-    const response = await api.get('/adviser-matching/requests', {
-      params: { groupId: groupId || undefined },
-    });
-    return (response.data?.data || []) as AdviserRequest[];
+    try {
+      const response = await api.get('/adviser-matching/requests', {
+        params: { groupId: groupId || undefined },
+      });
+      return (response.data?.data || []) as AdviserRequest[];
+    } catch (err) {
+      console.warn('[adviserRequestService] API getRequests error, falling back to direct Firestore:', err);
+      try {
+        const queries = [];
+        if (studentId) {
+          queries.push(getDocs(query(collection(db, COLLECTION), where('studentId', '==', studentId))));
+        }
+        if (groupId) {
+          queries.push(getDocs(query(collection(db, COLLECTION), where('groupId', '==', groupId))));
+        }
+        if (leaderId && leaderId !== studentId) {
+          queries.push(getDocs(query(collection(db, COLLECTION), where('studentId', '==', leaderId))));
+        }
+        const snaps = await Promise.all(queries);
+        const map = new Map<string, AdviserRequest>();
+        snaps.forEach(snap => {
+          if (snap && snap.docs) {
+            snap.docs.forEach(d => {
+              map.set(d.id, { id: d.id, ...d.data() } as AdviserRequest);
+            });
+          }
+        });
+        return Array.from(map.values());
+      } catch (fErr) {
+        console.warn('[adviserRequestService] Firestore fallback query warning:', fErr);
+        return [];
+      }
+    }
   }
 
   /**

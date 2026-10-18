@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../services/api";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../firebase/firebase";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Textarea } from "../components/ui/Textarea";
@@ -97,11 +99,35 @@ export const Repository = () => {
     try {
       // Fetch all publications once, we'll apply filters locally for instant Scholar-like UX
       const res = await api.get("/repository");
-      if (res.data && res.data.data) {
+      if (res.data && res.data.data && res.data.data.length > 0) {
         setPublications(res.data.data);
+      } else {
+        // Direct Firestore fallback if API returns empty
+        const q = query(
+          collection(db, "repository_publications"),
+          where("publicationStatus", "==", "approved")
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          list.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+          setPublications(list);
+        }
       }
     } catch (err) {
-      console.error("[Repository] fetch error:", err);
+      console.warn("[Repository] API fetch warning, loading directly from Firestore:", err);
+      try {
+        const snap = await getDocs(collection(db, "repository_publications"));
+        if (!snap.empty) {
+          const list = snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((p) => p.publicationStatus !== "pending_publication" && p.publicationStatus !== "rejected");
+          list.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+          setPublications(list);
+        }
+      } catch (fsErr) {
+        console.error("[Repository] Firestore direct read error:", fsErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -292,7 +318,7 @@ export const Repository = () => {
             </form>
 
             {/* Upload Action */}
-            {(role === "admin" || role === "student") && (
+            {(role === "admin" || role === "research_coordinator" || role === "student") && (
               <Button 
                 variant="primary" 
                 onClick={() => setPublishModalOpen(true)} 
@@ -427,7 +453,7 @@ export const Repository = () => {
                       <span className="cursor-pointer hover:underline transition-colors">Related articles</span>
                       <span className="cursor-pointer hover:underline transition-colors">All {pub.downloadsCount || 1} versions</span>
                       
-                      {role === "admin" && (
+                      {(role === "admin" || role === "research_coordinator") && (
                         <>
                           <span className="text-gray-300 dark:text-gray-600">|</span>
                           <button 

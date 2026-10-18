@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 
 export const Projects = () => {
   const { role } = useAuth();
+  const isAdmin = role === "admin" || role === "research_coordinator" || role === "coordinator";
   const [projects, setProjects] = useState([]);
   const [advisers, setAdvisers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +30,7 @@ export const Projects = () => {
         setProjects(projRes.data.data);
       }
 
-      if (role === "admin") {
+      if (isAdmin) {
         const advRes = await api.get("/users", { params: { role: "adviser" } });
         if (advRes.data && advRes.data.data) {
           setAdvisers(advRes.data.data);
@@ -119,7 +120,7 @@ export const Projects = () => {
               </div>
 
               {/* Admin Adviser Assignment Bar */}
-              {role === "admin" && (
+              {isAdmin && (
                 <div className="pt-3 border-t border-gray-200 dark:border-slate-800">
                   {assigningId === p.id ? (
                     <div className="flex items-center gap-2">

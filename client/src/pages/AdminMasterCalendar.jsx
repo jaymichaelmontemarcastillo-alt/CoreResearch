@@ -1129,7 +1129,7 @@ export const MasterCalendar = () => {
             {/* Footer Summary */}
             <div className="pt-3 border-t border-gray-100 dark:border-[#222433] flex items-center justify-between text-[11px] text-gray-400 shrink-0 mt-auto">
               <span>Institutional schedule</span>
-              {effectiveRole === "admin" && (
+              {(effectiveRole === "admin" || effectiveRole === "research_coordinator" || effectiveRole === "coordinator") && (
                 <Link to="/admin/scheduling" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                   Manage Schedules →
                 </Link>

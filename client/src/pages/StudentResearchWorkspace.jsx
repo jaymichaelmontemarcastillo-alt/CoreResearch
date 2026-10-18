@@ -204,7 +204,7 @@ export const StudentResearchWorkspace = () => {
           );
 
           // If no workspace found yet, check if group already has title, adviser, or accepted request/proposal
-          if (!targetWorkspace && group) {
+          if (!targetWorkspace && group && group.status !== 'forming' && group.adviserId && group.title) {
             try {
               targetWorkspace = await researchWorkspaceService.getOrCreateWorkspaceForGroup(group, userProfile, leaderUid);
             } catch (e) {
@@ -212,64 +212,43 @@ export const StudentResearchWorkspace = () => {
             }
           }
 
-          // If no workspace yet, subscribe to requests for real-time creation/feedback
+          // If no active workspace yet, check if matching is finished or redirect to /submit-title
           if (!targetWorkspace) {
-            setLoading(false); // Done loading initial, waiting on subscriptions
-            unsubscribeRequests = adviserRequestService.subscribeToStudentRequests(
-              currentUser.uid,
-              async (requests) => {
-                const accepted = requests.find((r) => r.status === 'accepted');
-                const declined = requests.find((r) => r.status === 'declined');
-                const pending = requests.find((r) => r.status === 'pending');
-
-                if (accepted && !workspace) {
-                  setToast(`Adviser Request Accepted by ${accepted.adviserName}!`);
-                  const newWs = await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(
-                    accepted,
-                    userProfile
-                  );
-                  setWorkspace(newWs);
-                  
-                  // Now subscribe to the new workspace's inner tasks/feedbacks
-                  unsubscribeWs = researchWorkspaceService.subscribeWorkspace(newWs.id, (u) => { if(u) setWorkspace(u); });
-                  unsubscribeTasks = researchTaskService.subscribeWorkspaceTasks(newWs.id, (t) => setTasks(t));
-                  unsubscribeFb = researchFeedbackService.subscribeWorkspaceFeedback(newWs.id, (f) => setFeedbackList(f));
-                  
-                  // Unsubscribe from requests since we have a workspace now
-                  unsubscribeRequests();
-                } else if (declined) {
-                  setToast(`Adviser Request Declined by ${declined.adviserName}. You may select another adviser.`);
-                  // Clear request after a moment so they can try again
-                  setTimeout(() => {
-                     adviserRequestService.deleteRequest(declined.id).then(() => {
-                       navigate('/submit-title');
-                     });
-                  }, 2000);
-                } else if (!pending && !accepted && !declined) {
-                  // Check if group has an active proposal
-                  if (group?.id) {
-                    try {
-                      const props = await titleProposalService.getProposalsByGroup(group.id, leaderUid);
-                      if (props && props.length > 0) {
-                        const approvedProp = props.find((p) => p.status === 'approved');
-                        if (approvedProp) {
-                          const newWs = await researchWorkspaceService.getOrCreateWorkspaceForProposal(approvedProp, userProfile);
-                          setWorkspace(newWs);
-                          return;
-                        }
-                        // Non-approved proposal (e.g. submitted or needs_revision): redirect to proposals
-                        navigate('/proposals');
-                        return;
-                      }
-                    } catch (e) {}
+            setLoading(false);
+            // Check if there are any accepted requests or approved proposals
+            try {
+              const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
+              const accepted = requests.find((r) => r.status === 'accepted' && !r.isArchived);
+              if (accepted) {
+                const newWs = await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(
+                  accepted,
+                  userProfile
+                );
+                targetWorkspace = newWs;
+              } else {
+                // If there is an approved proposal with assigned adviser
+                if (group?.id) {
+                  const props = await titleProposalService.getProposalsByGroup(group.id, leaderUid);
+                  const approvedProp = props.find((p) => p.status === 'approved' && !p.isArchived);
+                  if (approvedProp && (approvedProp.adviserId || group.adviserId)) {
+                    const newWs = await researchWorkspaceService.getOrCreateWorkspaceForProposal(approvedProp, userProfile);
+                    targetWorkspace = newWs;
                   }
-                  // No requests and no proposals at all, go to submit title
-                  navigate('/submit-title');
                 }
-              },
-              group?.id
-            );
-            return; // stop executing the rest of loadWorkspace
+              }
+            } catch (err) {
+              console.warn('[StudentResearchWorkspace] Verification check error:', err);
+            }
+
+            if (!targetWorkspace) {
+              // The group has NOT completed the matching process!
+              // Redirect to submit-title immediately
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('workspace-status-changed', { detail: { hasWorkspace: false } }));
+              }
+              navigate('/submit-title', { replace: true });
+              return;
+            }
           }
         }
 
@@ -291,13 +270,18 @@ export const StudentResearchWorkspace = () => {
               .catch(() => {});
           }
 
-          // Subscribe to evaluations in real-time
+          // Subscribe to evaluations in real-time across workspaceId, groupId, and projectId
+          const evalOptions = {
+            groupId: targetWorkspace.groupId || userProfile?.groupId,
+            projectId: targetWorkspace.projectId,
+            documentId: targetWorkspace.documentId,
+          };
           unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
              setProposalEvals(evals);
-          });
+          }, evalOptions);
           unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
              setFinalEvals(evals);
-          });
+          }, evalOptions);
 
 
           // Real-time subscriptions
@@ -372,7 +356,7 @@ export const StudentResearchWorkspace = () => {
     try {
       const isConfirmed = await confirm({
         title: "Restart Research Progress",
-        message: "WARNING: This will archive your current workspace, manuscript, and group progress. You will be prompted to submit a new research title proposal to start fresh. Proceed?",
+        message: "WARNING: This will archive your current workspace, manuscript, tasks, rubrics, and schedules. Your research group members and accounts will stay intact, and you will be prompted to submit a new research title proposal to start fresh. Proceed?",
         confirmText: "Archive and Restart",
         variant: "danger"
       });
@@ -380,75 +364,32 @@ export const StudentResearchWorkspace = () => {
       if (!currentUser?.uid) throw new Error('You must be signed in to restart research progress.');
 
       setIsRestarting(true);
-      const now = new Date().toISOString();
       const reason = 'Student restarted research progress';
-      const actorName = userProfile?.fullName || 'Student';
-      const { doc, getDoc, writeBatch } = await import('firebase/firestore');
-      const { db } = await import('../firebase/firebase');
-      const group = await groupService.getGroupByStudentId(currentUser.uid);
-      const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
-      const activeRequests = requests.filter((request) =>
-        request.status === 'pending' || request.status === 'accepted'
-      );
-      if (activeRequests.length > 497) {
-        throw new Error('Too many active adviser requests to restart safely. Please contact support.');
-      }
 
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'manuscript_workspaces', workspace.id), {
-        isArchived: true,
-        status: 'archived',
-        archivedAt: now,
-        archivedBy: currentUser.uid,
-        archivedByName: actorName,
-        archiveReason: reason,
-        updatedAt: now,
-      });
-
-      if (workspace.documentId) {
-        const documentRef = doc(db, 'manuscript_documents', workspace.documentId);
-        const manuscriptDocument = await getDoc(documentRef);
-        if (manuscriptDocument.exists()) {
-          batch.update(documentRef, {
-            isArchived: true,
-            status: 'archived',
-            archivedAt: now,
-            archivedBy: currentUser.uid,
-            archiveReason: reason,
-            updatedAt: now,
-          });
-        }
-      }
-
-      if (group) {
-        batch.update(doc(db, 'research_groups', group.id), {
-          isArchived: true,
-          status: 'archived',
-          archivedAt: now,
-          archivedBy: currentUser.uid,
-          archivedByName: actorName,
-          archiveReason: reason,
-          updatedAt: now,
-        });
-      }
-
-      for (const request of activeRequests) {
-        batch.update(doc(db, 'adviser_requests', request.id), {
-          status: 'declined',
-          isArchived: true,
-          updatedAt: now,
-          archiveReason: reason,
-        });
-      }
-
-      await batch.commit();
+      // Authoritative backend restart archives all progress (workspace, manuscript, rubrics, tasks, schedules, comments)
+      // while keeping group members and accounts intact
+      await researchWorkspaceService.restartWorkspace(workspace.id, reason);
 
       dataCache.invalidate(`workspace_${currentUser.uid}`);
       dataCache.invalidate(`group_${currentUser.uid}`);
       dataCache.invalidate('user_docs');
+      dataCache.invalidate('research_groups');
+      dataCache.invalidate('proposals');
+      dataCache.invalidate('schedules');
+      try {
+        localStorage.removeItem(`draft_${workspace.id}`);
+      } catch (e) {}
 
-      setToast('Workspace archived. You can now submit a new title.');
-      navigate('/submit-title');
+      setWorkspace(null);
+      setTasks([]);
+      setFeedbackList([]);
+      setProposalEvals([]);
+      setFinalEvals([]);
+
+      setToast('Research progress archived successfully. You can now submit a new title proposal with your group.');
+      setTimeout(() => {
+        navigate('/submit-title', { replace: true });
+      }, 500);
     } catch (err) {
       console.error('Reset workspace error:', err);
       setToast('Failed to restart workspace: ' + (err instanceof Error ? err.message : String(err)));
@@ -1096,7 +1037,19 @@ export const StudentResearchWorkspace = () => {
           defenseId={selectedEval.defenseId}
           panelistId={selectedEval.panelistId}
           panelistName={selectedEval.panelistName}
-          groupDetails={workspace}
+          groupDetails={{
+            ...workspace,
+            adviser: workspace?.adviserName || workspace?.adviser || '',
+            adviserName: workspace?.adviserName || workspace?.adviser || '',
+            groupNo: workspace?.groupName || workspace?.groupNo || (workspace?.name || ''),
+            title: workspace?.title || workspace?.projectTitle || workspace?.proposalTitle || '',
+            proponents: Array.isArray(workspace?.members) && workspace.members.length > 0
+              ? workspace.members.map((m) => m.fullName || m.name || m.email).filter(Boolean).join(', ')
+              : (workspace?.proponents || ''),
+            date: selectedEval?.meta?.date || selectedEval?.date || '',
+            time: selectedEval?.meta?.time || selectedEval?.time || '',
+            expert: selectedEval?.meta?.expert || selectedEval?.panelistRole || '',
+          }}
           existingEval={selectedEval}
           readOnly={true}
         />
@@ -1112,7 +1065,19 @@ export const StudentResearchWorkspace = () => {
           defenseId={selectedEval.defenseId}
           panelistId={selectedEval.panelistId}
           panelistName={selectedEval.panelistName}
-          groupDetails={workspace}
+          groupDetails={{
+            ...workspace,
+            adviser: workspace?.adviserName || workspace?.adviser || '',
+            adviserName: workspace?.adviserName || workspace?.adviser || '',
+            groupNo: workspace?.groupName || workspace?.groupNo || (workspace?.name || ''),
+            title: workspace?.title || workspace?.projectTitle || workspace?.proposalTitle || '',
+            proponents: Array.isArray(workspace?.members) && workspace.members.length > 0
+              ? workspace.members.map((m) => m.fullName || m.name || m.email).filter(Boolean).join(', ')
+              : (workspace?.proponents || ''),
+            date: selectedEval?.meta?.date || selectedEval?.date || '',
+            time: selectedEval?.meta?.time || selectedEval?.time || '',
+            expert: selectedEval?.meta?.expert || selectedEval?.panelistRole || '',
+          }}
           existingEval={selectedEval}
           readOnly={true}
         />

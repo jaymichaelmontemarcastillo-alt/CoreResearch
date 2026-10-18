@@ -153,7 +153,7 @@ export default function App() {
                       <Route path="/admin/courses" element={<Courses />} />
                       <Route path="/admin/courses/:courseId/sections" element={<Sections />} />
                     </Route>
-                    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                    <Route element={<ProtectedRoute allowedRoles={['admin', 'research_coordinator']} />}>
                       <Route path="/admin/advisers" element={<AdminAdvisers />} />
                       <Route path="/admin/profile" element={<ProfileSettings />} />
                     </Route>

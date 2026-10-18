@@ -214,7 +214,7 @@ export const SubmitTitle = () => {
           currentUser.uid,
           group?.id,
         );
-        if (!ws && group && (group.title || group.adviserId)) {
+        if (!ws && group && group.status !== 'forming' && group.title && group.adviserId) {
           try {
             ws = await researchWorkspaceService.getOrCreateWorkspaceForGroup(
               group,
@@ -232,7 +232,7 @@ export const SubmitTitle = () => {
           return;
         }
 
-        if (group?.title && isMounted) {
+        if (group?.title && group?.status !== 'forming' && isMounted) {
           setExistingGroupTitle({
             title: group.title,
             groupName: group.name,
@@ -254,10 +254,12 @@ export const SubmitTitle = () => {
               .map((request) => request.adviserId),
           );
         }
-      } catch (err) {
         if (isMounted) {
-          setToast("Failed to verify state: " + err.message);
-          setToastVariant("error");
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn("[SubmitTitle] State check warning:", err);
+        if (isMounted) {
           setLoading(false);
         }
       }

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { Document } from '../models/Document.js';
 
-const privilegedRoles = ['admin', 'research_coordinator'];
+const privilegedRoles = ['admin', 'research_coordinator', 'coordinator'];
 
 const hasUid = (values, uid) => Array.isArray(values) && values.includes(uid);
 

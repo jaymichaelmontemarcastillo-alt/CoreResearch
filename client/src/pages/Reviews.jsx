@@ -105,8 +105,8 @@ export const Reviews = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left / Top: Post Review Box (Adviser & Panelist & Admin) */}
-        {(role === "adviser" || role === "panelist" || role === "admin") && (
+        {/* Left / Top: Post Review Box (Adviser & Panelist & Admin & Coordinator) */}
+        {(role === "adviser" || role === "panelist" || role === "admin" || role === "research_coordinator") && (
           <div className="lg:col-span-5">
             <Card className="space-y-4 sticky top-20">
               <h2 className="text-base font-medium text-gray-900 dark:text-white flex items-center gap-2">
@@ -144,7 +144,7 @@ export const Reviews = () => {
         )}
 
         {/* Right / Main: Threaded Feedback Feed */}
-        <div className={(role === "adviser" || role === "panelist" || role === "admin") ? "lg:col-span-7 space-y-4" : "lg:col-span-12 space-y-4"}>
+        <div className={(role === "adviser" || role === "panelist" || role === "admin" || role === "research_coordinator") ? "lg:col-span-7 space-y-4" : "lg:col-span-12 space-y-4"}>
           {loading ? (
             <div className="py-12 text-center text-gray-400 dark:text-gray-500">Loading review thread...</div>
           ) : reviews.length === 0 ? (

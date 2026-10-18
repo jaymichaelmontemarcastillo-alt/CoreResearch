@@ -38,9 +38,16 @@ export const AdminAdvisers = () => {
   const [advisers, setAdvisers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('all');
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState('success');
+
+  // Bulk & all-faculty workload management state
+  const [bulkCapacity, setBulkCapacity] = useState(5);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [isWorkloadModalOpen, setIsWorkloadModalOpen] = useState(false);
+  const [workloadForm, setWorkloadForm] = useState({});
+  const [workloadSearch, setWorkloadSearch] = useState('');
+  const [savingWorkloads, setSavingWorkloads] = useState(false);
 
   // Manage Profile Modal state
   const [selectedAdviser, setSelectedAdviser] = useState(null);
@@ -49,7 +56,6 @@ export const AdminAdvisers = () => {
     fullName: '',
     department: '',
     academicRank: 'Assistant Professor',
-    maxAdvisees: 5,
     status: 'active',
     expertise: [],
   });
@@ -100,7 +106,11 @@ export const AdminAdvisers = () => {
         }
       });
 
-      setAdvisers(Array.from(map.values()));
+      const list = Array.from(map.values());
+      setAdvisers(list);
+      if (list.length > 0) {
+        setBulkCapacity(list[0].maxCapacity || list[0].maxAdvisees || 5);
+      }
     } catch (err) {
       console.error('[AdminAdvisers] fetch error:', err);
       showToast('Error loading advisers.', 'error');
@@ -111,17 +121,15 @@ export const AdminAdvisers = () => {
 
   const filteredAdvisers = useMemo(() => {
     return advisers.filter((a) => {
-      const matchesDept = departmentFilter === 'all' || a.department === departmentFilter;
       const query = search.trim().toLowerCase();
       const name = (a.fullName || `${a.first_name || ''} ${a.last_name || ''}`).toLowerCase();
       const email = (a.email || '').toLowerCase();
       const rank = (a.academicRank || '').toLowerCase();
       const tags = (a.expertise || []).join(' ').toLowerCase();
 
-      const matchesSearch = !query || name.includes(query) || email.includes(query) || rank.includes(query) || tags.includes(query);
-      return matchesDept && matchesSearch;
+      return !query || name.includes(query) || email.includes(query) || rank.includes(query) || tags.includes(query);
     });
-  }, [advisers, departmentFilter, search]);
+  }, [advisers, search]);
 
   const handleOpenEdit = async (adviser) => {
     setSelectedAdviser(adviser);
@@ -129,7 +137,6 @@ export const AdminAdvisers = () => {
       fullName: adviser.fullName || `${adviser.first_name || ''} ${adviser.last_name || ''}`.trim(),
       department: adviser.department || 'Department of Computer Science',
       academicRank: adviser.academicRank || 'Assistant Professor',
-      maxAdvisees: adviser.maxCapacity || adviser.maxAdvisees || 5,
       status: adviser.status || 'active',
       expertise: Array.isArray(adviser.expertise) ? [...adviser.expertise] : [],
     });
@@ -170,12 +177,15 @@ export const AdminAdvisers = () => {
 
     setSaving(true);
     try {
+      // Preserve existing capacity of the faculty adviser
+      const currentCapacity = selectedAdviser.maxCapacity || selectedAdviser.maxAdvisees || 5;
+
       await userService.updateUser(selectedAdviser.uid, {
         fullName: editFormData.fullName,
-        department: editFormData.department,
+        department: editFormData.department || selectedAdviser.department || 'Department of Computer Science',
         academicRank: editFormData.academicRank,
-        maxAdvisees: Number(editFormData.maxAdvisees),
-        maxCapacity: Number(editFormData.maxAdvisees),
+        maxAdvisees: currentCapacity,
+        maxCapacity: currentCapacity,
         status: editFormData.status,
         selectedExpertise: editFormData.expertise,
         expertise: editFormData.expertise,
@@ -192,6 +202,126 @@ export const AdminAdvisers = () => {
     }
   };
 
+  // Bulk update all faculty advisee workloads
+  const handleApplyBulkCapacity = async () => {
+    const newCap = parseInt(bulkCapacity, 10);
+    if (isNaN(newCap) || newCap < 1) {
+      showToast('Please enter a valid advisee capacity (at least 1 group).', 'warning');
+      return;
+    }
+
+    if (advisers.length === 0) {
+      showToast('No faculty advisers found to update.', 'warning');
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Update All Faculty Advisee Workloads',
+      message: `Set the maximum advisee capacity to ${newCap} group${newCap === 1 ? '' : 's'} for all ${advisers.length} faculty members?`,
+      confirmText: 'Update All',
+      cancelText: 'Cancel',
+      variant: 'primary',
+    });
+
+    if (!confirmed) return;
+
+    setBulkUpdating(true);
+    try {
+      await Promise.all(
+        advisers.map((a) =>
+          userService.updateUser(a.uid, {
+            maxCapacity: newCap,
+            maxAdvisees: newCap,
+          })
+        )
+      );
+
+      setAdvisers((prev) =>
+        prev.map((a) => ({
+          ...a,
+          maxCapacity: newCap,
+          maxAdvisees: newCap,
+        }))
+      );
+
+      showToast(`Updated advisee workload capacity to ${newCap} groups for all faculty!`, 'success');
+    } catch (err) {
+      console.error('[AdminAdvisers] bulk update error:', err);
+      showToast('Failed to update all faculty workloads. Please try again.', 'error');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  // Open modal to view and customize each faculty's advisee workload
+  const handleOpenWorkloadModal = () => {
+    const initialMap = {};
+    advisers.forEach((a) => {
+      initialMap[a.uid] = a.maxCapacity || a.maxAdvisees || 5;
+    });
+    setWorkloadForm(initialMap);
+    setWorkloadSearch('');
+    setIsWorkloadModalOpen(true);
+  };
+
+  const handleSetAllInModal = (targetCapacity) => {
+    const val = Math.max(1, parseInt(targetCapacity, 10) || 1);
+    const updated = {};
+    advisers.forEach((a) => {
+      updated[a.uid] = val;
+    });
+    setWorkloadForm(updated);
+  };
+
+  const handleSaveAllWorkloads = async (e) => {
+    if (e) e.preventDefault();
+    setSavingWorkloads(true);
+    try {
+      const updates = advisers.filter((a) => {
+        const newCap = parseInt(workloadForm[a.uid], 10);
+        const oldCap = a.maxCapacity || a.maxAdvisees || 5;
+        return !isNaN(newCap) && newCap !== oldCap;
+      });
+
+      if (updates.length === 0) {
+        showToast('No workload changes were made.', 'info');
+        setIsWorkloadModalOpen(false);
+        return;
+      }
+
+      await Promise.all(
+        updates.map((a) => {
+          const cap = Math.max(1, parseInt(workloadForm[a.uid], 10) || 5);
+          return userService.updateUser(a.uid, {
+            maxCapacity: cap,
+            maxAdvisees: cap,
+          });
+        })
+      );
+
+      setAdvisers((prev) =>
+        prev.map((a) => {
+          const cap = parseInt(workloadForm[a.uid], 10);
+          if (!isNaN(cap)) {
+            return { ...a, maxCapacity: cap, maxAdvisees: cap };
+          }
+          return a;
+        })
+      );
+
+      showToast(
+        `Updated advisee workloads for ${updates.length} faculty member${updates.length === 1 ? '' : 's'}!`,
+        'success'
+      );
+      setIsWorkloadModalOpen(false);
+    } catch (err) {
+      console.error('[AdminAdvisers] save workloads error:', err);
+      showToast('Failed to save faculty workloads.', 'error');
+    } finally {
+      setSavingWorkloads(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {toastMessage && (
@@ -204,9 +334,9 @@ export const AdminAdvisers = () => {
         description="Oversee faculty adviser profiles, research specializations, active advisee quotas, workload balances, and assigned student research groups."
       />
 
-      {/* Search and Filter (No container, justified) */}
-      <div className="flex flex-col sm:flex-row items-end justify-between gap-4 pb-1">
-        <div className="w-full sm:flex-1 sm:max-w-xl">
+      {/* Search and Workload Controls (Department dropdown removed) */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-1">
+        <div className="w-full lg:flex-1 lg:max-w-xl">
           <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
             Search Faculty
           </label>
@@ -224,27 +354,45 @@ export const AdminAdvisers = () => {
           </div>
         </div>
 
-        <div className="flex items-end gap-3 w-full sm:w-auto">
-          <div className="hidden sm:flex h-10 items-center px-1">
-            <HiFunnel className="w-4 h-4 text-gray-300 dark:text-[#6b6f84]" />
-          </div>
-
-          <div className="w-full sm:w-64">
+        {/* Admin Edit Faculty Advisee Workload Controls */}
+        <div className="flex flex-wrap items-end gap-2.5 w-full lg:w-auto">
+          <div>
             <label className="block text-[11px] font-semibold text-gray-400 dark:text-[#6b6f84] uppercase tracking-wider mb-1.5">
-              Department
+              Faculty Advisee Workload
             </label>
-            <div className="relative">
-              <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-full text-[13px] font-medium text-gray-700 dark:text-[#f3f4f8] pl-4 pr-9 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer appearance-none"
+            <div className="flex items-center gap-2">
+              <div className="relative w-28">
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={bulkCapacity}
+                  onChange={(e) => setBulkCapacity(e.target.value)}
+                  className="w-full h-10 bg-white dark:bg-[#0e0f15] border border-gray-200 dark:border-[#222433] rounded-full text-sm font-semibold text-gray-900 dark:text-[#f3f4f8] pl-3.5 pr-10 text-center shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none"
+                  title="Advisee capacity (groups)"
+                />
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-gray-400 pointer-events-none">
+                  grp
+                </span>
+              </div>
+              <Button
+                variant="primary"
+                onClick={handleApplyBulkCapacity}
+                isLoading={bulkUpdating}
+                className="h-10 rounded-full px-4 text-xs font-semibold shadow-xs whitespace-nowrap"
+                title="Apply this capacity to all faculty members"
               >
-                <option value="all">All Departments</option>
-                <option value="Department of Computer Science">Department of Computer Science</option>
-                <option value="Department of Information Technology">Department of Information Technology</option>
-                <option value="Department of Information Systems">Department of Information Systems</option>
-              </select>
-              <HiChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                Update All Faculty
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleOpenWorkloadModal}
+                className="h-10 rounded-full px-4 text-xs font-semibold shadow-xs whitespace-nowrap flex items-center gap-1.5"
+                title="Open detailed faculty workload manager"
+              >
+                <HiPencilSquare className="w-4 h-4 text-gray-500" />
+                <span>Manage Workloads</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -261,10 +409,10 @@ export const AdminAdvisers = () => {
           <EmptyState
             icon={HiUsers}
             title="No advisers found"
-            description="No faculty members match the current search or department filter."
+            description="No faculty members match the current search."
             action={
-              <Button variant="outline" size="sm" onClick={() => { setSearch(''); setDepartmentFilter('all'); }}>
-                Reset Filters
+              <Button variant="outline" size="sm" onClick={() => setSearch('')}>
+                Reset Search
               </Button>
             }
           />
@@ -288,14 +436,14 @@ export const AdminAdvisers = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Manage Adviser Profile & Capacity"
+        title="Manage Adviser Profile"
         icon={HiAcademicCap}
         maxWidth="max-w-2xl"
       >
         {selectedAdviser && (
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
+              <div className="sm:col-span-2">
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Full Name</label>
                 <Input
                   value={editFormData.fullName}
@@ -320,46 +468,18 @@ export const AdminAdvisers = () => {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Department</label>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Mentorship Status</label>
                 <select
-                  value={editFormData.department}
-                  onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                  value={editFormData.status}
+                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
                   className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
                 >
-                  <option value="Department of Computer Science">Department of Computer Science</option>
-                  <option value="Department of Information Technology">Department of Information Technology</option>
-                  <option value="Department of Information Systems">Department of Information Systems</option>
+                  <option value="active">Active & Accepting Advisees</option>
+                  <option value="at_capacity">At Capacity (No New Groups)</option>
+                  <option value="on_sabbatical">On Sabbatical / Leave</option>
+                  <option value="inactive">Inactive</option>
                 </select>
               </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Max Advisee Capacity (Groups)
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="15"
-                  value={editFormData.maxAdvisees}
-                  onChange={(e) => setEditFormData({ ...editFormData, maxAdvisees: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Availability Status */}
-            <div>
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Mentorship Status</label>
-              <select
-                value={editFormData.status}
-                onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                className="w-full text-xs bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl p-2.5 text-gray-900 dark:text-white"
-              >
-                <option value="active">Active & Accepting Advisees</option>
-                <option value="at_capacity">At Capacity (No New Groups)</option>
-                <option value="on_sabbatical">On Sabbatical / Leave</option>
-                <option value="inactive">Inactive</option>
-              </select>
             </div>
 
             {/* Expertise Tags Management */}
@@ -445,6 +565,127 @@ export const AdminAdvisers = () => {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* MANAGE ALL FACULTY WORKLOADS MODAL */}
+      <Modal
+        isOpen={isWorkloadModalOpen}
+        onClose={() => setIsWorkloadModalOpen(false)}
+        title="Manage Faculty Advisee Workload Limits"
+        icon={HiBriefcase}
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Configure advisee capacity quotas for all faculty members. You can quickly set a uniform capacity limit for everyone or customize capacity individually per faculty member.
+          </p>
+
+          {/* Quick uniform capacity batch bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40">
+            <div className="flex items-center gap-2 text-xs font-medium text-blue-900 dark:text-blue-300">
+              <HiSparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>Set uniform capacity for all faculty:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {[3, 5, 8, 10].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => handleSetAllInModal(num)}
+                  className="px-2.5 py-1 text-xs font-medium rounded-lg bg-white dark:bg-[#1c1d28] border border-blue-200 dark:border-[#2b2d3f] text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-900/40 transition-colors shadow-2xs cursor-pointer"
+                >
+                  {num} groups
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search inside modal */}
+          <div className="relative">
+            <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search faculty in workload list..."
+              value={workloadSearch}
+              onChange={(e) => setWorkloadSearch(e.target.value)}
+              className="w-full text-xs pl-9 pr-3 py-2 bg-gray-50 dark:bg-[#1c1d28] border border-gray-200 dark:border-[#2b2d3f] rounded-xl text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Faculty Workload Table */}
+          <div className="max-h-[360px] overflow-y-auto border border-gray-200 dark:border-[#2b2d3f] rounded-xl divide-y divide-gray-100 dark:divide-[#222433]">
+            {advisers
+              .filter((a) => {
+                if (!workloadSearch.trim()) return true;
+                const q = workloadSearch.trim().toLowerCase();
+                const name = (a.fullName || `${a.first_name || ''} ${a.last_name || ''}`).toLowerCase();
+                const rank = (a.academicRank || '').toLowerCase();
+                return name.includes(q) || rank.includes(q);
+              })
+              .map((adviser) => {
+                const currentCap = workloadForm[adviser.uid] ?? (adviser.maxCapacity || adviser.maxAdvisees || 5);
+                const activeCount = adviser.activeAdviseeCount || 0;
+                const isOver = activeCount >= currentCap;
+
+                return (
+                  <div
+                    key={adviser.uid}
+                    className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-xs text-gray-900 dark:text-white truncate">
+                        {adviser.fullName || `${adviser.first_name || ''} ${adviser.last_name || ''}`.trim() || 'Faculty Member'}
+                      </div>
+                      <div className="text-[11px] text-gray-400 mt-0.5 truncate">
+                        {adviser.academicRank || 'Assistant Professor'} • {adviser.department || 'Computer Studies'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                      {/* Active advisee count badge */}
+                      <span
+                        className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${
+                          isOver
+                            ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-gray-100 text-gray-700 dark:bg-[#1c1d28] dark:text-gray-300'
+                        }`}
+                      >
+                        {activeCount} active group{activeCount === 1 ? '' : 's'}
+                      </span>
+
+                      {/* Workload Capacity Input */}
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[11px] text-gray-500 font-medium">Limit:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          value={workloadForm[adviser.uid] ?? 5}
+                          onChange={(e) =>
+                            setWorkloadForm({
+                              ...workloadForm,
+                              [adviser.uid]: Math.max(1, parseInt(e.target.value, 10) || 1),
+                            })
+                          }
+                          className="w-16 text-center text-xs font-semibold py-1 px-1.5 bg-white dark:bg-[#15161e] border border-gray-300 dark:border-[#2b2d3f] rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <span className="text-[11px] text-gray-400">groups</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#222433]">
+            <Button variant="outline" size="sm" type="button" onClick={() => setIsWorkloadModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleSaveAllWorkloads} isLoading={savingWorkloads}>
+              Save All Workloads
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

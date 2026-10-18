@@ -16,7 +16,8 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   // Pending or rejected accounts are prevented from accessing any protected routes
-  if (userProfile?.role !== 'admin' && (userProfile?.status === 'pending' || userProfile?.status === 'rejected' || userProfile?.is_approved === false)) {
+  const isPrivilegedAdmin = userProfile?.role === 'admin' || userProfile?.role === 'research_coordinator' || userProfile?.role === 'coordinator';
+  if (!isPrivilegedAdmin && (userProfile?.status === 'pending' || userProfile?.status === 'rejected' || userProfile?.is_approved === false)) {
     return <Navigate to="/pending-approval" replace />;
   }
 
@@ -30,14 +31,24 @@ export const ProtectedRoute = ({ allowedRoles = [] }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    if (role === 'adviser' || role === 'faculty') {
-      return <Navigate to="/advisees" replace />;
+  if (allowedRoles.length > 0) {
+    const effectiveAllowed = [...allowedRoles];
+    if (effectiveAllowed.includes('admin')) {
+      effectiveAllowed.push('research_coordinator', 'coordinator');
     }
-    if (role === 'student') {
-      return <Navigate to="/dashboard" replace />;
+    if (effectiveAllowed.includes('research_coordinator') || effectiveAllowed.includes('coordinator')) {
+      effectiveAllowed.push('admin');
     }
-    return <Navigate to="/unauthorized" replace />;
+
+    if (!effectiveAllowed.includes(role)) {
+      if (role === 'adviser' || role === 'faculty') {
+        return <Navigate to="/advisees" replace />;
+      }
+      if (role === 'student') {
+        return <Navigate to="/dashboard" replace />;
+      }
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   return <Outlet />;

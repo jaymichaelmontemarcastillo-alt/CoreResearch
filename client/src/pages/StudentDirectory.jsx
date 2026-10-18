@@ -36,7 +36,7 @@ import { useAuth } from "../context/AuthContext";
 
 export const StudentDirectory = () => {
   const { currentUser, role, userProfile } = useAuth();
-  const isAdmin = role === "admin" || userProfile?.role === "admin";
+  const isAdmin = role === "admin" || userProfile?.role === "admin" || role === "research_coordinator" || userProfile?.role === "research_coordinator" || role === "coordinator";
   
   // --- Data State ---
   const [courses, setCourses] = useState([]);

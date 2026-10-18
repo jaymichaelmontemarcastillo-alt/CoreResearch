@@ -33,7 +33,7 @@ export const Masterlist = () => {
   const [toast, setToast] = useState({ message: "", variant: "error" });
 
   useEffect(() => {
-    if (role === "student" && userProfile?.uid) {
+    if ((role === "student" || userProfile?.role === "student") && userProfile?.uid) {
       loadMasterlistData();
     } else {
       setLoading(false);
@@ -41,34 +41,60 @@ export const Masterlist = () => {
   }, [role, userProfile]);
 
   const loadMasterlistData = async () => {
-    if (!userProfile?.sectionId) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
-      // 1. Load course and section metadata
-      const [allCourses, allSections] = await Promise.all([
-        courseService.getAllCourses(),
-        sectionService.getAllSections(),
-      ]);
+      // Fetch classmates, groups, and section metadata via backend
+      const data = await studentService.getClassmates();
 
-      const foundCourse = allCourses.find((c) => c.id === userProfile.courseId);
-      const foundSection = allSections.find((s) => s.id === userProfile.sectionId);
-      setCourse(foundCourse || null);
-      setSection(foundSection || null);
+      const userCourseId = (userProfile?.courseId || (userProfile?.program?.toLowerCase().includes('computer science') ? 'bscs' : 'bsit')).toLowerCase();
+      const userProgramCode = (userProfile?.programCode || (userCourseId === 'bscs' ? 'BSCS' : 'BSIT')).toUpperCase();
 
-      // 2. Fetch all students belonging to the same academic section
-      const allStudents = await studentService.getAllStudents();
-      const sectionStudents = allStudents.filter(
-        (s) => s.sectionId === userProfile.sectionId
-      );
+      let userMajorCode = (userProfile?.majorCode || '').toUpperCase();
+      const specStr = (userProfile?.major || userProfile?.programSpecialization || '').toUpperCase();
+      if (!userMajorCode && specStr) {
+        if (specStr.includes('WMAD') || specStr.includes('WEB AND MOBILE')) userMajorCode = 'WMAD';
+        else if (specStr.includes('AMG') || specStr.includes('ANIMATION')) userMajorCode = 'AMG';
+        else if (specStr.includes('SMP') || specStr.includes('SERVICE MANAGEMENT')) userMajorCode = 'SMP';
+        else if (specStr.includes('IS') || specStr.includes('INTELLIGENT SYSTEMS')) userMajorCode = 'IS';
+      }
+      if (!userMajorCode && userProgramCode === 'BSIT') userMajorCode = 'WMAD';
 
-      // 3. Fetch all groups in this section to determine group status automatically
-      const sectionGroups = await groupService.getGroupsBySection(userProfile.sectionId);
-      setGroups(sectionGroups);
-      setStudents(sectionStudents);
+      const userSectionId = userProfile?.sectionId || data.section?.id || '';
+      const userSectionName = (userProfile?.sectionName || userProfile?.section || data.section?.name || 'A').toUpperCase();
+
+      // STRICT CLASSMATE FILTERING:
+      // "ONLY THE CLASSMATE OF LOGIN STUDETN WILL BE DISPLAYED ON TEH TABLE, NOT OTHER SPECIALIZATION OR COURSES/PROGRAM."
+      const classmateList = (data.classmates || []).filter((s) => {
+        // 1. Program / Course check
+        const sCourse = (s.courseId || (s.program?.toLowerCase().includes('computer science') ? 'bscs' : 'bsit')).toLowerCase();
+        const sProg = (s.programCode || (sCourse === 'bscs' ? 'BSCS' : 'BSIT')).toUpperCase();
+        if (sCourse !== userCourseId && sProg !== userProgramCode) return false;
+
+        // 2. Specialization / Major check
+        let sMajor = (s.majorCode || '').toUpperCase();
+        const sSpec = (s.major || s.programSpecialization || '').toUpperCase();
+        if (!sMajor && sSpec) {
+          if (sSpec.includes('WMAD') || sSpec.includes('WEB AND MOBILE')) sMajor = 'WMAD';
+          else if (sSpec.includes('AMG') || sSpec.includes('ANIMATION')) sMajor = 'AMG';
+          else if (sSpec.includes('SMP') || sSpec.includes('SERVICE MANAGEMENT')) sMajor = 'SMP';
+          else if (sSpec.includes('IS') || sSpec.includes('INTELLIGENT SYSTEMS')) sMajor = 'IS';
+        }
+        if (!sMajor && sProg === 'BSIT') sMajor = 'WMAD';
+        if (userMajorCode && sMajor && sMajor !== userMajorCode) return false;
+
+        // 3. Section check
+        const sSecId = s.sectionId || '';
+        const sSecName = (s.sectionName || s.section || '').toUpperCase();
+        if (userSectionId && sSecId && sSecId !== userSectionId) return false;
+        if (userSectionName && sSecName && sSecName !== userSectionName) return false;
+
+        return true;
+      });
+
+      setStudents(classmateList);
+      setGroups(data.groups || []);
+      if (data.course) setCourse(data.course);
+      if (data.section) setSection(data.section);
     } catch (err) {
       console.error("[Masterlist] Error loading section masterlist:", err);
       setToast({ message: "Unable to load section masterlist.", variant: "error" });
@@ -133,7 +159,7 @@ export const Masterlist = () => {
   }
 
   // 1. EMPTY STATE: Student Has No Section Assigned Yet (Prompt Section 2.6)
-  if (!userProfile?.sectionId) {
+  if (!userProfile?.sectionId && !section && students.length === 0) {
     return (
       <div className="space-y-6 font-inter">
         <PageHeader

@@ -7,7 +7,7 @@ export const buildUserListCandidateFilter = ({ role, status, search, program, co
 
   if (role && role !== 'all') {
     conditions.push(role === 'faculty'
-      ? { role: { $in: ['adviser', 'research_coordinator', 'panelist'] } }
+      ? { role: { $in: ['adviser', 'research_coordinator', 'panelist', 'faculty'] } }
       : { role });
   }
 

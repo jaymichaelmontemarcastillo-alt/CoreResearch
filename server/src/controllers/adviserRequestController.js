@@ -26,34 +26,31 @@ export const getAdviserRequests = async (req, res) => {
         .collection("research_groups")
         .doc(groupId)
         .get();
-      if (!groupSnapshot.exists) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Research group not found." });
-      }
-      const group = groupSnapshot.data();
-      const isMember =
-        (group.memberIds || []).includes(studentId) ||
-        (group.members || []).some((member) => member.uid === studentId) ||
-        group.leaderId === studentId;
-      if (!isMember) {
-        return res.status(403).json({
-          success: false,
-          message: "You are not a member of this research group.",
-        });
-      }
-      snapshots.push(
-        await db.collection(COLLECTION).where("groupId", "==", groupId).get(),
-      );
-      if (snapshots[1].empty) {
-        const leaderId = group.memberIds?.[0] || group.members?.[0]?.uid;
-        if (leaderId)
-          snapshots.push(
-            await db
-              .collection(COLLECTION)
-              .where("studentId", "==", leaderId)
-              .get(),
-          );
+      if (groupSnapshot.exists) {
+        const group = groupSnapshot.data();
+        const isMember =
+          (group.memberIds || []).includes(studentId) ||
+          (group.members || []).some((member) => member.uid === studentId) ||
+          group.leaderId === studentId;
+        if (!isMember) {
+          return res.status(403).json({
+            success: false,
+            message: "You are not a member of this research group.",
+          });
+        }
+        const groupRequestsSnap = await db.collection(COLLECTION).where("groupId", "==", groupId).get();
+        snapshots.push(groupRequestsSnap);
+        if (groupRequestsSnap.empty) {
+          const leaderId = group.memberIds?.[0] || group.members?.[0]?.uid;
+          if (leaderId && leaderId !== studentId) {
+            snapshots.push(
+              await db
+                .collection(COLLECTION)
+                .where("studentId", "==", leaderId)
+                .get(),
+            );
+          }
+        }
       }
     }
 

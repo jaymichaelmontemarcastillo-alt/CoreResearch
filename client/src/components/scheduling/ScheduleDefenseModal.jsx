@@ -252,12 +252,14 @@ export const ScheduleDefenseModal = ({
         });
       }
 
-      const stageLabel = isRedefense
+      const isRedefenseActive = Boolean(isRedefense || isRedefenseMode);
+      const stageLabel = isRedefenseActive
         ? (defenseStage === 'final_defense' ? 'Final Re-defense' : 'Proposal Re-defense')
         : (defenseStage === 'final_defense' ? 'Final Defense' : 'Proposal Defense');
 
       const payload = {
         projectId: currentGroup.id,
+        groupId: currentGroup.id,
         projectTitle:
           currentProposal?.title ||
           currentGroup.title ||
@@ -273,21 +275,24 @@ export const ScheduleDefenseModal = ({
         panelistIds: panelistIdList,
         panelists: panelistObjects,
         status: 'scheduled',
+        resultStatus: isRedefenseActive ? 're_defense' : 'scheduled',
         defenseStage: stageLabel,
+        isRedefense: isRedefenseActive,
         notes: notes.trim(),
       };
 
       // 1. Create the new chronological schedule entry
       await scheduleService.createSchedule(payload);
 
-      // 2. Mark previous schedules for this group as completed or archived if they were still scheduled
+      // 2. Mark previous schedules for this group as completed or for_redefense if they were still scheduled
       if (groupSchedulesHistory.length > 0) {
         await Promise.all(
           groupSchedulesHistory.map((s) => {
             if (s.status === 'scheduled') {
               return scheduleService
                 .updateSchedule(s.id, {
-                  status: isRedefenseMode ? 'for_redefense' : 'completed',
+                  status: isRedefenseActive ? 'for_redefense' : 'completed',
+                  resultStatus: isRedefenseActive ? 're_defense' : 'completed',
                 })
                 .catch(() => null);
             }
@@ -296,12 +301,14 @@ export const ScheduleDefenseModal = ({
         );
       }
 
-      // 3. Update group records with assigned adviser and panelists
+      // 3. Update group records with assigned adviser, panelists, and stage
       await groupService
         .updateGroup(currentGroup.id, {
           adviserId,
           adviserName,
           panelists: panelistObjects,
+          defenseStage: stageLabel,
+          redefenseRequired: isRedefenseActive,
         })
         .catch(() => null);
 

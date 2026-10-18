@@ -206,7 +206,7 @@ export const UserRequests = () => {
 
     setActionLoadingUid(u.uid);
     try {
-      await userService.approveUser(u.uid, currentUser?.uid || "admin");
+      await userService.approveUser(u.uid, currentUser?.uid || "admin", u.role);
       showToast(
         isAdviser
           ? `Faculty Adviser ${u.fullName || u.email} approved and assigned as active adviser.`
@@ -297,7 +297,7 @@ export const UserRequests = () => {
     try {
       const adminUid = currentUser?.uid || "admin";
       const results = await Promise.allSettled(
-        targets.map((u) => userService.approveUser(u.uid, adminUid))
+        targets.map((u) => userService.approveUser(u.uid, adminUid, u.role))
       );
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.filter((r) => r.status === "rejected").length;

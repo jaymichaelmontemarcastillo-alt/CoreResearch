@@ -256,7 +256,7 @@ export const Sidebar = ({
           label: "Advisers & Faculty",
           path: "/admin/advisers",
           icon: HiAcademicCap,
-          roles: ["admin"],
+          roles: ["admin", "research_coordinator"],
         },
         ...(effectiveRole === "student" ? [
           {
@@ -306,13 +306,13 @@ export const Sidebar = ({
           label: "Calendar",
           path: "/calendar",
           icon: HiCalendarDays,
-          roles: ["student", "adviser", "panelist", "faculty"],
+          roles: ["student", "adviser", "panelist", "faculty", "admin", "research_coordinator"],
         },
         {
           label: "Schedule",
           path: "/schedules",
           icon: HiCalendarDays,
-          roles: ["student", "adviser", "panelist", "faculty"],
+          roles: ["student", "adviser", "panelist", "faculty", "admin", "research_coordinator"],
         },
         {
           label: "Scheduling",
@@ -417,9 +417,16 @@ export const Sidebar = ({
       <div className={`flex-1 overflow-y-auto overflow-x-hidden whitespace-nowrap no-scrollbar ${isMobile ? 'py-1 space-y-1 px-2' : `py-3 space-y-1.5 ${expanded ? "px-3" : "px-2"}`}`}>
         {navItems.map((nav) => {
           if (nav.category) {
-            const visibleItems = nav.items.filter((item) =>
-              item.roles.includes(role || "student")
-            );
+            const currentRole = role || "student";
+            const visibleItems = nav.items.filter((item) => {
+              if (item.roles.includes(currentRole)) return true;
+              if (
+                (currentRole === "research_coordinator" || currentRole === "coordinator") &&
+                item.roles.includes("admin")
+              ) return true;
+              if (currentRole === "admin" && (item.roles.includes("research_coordinator") || item.roles.includes("coordinator"))) return true;
+              return false;
+            });
             if (visibleItems.length === 0) return null;
 
             const isOpen = openDropdowns[nav.category];
@@ -498,7 +505,12 @@ export const Sidebar = ({
               </div>
             );
           } else {
-            if (!nav.roles.includes(role || "student")) return null;
+            const currentRole = role || "student";
+            const isVisible =
+              nav.roles.includes(currentRole) ||
+              ((currentRole === "research_coordinator" || currentRole === "coordinator") && nav.roles.includes("admin")) ||
+              (currentRole === "admin" && (nav.roles.includes("research_coordinator") || nav.roles.includes("coordinator")));
+            if (!isVisible) return null;
 
             const Icon = nav.icon;
             const active = isItemActive(nav.path);
