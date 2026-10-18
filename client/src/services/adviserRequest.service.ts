@@ -56,18 +56,16 @@ class AdviserRequestService {
     const response = await api.post('/adviser-matching/requests', stripUndefined(input));
     const request = response.data?.data as AdviserRequest;
 
-    // Do not repeat notifications when the backend returns an existing request.
+    // Do not block UI response on notification dispatch
     if (response.data?.created) {
-      try {
-        await notificationService.createNotification({
-          userId: request.adviserId,
-          title: 'New Adviser Request',
-          message: `${request.studentName} has selected you as their research adviser for: ${request.researchTitle}`,
-          type: 'info'
-        });
-      } catch (error) {
+      notificationService.createNotification({
+        userId: request.adviserId,
+        title: 'New Adviser Request',
+        message: `${request.studentName} has selected you as their research adviser for: ${request.researchTitle}`,
+        type: 'info'
+      }).catch((error) => {
         console.warn('[adviserRequestService] Request saved, but adviser notification failed:', error);
-      }
+      });
     }
 
     return request;
@@ -82,43 +80,59 @@ class AdviserRequestService {
     return snap.data() as AdviserRequest;
   }
 
+  private inflightRequests = new Map<string, Promise<AdviserRequest[]>>();
+
   /**
    * Fetch all requests for a specific student/group with automatic leader linkage.
+   * Uses in-flight deduplication to prevent duplicate concurrent API calls.
    */
   async getRequestsForStudentOrGroup(studentId: string, groupId?: string, leaderId?: string): Promise<AdviserRequest[]> {
-    try {
-      const response = await api.get('/adviser-matching/requests', {
-        params: { groupId: groupId || undefined },
-      });
-      return (response.data?.data || []) as AdviserRequest[];
-    } catch (err) {
-      console.warn('[adviserRequestService] API getRequests error, falling back to direct Firestore:', err);
+    const cacheKey = `${studentId}:${groupId || 'none'}`;
+    const existing = this.inflightRequests.get(cacheKey);
+    if (existing) return existing;
+
+    const requestPromise = (async () => {
       try {
-        const queries = [];
-        if (studentId) {
-          queries.push(getDocs(query(collection(db, COLLECTION), where('studentId', '==', studentId))));
-        }
-        if (groupId) {
-          queries.push(getDocs(query(collection(db, COLLECTION), where('groupId', '==', groupId))));
-        }
-        if (leaderId && leaderId !== studentId) {
-          queries.push(getDocs(query(collection(db, COLLECTION), where('studentId', '==', leaderId))));
-        }
-        const snaps = await Promise.all(queries);
-        const map = new Map<string, AdviserRequest>();
-        snaps.forEach(snap => {
-          if (snap && snap.docs) {
-            snap.docs.forEach(d => {
-              map.set(d.id, { id: d.id, ...d.data() } as AdviserRequest);
-            });
-          }
+        const response = await api.get('/adviser-matching/requests', {
+          params: { groupId: groupId || undefined },
         });
-        return Array.from(map.values());
-      } catch (fErr) {
-        console.warn('[adviserRequestService] Firestore fallback query warning:', fErr);
-        return [];
+        return (response.data?.data || []) as AdviserRequest[];
+      } catch (err: any) {
+        console.warn('[adviserRequestService] API getRequests error, falling back to direct Firestore:', err.message || err);
+        try {
+          const queries = [];
+          if (studentId) {
+            queries.push(getDocs(query(collection(db, COLLECTION), where('studentId', '==', studentId))));
+          }
+          if (groupId) {
+            queries.push(getDocs(query(collection(db, COLLECTION), where('groupId', '==', groupId))));
+          }
+          const snaps = await Promise.all(queries);
+          const map = new Map<string, AdviserRequest>();
+          snaps.forEach(snap => {
+            if (snap && snap.docs) {
+              snap.docs.forEach(d => {
+                map.set(d.id, { id: d.id, ...d.data() } as AdviserRequest);
+              });
+            }
+          });
+          return Array.from(map.values());
+        } catch (fErr: any) {
+          console.error('[adviserRequestService] Direct Firestore fallback failed:', fErr.message || fErr);
+          // Do not silently return [] on backend and storage failures, as that falsely indicates
+          // zero active requests and causes duplicate submissions.
+          const errorMsg = err.response?.data?.message || fErr.message || 'Unable to load adviser requests.';
+          throw new Error(errorMsg);
+        }
+      } finally {
+        setTimeout(() => {
+          this.inflightRequests.delete(cacheKey);
+        }, 3000);
       }
-    }
+    })();
+
+    this.inflightRequests.set(cacheKey, requestPromise);
+    return requestPromise;
   }
 
   /**

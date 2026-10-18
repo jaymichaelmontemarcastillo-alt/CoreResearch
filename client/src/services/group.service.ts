@@ -11,7 +11,7 @@ import {
   where,
   orderBy,
 } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { db, auth } from '../firebase/firebase';
 import { ResearchGroup, CreateResearchGroupInput, GroupInvitation } from '../types/group.types';
 import { notificationService } from './notification.service';
 
@@ -561,7 +561,8 @@ export const groupService = {
 
       // 4. Check existing Documents (link leader's documents to the group)
       try {
-        if (leaderUid) {
+        const currentAuthUid = auth.currentUser?.uid;
+        if (leaderUid && leaderUid === currentAuthUid) {
           const docSnap = await getDocs(
             query(collection(db, 'documents'), where('ownerId', '==', leaderUid))
           );
@@ -579,23 +580,26 @@ export const groupService = {
         console.warn('[groupService] Document sync error:', docErr);
       }
 
-      // 5. If group doc itself was missing title or adviser, backfill it
-      if ((!group.title && projectTitle) || (!group.adviserId && adviserId)) {
+      // 5. If group doc itself was missing title or adviser, backfill it (only if leader)
+      const currentAuthUid = auth.currentUser?.uid;
+      const isLeader = group.leaderUid === currentAuthUid || (Array.isArray(group.memberIds) && group.memberIds[0] === currentAuthUid);
+      if (isLeader && ((!group.title && projectTitle) || (!group.adviserId && adviserId))) {
         const groupUpdates: any = { updatedAt: new Date().toISOString() };
         if (!group.title && projectTitle) groupUpdates.title = projectTitle;
         if (!group.adviserId && adviserId) {
           groupUpdates.adviserId = adviserId;
           groupUpdates.adviserName = adviserName;
         }
-        await updateDoc(groupRef, groupUpdates);
+        await updateDoc(groupRef, groupUpdates).catch((gErr) => {
+          console.warn('[groupService] Group backfill note:', gErr.message);
+        });
       }
 
-      // 6. Update user profiles for ALL members in this group to bind them to the leader's project
-      const allMembersToSync = Array.from(new Set([...(group.memberIds || []), memberUid]));
-      for (const uid of allMembersToSync) {
-        if (!uid) continue;
+      // 6. Update user profile ONLY for the current authenticated user to bind them to the leader's project
+      const uidToSync = memberUid || currentAuthUid;
+      if (uidToSync && uidToSync === currentAuthUid) {
         try {
-          const userRef = doc(db, 'users', uid);
+          const userRef = doc(db, 'users', uidToSync);
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
             const userData = userSnap.data();
@@ -621,12 +625,12 @@ export const groupService = {
 
             await updateDoc(userRef, userUpdates);
           }
-        } catch (uErr) {
-          console.warn(`[groupService] Error updating user profile ${uid}:`, uErr);
+        } catch (uErr: any) {
+          console.warn(`[groupService] Error updating user profile ${uidToSync}:`, uErr.message);
         }
       }
-    } catch (err) {
-      console.error('[groupService] syncMemberToGroupProject failed:', err);
+    } catch (err: any) {
+      console.error('[groupService] syncMemberToGroupProject failed:', err.message || err);
     }
   },
 

@@ -63,6 +63,8 @@ export const SubmitTitle = () => {
   const [isRestoredRequest, setIsRestoredRequest] = useState(false);
   const [matchingSession, setMatchingSession] = useState(null);
   const [declinedAdviserIds, setDeclinedAdviserIds] = useState([]);
+  const [stateCheckError, setStateCheckError] = useState(null);
+  const [retryCounter, setRetryCounter] = useState(0);
 
   // Document Processing State
   const [processingStage, setProcessingStage] = useState("idle"); // 'idle' | stage_id
@@ -150,6 +152,7 @@ export const SubmitTitle = () => {
 
     const checkExistingState = async () => {
       try {
+        setStateCheckError(null);
         const group = await groupService.getGroupByStudentId(currentUser.uid);
 
         // Check the persisted request before workspace/title checks. The title is
@@ -260,6 +263,7 @@ export const SubmitTitle = () => {
       } catch (err) {
         console.warn("[SubmitTitle] State check warning:", err);
         if (isMounted) {
+          setStateCheckError(err.message || "Unable to check active adviser request.");
           setLoading(false);
         }
       }
@@ -273,7 +277,7 @@ export const SubmitTitle = () => {
       isMounted = false;
       if (unsubscribe) unsubscribe();
     };
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, retryCounter]);
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
@@ -554,6 +558,39 @@ export const SubmitTitle = () => {
     PROCESSING_STAGES.find((s) => s.id === processingStage) ||
     PROCESSING_STAGES[0];
 
+  if (stateCheckError && !pendingRequest) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 pb-12 mt-8">
+        <div className="p-8 text-center space-y-6 rounded-3xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Service Temporarily Unavailable
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 max-w-lg mx-auto">
+              {stateCheckError}
+            </p>
+          </div>
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="primary"
+              className="px-6 py-2.5 rounded-xl cursor-pointer"
+              onClick={() => {
+                setLoading(true);
+                setStateCheckError(null);
+                setRetryCounter((c) => c + 1);
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (pendingRequest) {
     return (
       <div className="max-w-3xl mx-auto space-y-6 pb-12 mt-8">
@@ -610,16 +647,41 @@ export const SubmitTitle = () => {
             </div>
           </div>
 
-          <div className="flex justify-center pt-4">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
             <Button
               variant="outline"
-              className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40 px-6 py-2.5 rounded-xl"
+              className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900/40 px-6 py-2.5 rounded-xl cursor-pointer"
               onClick={handleCancelRequest}
             >
               Cancel Request
             </Button>
+            <Button
+              variant="primary"
+              className="px-6 py-2.5 rounded-xl cursor-pointer"
+              onClick={() => setIsMatchingModalOpen(true)}
+            >
+              View Matching Modal
+            </Button>
           </div>
         </div>
+
+        <MatchingModal
+          isOpen={isMatchingModalOpen}
+          onClose={() => setIsMatchingModalOpen(false)}
+          title={title.trim() || pendingRequest?.researchTitle || ""}
+          description={description.trim() || pendingRequest?.researchDescription || ""}
+          currentUser={currentUser}
+          userProfile={userProfile}
+          declinedAdviserIds={declinedAdviserIds}
+          restoredSession={matchingSession}
+          initialPendingRequest={pendingRequest}
+          onSuccess={(request) => {
+            setToast("Adviser selection submitted successfully.");
+            setToastVariant("success");
+            setPendingRequest(request);
+            setIsRestoredRequest(false);
+          }}
+        />
       </div>
     );
   }
@@ -843,10 +905,10 @@ export const SubmitTitle = () => {
         userProfile={userProfile}
         declinedAdviserIds={declinedAdviserIds}
         restoredSession={matchingSession}
+        initialPendingRequest={pendingRequest}
         onSuccess={(request) => {
           setToast("Adviser selection submitted successfully.");
           setToastVariant("success");
-          setIsMatchingModalOpen(false);
           setPendingRequest(request);
           setIsRestoredRequest(false);
         }}

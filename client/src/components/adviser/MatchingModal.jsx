@@ -15,12 +15,12 @@ import {
   X,
   Sparkles,
   ExternalLink,
+  Clock,
+  Loader2,
 } from "lucide-react";
 import adviserMatchingService from "../../services/adviserMatching.service";
 import adviserRequestService from "../../services/adviserRequest.service";
 import groupService from "../../services/group.service";
-import { courseService } from "../../services/course.service";
-import { sectionService } from "../../services/section.service";
 import { useConfirm } from "../../context/ConfirmContext";
 
 const LOADING_MESSAGES = [
@@ -40,6 +40,7 @@ export const MatchingModal = ({
   userProfile,
   declinedAdviserIds = [],
   restoredSession = null,
+  initialPendingRequest = null,
   onSuccess,
   initialPreviewState = null, // null | 'live' | 'loading' | 'empty' | 'error'
 }) => {
@@ -57,6 +58,72 @@ export const MatchingModal = ({
   const [serviceError, setServiceError] = useState(null);
   const [submittingId, setSubmittingId] = useState(null);
   const [toast, setToast] = useState("");
+  const [pendingRequest, setPendingRequest] = useState(initialPendingRequest || null);
+  const [declinedRequest, setDeclinedRequest] = useState(null);
+
+  // Sync initialPendingRequest prop
+  useEffect(() => {
+    if (initialPendingRequest) {
+      setPendingRequest(initialPendingRequest);
+    }
+  }, [initialPendingRequest]);
+
+  // Real-time listener for active student/group adviser requests
+  useEffect(() => {
+    if (!isOpen || !currentUser?.uid) return;
+    let unsubscribe = null;
+    let isMounted = true;
+
+    const setupListener = async () => {
+      try {
+        const group = await groupService.getGroupByStudentId(currentUser.uid);
+        if (!isMounted) return;
+
+        unsubscribe = adviserRequestService.subscribeToStudentRequests(
+          currentUser.uid,
+          (requests) => {
+            if (!isMounted) return;
+            const sorted = [...requests].sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            );
+            const active = sorted.find(
+              (r) =>
+                (r.status === "pending" || r.status === "accepted") &&
+                !r.isArchived,
+            );
+            const declined = sorted.find(
+              (r) => r.status === "declined" && !r.isArchived,
+            );
+
+            if (active?.status === "accepted") {
+              onClose();
+              navigate("/research/workspace");
+            } else if (active) {
+              setPendingRequest(active);
+              setDeclinedRequest(null);
+            } else if (declined) {
+              setDeclinedRequest(declined);
+              setPendingRequest(null);
+            } else {
+              setPendingRequest(null);
+              setDeclinedRequest(null);
+            }
+          },
+          group?.id,
+        );
+      } catch (err) {
+        console.warn("[MatchingModal] Error setting up request listener:", err);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isOpen, currentUser, navigate, onClose]);
 
   // UI Interactive States
   const [selectedAdviser, setSelectedAdviser] = useState(null);
@@ -265,6 +332,10 @@ export const MatchingModal = ({
   // Otherwise computed naturally:
   const effectiveState = previewState
     ? previewState
+    : pendingRequest
+    ? "pending"
+    : declinedRequest
+    ? "declined"
     : loading
     ? "loading"
     : serviceError
@@ -272,6 +343,51 @@ export const MatchingModal = ({
     : displayedList.length === 0
     ? "empty"
     : "live";
+
+  const handleClearDeclined = async () => {
+    if (!declinedRequest) return;
+    setLoading(true);
+    try {
+      await adviserRequestService.deleteRequest(declinedRequest.id);
+      setDeclinedRequest(null);
+      if (matches.length === 0) {
+        await runMatching();
+      } else {
+        setLoading(false);
+      }
+    } catch (err) {
+      setToast("Failed to clear declined request: " + (err.message || "Unknown error"));
+      setLoading(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!pendingRequest) return;
+    const isConfirmed = await confirm({
+      title: "Cancel Request",
+      message:
+        "Are you sure you want to cancel this request and select another adviser?",
+      confirmText: "Cancel Request",
+      variant: "danger",
+    });
+    if (!isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await adviserRequestService.deleteRequest(pendingRequest.id);
+      setPendingRequest(null);
+      setSelectedAdviser(null);
+      setToast("Request cancelled. You can now select a different adviser.");
+      if (matches.length === 0) {
+        await runMatching();
+      } else {
+        setLoading(false);
+      }
+    } catch (err) {
+      setToast("Failed to cancel request: " + (err.message || "Unknown error"));
+      setLoading(false);
+    }
+  };
 
   const handleSelectAdviser = async (adviser) => {
     if (!adviser) return;
@@ -287,32 +403,26 @@ export const MatchingModal = ({
     setSubmittingId(adviser.adviserId || adviser.uid);
     try {
       const group = await groupService.getGroupByStudentId(currentUser.uid);
-      const allCourses = await courseService.getAllCourses();
 
-      const courseId = group?.courseId || userProfile?.courseId;
-      const sectionId = group?.sectionId || userProfile?.sectionId;
-      const course = allCourses.find((c) => c.id === courseId);
-
-      let section = null;
-      if (courseId && sectionId) {
-        const sections = await sectionService.getSectionsByCourseId(courseId);
-        section = sections.find((s) => s.id === sectionId);
-      }
+      const courseId = group?.courseId || userProfile?.courseId || "";
+      const courseName = group?.courseName || userProfile?.course || userProfile?.program || "";
+      const sectionId = group?.sectionId || userProfile?.sectionId || "";
+      const sectionName = group?.sectionName || userProfile?.section || "";
 
       const request = await adviserRequestService.createRequest({
         studentId: currentUser.uid,
-        studentName: userProfile?.fullName || currentUser.email,
-        groupId: group?.id,
-        groupName: group?.name,
-        courseId: course?.id,
-        courseName: course?.code || course?.name,
-        sectionId: section?.id,
-        sectionName: section?.name,
+        studentName: userProfile?.fullName || currentUser.displayName || currentUser.email || "Student",
+        groupId: group?.id || "",
+        groupName: group?.name || "",
+        courseId,
+        courseName,
+        sectionId,
+        sectionName,
         researchTitle: title,
         researchDescription: description,
         adviserId: adviser.adviserId || adviser.uid,
         adviserName: adviser.adviserName || adviser.fullName,
-        compatibilityScore: adviser.compatibilityScore || adviser.score,
+        compatibilityScore: adviser.compatibilityScore || adviser.score || 0,
       });
 
       if (group?.id && title) {
@@ -322,10 +432,8 @@ export const MatchingModal = ({
       }
 
       setToast(`Request successfully sent to ${adviser.adviserName || adviser.fullName}!`);
+      setPendingRequest(request);
       if (onSuccess) onSuccess(request);
-      setTimeout(() => {
-        onClose();
-      }, 1000);
     } catch (err) {
       console.error("[MatchingModal] select error:", err);
       setToast("Failed to select adviser: " + (err.message || "Unknown error"));
@@ -367,8 +475,24 @@ export const MatchingModal = ({
               Faculty Adviser Matching
             </h2>
 
+            {/* Request Pending pill badge */}
+            {pendingRequest && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Request Pending
+              </span>
+            )}
+
+            {/* Request Declined pill badge */}
+            {declinedRequest && !pendingRequest && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200/60 dark:border-red-900/40 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                Request Declined
+              </span>
+            )}
+
             {/* Restored saved match results pill badge */}
-            {restoredSession && (
+            {restoredSession && !pendingRequest && !declinedRequest && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/40 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
                 Restored saved match results
@@ -418,78 +542,173 @@ export const MatchingModal = ({
         </div>
 
         {/* 3. TABS & FILTER ROW */}
-        <div className="px-5 sm:px-6 pb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-[#222433] shrink-0">
-          {/* Left Segmented Tab Control */}
-          <div className="inline-flex bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-xl border border-gray-200/60 dark:border-[#2b2d3f] shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab("matches")}
-              className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "matches"
-                  ? "bg-white dark:bg-[#252836] text-gray-900 dark:text-white shadow-xs"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              Recommended Matches
-              <span
-                className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                  activeTab === "matches"
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
-                    : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-              >
-                {filteredMatches.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("available")}
-              className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "available"
-                  ? "bg-white dark:bg-[#252836] text-gray-900 dark:text-white shadow-xs"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              Available Faculty
-              <span
-                className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                  activeTab === "available"
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
-                    : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-              >
-                {filteredAlternatives.length}
-              </span>
-            </button>
-          </div>
-
-          {/* Right Search Input */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Filter by name, topic, or paper..."
-              className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-full text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs transition-all"
-            />
-            {searchFilter && (
+        {!pendingRequest && !declinedRequest && (
+          <div className="px-5 sm:px-6 pb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-[#222433] shrink-0">
+            {/* Left Segmented Tab Control */}
+            <div className="inline-flex bg-gray-100 dark:bg-[#1c1d28] p-1 rounded-xl border border-gray-200/60 dark:border-[#2b2d3f] shrink-0">
               <button
                 type="button"
-                onClick={() => setSearchFilter("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
+                onClick={() => setActiveTab("matches")}
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                  activeTab === "matches"
+                    ? "bg-white dark:bg-[#252836] text-gray-900 dark:text-white shadow-xs"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
               >
-                ✕
+                Recommended Matches
+                <span
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                    activeTab === "matches"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {filteredMatches.length}
+                </span>
               </button>
-            )}
-          </div>
-        </div>
 
-        {/* 4. MAIN CONTENT AREA (Live Data, Loading, Empty, or Error) */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("available")}
+                className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                  activeTab === "available"
+                    ? "bg-white dark:bg-[#252836] text-gray-900 dark:text-white shadow-xs"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                Available Faculty
+                <span
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                    activeTab === "available"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {filteredAlternatives.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Right Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="Filter by name, topic, or paper..."
+                className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#2b2d3f] rounded-full text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs transition-all"
+              />
+              {searchFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSearchFilter("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 4. MAIN CONTENT AREA (Live Data, Loading, Empty, Error, Pending, or Declined) */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-3.5">
+          {/* VERSION PENDING: ACTIVE ADVISER REQUEST */}
+          {pendingRequest && (
+            <div className="p-6 sm:p-8 text-center space-y-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 animate-in fade-in duration-150">
+              <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
+                <Clock className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                  Adviser Request Pending
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-md mx-auto leading-relaxed">
+                  Your request has been submitted to{" "}
+                  <strong className="text-gray-900 dark:text-white">
+                    {pendingRequest.adviserName}
+                  </strong>
+                  . Once accepted, your Research Workspace will be activated immediately.
+                </p>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#15161e] border border-amber-200/80 dark:border-amber-900/30 text-left text-xs space-y-3 max-w-lg mx-auto shadow-2xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                    Research Title
+                  </span>
+                  <p className="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm mt-0.5">
+                    {pendingRequest.researchTitle || title}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-100 dark:border-[#2b2d3f] pt-2.5">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                      Faculty Mentor
+                    </span>
+                    <p className="font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+                      {pendingRequest.adviserName}
+                    </p>
+                  </div>
+                  {pendingRequest.compatibilityScore > 0 && (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/40">
+                      {pendingRequest.compatibilityScore}% Compatibility
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={handleCancelRequest}
+                  className="px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-900/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel Request & Pick Another
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* VERSION DECLINED: DECLINED ADVISER REQUEST */}
+          {!pendingRequest && declinedRequest && (
+            <div className="p-6 sm:p-8 text-center space-y-5 rounded-2xl bg-red-50/70 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 animate-in fade-in duration-150">
+              <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 flex items-center justify-center mx-auto shadow-xs">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                  Adviser Request Declined
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-md mx-auto leading-relaxed">
+                  <strong className="text-gray-900 dark:text-white">
+                    {declinedRequest.adviserName}
+                  </strong>{" "}
+                  was unable to accept your request at this time. Your manuscript matches are preserved so you can select another faculty adviser.
+                </p>
+              </div>
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={handleClearDeclined}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+                >
+                  Pick Another Faculty Adviser
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* VERSION 2: LOADING SKELETON STATE */}
-          {effectiveState === "loading" && (
+          {!pendingRequest && !declinedRequest && effectiveState === "loading" && (
             <div className="space-y-3.5">
               {[1, 2].map((i) => (
                 <div
@@ -520,7 +739,7 @@ export const MatchingModal = ({
           )}
 
           {/* VERSION 4: ERROR STATE */}
-          {effectiveState === "error" && (
+          {!pendingRequest && !declinedRequest && effectiveState === "error" && (
             <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-white dark:bg-[#15161e] p-10 sm:p-14 flex flex-col items-center justify-center text-center space-y-3.5 shadow-2xs">
               <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-500 shrink-0">
                 <AlertTriangle className="w-6 h-6 text-red-500" />
@@ -546,7 +765,7 @@ export const MatchingModal = ({
           )}
 
           {/* VERSION 3: EMPTY STATE */}
-          {effectiveState === "empty" && (
+          {!pendingRequest && !declinedRequest && effectiveState === "empty" && (
             <div className="rounded-2xl border border-gray-200 dark:border-[#2b2d3f] p-10 sm:p-14 flex flex-col items-center justify-center text-center space-y-3.5 bg-white dark:bg-[#15161e] shadow-2xs">
               <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
                 <Search className="w-5 h-5 text-gray-400" />
@@ -574,7 +793,7 @@ export const MatchingModal = ({
           )}
 
           {/* VERSION 1: LIVE DATA STATE */}
-          {effectiveState === "live" && (
+          {!pendingRequest && !declinedRequest && effectiveState === "live" && (
             <div className="space-y-3.5">
               {displayedList.map((adviser, index) => {
                 const adviserId = adviser.adviserId || adviser.uid || adviser.id;
@@ -823,36 +1042,38 @@ export const MatchingModal = ({
         </div>
 
         {/* 5. MODAL FOOTER */}
-        <div className="px-5 sm:px-6 py-4 border-t border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          {/* Helper caption with green dot */}
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span>Compatibility scores reflect NLP topic overlap; verify advising slot capacity before requesting.</span>
-          </div>
+        {!pendingRequest && !declinedRequest && (
+          <div className="px-5 sm:px-6 py-4 border-t border-gray-100 dark:border-[#222433] bg-white dark:bg-[#15161e] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            {/* Helper caption with green dot */}
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span>Compatibility scores reflect NLP topic overlap; verify advising slot capacity before requesting.</span>
+            </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white px-4 py-2 font-medium cursor-pointer transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!selectedAdviser || submittingId !== null}
-              onClick={() => selectedAdviser && handleSelectAdviser(selectedAdviser)}
-              className={`text-xs font-semibold px-5 py-2.5 rounded-xl transition-all ${
-                selectedAdviser
-                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
-                  : "bg-gray-100 dark:bg-[#2b2d3f] text-gray-400 dark:text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              {submittingId ? "Sending..." : "Confirm Adviser Selection"}
-            </button>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white px-4 py-2 font-medium cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!selectedAdviser || submittingId !== null}
+                onClick={() => selectedAdviser && handleSelectAdviser(selectedAdviser)}
+                className={`text-xs font-semibold px-5 py-2.5 rounded-xl transition-all ${
+                  selectedAdviser
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+                    : "bg-gray-100 dark:bg-[#2b2d3f] text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {submittingId ? "Sending..." : "Confirm Adviser Selection"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>,
     document.body

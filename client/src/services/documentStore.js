@@ -1,4 +1,3 @@
-// src/services/documentStore.js
 import { 
   collection, 
   doc, 
@@ -8,6 +7,7 @@ import {
   updateDoc, 
   deleteDoc, 
   query, 
+  where,
   orderBy, 
   onSnapshot,
   serverTimestamp 
@@ -45,7 +45,17 @@ export const documentStore = {
   fetchDocuments: async (userProfile = null) => {
     try {
       const colRef = collection(db, COLLECTION_NAME);
-      const q = query(colRef, orderBy('updatedAt', 'desc'));
+      const isStaff = userProfile && ['admin', 'research_coordinator', 'coordinator'].includes(userProfile.role);
+      let q;
+      if (isStaff) {
+        q = query(colRef, orderBy('updatedAt', 'desc'));
+      } else if (userProfile?.groupId) {
+        q = query(colRef, where('groupId', '==', userProfile.groupId), orderBy('updatedAt', 'desc'));
+      } else if (userProfile?.uid) {
+        q = query(colRef, where('ownerId', '==', userProfile.uid), orderBy('updatedAt', 'desc'));
+      } else {
+        return Array.from(memoryDocCache.values());
+      }
       const snapshot = await getDocs(q);
 
       const docs = snapshot.docs.map(snap => {

@@ -120,12 +120,12 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
               studentGroup?.id,
               leaderUid
             );
-            // Auto-resolve / provision workspace if group or leader already has title or accepted request or approved proposal
-            if (!fetchedWs && studentGroup) {
+            // Auto-resolve / provision workspace only when group has assigned title/adviser
+            if (!fetchedWs && studentGroup && studentGroup.status !== 'forming' && (studentGroup.adviserId || studentGroup.title)) {
               try {
                 fetchedWs = await researchWorkspaceService.getOrCreateWorkspaceForGroup(studentGroup, userProfile, leaderUid);
               } catch (e) {
-                console.warn('[StudentDashboardView] Auto workspace create fallback:', e);
+                console.info('[StudentDashboardView] Workspace prerequisite pending:', e.message);
               }
             }
             return fetchedWs;

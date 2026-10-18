@@ -5,11 +5,33 @@ import { User } from "../models/User.js";
 
 const COLLECTION = "adviser_requests";
 
+// Short-term in-memory cache to prevent burning Firestore read quota on repeated fetches
+const requestsCache = new Map();
+const CACHE_TTL_MS = 20000; // 20 seconds
+
+function getCachedRequests(key) {
+  const item = requestsCache.get(key);
+  if (item && Date.now() - item.timestamp < CACHE_TTL_MS) {
+    return item.data;
+  }
+  return null;
+}
+
+function setCachedRequests(key, data) {
+  requestsCache.set(key, { data, timestamp: Date.now() });
+}
+
+export function invalidateRequestsCache(groupId, studentId) {
+  if (groupId) requestsCache.delete(`group:${groupId}`);
+  if (studentId) requestsCache.delete(`student:${studentId}`);
+}
+
 /** Read requests owned by the student or belonging to their verified group. */
 export const getAdviserRequests = async (req, res) => {
   if (!db) {
     return res.status(503).json({
       success: false,
+      code: "STORAGE_UNAVAILABLE",
       message: "Request storage is temporarily unavailable.",
     });
   }
@@ -17,6 +39,14 @@ export const getAdviserRequests = async (req, res) => {
   const studentId = req.user?.uid;
   const groupId =
     typeof req.query.groupId === "string" ? req.query.groupId : "";
+  const cacheKey = groupId ? `group:${groupId}` : `student:${studentId}`;
+
+  // 1. Return fresh in-memory cache if available to prevent Firestore quota exhaustion
+  const cached = getCachedRequests(cacheKey);
+  if (cached) {
+    return res.status(200).json({ success: true, data: cached });
+  }
+
   try {
     const snapshots = [
       await db.collection(COLLECTION).where("studentId", "==", studentId).get(),
@@ -35,6 +65,7 @@ export const getAdviserRequests = async (req, res) => {
         if (!isMember) {
           return res.status(403).json({
             success: false,
+            code: "FORBIDDEN",
             message: "You are not a member of this research group.",
           });
         }
@@ -63,14 +94,38 @@ export const getAdviserRequests = async (req, res) => {
         });
       }),
     );
+    const data = [...requests.values()];
+    setCachedRequests(cacheKey, data);
     return res
       .status(200)
-      .json({ success: true, data: [...requests.values()] });
+      .json({ success: true, data });
   } catch (error) {
-    console.error("[AdviserRequest] Read failed:", error);
+    const isQuotaExceeded =
+      error.code === 8 ||
+      error.message?.includes("RESOURCE_EXHAUSTED") ||
+      error.details?.includes("Quota exceeded");
+
+    console.error(
+      `[AdviserRequest] Read failed (${isQuotaExceeded ? "QUOTA_EXHAUSTED" : "INTERNAL_ERROR"}):`,
+      error.message || error,
+    );
+
+    // If quota is exhausted but we have stale cache in memory, serve it gracefully
+    const stale = requestsCache.get(cacheKey);
+    if (stale?.data) {
+      console.warn(`[AdviserRequest] Serving stale cached requests for ${cacheKey}`);
+      return res.status(200).json({ success: true, data: stale.data, stale: true });
+    }
+
+    const statusCode = isQuotaExceeded ? 503 : 500;
+    const errorCode = isQuotaExceeded ? "STORAGE_QUOTA_EXCEEDED" : "INTERNAL_ERROR";
+    const errorMessage = isQuotaExceeded
+      ? "Database read quota exceeded. Please wait a moment and try again."
+      : "Unable to load adviser requests.";
+
     return res
-      .status(500)
-      .json({ success: false, message: "Unable to load adviser requests." });
+      .status(statusCode)
+      .json({ success: false, code: errorCode, message: errorMessage });
   }
 };
 
@@ -100,6 +155,36 @@ export const createAdviserRequest = async (req, res) => {
       success: false,
       message: "A research title and adviser are required.",
     });
+  }
+
+  // 1. Pre-validate adviser eligibility in MongoDB before entering Firestore transaction
+  if (mongoose.connection.readyState === 1) {
+    const adviser = await User.findOne({
+      uid: input.adviserId,
+      role: { $in: ["adviser", "faculty", "admin"] },
+    }).lean();
+    if (
+      !adviser ||
+      adviser.status === "inactive" ||
+      adviser.status === "suspended" ||
+      adviser.is_approved === false
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "The selected adviser is not eligible to receive requests.",
+      });
+    }
+    const adviserCapacity = adviser.maxCapacity ?? 5;
+    if (
+      adviser.isAvailable === false ||
+      (adviser.activeGroupsCount ?? 0) >= adviserCapacity
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "The selected adviser no longer has an open advising slot. Refresh the matching results and choose another adviser.",
+      });
+    }
   }
 
   const groupId = input.groupId || "";
@@ -136,30 +221,21 @@ export const createAdviserRequest = async (req, res) => {
         }
       }
 
-      const groupQuery = groupId
-        ? db.collection(COLLECTION).where("groupId", "==", groupId)
-        : null;
-      const groupMemberIds = groupSnapshot
-        ? [
-            ...new Set(
-              [
-                studentId,
-                ...(groupSnapshot.data().memberIds || []),
-                ...(groupSnapshot.data().members || []).map(
-                  (member) => member.uid,
-                ),
-              ].filter(Boolean),
-            ),
-          ]
-        : [studentId];
-      const queryReads = [
-        ...(groupQuery ? [transaction.get(groupQuery)] : []),
-        ...groupMemberIds.map((memberId) =>
+      // Fast check for active request for this group or student
+      const queryReads = [];
+      if (groupId) {
+        queryReads.push(
           transaction.get(
-            db.collection(COLLECTION).where("studentId", "==", memberId),
+            db.collection(COLLECTION).where("groupId", "==", groupId),
           ),
+        );
+      }
+      queryReads.push(
+        transaction.get(
+          db.collection(COLLECTION).where("studentId", "==", studentId),
         ),
-      ];
+      );
+
       const snapshots = await Promise.all(queryReads);
       const requestDocs = new Map();
       snapshots.forEach((snapshot) => {
@@ -169,7 +245,7 @@ export const createAdviserRequest = async (req, res) => {
       });
       const activeDoc = [...requestDocs.values()].find((requestDoc) => {
         const request = requestDoc.data();
-        return request.status === "pending" || request.status === "accepted";
+        return (request.status === "pending" || request.status === "accepted") && !request.isArchived;
       });
 
       if (activeDoc) {
@@ -182,41 +258,6 @@ export const createAdviserRequest = async (req, res) => {
           request: { id: activeDoc.id, ...activeDoc.data() },
           created: false,
         };
-      }
-
-      if (mongoose.connection.readyState !== 1) {
-        const error = new Error(
-          "Adviser availability could not be verified. Please retry.",
-        );
-        error.status = 503;
-        throw error;
-      }
-      const adviser = await User.findOne({
-        uid: input.adviserId,
-        role: { $in: ["adviser", "faculty", "admin"] },
-      }).lean();
-      if (
-        !adviser ||
-        adviser.status === "inactive" ||
-        adviser.status === "suspended" ||
-        adviser.is_approved === false
-      ) {
-        const error = new Error(
-          "The selected adviser is not eligible to receive requests.",
-        );
-        error.status = 400;
-        throw error;
-      }
-      const adviserCapacity = adviser.maxCapacity ?? 5;
-      if (
-        adviser.isAvailable === false ||
-        (adviser.activeGroupsCount ?? 0) >= adviserCapacity
-      ) {
-        const error = new Error(
-          "The selected adviser no longer has an open advising slot. Refresh the matching results and choose another adviser.",
-        );
-        error.status = 409;
-        throw error;
       }
 
       const requestRef = db.collection(COLLECTION).doc();
@@ -250,18 +291,42 @@ export const createAdviserRequest = async (req, res) => {
       return { request, created: true };
     });
 
+    invalidateRequestsCache(groupId, studentId);
+
     return res.status(result.created ? 201 : 200).json({
       success: true,
       created: result.created,
       data: result.request,
     });
   } catch (error) {
-    console.error("[AdviserRequest] Create failed:", error);
-    return res.status(error.status || 500).json({
+    const isQuotaExceeded =
+      error.code === 8 ||
+      error.message?.includes("RESOURCE_EXHAUSTED") ||
+      error.details?.includes("Quota exceeded");
+
+    console.error(
+      `[AdviserRequest] Create failed (${isQuotaExceeded ? "QUOTA_EXHAUSTED" : error.status ? "CLIENT_ERROR" : "INTERNAL_ERROR"}):`,
+      error.message || error,
+    );
+
+    const statusCode = error.status || (isQuotaExceeded ? 503 : 500);
+    const errorCode = isQuotaExceeded
+      ? "STORAGE_QUOTA_EXCEEDED"
+      : error.status === 403
+      ? "FORBIDDEN"
+      : error.status === 404
+      ? "NOT_FOUND"
+      : "INTERNAL_ERROR";
+    const errorMessage = error.status
+      ? error.message
+      : isQuotaExceeded
+      ? "Database storage quota exceeded. Please wait a moment and retry."
+      : "Unable to submit the adviser request.";
+
+    return res.status(statusCode).json({
       success: false,
-      message: error.status
-        ? error.message
-        : "Unable to submit the adviser request.",
+      code: errorCode,
+      message: errorMessage,
     });
   }
 };
