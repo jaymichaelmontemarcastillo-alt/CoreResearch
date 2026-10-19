@@ -572,16 +572,6 @@ export const Repository = () => {
               {filteredPublications.map((pub) => (
                 <div key={pub.id} className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
-                    {/* Semantic Relevance Badge when Smart Search is ON */}
-                    {smartSearch && smartSearchResults?.has(pub.id) && (
-                      <div className="mb-1.5 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          <HiOutlineSparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          {smartSearchResults.get(pub.id).score}% Semantic Relevance &bull; {smartSearchResults.get(pub.id).relevance}
-                        </span>
-                      </div>
-                    )}
-
                     <h3 
                       className="text-[17px] font-medium text-[#1a0dab] dark:text-[#8ab4f8] hover:underline cursor-pointer leading-tight mb-1"
                       onClick={() => setSelectedPub(pub)}
