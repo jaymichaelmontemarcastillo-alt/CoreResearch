@@ -22,19 +22,13 @@ export const manuscriptDocumentAdapter = {
       throw new Error('No workspace provided to manuscript adapter.');
     }
 
-    // 1. If workspace already has an active documentId, verify existence
+    // 1. If workspace already has an active documentId, use it directly!
+    // NEVER overwrite an existing workspace documentId with a new document.
     if (workspace.documentId) {
-      try {
-        const existingDoc = await documentStore.fetchDocument(workspace.documentId);
-        if (existingDoc && existingDoc.id) {
-          return {
-            documentId: existingDoc.id,
-            editorUrl: `/documents/${existingDoc.id}`,
-          };
-        }
-      } catch (err) {
-        console.warn('[ManuscriptAdapter] Existing document check fallback:', err);
-      }
+      return {
+        documentId: workspace.documentId,
+        editorUrl: `/documents/${workspace.documentId}`,
+      };
     }
 
     // 1b. Check if an existing document was already created for this group or workspace leader

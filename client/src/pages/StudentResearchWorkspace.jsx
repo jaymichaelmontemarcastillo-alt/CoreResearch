@@ -585,13 +585,18 @@ export const StudentResearchWorkspace = () => {
               size="sm"
               onClick={async () => {
                 try {
-                  const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(
-                    { id: `ws-${currentUser?.uid}`, title: 'Research Manuscript Draft', groupId: userProfile?.groupId || '' },
-                    userProfile
-                  );
-                  navigate(doc.editorUrl, { state: { from: location.pathname + location.search } });
+                  const targetGroupId = userProfile?.groupId;
+                  if (targetGroupId) {
+                    const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(currentUser?.uid || '', targetGroupId);
+                    if (ws) {
+                      const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(ws, userProfile);
+                      navigate(doc.editorUrl, { state: { from: location.pathname + location.search } });
+                      return;
+                    }
+                  }
+                  navigate('/submit-title');
                 } catch (e) {
-                  navigate(`/documents/doc-${Date.now()}`, { state: { from: location.pathname + location.search } });
+                  navigate('/submit-title');
                 }
               }}
             >

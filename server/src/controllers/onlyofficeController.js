@@ -55,12 +55,10 @@ export const generateConfig = async (req, res) => {
     const documentUrl = `${backendHost}/api/onlyoffice/download/${encodeURIComponent(documentId)}?token=${encodeURIComponent(downloadToken)}`;
     const callbackUrl = `${backendHost}/api/onlyoffice/callback?id=${encodeURIComponent(documentId)}`;
 
-    // Inspection is read-only by default for Admins, Coordinators, Advisers, and Panelists.
-    // Explicit edit mode must be permitted and requested.
-    const isReadOnly = ['adviser', 'panelist'].includes(user.role) ||
-      isExplicitPanelistMode ||
-      isExplicitReadMode ||
-      (isAdmin && req.query.mode !== 'edit');
+    // Advisers, Panelists, Admins, and Research Coordinators view in read-only mode.
+    // Group student members edit the manuscript collaboratively.
+    const isReviewOnlyRole = ['adviser', 'panelist', 'admin', 'research_coordinator', 'coordinator'].includes(user.role);
+    const isReadOnly = isReviewOnlyRole || isExplicitPanelistMode || isExplicitReadMode;
 
     const config = {
       document: {

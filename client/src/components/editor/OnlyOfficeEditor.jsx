@@ -144,7 +144,7 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
     return () => {
       isMounted = false;
     };
-  }, [documentId]);
+  }, [documentId, mode]);
 
   const [loadError, setLoadError] = useState(null);
 

@@ -172,9 +172,10 @@ export const DocumentEditorPage = () => {
     const searchParams = new URLSearchParams(location.search);
     const urlMode = searchParams.get('mode');
     const isAdminOrCoordinator = userProfile?.role === 'admin' || userProfile?.role === 'research_coordinator';
-    const isExplicitReadOnly = urlMode === 'read' || (isAdminOrCoordinator && urlMode !== 'edit');
     const isPanelist = urlMode === 'panelist' || userProfile?.role === 'panelist' || currentFacultyMode === 'panelist';
     const isAdviser = !isPanelist && (userProfile?.role === 'adviser' || (userProfile?.role === 'faculty' && currentFacultyMode !== 'panelist'));
+    const isReviewOnlyRole = isAdviser || isAdminOrCoordinator || isPanelist;
+    const isExplicitReadOnly = urlMode === 'read' || isReviewOnlyRole;
     const isPanelistMode = isPanelist;
     const urlWorkspaceId = searchParams.get('workspaceId');
     const urlChapterId = searchParams.get('chapterId');
@@ -697,9 +698,13 @@ export const DocumentEditorPage = () => {
                     <span className={`shrink-0 whitespace-nowrap text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
                       isAdminOrCoordinator
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                        : isAdviser
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                        : isPanelist
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
                     }`}>
-                      {isAdminOrCoordinator ? 'Admin Review • Read-Only' : 'Read-Only'}
+                      {isAdminOrCoordinator ? 'Admin Review • Read-Only' : isAdviser ? 'Adviser Review • Read-Only' : isPanelist ? 'Panelist Review' : 'Read-Only'}
                     </span>
                   </div>
                 ) : (
@@ -890,7 +895,7 @@ export const DocumentEditorPage = () => {
               })()}
 
               {/* Only show approval/revision actions to authorized advisers (not during general administrative inspection) */}
-              {!isExplicitReadOnly && (() => {
+              {!isAdminOrCoordinator && (isAdviser || isPanelist) && (() => {
                 const currSec = (workspace.sections || []).find((s) => s.id === activeChapterId);
                 const isApproved = currSec?.status === 'completed';
 

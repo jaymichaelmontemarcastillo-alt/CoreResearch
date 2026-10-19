@@ -38,15 +38,26 @@ const isResourceParticipant = (record, user) => {
   return false;
 };
 
-const getFirestoreRecord = async (collectionName, id) => {
-  if (isDevMockMode) {
-    const record = mockFirestoreDb.get(collectionName)?.get(id);
-    return record ? { id, ...record } : null;
-  }
-  if (!db) return null;
+const withTimeout = (promise, ms = 2000) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), ms))
+  ]);
+};
 
-  const snapshot = await db.collection(collectionName).doc(id).get();
-  return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+const getFirestoreRecord = async (collectionName, id) => {
+  try {
+    if (isDevMockMode) {
+      const record = mockFirestoreDb.get(collectionName)?.get(id);
+      return record ? { id, ...record } : null;
+    }
+    if (!db) return null;
+
+    const snapshot = await withTimeout(db.collection(collectionName).doc(id).get(), 1500);
+    return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+  } catch (err) {
+    return null;
+  }
 };
 
 export const canAccessProject = async (user, projectId, additionalRecord = null) => {
@@ -55,52 +66,128 @@ export const canAccessProject = async (user, projectId, additionalRecord = null)
   if (additionalRecord && isResourceParticipant(additionalRecord, user)) return true;
 
   const records = additionalRecord ? [additionalRecord] : [];
+
+  // 1. Check MongoDB Document (fast and resilient)
+  let mongoDoc = null;
+  if (mongoose.connection.readyState === 1) {
+    try {
+      mongoDoc = await Document.findOne({ id: projectId }).lean();
+      if (mongoDoc) records.push(mongoDoc);
+    } catch (e) {}
+  }
+
+  if (records.some((record) => isResourceParticipant(record, user))) return true;
+
+  // 2. Resolve group from MongoDB
+  const groupIds = new Set(records.map((record) => record.groupId).filter(Boolean));
+  if (records.some((record) => record.id === projectId)) {
+    groupIds.add(projectId);
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const ownerIds = [
+        ...records.map((r) => r.ownerId),
+        ...records.map((r) => r.ownerUid),
+        ...(mongoDoc?.authors || [])
+      ].filter(Boolean);
+
+      const orClauses = [];
+      if (groupIds.size > 0) {
+        orClauses.push({ id: { $in: Array.from(groupIds) } });
+      }
+      if (ownerIds.length > 0) {
+        orClauses.push({ memberIds: { $in: ownerIds } });
+        orClauses.push({ 'members.uid': { $in: ownerIds } });
+        orClauses.push({ 'members.id': { $in: ownerIds } });
+      }
+
+      if (orClauses.length > 0) {
+        const matchedGroups = await mongoose.connection.db.collection('researchgroups').find({ $or: orClauses }).toArray();
+        for (const mg of matchedGroups) {
+          const isRelatedToDoc = (
+            (mg.id && groupIds.has(mg.id)) ||
+            (mongoDoc && ownerIds.some(oid => hasUid(mg.memberIds, oid) || mg.members?.some(m => m?.uid === oid || m?.id === oid))) ||
+            (records.some(r => r.groupId === mg.id || r.id === mg.id || r.workspaceId === mg.workspaceId))
+          );
+
+          if (isRelatedToDoc) {
+            records.push(mg);
+            if (mg.id) groupIds.add(mg.id);
+
+            // Backfill MongoDB document if missing groupId or full authors
+            if (mongoDoc && (!mongoDoc.groupId || !mongoDoc.authors || mongoDoc.authors.length <= 1)) {
+              const allMembers = Array.isArray(mg.memberIds) ? mg.memberIds : [];
+              await Document.updateOne(
+                { id: mongoDoc.id },
+                { $set: { groupId: mg.id, authors: allMembers, adviser: mg.adviserId || mongoDoc.adviser } }
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (records.some((record) => isResourceParticipant(record, user))) return true;
+
+  // 3. Firestore checks (with timeout protection)
   const collectionNames = [
     'research_groups',
     'research_projects',
     'manuscript_workspaces',
     'proposals',
     'manuscript_drafts',
+    'documents'
   ];
 
   for (const collectionName of collectionNames) {
     const record = await getFirestoreRecord(collectionName, projectId);
-    if (record) records.push(record);
+    if (record) {
+      records.push(record);
+      if (record.groupId) groupIds.add(record.groupId);
+    }
   }
 
-  if (mongoose.connection.readyState === 1) {
-    const document = await Document.findOne({ id: projectId }).lean();
-    if (document) records.push(document);
+  if (db && !isDevMockMode) {
+    try {
+      const wsPromise = db.collection('manuscript_workspaces').where('documentId', '==', projectId).limit(1).get();
+      const wsSnap = await withTimeout(wsPromise, 1500);
+      if (!wsSnap.empty) {
+        const wsDoc = wsSnap.docs[0];
+        const wsData = { id: wsDoc.id, ...wsDoc.data() };
+        records.push(wsData);
+        if (wsData.groupId) groupIds.add(wsData.groupId);
+      }
+    } catch (e) {}
   }
 
   if (records.some((record) => isResourceParticipant(record, user))) return true;
-
-  const groupIds = new Set(records.map((record) => record.groupId).filter(Boolean));
-  if (records.some((record) => record.id === projectId)) {
-    groupIds.add(projectId);
-  }
 
   for (const groupId of groupIds) {
     const group = await getFirestoreRecord('research_groups', groupId);
     if (group && isResourceParticipant(group, user)) return true;
   }
 
+  // 4. Schedule check for adviser and panelist
   if (['adviser', 'panelist'].includes(user.role) && mongoose.connection.readyState === 1) {
-    const { Schedule } = await import('../models/Schedule.js');
-    const scheduleProjectIds = new Set([
-      projectId,
-      ...records.map((record) => record.projectId).filter(Boolean),
-      ...groupIds,
-    ]);
-    const schedule = await Schedule.findOne({ projectId: { $in: Array.from(scheduleProjectIds) } }).lean();
-    if (schedule) {
-      if (user.role === 'adviser' && schedule.adviserId === user.uid) return true;
-      if (
-        user.role === 'panelist' &&
-        Array.isArray(schedule.panelists) &&
-        schedule.panelists.some((panelist) => panelist?.id === user.uid || panelist?.uid === user.uid)
-      ) return true;
-    }
+    try {
+      const { Schedule } = await import('../models/Schedule.js');
+      const scheduleProjectIds = new Set([
+        projectId,
+        ...records.map((record) => record.projectId).filter(Boolean),
+        ...groupIds,
+      ]);
+      const schedule = await Schedule.findOne({ projectId: { $in: Array.from(scheduleProjectIds) } }).lean();
+      if (schedule) {
+        if (user.role === 'adviser' && (schedule.adviserId === user.uid || schedule.adviser === user.uid)) return true;
+        if (
+          user.role === 'panelist' &&
+          Array.isArray(schedule.panelists) &&
+          schedule.panelists.some((panelist) => panelist?.id === user.uid || panelist?.uid === user.uid)
+        ) return true;
+      }
+    } catch (e) {}
   }
 
   return false;
