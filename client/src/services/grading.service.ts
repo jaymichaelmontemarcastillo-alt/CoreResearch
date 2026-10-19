@@ -208,7 +208,34 @@ export const gradingService = {
       submittedAt: now,
     };
 
-    await setDoc(docRef, stripUndefined(evaluation) as ProposalEvaluation, { merge: true });
+    const cleanEval = stripUndefined(evaluation) as ProposalEvaluation;
+
+    try {
+      await setDoc(docRef, cleanEval, { merge: true });
+    } catch (err: any) {
+      const isPermissionErr =
+        err?.code === 'permission-denied' ||
+        (err?.message && err.message.toLowerCase().includes('permission'));
+
+      if (isPermissionErr) {
+        // Fallback for Firestore rules update restriction: update only core evaluation fields
+        const updatePayload: Record<string, any> = {
+          scores: cleanEval.scores,
+          subTotals: cleanEval.subTotals,
+          verdict: cleanEval.verdict,
+          submittedAt: now,
+        };
+        if (cleanEval.remarks !== undefined) updatePayload.remarks = cleanEval.remarks;
+        if (cleanEval.workspaceId) updatePayload.workspaceId = cleanEval.workspaceId;
+        if (cleanEval.projectId) updatePayload.projectId = cleanEval.projectId;
+        if (cleanEval.groupId) updatePayload.groupId = cleanEval.groupId;
+        if (cleanEval.documentId) updatePayload.documentId = cleanEval.documentId;
+
+        await updateDoc(docRef, updatePayload);
+      } else {
+        throw err;
+      }
+    }
 
     // Touch manuscript_workspaces so any realtime listeners update immediately
     if (input.workspaceId) {
@@ -272,7 +299,40 @@ export const gradingService = {
       submittedAt: now,
     };
 
-    await setDoc(docRef, stripUndefined(evaluation) as FinalDefenseEvaluation, { merge: true });
+    const cleanEval = stripUndefined(evaluation) as FinalDefenseEvaluation;
+
+    try {
+      await setDoc(docRef, cleanEval, { merge: true });
+    } catch (err: any) {
+      const isPermissionErr =
+        err?.code === 'permission-denied' ||
+        (err?.message && err.message.toLowerCase().includes('permission'));
+
+      if (isPermissionErr) {
+        // Fallback for Firestore rules update restriction: update only core evaluation fields
+        const updatePayload: Record<string, any> = {
+          scores: cleanEval.scores,
+          subTotals: cleanEval.subTotals,
+          verdict: cleanEval.verdict,
+          submittedAt: now,
+        };
+        if (cleanEval.revisionDirectives !== undefined) {
+          updatePayload.revisionDirectives = cleanEval.revisionDirectives;
+        }
+        if (cleanEval.revisionDeadline !== undefined) {
+          updatePayload.revisionDeadline = cleanEval.revisionDeadline;
+        }
+        if (cleanEval.remarks !== undefined) updatePayload.remarks = cleanEval.remarks;
+        if (cleanEval.workspaceId) updatePayload.workspaceId = cleanEval.workspaceId;
+        if (cleanEval.projectId) updatePayload.projectId = cleanEval.projectId;
+        if (cleanEval.groupId) updatePayload.groupId = cleanEval.groupId;
+        if (cleanEval.documentId) updatePayload.documentId = cleanEval.documentId;
+
+        await updateDoc(docRef, updatePayload);
+      } else {
+        throw err;
+      }
+    }
 
     // Touch manuscript_workspaces so any realtime listeners update immediately
     if (input.workspaceId) {

@@ -252,9 +252,9 @@ export const FinalGradingModal = ({
     setSubmitError('');
     try {
       await onSubmit({
-        defenseId,
-        panelistId,
-        panelistName,
+        defenseId: defenseId || existingEval?.defenseId,
+        panelistId: panelistId || existingEval?.panelistId,
+        panelistName: panelistName || existingEval?.panelistName,
         meta,
         scores: {
           format: Number(scores.format),

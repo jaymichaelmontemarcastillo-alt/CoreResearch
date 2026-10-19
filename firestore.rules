@@ -659,11 +659,11 @@ service cloud.firestore {
       allow create: if (assignedPanelist(request.resource.data.get('defenseId', '')) || staff())
         && request.resource.data.get('panelistId', '') == request.auth.uid;
       allow update: if (assignedPanelist(resource.data.get('defenseId', '')) || staff())
-        && resource.data.get('panelistId', '') == request.auth.uid
-        && request.resource.data.get('panelistId', '') == resource.data.get('panelistId', '')
-        && request.resource.data.get('defenseId', '') == resource.data.get('defenseId', '')
+        && (resource.data.get('panelistId', '') == request.auth.uid || staff())
+        && (request.resource.data.get('panelistId', '') == resource.data.get('panelistId', '') || staff())
+        && (request.resource.data.get('defenseId', '') == resource.data.get('defenseId', '') || staff())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'scores', 'subTotals', 'verdict', 'submittedAt', 'remarks', 'workspaceId', 'projectId', 'groupId', 'documentId'
+          'scores', 'subTotals', 'verdict', 'submittedAt', 'remarks', 'workspaceId', 'projectId', 'groupId', 'documentId', 'meta', 'panelistName', 'defenseId', 'panelistId', 'id'
         ]);
 
       allow delete: if staff();
@@ -674,11 +674,11 @@ service cloud.firestore {
       allow create: if (assignedPanelist(request.resource.data.get('defenseId', '')) || staff())
         && request.resource.data.get('panelistId', '') == request.auth.uid;
       allow update: if (assignedPanelist(resource.data.get('defenseId', '')) || staff())
-        && resource.data.get('panelistId', '') == request.auth.uid
-        && request.resource.data.get('panelistId', '') == resource.data.get('panelistId', '')
-        && request.resource.data.get('defenseId', '') == resource.data.get('defenseId', '')
+        && (resource.data.get('panelistId', '') == request.auth.uid || staff())
+        && (request.resource.data.get('panelistId', '') == resource.data.get('panelistId', '') || staff())
+        && (request.resource.data.get('defenseId', '') == resource.data.get('defenseId', '') || staff())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'scores', 'subTotals', 'verdict', 'submittedAt', 'revisionDirectives', 'revisionDeadline', 'remarks', 'workspaceId', 'projectId', 'groupId', 'documentId'
+          'scores', 'subTotals', 'verdict', 'submittedAt', 'revisionDirectives', 'revisionDeadline', 'remarks', 'workspaceId', 'projectId', 'groupId', 'documentId', 'meta', 'panelistName', 'defenseId', 'panelistId', 'id'
         ]);
       allow delete: if staff();
     }
