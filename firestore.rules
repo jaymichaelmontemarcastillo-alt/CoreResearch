@@ -135,7 +135,9 @@ service cloud.firestore {
         || (approved() && data.get('panelistId', '') == request.auth.uid)
         || assignedPanelist(data.get('defenseId', ''))
         || workspaceParticipant(data.get('workspaceId', ''))
-        || projectParticipant(data.get('projectId', ''));
+        || projectParticipant(data.get('projectId', ''))
+        || groupMember(data.get('groupId', ''))
+        || participant(data);
     }
 
     match /users/{userId} {
@@ -344,10 +346,17 @@ service cloud.firestore {
         participant(resource.data)
         && request.resource.data.get('groupId', '') == resource.data.get('groupId', '')
         && request.resource.data.get('studentId', '') == resource.data.get('studentId', '')
-        && request.resource.data.get('adviserId', '') == resource.data.get('adviserId', '')
+        && (
+          request.resource.data.get('adviserId', '') == resource.data.get('adviserId', '')
+          || resource.data.get('adviserId', '') == ''
+          || groupLeader(resource.data.get('groupId', ''))
+          || request.auth.uid == resource.data.get('adviserId', '')
+          || request.auth.uid == request.resource.data.get('adviserId', '')
+        )
         && (
           request.resource.data.get('memberIds', []) == resource.data.get('memberIds', [])
           || groupLeader(resource.data.get('groupId', ''))
+          || groupMember(resource.data.get('groupId', ''))
         )
       );
       allow delete: if staff();
@@ -410,6 +419,13 @@ service cloud.firestore {
       }
     }
 
+    match /manuscript_documents/{documentId} {
+      allow read: if staff() || participant(resource.data) || workspaceParticipant(resource.data.get('workspaceId', ''));
+      allow create: if staff() || participant(request.resource.data);
+      allow update: if staff() || participant(resource.data) || workspaceParticipant(resource.data.get('workspaceId', ''));
+      allow delete: if staff();
+    }
+
     match /manuscript_versions/{versionId} {
       allow read: if staff() || participant(resource.data);
       allow create: if staff() || participant(request.resource.data);
@@ -423,7 +439,7 @@ service cloud.firestore {
     }
 
     match /research_tasks/{taskId} {
-      allow read: if staff() || participant(resource.data);
+      allow read: if staff() || participant(resource.data) || workspaceParticipant(resource.data.get('workspaceId', ''));
       allow create: if staff()
         || (
           approved()
@@ -444,8 +460,11 @@ service cloud.firestore {
         )
         || (
           approved()
-          && resource.data.get('studentId', '') == request.auth.uid
-          && request.resource.data.get('status', '') in ['in_progress', 'submitted']
+          && (
+            resource.data.get('studentId', '') == request.auth.uid
+            || workspaceParticipant(resource.data.get('workspaceId', ''))
+          )
+          && request.resource.data.get('status', '') in ['todo', 'in_progress', 'submitted', 'completed', 'archived']
           && request.resource.data.get('adviserId', '') == resource.data.get('adviserId', '')
           && request.resource.data.get('studentId', '') == resource.data.get('studentId', '')
           && request.resource.data.get('workspaceId', '') == resource.data.get('workspaceId', '')
@@ -471,8 +490,8 @@ service cloud.firestore {
         )
         || (
           workspaceParticipant(resource.data.get('workspaceId', ''))
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && request.resource.data.get('status', '') in ['open', 'addressed', 'resolved']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'isArchived', 'archivedAt', 'archivedBy', 'archiveReason'])
+          && request.resource.data.get('status', '') in ['open', 'addressed', 'resolved', 'archived']
         )
         || (
           approved()
@@ -643,6 +662,11 @@ service cloud.firestore {
           'scores', 'subTotals', 'verdict', 'submittedAt', 'revisionDirectives', 'revisionDeadline', 'remarks', 'workspaceId', 'projectId', 'groupId', 'documentId'
         ]);
       allow delete: if staff();
+    }
+
+    match /evaluations/{evaluationId} {
+      allow read: if canAccessEvaluation(resource.data);
+      allow create, update, delete: if staff();
     }
 
     match /{document=**} {

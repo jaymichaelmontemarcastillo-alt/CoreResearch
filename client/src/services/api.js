@@ -19,17 +19,33 @@ api.interceptors.request.use(
       if (typeof localStorage !== 'undefined') {
         const devToken = localStorage.getItem('core_research_dev_token');
         if (devToken && devToken !== 'undefined' && devToken !== 'null') {
-          config.headers.Authorization = `Bearer ${devToken}`;
+          if (config.headers?.set) {
+            config.headers.set('Authorization', `Bearer ${devToken}`);
+          } else {
+            config.headers.Authorization = `Bearer ${devToken}`;
+          }
           usingDevToken = true;
         }
       }
 
-      // 2. Fallback to Firebase Auth Token if not in dev mode (use cached token, 0ms)
+      // 2. Fallback to Firebase Auth Token if not in dev mode
       if (!usingDevToken) {
-        const currentUser = auth.currentUser;
+        let currentUser = auth.currentUser;
+        if (!currentUser && typeof auth.authStateReady === 'function') {
+          try {
+            await auth.authStateReady();
+            currentUser = auth.currentUser;
+          } catch (readyErr) {
+            console.warn('[API Interceptor] authStateReady error:', readyErr);
+          }
+        }
         if (currentUser) {
           const token = await currentUser.getIdToken(false);
-          config.headers.Authorization = `Bearer ${token}`;
+          if (config.headers?.set) {
+            config.headers.set('Authorization', `Bearer ${token}`);
+          } else {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
         }
       }
     } catch (error) {
@@ -48,10 +64,22 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401 && !originalRequest?._retry) {
       originalRequest._retry = true;
       try {
-        const currentUser = auth.currentUser;
+        let currentUser = auth.currentUser;
+        if (!currentUser && typeof auth.authStateReady === 'function') {
+          try {
+            await auth.authStateReady();
+            currentUser = auth.currentUser;
+          } catch (readyErr) {
+            console.warn('[API Error 401] authStateReady error:', readyErr);
+          }
+        }
         if (currentUser) {
           const freshToken = await currentUser.getIdToken(true);
-          originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+          if (originalRequest.headers?.set) {
+            originalRequest.headers.set('Authorization', `Bearer ${freshToken}`);
+          } else if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+          }
           return api(originalRequest);
         }
       } catch (refreshErr) {

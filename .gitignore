@@ -13,6 +13,7 @@
 !client/package-lock.json
 !firebase.json
 !.firebaserc
+!firestore.indexes.json
 
 # Private Keys
 *.pem

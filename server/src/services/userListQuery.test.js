@@ -7,7 +7,7 @@ test('pushes role and pending-approval constraints into the Mongo query', () => 
 
   assert.deepEqual(filter, {
     $and: [
-      { role: { $in: ['adviser', 'research_coordinator', 'panelist'] } },
+      { role: { $in: ['adviser', 'research_coordinator', 'panelist', 'faculty'] } },
       { role: { $nin: ['admin', 'research_coordinator'] } },
       { status: { $nin: ['approved', 'active', 'rejected'] } },
       { is_approved: { $ne: true } },
