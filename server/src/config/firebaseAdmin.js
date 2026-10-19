@@ -40,10 +40,9 @@ try {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
       const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
       const emailDomain = clientEmail.includes('@') ? clientEmail.split('@')[1] : '';
-      const emailProjectId = emailDomain.includes('.') ? emailDomain.split('.')[0] : null;
-      const resolvedProjectId = (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PROJECT_ID !== 'coreresearch-db63b')
+      const resolvedProjectId = (process.env.FIREBASE_PROJECT_ID && !['coreresearch-db63b', 'db63b'].includes(process.env.FIREBASE_PROJECT_ID))
         ? process.env.FIREBASE_PROJECT_ID
-        : (emailProjectId && emailProjectId !== 'iam' ? emailProjectId : 'coreresearch-33a17');
+        : ((emailProjectId && !['iam', 'coreresearch-db63b', 'db63b'].includes(emailProjectId)) ? emailProjectId : 'coreresearch-33a17');
 
       admin.initializeApp({
         credential: admin.credential.cert({

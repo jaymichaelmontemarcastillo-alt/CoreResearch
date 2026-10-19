@@ -16,9 +16,11 @@ import { Button } from '../components/ui/Button';
 import { Toast } from '../components/ui/Toast';
 import { Badge } from '../components/ui/Badge';
 import { useConfirm } from '../context/ConfirmContext';
+import { useAuth } from '../context/AuthContext';
 
 export const ResearchDocumentsPage = () => {
   const { confirm } = useConfirm();
+  const { currentUser, loading: authLoading } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -28,19 +30,25 @@ export const ResearchDocumentsPage = () => {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    if (authLoading) return;
+    if (currentUser) {
+      fetchDocuments();
+    } else {
+      setIsLoading(false);
+    }
+  }, [currentUser, authLoading]);
 
   const fetchDocuments = async () => {
     try {
       setIsLoading(true);
       const res = await api.get('/adviser-research/me');
-      if (res.data.success) {
+      if (res.data?.success && Array.isArray(res.data?.data)) {
         setDocuments(res.data.data);
       }
     } catch (err) {
       console.error('Failed to fetch research documents:', err);
-      setToast({ variant: 'error', message: 'Failed to load documents.' });
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to load documents.';
+      setToast({ variant: 'error', message: errMsg });
     } finally {
       setIsLoading(false);
     }

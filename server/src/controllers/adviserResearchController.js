@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { connectDB } from '../config/db.js';
 import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 import adviserResearchProcessingService from '../services/adviserResearchProcessingService.js';
 
@@ -40,6 +42,9 @@ export const uploadDocument = async (req, res) => {
  */
 export const getMyDocuments = async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
     const adviserId = req.user.uid;
     const userEmail = req.user.email;
     const isPrivileged = ['admin', 'research_coordinator', 'coordinator'].includes(req.user.role);

@@ -10,6 +10,9 @@ const api = axios.create({
   },
 });
 
+// Shared refresh promise to prevent concurrent refresh loops across parallel requests
+let refreshPromise = null;
+
 // Interceptor to inject Firebase Auth Token or Dev Token
 api.interceptors.request.use(
   async (config) => {
@@ -30,6 +33,12 @@ api.interceptors.request.use(
 
       // 2. Fallback to Firebase Auth Token if not in dev mode
       if (!usingDevToken) {
+        // If this is a retried request that already has a fresh Authorization header, preserve it!
+        const existingAuth = config.headers?.Authorization || (config.headers?.get && config.headers.get('Authorization'));
+        if (config._retry && existingAuth) {
+          return config;
+        }
+
         let currentUser = auth.currentUser;
         if (!currentUser && typeof auth.authStateReady === 'function') {
           try {
@@ -40,7 +49,8 @@ api.interceptors.request.use(
           }
         }
         if (currentUser) {
-          const token = await currentUser.getIdToken(false);
+          // If a refresh is currently running, wait for the fresh token
+          const token = refreshPromise ? await refreshPromise : await currentUser.getIdToken(false);
           if (config.headers?.set) {
             config.headers.set('Authorization', `Bearer ${token}`);
           } else {
@@ -74,7 +84,12 @@ api.interceptors.response.use(
           }
         }
         if (currentUser) {
-          const freshToken = await currentUser.getIdToken(true);
+          if (!refreshPromise) {
+            refreshPromise = currentUser.getIdToken(true).finally(() => {
+              refreshPromise = null;
+            });
+          }
+          const freshToken = await refreshPromise;
           if (originalRequest.headers?.set) {
             originalRequest.headers.set('Authorization', `Bearer ${freshToken}`);
           } else if (originalRequest.headers) {
