@@ -29,6 +29,12 @@ export const Repository = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(initialSearch);
   
+  // Smart Search State
+  const [smartSearch, setSmartSearch] = useState(false);
+  const [smartSearchLoading, setSmartSearchLoading] = useState(false);
+  const [smartSearchResults, setSmartSearchResults] = useState(null);
+  const [smartSearchError, setSmartSearchError] = useState(null);
+
   // Filters
   const [department, setDepartment] = useState("all");
   const [yearFilter, setYearFilter] = useState("any");
@@ -142,9 +148,71 @@ export const Repository = () => {
     }
   }, []);
 
+  const executeSmartSearch = async (queryText) => {
+    if (!queryText || !queryText.trim()) {
+      setSmartSearchResults(null);
+      setSmartSearchError(null);
+      return;
+    }
+    setSmartSearchLoading(true);
+    setSmartSearchError(null);
+    try {
+      const res = await api.post("/repository/smart-search", {
+        query: queryText.trim(),
+      });
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        const scoreMap = new Map();
+        res.data.data.forEach((item) => {
+          scoreMap.set(item.id, item);
+        });
+        setSmartSearchResults(scoreMap);
+        setSmartSearchError(null);
+      } else {
+        throw new Error(res.data?.message || "Failed to retrieve semantic search results");
+      }
+    } catch (err) {
+      console.warn("[Repository] Smart Search error:", err);
+      setSmartSearchError("Smart Search service is currently unavailable. Displaying standard search results.");
+      setSmartSearchResults(null);
+    } finally {
+      setSmartSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!smartSearch) {
+      setSmartSearchResults(null);
+      setSmartSearchError(null);
+      return;
+    }
+    if (!search || !search.trim()) {
+      setSmartSearchResults(null);
+      setSmartSearchError(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      executeSmartSearch(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [smartSearch, search]);
+
+  const handleToggleSmartSearch = () => {
+    const nextState = !smartSearch;
+    setSmartSearch(nextState);
+    if (!nextState) {
+      setSmartSearchResults(null);
+      setSmartSearchError(null);
+    } else if (search && search.trim()) {
+      executeSmartSearch(search);
+    }
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setSearchParams(search ? { search } : {});
+    if (smartSearch && search && search.trim()) {
+      executeSmartSearch(search);
+    }
   };
 
   const handlePublishSubmit = async (e) => {
@@ -244,8 +312,12 @@ export const Repository = () => {
   // Apply local filtering & sorting instantly
   const filteredPublications = publications
     .filter((pub) => {
-      // Search filter
-      if (search) {
+      // Search filter: Smart Search (semantic) when ON, exact keyword search when OFF
+      if (smartSearch && search.trim() && smartSearchResults) {
+        if (!smartSearchResults.has(pub.id)) {
+          return false;
+        }
+      } else if (search) {
         const q = search.toLowerCase();
         const matchTitle = pub.title?.toLowerCase().includes(q);
         const matchAbstract = pub.abstract?.toLowerCase().includes(q);
@@ -277,6 +349,11 @@ export const Repository = () => {
       return true;
     })
     .sort((a, b) => {
+      if (smartSearch && search.trim() && smartSearchResults && sortBy === "relevance") {
+        const scoreA = smartSearchResults.get(a.id)?.score || 0;
+        const scoreB = smartSearchResults.get(b.id)?.score || 0;
+        return scoreB - scoreA;
+      }
       if (sortBy === "date") {
         const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : new Date(`${a.publicationYear}-01-01`).getTime();
         const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : new Date(`${b.publicationYear}-01-01`).getTime();
@@ -297,10 +374,10 @@ export const Repository = () => {
           {/* Spacer to align search bar with the main results column */}
           <div className="hidden md:block w-44 shrink-0" />
 
-          {/* Search Bar + Action Button aligned with results */}
-          <div className="flex-1 w-full flex items-center justify-start gap-4">
-            <form onSubmit={handleSearchSubmit} className="w-full max-w-2xl">
-              <div className="relative w-full">
+          {/* Search Bar + Smart Search Toggle + Action Button aligned with results */}
+          <div className="flex-1 w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-start gap-4">
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl flex items-center gap-2 sm:gap-3">
+              <div className="relative flex-1">
                 <input
                   type="text"
                   placeholder="Search articles, theses, authors..."
@@ -310,10 +387,46 @@ export const Repository = () => {
                 />
                 <button 
                   type="submit" 
+                  aria-label="Submit search"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-primary dark:text-[#8ab4f8] p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   <HiMagnifyingGlass className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* Smart Search Toggle */}
+              <div className="flex items-center gap-2 shrink-0 select-none bg-gray-50 dark:bg-[#2a2b2e] px-3 py-2 rounded-full border border-gray-200 dark:border-gray-700 shadow-xs">
+                <button
+                  type="button"
+                  id="smart-search-toggle"
+                  role="switch"
+                  aria-checked={smartSearch}
+                  onClick={handleToggleSmartSearch}
+                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${
+                    smartSearch ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                  title={smartSearch ? "Turn Smart Search OFF" : "Turn Smart Search ON (NLP Semantic Ranking)"}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      smartSearch ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <label
+                  htmlFor="smart-search-toggle"
+                  onClick={handleToggleSmartSearch}
+                  className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <HiOutlineSparkles className={`w-4 h-4 transition-colors ${smartSearch ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
+                  <span className="hidden sm:inline">Smart Search</span>
+                  <span className="sm:hidden">Smart</span>
+                  {smartSearch && (
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                      ON
+                    </span>
+                  )}
+                </label>
               </div>
             </form>
 
@@ -322,7 +435,7 @@ export const Repository = () => {
               <Button 
                 variant="primary" 
                 onClick={() => setPublishModalOpen(true)} 
-                className="w-full md:w-auto shrink-0 shadow-sm whitespace-nowrap"
+                className="w-full sm:w-auto shrink-0 shadow-sm whitespace-nowrap"
               >
                 <HiPlusCircle className="w-5 h-5 mr-2" /> Upload Manuscript
               </Button>
@@ -404,6 +517,42 @@ export const Repository = () => {
 
         {/* Main Results List */}
         <div className="flex-1 max-w-3xl pb-16">
+          {/* Smart Search Status Indicators */}
+          {smartSearch && smartSearchLoading && (
+            <div className="mb-6 p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 flex items-center gap-3 text-sm text-blue-900 dark:text-blue-100 animate-pulse shadow-xs">
+              <HiOutlineSparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
+              <span>Analyzing research documents and ranking by semantic relevance...</span>
+            </div>
+          )}
+
+          {smartSearch && smartSearchError && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center justify-between text-sm text-amber-900 dark:text-amber-200 shadow-xs">
+              <div className="flex items-center gap-2">
+                <HiOutlineSparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>{smartSearchError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSmartSearchError(null)}
+                className="text-xs font-semibold underline hover:no-underline text-amber-900 dark:text-amber-100 ml-3"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {smartSearch && !smartSearchLoading && smartSearchResults && search.trim() && (
+            <div className="mb-6 px-4 py-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs text-blue-900 dark:text-blue-200 shadow-2xs">
+              <span className="flex items-center gap-1.5 font-medium">
+                <HiOutlineSparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                Semantic relevance ranking active for &ldquo;{search}&rdquo; &bull; {filteredPublications.length} {filteredPublications.length === 1 ? 'publication' : 'publications'} ranked
+              </span>
+              <span className="hidden sm:inline-block font-semibold px-2 py-0.5 rounded bg-blue-100/70 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                NLP Powered
+              </span>
+            </div>
+          )}
+
           {loading ? (
             <div className="py-12 text-center text-gray-500 text-lg">
               Loading repository...
@@ -423,6 +572,16 @@ export const Repository = () => {
               {filteredPublications.map((pub) => (
                 <div key={pub.id} className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
+                    {/* Semantic Relevance Badge when Smart Search is ON */}
+                    {smartSearch && smartSearchResults?.has(pub.id) && (
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          <HiOutlineSparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          {smartSearchResults.get(pub.id).score}% Semantic Relevance &bull; {smartSearchResults.get(pub.id).relevance}
+                        </span>
+                      </div>
+                    )}
+
                     <h3 
                       className="text-[17px] font-medium text-[#1a0dab] dark:text-[#8ab4f8] hover:underline cursor-pointer leading-tight mb-1"
                       onClick={() => setSelectedPub(pub)}

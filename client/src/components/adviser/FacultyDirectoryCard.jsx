@@ -84,8 +84,11 @@ export const FacultyDirectoryCard = ({
     `${adviser.first_name || ''} ${adviser.last_name || ''}`.trim() ||
     'Faculty Member';
 
-  const academicRank = adviser.academicRank || 'Assistant Professor';
+  const hasCustomRank =
+    adviser.academicRank &&
+    adviser.academicRank.toLowerCase().trim() !== 'assistant professor';
   const cleanDepartment = formatDepartmentName(adviser.department);
+  const subtitleText = hasCustomRank ? `${adviser.academicRank} • ${cleanDepartment}` : cleanDepartment;
   const theme = getFacultyBannerTheme(adviser.department, index);
 
   // Workload computations
@@ -178,12 +181,12 @@ export const FacultyDirectoryCard = ({
             {fullName}
           </h3>
 
-          {/* Academic Rank & Department: Minimized compact muted subtitle (13px, color rgba(255,255,255,0.88)) */}
+          {/* Department / Subtitle: Minimized compact muted subtitle (13px, color rgba(255,255,255,0.88)) */}
           <p
             className="text-[13px] text-white/90 font-medium truncate mt-0.5 tracking-normal"
-            title={`${academicRank} • ${cleanDepartment}`}
+            title={subtitleText}
           >
-            {academicRank} • {cleanDepartment}
+            {subtitleText}
           </p>
         </div>
 

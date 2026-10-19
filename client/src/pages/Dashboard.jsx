@@ -136,99 +136,19 @@ export const Dashboard = () => {
             {effectiveRole === "panelist" && <PanelistDashboardMetrics />}
             {isAdminOrCoordinator && <AdminAnalyticsSection />}
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {/* Left 2 Cols (or 3 for admin) */}
-              <div className={isAdminOrCoordinator ? "lg:col-span-3 space-y-5" : "lg:col-span-2 space-y-5"}>
-
-            {/* ====== ADMIN CONTENT ====== */}
-            {isAdminOrCoordinator && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Research Hub</span>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Manuscript Management & Workflow
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
-                      Review new uploads, ongoing revisions, approve camera-ready copies, award Best Thesis, and edit defense grades.
-                    </p>
-                  </div>
-                  <Link
-                    to="/admin/manuscripts"
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-                  >
-                    Manage Manuscripts →
-                  </Link>
+            {/* Main Content Grid for Non-Admins */}
+            {!isAdminOrCoordinator && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 space-y-5">
+                  {/* ====== ADVISER & PANELIST CONTENT ====== */}
                 </div>
 
-                <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Intelligence</span>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Data Analytics & Flow
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
-                      Track the institutional research lifecycle flow, completion funnel, program comparisons, and adviser workloads.
-                    </p>
-                  </div>
-                  <Link
-                    to="/admin/analytics"
-                    className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1"
-                  >
-                    View Analytics Flow →
-                  </Link>
-                </div>
-
-                <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Faculty</span>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Adviser & Faculty Profiles
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
-                      Supervise adviser research specializations, active advisee quotas, and assigned research cohorts.
-                    </p>
-                  </div>
-                  <Link
-                    to="/admin/advisers"
-                    className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
-                  >
-                    Manage Advisers →
-                  </Link>
-                </div>
-
-                <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-5 flex flex-col justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-600 transition">
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Access</span>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      User & Student Accounts
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-[#9396a8] leading-relaxed">
-                      Manage institutional accounts, assign roles, approve registrations, and handle department affiliations.
-                    </p>
-                  </div>
-                  <Link
-                    to="/admin/users"
-                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
-                  >
-                    Manage Users →
-                  </Link>
+                {/* Right Col: Recent Activity for Non-Admins */}
+                <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 h-full">
+                  <RecentActivityWidget currentUser={currentUser} />
                 </div>
               </div>
             )}
-
-            {/* ====== ADVISER & PANELIST CONTENT ====== */}
-            {/* Adviser specific dashboard content (Adviser Requests moved to separate page) */}
-          </div>
-
-          {/* Right Col: Recent Activity for Non-Admins */}
-          {!isAdminOrCoordinator && (
-            <div className="bg-white dark:bg-[#15161e] rounded-2xl border border-gray-200/80 dark:border-[#222433] p-6 h-full">
-              <RecentActivityWidget currentUser={currentUser} />
-            </div>
-          )}
-        </div>
       </>
     )}
   </Suspense>

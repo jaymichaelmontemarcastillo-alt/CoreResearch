@@ -902,6 +902,20 @@ export const researchWorkspaceService = {
   },
 
   /**
+   * Fetch active advisee workload counts for all advisers
+   * Accessible by all authenticated roles (students, faculty, coordinators, admin)
+   */
+  async getAdviserWorkloads(): Promise<Record<string, number>> {
+    try {
+      const res = await api.get('/workspaces/adviser-workloads');
+      return res.data?.data || {};
+    } catch (e) {
+      console.warn('[researchWorkspaceService] Failed to fetch adviser workloads:', e);
+      return {};
+    }
+  },
+
+  /**
    * Real-time subscription to a workspace
    */
   subscribeWorkspace(

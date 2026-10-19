@@ -281,6 +281,7 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
       )}
 
       <DocumentEditor
+        key={`${documentId}-${documentServerUrl}`}
         id="onlyoffice-editor"
         documentServerUrl={documentServerUrl}
         config={config}

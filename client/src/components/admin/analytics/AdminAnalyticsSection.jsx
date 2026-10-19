@@ -3,11 +3,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import adminAnalyticsService from '../../../services/adminAnalytics.service';
 import { AdminSummaryCards } from './AdminSummaryCards';
 import { AdminAnalyticsFilters } from './AdminAnalyticsFilters';
-import { ResearchStatusDistributionChart } from './ResearchStatusDistributionChart';
 import { ResearchTopicsTrendChart } from './ResearchTopicsTrendChart';
 import { AdviserWorkloadChart } from './AdviserWorkloadChart';
 import { StudentsByProgramChart } from './StudentsByProgramChart';
 import { ResearchCompletionRateChart } from './ResearchCompletionRateChart';
+import { AdminQuickNavCards } from './AdminQuickNavCards';
 import { RecentActivityWidget } from '../../dashboard/activity/RecentActivityWidget';
 export const AdminAnalyticsSection = () => {
   const [processed, setProcessed] = useState({
@@ -89,28 +89,25 @@ export const AdminAnalyticsSection = () => {
         </div>
       </div>
 
-      {/* 4. Analytics Section - Row 2: Students by Program & Status Distribution */}
+      {/* 4. Analytics Section - Row 2: Students by Program & Adviser Workload */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         <StudentsByProgramChart
           data={processed.studentsByProgram}
-          loading={loading}
-        />
-        <ResearchStatusDistributionChart
-          data={processed.statusDistribution}
-          loading={loading}
-        />
-      </div>
-
-      {/* 5. Analytics Section - Row 3: Completion Rate & Adviser Workload */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        <ResearchCompletionRateChart
-          data={processed.completionRate}
           loading={loading}
         />
         <AdviserWorkloadChart
           data={processed.adviserWorkload}
           loading={loading}
         />
+      </div>
+
+      {/* 5. Analytics Section - Row 3: Completion Rate & Quick Navigation Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
+        <ResearchCompletionRateChart
+          data={processed.completionRate}
+          loading={loading}
+        />
+        <AdminQuickNavCards />
       </div>
     </div>
   );

@@ -45,6 +45,7 @@ export const AdviserAdvisees = () => {
 
   const [groups, setGroups] = useState([]);
   const [progressMap, setProgressMap] = useState({});
+  const [workspaceMap, setWorkspaceMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ message: '', variant: 'error' });
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,6 +124,7 @@ export const AdviserAdvisees = () => {
           }
         })
       );
+      setWorkspaceMap(wsMap);
 
       const progress = await facultyService.getGroupsProgressSummary(fetchedGroups);
       setProgressMap(progress);
@@ -152,6 +154,7 @@ export const AdviserAdvisees = () => {
 
         return {
           ...group,
+          workspaceId: ws?.id || group.workspaceId || '',
           title: resolvedTitle,
           programCode: course?.code || course?.name || 'BSIT',
           sectionName: section?.name || group.sectionName || 'A',
@@ -613,7 +616,7 @@ export const AdviserAdvisees = () => {
                             size="sm"
                             variant="secondary"
                             onClick={() => {
-                              const targetWsId = workspaceMap[group.id]?.id || group.workspaceId || group.id;
+                              const targetWsId = group.workspaceId || workspaceMap[group.id]?.id || group.id;
                               navigate(`/faculty/workspace/${targetWsId}`);
                             }}
                             title="Open collaborative workspace and drafts"

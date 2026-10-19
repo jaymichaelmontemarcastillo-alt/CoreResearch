@@ -7,10 +7,14 @@ import {
   createFeedback,
   updateFeedbackStatus,
   restartWorkspace,
+  getAdviserWorkloads,
 } from '../controllers/workspaceController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Adviser workloads summary (for directory cards, student pages, admin)
+router.get('/adviser-workloads', verifyToken, getAdviserWorkloads);
 
 // Workspace fetch & lifecycle
 router.get('/:id', verifyToken, getWorkspace);

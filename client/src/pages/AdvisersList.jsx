@@ -1,5 +1,5 @@
 // src/pages/AdvisersList.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -45,11 +45,23 @@ export const AdvisersList = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1. Fetch advisers from user service and workspaces for workload
-        const [adviserUsers, allWorkspaces] = await Promise.all([
-          userService.getUsersByRole('adviser'),
+        // 1. Fetch advisers and faculty from user service, workspaces, and backend workloads
+        const [adviserUsers, facultyUsers, allWorkspaces, backendWorkloads] = await Promise.all([
+          userService.getUsersByRole('adviser').catch(() => []),
+          userService.getUsersByRole('faculty').catch(() => []),
           researchWorkspaceService.getAllWorkspaces().catch(() => []),
+          researchWorkspaceService.getAdviserWorkloads().catch(() => ({})),
         ]);
+
+        // Deduplicate faculty & advisers by uid / id
+        const userMap = new Map();
+        [...adviserUsers, ...facultyUsers].forEach((u) => {
+          const key = u.uid || u.id;
+          if (key && !userMap.has(key)) {
+            userMap.set(key, u);
+          }
+        });
+        const combinedUsers = Array.from(userMap.values());
 
         // 2. Fetch publications from repository
         let repoPubs = [];
@@ -76,7 +88,7 @@ export const AdvisersList = () => {
         }
 
         // Map publications to advisers if they match adviserName or adviserId or user.publishedWorks
-        const enriched = adviserUsers.map((adv) => {
+        const enriched = combinedUsers.map((adv) => {
           const nameMatch = adv.fullName || `${adv.first_name} ${adv.last_name}`.trim();
 
           // Map documents uploaded by this adviser in /research-documents
@@ -180,15 +192,20 @@ export const AdvisersList = () => {
           const activeGroups = (allWorkspaces || []).filter(
             (ws) => (ws.adviserId === adv.uid || ws.adviserId === adv.id) && ws.status !== 'archived'
           );
+          const activeCount = Math.max(
+            activeGroups.length,
+            backendWorkloads[adv.uid] || 0,
+            backendWorkloads[adv.id] || 0
+          );
 
           return {
             ...adv,
             displayName: nameMatch || 'Faculty Adviser',
             fullName: nameMatch || 'Faculty Adviser',
-            activeAdviseeCount: activeGroups.length,
+            activeAdviseeCount: activeCount,
             maxAdvisees: adv.maxCapacity || adv.maxAdvisees || 5,
             maxCapacity: adv.maxCapacity || adv.maxAdvisees || 5,
-            academicRank: adv.academicRank || 'Assistant Professor',
+            academicRank: adv.academicRank || '',
             status: adv.status || 'active',
             allExpertise,
             expertise: allExpertise,
@@ -196,6 +213,8 @@ export const AdvisersList = () => {
           };
         });
 
+        // Sort advisers with active advisee workloads on top
+        enriched.sort((a, b) => (b.activeAdviseeCount || 0) - (a.activeAdviseeCount || 0));
         setAdvisers(enriched);
       } catch (err) {
         console.error('[AdvisersList] Fetch error:', err);
@@ -207,21 +226,25 @@ export const AdvisersList = () => {
     fetchData();
   }, []);
 
-  // Filter advisers by search and department
-  const filteredAdvisers = advisers.filter((adv) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !search ||
-      adv.displayName.toLowerCase().includes(q) ||
-      (adv.department && adv.department.toLowerCase().includes(q)) ||
-      adv.allExpertise.some((e) => e.toLowerCase().includes(q));
+  // Filter advisers by search and department, keeping advisers with handled workload on top
+  const filteredAdvisers = useMemo(() => {
+    return advisers
+      .filter((adv) => {
+        const q = search.toLowerCase();
+        const matchesSearch =
+          !search ||
+          adv.displayName.toLowerCase().includes(q) ||
+          (adv.department && adv.department.toLowerCase().includes(q)) ||
+          adv.allExpertise.some((e) => e.toLowerCase().includes(q));
 
-    const matchesDept =
-      departmentFilter === 'all' ||
-      (adv.department && adv.department.toLowerCase().includes(departmentFilter.toLowerCase()));
+        const matchesDept =
+          departmentFilter === 'all' ||
+          (adv.department && adv.department.toLowerCase().includes(departmentFilter.toLowerCase()));
 
-    return matchesSearch && matchesDept;
-  });
+        return matchesSearch && matchesDept;
+      })
+      .sort((a, b) => (b.activeAdviseeCount || 0) - (a.activeAdviseeCount || 0));
+  }, [advisers, search, departmentFilter]);
 
   return (
     <div className="space-y-6">
@@ -348,7 +371,10 @@ export const AdvisersList = () => {
                   </p>
                 )}
 
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-1.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-[#1c1d28] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#2b2d3f]">
+                    Advisee Workload: <strong className="text-gray-900 dark:text-white">{selectedAdviser.activeAdviseeCount || 0} / {selectedAdviser.maxCapacity || selectedAdviser.maxAdvisees || 5} groups</strong>
+                  </span>
                   <a
                     href={`mailto:${selectedAdviser.email}`}
                     className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"

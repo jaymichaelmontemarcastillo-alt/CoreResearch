@@ -252,7 +252,8 @@ export const FacultyWorkspaceView = () => {
         await researchWorkspaceService.linkDocumentId(workspace.id, documentId);
       }
 
-      const readModeParam = isAdmin ? '&mode=read' : '';
+      const isReviewRole = isAdviser || isPanelist || isAdmin;
+      const readModeParam = isReviewRole ? '&mode=read' : '';
       const targetUrl = chapterId
         ? `${editorUrl}?workspaceId=${workspace.id}&chapterId=${chapterId}${readModeParam}`
         : `${editorUrl}?workspaceId=${workspace.id}${readModeParam}`;

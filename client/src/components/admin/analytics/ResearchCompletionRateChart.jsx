@@ -30,6 +30,7 @@ export const ResearchCompletionRateChart = ({
       loading={loading}
       isEmpty={isEmpty}
       emptyMessage="No research projects initiated yet"
+      className="h-full"
     >
       <div className="flex flex-col md:flex-row items-center justify-around gap-6 w-full h-full py-2">
         {/* Circular Progress Gauge */}

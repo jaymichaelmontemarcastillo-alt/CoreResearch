@@ -8,6 +8,7 @@ import {
   approveRepositoryPublication,
   rejectRepositoryPublication
 } from '../controllers/repositoryController.js';
+import { repositorySmartSearch } from '../controllers/repositorySmartSearchController.js';
 import { verifyToken, requireRole, optionalVerifyToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -34,6 +35,9 @@ const handlePdfUpload = (req, res, next) => {
 
 // Search & Browse Public Research Repository (Public/Authenticated with role-based document access)
 router.get('/', optionalVerifyToken, getRepositoryPublications);
+
+// Smart Search: Semantic relevance ranking for repository publications
+router.post('/smart-search', optionalVerifyToken, repositorySmartSearch);
 
 // Publish approved paper to repository (Admin, Research Coordinator, and Student)
 router.post('/publish', verifyToken, requireRole(['admin', 'research_coordinator', 'student']), handlePdfUpload, publishToRepository);

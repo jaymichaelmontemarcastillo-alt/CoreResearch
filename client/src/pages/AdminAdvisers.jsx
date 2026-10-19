@@ -77,10 +77,11 @@ export const AdminAdvisers = () => {
   const fetchAdvisers = async () => {
     setLoading(true);
     try {
-      const [adviserUsers, facultyUsers, allWorkspaces] = await Promise.all([
+      const [adviserUsers, facultyUsers, allWorkspaces, backendWorkloads] = await Promise.all([
         userService.getUsersByRole('adviser'),
         userService.getUsersByRole('faculty'),
         researchWorkspaceService.getAllWorkspaces().catch(() => []),
+        researchWorkspaceService.getAdviserWorkloads().catch(() => ({})),
       ]);
 
       // Deduplicate by uid
@@ -89,14 +90,20 @@ export const AdminAdvisers = () => {
         if (!map.has(u.uid)) {
           // Count active advisee groups for this adviser
           const activeGroups = allWorkspaces.filter(
-            (ws) => ws.adviserId === u.uid && ws.status !== 'archived'
+            (ws) => (ws.adviserId === u.uid || ws.adviserId === u.id) && ws.status !== 'archived'
           );
+          const activeCount = Math.max(
+            activeGroups.length,
+            backendWorkloads[u.uid] || 0,
+            backendWorkloads[u.id] || 0
+          );
+
           map.set(u.uid, {
             ...u,
-            activeAdviseeCount: activeGroups.length,
+            activeAdviseeCount: activeCount,
             maxAdvisees: u.maxCapacity || u.maxAdvisees || 5,
             maxCapacity: u.maxCapacity || u.maxAdvisees || 5,
-            academicRank: u.academicRank || 'Assistant Professor',
+            academicRank: u.academicRank || '',
             status: u.status || 'active',
             expertise: u.selectedExpertise || u.specialization || u.expertise || [
               'Software Engineering',
@@ -107,6 +114,8 @@ export const AdminAdvisers = () => {
       });
 
       const list = Array.from(map.values());
+      // Sort advisers with active advisee workloads on top
+      list.sort((a, b) => (b.activeAdviseeCount || 0) - (a.activeAdviseeCount || 0));
       setAdvisers(list);
       if (list.length > 0) {
         setBulkCapacity(list[0].maxCapacity || list[0].maxAdvisees || 5);
@@ -120,15 +129,17 @@ export const AdminAdvisers = () => {
   };
 
   const filteredAdvisers = useMemo(() => {
-    return advisers.filter((a) => {
-      const query = search.trim().toLowerCase();
-      const name = (a.fullName || `${a.first_name || ''} ${a.last_name || ''}`).toLowerCase();
-      const email = (a.email || '').toLowerCase();
-      const rank = (a.academicRank || '').toLowerCase();
-      const tags = (a.expertise || []).join(' ').toLowerCase();
+    return advisers
+      .filter((a) => {
+        const query = search.trim().toLowerCase();
+        const name = (a.fullName || `${a.first_name || ''} ${a.last_name || ''}`).toLowerCase();
+        const email = (a.email || '').toLowerCase();
+        const rank = (a.academicRank || '').toLowerCase();
+        const tags = (a.expertise || []).join(' ').toLowerCase();
 
-      return !query || name.includes(query) || email.includes(query) || rank.includes(query) || tags.includes(query);
-    });
+        return !query || name.includes(query) || email.includes(query) || rank.includes(query) || tags.includes(query);
+      })
+      .sort((a, b) => (b.activeAdviseeCount || 0) - (a.activeAdviseeCount || 0));
   }, [advisers, search]);
 
   const handleOpenEdit = async (adviser) => {
@@ -622,6 +633,7 @@ export const AdminAdvisers = () => {
                 const rank = (a.academicRank || '').toLowerCase();
                 return name.includes(q) || rank.includes(q);
               })
+              .sort((a, b) => (b.activeAdviseeCount || 0) - (a.activeAdviseeCount || 0))
               .map((adviser) => {
                 const currentCap = workloadForm[adviser.uid] ?? (adviser.maxCapacity || adviser.maxAdvisees || 5);
                 const activeCount = adviser.activeAdviseeCount || 0;
@@ -637,7 +649,10 @@ export const AdminAdvisers = () => {
                         {adviser.fullName || `${adviser.first_name || ''} ${adviser.last_name || ''}`.trim() || 'Faculty Member'}
                       </div>
                       <div className="text-[11px] text-gray-400 mt-0.5 truncate">
-                        {adviser.academicRank || 'Assistant Professor'} • {adviser.department || 'Computer Studies'}
+                        {adviser.academicRank && adviser.academicRank.toLowerCase().trim() !== 'assistant professor'
+                          ? `${adviser.academicRank} • `
+                          : ''}
+                        {adviser.department || 'Computer Studies'}
                       </div>
                     </div>
 

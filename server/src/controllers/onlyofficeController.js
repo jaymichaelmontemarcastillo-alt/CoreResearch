@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getStorageProvider } from '../services/storage/storageManager.js';
+import { getStorageProvider, getReadProviders } from '../services/storage/storageManager.js';
 import { Document } from '../models/Document.js';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { canAccessProject, isPrivilegedRole } from '../middleware/resourceAuthorization.js';
@@ -44,7 +44,10 @@ export const generateConfig = async (req, res) => {
     const hostHeader = req.get('host') || '';
     const isLocal = hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1');
     const defaultHost = isLocal ? 'http://host.docker.internal:5000' : `${req.protocol}://${hostHeader}`;
-    const backendHost = process.env.BACKEND_PUBLIC_URL || defaultHost;
+    let backendHost = process.env.BACKEND_PUBLIC_URL;
+    if (!backendHost || (!isLocal && backendHost.includes('host.docker.internal'))) {
+      backendHost = defaultHost;
+    }
     const documentKey = `${documentId}-${Date.now()}`;
     await Document.updateOne({ id: documentId }, { $set: { onlyofficeKey: documentKey } });
     const downloadToken = jwt.sign(
@@ -131,8 +134,14 @@ export const downloadDocument = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Document or file not found' });
     }
 
-    const storageProvider = getStorageProvider();
-    const stream = await storageProvider.downloadStream(document.onlyofficeFileKey);
+    const readProviders = getReadProviders();
+    let stream = null;
+    for (const provider of readProviders) {
+      try {
+        stream = await provider.downloadStream(document.onlyofficeFileKey);
+        if (stream) break;
+      } catch (e) {}
+    }
     
     if (!stream) {
       return res.status(404).json({ success: false, message: 'Physical file not found in storage' });

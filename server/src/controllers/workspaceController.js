@@ -592,3 +592,53 @@ export const restartWorkspace = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * Get active advisee workload counts for all advisers
+ * Accessible to authenticated users (students, faculty, admin)
+ */
+export const getAdviserWorkloads = async (req, res) => {
+  try {
+    const workloads = {};
+
+    if (isDevMockMode) {
+      const map = mockFirestoreDb.get('manuscript_workspaces') || new Map();
+      for (const ws of map.values()) {
+        if (ws.adviserId && ws.status !== 'archived') {
+          workloads[ws.adviserId] = (workloads[ws.adviserId] || 0) + 1;
+        }
+      }
+    } else if (db) {
+      // 1. Check manuscript_workspaces
+      const wsSnap = await db.collection('manuscript_workspaces').get();
+      wsSnap.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.adviserId && data.status !== 'archived') {
+          workloads[data.adviserId] = (workloads[data.adviserId] || 0) + 1;
+        }
+      });
+
+      // 2. Check research_groups to account for active assigned groups
+      const groupSnap = await db.collection('research_groups').get();
+      const groupsPerAdv = {};
+      groupSnap.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.adviserId && !data.isArchived && data.adviserId !== 'undefined') {
+          groupsPerAdv[data.adviserId] = (groupsPerAdv[data.adviserId] || 0) + 1;
+        }
+      });
+
+      for (const [advId, count] of Object.entries(groupsPerAdv)) {
+        if (!workloads[advId] || count > workloads[advId]) {
+          workloads[advId] = count;
+        }
+      }
+    }
+
+    return res.status(200).json({ success: true, data: workloads });
+  } catch (error) {
+    console.error('[workspaceController] getAdviserWorkloads error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
