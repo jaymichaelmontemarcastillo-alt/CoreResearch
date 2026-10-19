@@ -222,14 +222,17 @@ export const getRepositoryPublications = async (req, res) => {
     }
 
     let list = [];
+    let mongoSuccess = false;
     try {
       list = await RepositoryPublication.find(filter).sort({ publishedAt: -1 }).lean();
+      mongoSuccess = true;
     } catch (mongoErr) {
       console.warn('[RepositoryController] MongoDB query failed, falling back to Firestore:', mongoErr.message);
     }
 
-    // Fallback to Firestore repository_publications if MongoDB returned 0 records
-    if (!list || list.length === 0) {
+    // Fallback to Firestore repository_publications only if MongoDB query actually failed
+    if (!mongoSuccess && (!list || list.length === 0)) {
+
       try {
         if (!isDevMockMode && db) {
           const snapshot = await db.collection('repository_publications').get();

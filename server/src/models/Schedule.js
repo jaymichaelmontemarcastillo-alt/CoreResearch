@@ -30,4 +30,11 @@ const ScheduleSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
+ScheduleSchema.index({ status: 1 });
+ScheduleSchema.index({ date: 1 });
+ScheduleSchema.index({ memberIds: 1 });
+ScheduleSchema.index({ 'panelists.id': 1 });
+ScheduleSchema.index({ 'panelists.email': 1 });
+
 export const Schedule = mongoose.model('Schedule', ScheduleSchema);
+

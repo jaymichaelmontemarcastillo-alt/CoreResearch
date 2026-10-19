@@ -612,7 +612,10 @@ export const AdviserAdvisees = () => {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => navigate(`/faculty/workspace/${group.id}`)}
+                            onClick={() => {
+                              const targetWsId = workspaceMap[group.id]?.id || group.workspaceId || group.id;
+                              navigate(`/faculty/workspace/${targetWsId}`);
+                            }}
                             title="Open collaborative workspace and drafts"
                             className="w-full justify-center"
                           >

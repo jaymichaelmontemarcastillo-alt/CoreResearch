@@ -11,6 +11,8 @@ import {
 import { auth, db } from '../firebase/firebase';
 import { UserProfile, CreateUserInput, UpdateUserInput, UserRole } from '../types/user.types';
 import api from './api';
+import { dataCache } from './dataCache';
+
 
 const COLLECTION_NAME = 'users';
 
@@ -111,8 +113,11 @@ export const userService = {
       updated_at: cleanInput.updated_at || now,
     });
     await setDoc(userRef, stripUndefined(newUser), { merge: true });
+    dataCache.invalidatePattern('user');
+    dataCache.invalidatePattern('adviser');
     return newUser;
   },
+
 
   /**
    * Fetch a single user profile document by UID.
@@ -384,7 +389,10 @@ export const userService = {
 
     const isSelfProfileUpdate = auth.currentUser?.uid === uid && !('role' in cleanUpdates);
     await api.patch(isSelfProfileUpdate ? '/users/me' : `/users/${uid}`, cleanUpdates);
+    dataCache.invalidatePattern('user');
+    dataCache.invalidatePattern('adviser');
   },
+
 
   /**
    * Check if a student ID number is already registered.
@@ -604,6 +612,8 @@ export const userService = {
     } catch (fsErr: any) {
       console.warn('[userService] approveUser direct Firestore write warning:', fsErr?.message);
     }
+    dataCache.invalidatePattern('user');
+    dataCache.invalidatePattern('adviser');
   },
 
   async rejectUser(uid: string, adminUid: string, reason?: string): Promise<void> {
@@ -627,6 +637,8 @@ export const userService = {
     } catch (fsErr: any) {
       console.warn('[userService] rejectUser direct Firestore write warning:', fsErr?.message);
     }
+    dataCache.invalidatePattern('user');
+    dataCache.invalidatePattern('adviser');
   },
 
 
@@ -637,7 +649,10 @@ export const userService = {
       ? `/users/${uid || 'by-email'}?email=${encodeURIComponent(email)}`
       : `/users/${uid}`;
     await api.delete(url);
+    dataCache.invalidatePattern('user');
+    dataCache.invalidatePattern('adviser');
   },
+
 };
 
 export default userService;

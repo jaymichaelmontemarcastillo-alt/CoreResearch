@@ -1,4 +1,5 @@
 import api from './api';
+import { dataCache } from './dataCache';
 import {
   DefenseSchedule,
   CreateScheduleInput,
@@ -21,6 +22,9 @@ export const scheduleService = {
     if (!createdData || typeof createdData.id !== 'string') {
       throw new Error('The schedules API returned an invalid created schedule.');
     }
+
+    dataCache.invalidatePattern('schedule');
+    dataCache.invalidatePattern('defense');
 
     const scheduleData: DefenseSchedule = {
       id: createdData.id,
@@ -121,6 +125,8 @@ export const scheduleService = {
    */
   async updateScheduleStatus(id: string, status: ScheduleStatus): Promise<void> {
     await api.patch(`/schedules/${id}/status`, { status });
+    dataCache.invalidatePattern('schedule');
+    dataCache.invalidatePattern('defense');
   },
 
   /**
@@ -128,6 +134,8 @@ export const scheduleService = {
    */
   async deleteSchedule(id: string): Promise<void> {
     await api.delete(`/schedules/${id}`);
+    dataCache.invalidatePattern('schedule');
+    dataCache.invalidatePattern('defense');
   },
 
   /**
@@ -153,6 +161,8 @@ export const scheduleService = {
     if (!response.data?.success || !Array.isArray(response.data.data)) {
       throw new Error('The schedules API returned an invalid bulk-create response.');
     }
+    dataCache.invalidatePattern('schedule');
+    dataCache.invalidatePattern('defense');
     return response.data;
   }
 };

@@ -132,14 +132,58 @@ export const FacultyWorkspaceView = () => {
           throw new Error('Workspace ID is missing.');
         }
 
-        let targetWorkspace = await researchWorkspaceService.getWorkspaceById(workspaceId);
-        
-        // If not found by ID, it might be a Group ID passed from the Adviser list
+        let targetWorkspace = null;
+
+        // 1. Try direct fetch by ID (checks if workspaceId is an active workspace document ID)
+        try {
+          const direct = await researchWorkspaceService.getWorkspaceById(workspaceId);
+          if (direct && direct.status !== 'archived' && !direct.isArchived) {
+            targetWorkspace = direct;
+          }
+        } catch (e) {
+          console.warn('[FacultyWorkspaceView] Direct getWorkspaceById lookup fallback:', e);
+        }
+
+        // 2. If not found or if a Group ID was passed, query adviser's own workspaces (passes Firestore rules 100%)
+        if (!targetWorkspace && currentUser?.uid) {
+          try {
+            const adviserWorkspaces = await researchWorkspaceService.getWorkspacesByAdviser(currentUser.uid);
+            targetWorkspace = adviserWorkspaces.find(
+              (w) => (w.id === workspaceId || w.groupId === workspaceId) && w.status !== 'archived' && !w.isArchived
+            ) || null;
+          } catch (e) {
+            console.warn('[FacultyWorkspaceView] getWorkspacesByAdviser lookup fallback:', e);
+          }
+        }
+
+        // 3. Check group doc directly for linked workspaceId
         if (!targetWorkspace) {
-          targetWorkspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', workspaceId);
+          try {
+            const grp = await groupService.getGroupById(workspaceId);
+            if (grp?.workspaceId) {
+              const linkedWs = await researchWorkspaceService.getWorkspaceById(grp.workspaceId);
+              if (linkedWs && linkedWs.status !== 'archived' && !linkedWs.isArchived) {
+                targetWorkspace = linkedWs;
+              }
+            }
+          } catch (e) {
+            console.warn('[FacultyWorkspaceView] Group linked workspaceId lookup fallback:', e);
+          }
+        }
+
+        // 4. Fallback lookup by student or group with safe catch
+        if (!targetWorkspace) {
+          try {
+            targetWorkspace = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', workspaceId);
+          } catch (e) {
+            console.warn('[FacultyWorkspaceView] getWorkspaceByStudentOrGroup lookup fallback:', e);
+          }
         }
         
         if (targetWorkspace) {
+          if (workspaceId !== targetWorkspace.id) {
+            navigate(`/faculty/workspace/${targetWorkspace.id}`, { replace: true });
+          }
           setWorkspace(targetWorkspace);
 
           unsubscribeWs = researchWorkspaceService.subscribeWorkspace(

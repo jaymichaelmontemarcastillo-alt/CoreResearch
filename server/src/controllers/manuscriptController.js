@@ -900,22 +900,34 @@ export const adminUpdateManuscript = async (req, res) => {
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
       const doc = await ref.get();
+      let targetRef = ref;
+      let targetDoc = doc;
+
       if (!doc.exists) {
-        // Fallback to mock map
-        const map = mockFirestoreDb.get('manuscripts');
-        const item = map?.get(id);
-        if (item) {
-          updated = { ...item, ...updates, updatedAt: new Date().toISOString() };
-          map.set(id, updated);
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (wsDoc.exists) {
+          targetRef = wsRef;
+          targetDoc = wsDoc;
         } else {
-          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+          // Fallback to mock map
+          const map = mockFirestoreDb.get('manuscripts');
+          const item = map?.get(id);
+          if (item) {
+            updated = { ...item, ...updates, updatedAt: new Date().toISOString() };
+            map.set(id, updated);
+          } else {
+            return res.status(404).json({ success: false, error: 'Manuscript not found' });
+          }
         }
-      } else {
-        await ref.update({
+      }
+
+      if (targetRef && targetDoc.exists) {
+        await targetRef.update({
           ...updates,
           updatedAt: new Date().toISOString()
         });
-        const refreshed = await ref.get();
+        const refreshed = await targetRef.get();
         updated = { id: refreshed.id, ...refreshed.data() };
       }
     }
@@ -940,12 +952,21 @@ export const updateManuscriptGrade = async (req, res) => {
     const { score, letter, remarks, criteria } = req.body;
     seedMockManuscriptsIfEmpty();
     let existing = null;
+    let targetColl = 'manuscript_versions';
 
     if (isDevMockMode) {
       existing = mockFirestoreDb.get('manuscripts').get(id) || null;
     } else {
       const snapshot = await db.collection('manuscript_versions').doc(id).get();
-      existing = snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+      if (snapshot.exists) {
+        existing = { id: snapshot.id, ...snapshot.data() };
+      } else {
+        const wsSnap = await db.collection('manuscript_workspaces').doc(id).get();
+        if (wsSnap.exists) {
+          existing = { id: wsSnap.id, ...wsSnap.data() };
+          targetColl = 'manuscript_workspaces';
+        }
+      }
     }
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Manuscript not found' });
@@ -986,7 +1007,7 @@ export const updateManuscriptGrade = async (req, res) => {
       map.set(id, item);
       updated = item;
     } else {
-      const ref = db.collection('manuscript_versions').doc(id);
+      const ref = db.collection(targetColl).doc(id);
       await ref.update({
         grade: gradeObj,
         updatedAt: new Date().toISOString()
@@ -1031,14 +1052,27 @@ export const toggleArchiveManuscript = async (req, res) => {
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
       const doc = await ref.get();
-      const current = doc.data() || {};
+      let targetRef = ref;
+      let targetDoc = doc;
+
+      if (!doc.exists) {
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (!wsDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+        targetRef = wsRef;
+        targetDoc = wsDoc;
+      }
+
+      const current = targetDoc.data() || {};
       const nextArchive = isArchived !== undefined ? Boolean(isArchived) : !current.isArchived;
       const patch = {
         isArchived: nextArchive,
         updatedAt: new Date().toISOString()
       };
-      await ref.update(patch);
-      const refreshed = await ref.get();
+      await targetRef.update(patch);
+      const refreshed = await targetRef.get();
       updated = { id: refreshed.id, ...refreshed.data() };
     }
 
@@ -1079,17 +1113,31 @@ export const toggleBestThesis = async (req, res) => {
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
       const doc = await ref.get();
-      const current = doc.data() || {};
+      let targetRef = ref;
+      let targetDoc = doc;
+
+      if (!doc.exists) {
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (!wsDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+        targetRef = wsRef;
+        targetDoc = wsDoc;
+      }
+
+      const current = targetDoc.data() || {};
       const nextBest = isBestThesis !== undefined ? Boolean(isBestThesis) : !current.isBestThesis;
       const patch = {
         isBestThesis: nextBest,
         bestThesisNotes: nextBest ? (notes || current.bestThesisNotes || 'Nominated and selected as Best Thesis.') : '',
         updatedAt: new Date().toISOString()
       };
-      await ref.update(patch);
-      const refreshed = await ref.get();
+      await targetRef.update(patch);
+      const refreshed = await targetRef.get();
       updated = { id: refreshed.id, ...refreshed.data() };
     }
+
 
     return res.status(200).json({
       success: true,

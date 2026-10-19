@@ -294,31 +294,56 @@ export const getSchedules = async (req, res) => {
       mongoDocs = await MongoSchedule.find({ status: { $ne: 'deleted' } }).lean();
     }
 
-    // Load research groups from Mongo and Firestore to enrich schedules with course, specialization, and student members
+    // Load referenced research groups from Mongo and Firestore to enrich schedules with course, specialization, and student members
     const groupMap = new Map();
-    try {
-      const groups = await mongoose.connection.collection('researchgroups').find({}).toArray();
-      groups.forEach(g => {
-        if (g.id) groupMap.set(g.id, g);
-        if (g._id) groupMap.set(g._id.toString(), g);
-      });
-    } catch (gErr) {
-      console.warn('[ScheduleController] Failed to load mongo groups:', gErr.message);
-    }
+    const referencedGroupIds = new Set();
+    mongoDocs.forEach(doc => {
+      if (doc.groupId) referencedGroupIds.add(String(doc.groupId));
+      if (doc.projectId) referencedGroupIds.add(String(doc.projectId));
+    });
 
-    if (db) {
+    if (referencedGroupIds.size > 0) {
+      const idArray = Array.from(referencedGroupIds);
       try {
-        const fgSnap = await db.collection('research_groups').get();
-        fgSnap.forEach(doc => {
-          const data = doc.data();
-          if (!groupMap.has(doc.id)) {
-            groupMap.set(doc.id, { id: doc.id, ...data });
-          }
+        const objectIds = idArray
+          .filter(id => mongoose.Types.ObjectId.isValid(id))
+          .map(id => new mongoose.Types.ObjectId(id));
+
+        const groups = await mongoose.connection.collection('researchgroups').find({
+          $or: [
+            { id: { $in: idArray } },
+            { _id: { $in: objectIds } }
+          ]
+        }).toArray();
+
+        groups.forEach(g => {
+          if (g.id) groupMap.set(String(g.id), g);
+          if (g._id) groupMap.set(g._id.toString(), g);
         });
-      } catch (fErr) {
-        console.warn('[ScheduleController] Firestore groups lookup warn:', fErr.message);
+      } catch (gErr) {
+        console.warn('[ScheduleController] Failed to load referenced mongo groups:', gErr.message);
+      }
+
+      // Only check Firestore for group IDs that were not found in MongoDB
+      if (db) {
+        const missingGroupIds = idArray.filter(id => !groupMap.has(id));
+        if (missingGroupIds.length > 0) {
+          try {
+            await Promise.all(
+              missingGroupIds.map(async (gid) => {
+                const docSnap = await db.collection('research_groups').doc(gid).get();
+                if (docSnap.exists) {
+                  groupMap.set(gid, { id: docSnap.id, ...docSnap.data() });
+                }
+              })
+            );
+          } catch (fErr) {
+            console.warn('[ScheduleController] Firestore groups lookup warn:', fErr.message);
+          }
+        }
       }
     }
+
 
     const specDisplayNames = {
       'IS': 'Intelligent Systems',

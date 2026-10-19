@@ -230,7 +230,7 @@ export const AdviserDashboardView = () => {
         return {
           ...grp,
           title: resolvedTitle,
-          workspaceId: ws?.id || grp.id,
+          workspaceId: ws?.id || grp.workspaceId || grp.id,
           status: ws?.status && ws.status !== 'not_started' ? ws.status : grp.status,
         };
       });
@@ -573,7 +573,7 @@ export const AdviserDashboardView = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() =>
-                        navigate(`/faculty/workspace/${item.groupId || item.workspaceId}`)
+                        navigate(`/faculty/workspace/${item.workspaceId || item.groupId}`)
                       }
                       className="shrink-0 text-[11px] py-1.5 flex items-center gap-1 self-start"
                     >
@@ -831,7 +831,7 @@ export const AdviserDashboardView = () => {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => navigate(`/faculty/workspace/${group.id}`)}
+                            onClick={() => navigate(`/faculty/workspace/${group.workspaceId || group.id}`)}
                             className="text-xs py-1 px-2.5 h-auto"
                           >
                             Workspace

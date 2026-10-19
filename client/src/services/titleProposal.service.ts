@@ -13,7 +13,11 @@ import {
   where,
   onSnapshot,
 } from 'firebase/firestore';
+
 import { db } from '../firebase/firebase';
+import { dataCache } from './dataCache';
+
+
 import {
   TitleProposal,
   CreateProposalInput,
@@ -90,8 +94,12 @@ export const titleProposalService = {
     };
 
     await setDoc(ref, stripUndefined(newProposal) as TitleProposal);
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
     return newProposal;
   },
+
 
   // ── Read ────────────────────────────────────────────────────────────────────
 
@@ -324,6 +332,7 @@ export const titleProposalService = {
       ...updates,
       updatedAt: new Date().toISOString(),
     }));
+    dataCache.invalidatePattern('proposal');
   },
 
   /**
@@ -347,6 +356,9 @@ export const titleProposalService = {
       lastSubmittedAt: now,
       updatedAt: now,
     }));
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
 
   /**
@@ -378,6 +390,9 @@ export const titleProposalService = {
       coordinatorFeedback: '',
       reviewedAt: null,
     }));
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
 
   /**
@@ -389,6 +404,9 @@ export const titleProposalService = {
       ...updates,
       updatedAt: new Date().toISOString(),
     }));
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
 
   // ── Coordinator Actions ─────────────────────────────────────────────────────
@@ -408,6 +426,9 @@ export const titleProposalService = {
       reviewedAt: now,
       updatedAt: now,
     }));
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
 
   /**
@@ -427,6 +448,9 @@ export const titleProposalService = {
       approvedAt: now,
       updatedAt: now,
     }));
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
 
   /**
@@ -443,6 +467,9 @@ export const titleProposalService = {
       reviewedAt: now,
       updatedAt: now,
     }));
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
 
   // ── Delete ──────────────────────────────────────────────────────────────────
@@ -453,7 +480,11 @@ export const titleProposalService = {
   async deleteProposal(id: string): Promise<void> {
     const ref = doc(db, COLLECTION, id);
     await deleteDoc(ref);
+    dataCache.invalidatePattern('proposal');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
   },
+
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 

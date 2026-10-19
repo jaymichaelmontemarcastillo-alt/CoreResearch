@@ -195,7 +195,7 @@ export const PanelistDefendees = () => {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => navigate(`/faculty/workspace/${group.id}`)}
+                            onClick={() => navigate(`/faculty/workspace/${group.workspaceId || group.id}`)}
                           >
                             Workspace <HiArrowRight className="w-3 h-3 ml-1" />
                           </Button>

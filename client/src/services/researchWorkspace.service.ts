@@ -27,6 +27,8 @@ import progressService from './progress.service';
 import { systemActivityService } from './systemActivity.service';
 import { researchFeedbackService } from './researchFeedback.service';
 import { notificationService } from './notification.service';
+import { dataCache } from './dataCache';
+
 
 const COLLECTION_NAME = 'manuscript_workspaces';
 
@@ -281,7 +283,13 @@ export const researchWorkspaceService = {
         window.dispatchEvent(new CustomEvent('workspace-status-changed', { detail: { hasWorkspace: false } }));
       }
 
+      dataCache.invalidatePattern('workspace');
+      dataCache.invalidatePattern('group');
+      dataCache.invalidatePattern('proposal');
+      dataCache.invalidatePattern('schedule');
+
       return backendData || {
+
         success: true,
         message: 'Research progress archived successfully. Group members and accounts are preserved.',
         workspaceId,
@@ -298,40 +306,54 @@ export const researchWorkspaceService = {
    */
   async getOrCreateWorkspaceForAdviserRequest(
     request: AdviserRequest,
-    userProfile: UserProfile
+    userProfile?: any
   ): Promise<ManuscriptWorkspace> {
+    // Check if an active workspace already exists for this group
+    if (request.groupId) {
+      const groupWs = await this.getWorkspaceByStudentOrGroup('', request.groupId);
+      if (groupWs && isActiveWorkspace(groupWs)) {
+        return groupWs;
+      }
+    }
+
     const workspaceId = `ws-${request.id}`;
     const docRef = doc(db, COLLECTION_NAME, workspaceId);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const existing = docSnap.data() as ManuscriptWorkspace;
-      if (request.groupId && (!existing.memberIds || !existing.memberIds.includes(userProfile?.uid))) {
-        try {
-          const groupSnap = await getDoc(doc(db, 'research_groups', request.groupId));
-          if (groupSnap.exists()) {
-            const gData = groupSnap.data();
-            const mergedIds = Array.from(new Set([...(existing.memberIds || [existing.studentId]), ...(gData.memberIds || [])]));
-            await updateDoc(docRef, {
-              memberIds: mergedIds,
-              members: gData.members || existing.members || [],
-              updatedAt: new Date().toISOString()
-            });
-            existing.memberIds = mergedIds;
-            existing.members = gData.members || existing.members || [];
+      if (isActiveWorkspace(existing)) {
+        if (request.groupId && userProfile?.uid && (!existing.memberIds || !existing.memberIds.includes(userProfile.uid))) {
+          try {
+            const groupSnap = await getDoc(doc(db, 'research_groups', request.groupId));
+            if (groupSnap.exists()) {
+              const gData = groupSnap.data();
+              const mergedIds = Array.from(new Set([...(existing.memberIds || [existing.studentId]), ...(gData.memberIds || [])]));
+              await updateDoc(docRef, {
+                memberIds: mergedIds,
+                members: gData.members || existing.members || [],
+                updatedAt: new Date().toISOString()
+              });
+              existing.memberIds = mergedIds;
+              existing.members = gData.members || existing.members || [];
+            }
+          } catch (e) {
+            console.warn('[researchWorkspaceService] Member sync error on existing workspace:', e);
           }
-        } catch (e) {
-          console.warn('[researchWorkspaceService] Member sync error on existing workspace:', e);
         }
+        return existing;
       }
-      return existing;
     }
 
-    let memberIds = [request.studentId || userProfile.uid];
+    const safeUid = request.studentId || userProfile?.uid || auth.currentUser?.uid || '';
+    const safeName = request.studentName || userProfile?.fullName || auth.currentUser?.displayName || 'Student Researcher';
+    const safeEmail = userProfile?.email || auth.currentUser?.email || '';
+
+    let memberIds = [safeUid];
     let members: any[] = [{
-      uid: request.studentId || userProfile.uid,
-      fullName: request.studentName || userProfile.fullName || 'Student Researcher',
-      email: userProfile.email || '',
+      uid: safeUid,
+      fullName: safeName,
+      email: safeEmail,
     }];
 
     if (request.groupId) {
@@ -366,16 +388,16 @@ export const researchWorkspaceService = {
       id: workspaceId,
       proposalId: request.id, // Keeping proposalId field but pointing to request ID for backward compatibility
       title: request.researchTitle || 'Research Manuscript',
-      studentId: request.studentId || userProfile.uid,
-      studentName: request.studentName || userProfile.fullName || 'Student Researcher',
+      studentId: safeUid,
+      studentName: safeName,
       groupId: request.groupId || '',
       groupName: request.groupName || 'Research Group',
-      courseId: request.courseId || userProfile.courseId || '',
-      memberIds,
+      courseId: request.courseId || userProfile?.courseId || '',
+      memberIds: Array.from(new Set(memberIds.filter(Boolean))),
       members,
       adviserId: request.adviserId || '',
       adviserName: request.adviserName || 'Assigned Adviser',
-      department: userProfile.department || 'Computer Studies',
+      department: userProfile?.department || 'Computer Studies',
       academicYear,
       semester,
       status: 'in_progress',
@@ -627,7 +649,7 @@ export const researchWorkspaceService = {
 
     // A workspace can ONLY be created if the group has finished the matching process:
     // They must have an assigned/accepted adviser AND an accepted title!
-    if (group.status === 'forming' || !resolvedAdviserId || !resolvedTitle) {
+    if (!resolvedAdviserId || !resolvedTitle) {
       throw new Error('Research workspace cannot be created until the group finishes adviser matching.');
     }
 
@@ -1477,6 +1499,8 @@ export const researchWorkspaceService = {
       adviserName,
       updatedAt: new Date().toISOString(),
     });
+    dataCache.invalidatePattern('workspace');
+    dataCache.invalidatePattern('group');
   },
 
   /**
@@ -1508,7 +1532,10 @@ export const researchWorkspaceService = {
     // 3. Delete workspace document
     const docRef = doc(db, COLLECTION_NAME, workspaceId);
     await deleteDoc(docRef);
+    dataCache.invalidatePattern('workspace');
+    dataCache.invalidatePattern('group');
   },
+
 };
 
 export default researchWorkspaceService;

@@ -22,6 +22,7 @@ const COLLECTION_NAME = 'manuscript_versions';
 
 import api from './api';
 import { notificationService } from './notification.service';
+import { dataCache } from './dataCache';
 
 export const manuscriptService = {
   /**
@@ -258,16 +259,31 @@ export const manuscriptService = {
     try {
       const res = await api.patch(`/manuscripts/${id}/admin-update`, updates);
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
+        dataCache.invalidatePattern('workspace');
         return res.data.data;
       }
     } catch (err) {
       console.warn('[manuscriptService] adminUpdateManuscript API fallback:', err);
     }
 
-    const docRef = doc(db, COLLECTION_NAME, id);
+    let targetColl = COLLECTION_NAME;
+    let docRef = doc(db, targetColl, id);
+    let snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      targetColl = 'manuscript_workspaces';
+      docRef = doc(db, targetColl, id);
+      snap = await getDoc(docRef);
+    }
+    if (!snap.exists()) {
+      throw new Error(`Manuscript ${id} not found in versions or workspaces.`);
+    }
+
     await updateDoc(docRef, { ...updates, updatedAt: new Date().toISOString() });
-    const snap = await getDoc(docRef);
-    return snap.data() as ManuscriptVersion;
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
+    const refreshed = await getDoc(docRef);
+    return refreshed.data() as ManuscriptVersion;
   },
 
   /**
@@ -280,16 +296,31 @@ export const manuscriptService = {
     try {
       const res = await api.patch(`/manuscripts/${id}/grade`, gradeData);
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
+        dataCache.invalidatePattern('workspace');
         return res.data.data;
       }
     } catch (err) {
       console.warn('[manuscriptService] updateManuscriptGrade API fallback:', err);
     }
 
-    const docRef = doc(db, COLLECTION_NAME, id);
+    let targetColl = COLLECTION_NAME;
+    let docRef = doc(db, targetColl, id);
+    let snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      targetColl = 'manuscript_workspaces';
+      docRef = doc(db, targetColl, id);
+      snap = await getDoc(docRef);
+    }
+    if (!snap.exists()) {
+      throw new Error(`Manuscript ${id} not found in versions or workspaces.`);
+    }
+
     await updateDoc(docRef, { grade: gradeData, updatedAt: new Date().toISOString() });
-    const snap = await getDoc(docRef);
-    return snap.data() as ManuscriptVersion;
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
+    const refreshed = await getDoc(docRef);
+    return refreshed.data() as ManuscriptVersion;
   },
 
   /**
@@ -300,6 +331,8 @@ export const manuscriptService = {
     try {
       const res = await api.patch(`/manuscripts/${id}/archive`, { isArchived });
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
+        dataCache.invalidatePattern('workspace');
         return res.data.data;
       }
     } catch (err) {
@@ -315,19 +348,23 @@ export const manuscriptService = {
       snap = await getDoc(docRef);
     }
 
-    const current = snap.exists() ? (snap.data() as ManuscriptVersion) : null;
-    const nextArchive = isArchived !== undefined ? isArchived : !current?.isArchived;
-    
-    if (snap.exists()) {
-      await updateDoc(docRef, {
-        isArchived: nextArchive,
-        updatedAt: new Date().toISOString()
-      });
-      const refreshed = await getDoc(docRef);
-      return refreshed.data() as ManuscriptVersion;
+    if (!snap.exists()) {
+      throw new Error(`Manuscript ${id} not found in versions or workspaces.`);
     }
-    return { id, isArchived: nextArchive } as ManuscriptVersion;
+
+    const current = snap.data() as ManuscriptVersion;
+    const nextArchive = isArchived !== undefined ? isArchived : !current?.isArchived;
+
+    await updateDoc(docRef, {
+      isArchived: nextArchive,
+      updatedAt: new Date().toISOString()
+    });
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
+    const refreshed = await getDoc(docRef);
+    return refreshed.data() as ManuscriptVersion;
   },
+
 
   /**
    * Bulk archive or restore multiple manuscripts
@@ -481,19 +518,24 @@ export const manuscriptService = {
       snap = await getDoc(docRef);
     }
 
-    const current = snap.exists() ? (snap.data() as ManuscriptVersion) : null;
-    const nextBest = isBestThesis !== undefined ? isBestThesis : !current?.isBestThesis;
-    if (snap.exists()) {
-      await updateDoc(docRef, {
-        isBestThesis: nextBest,
-        bestThesisNotes: nextBest ? (notes || current?.bestThesisNotes || 'Selected as Best Thesis.') : '',
-        updatedAt: new Date().toISOString()
-      });
-      const refreshed = await getDoc(docRef);
-      return refreshed.data() as ManuscriptVersion;
+    if (!snap.exists()) {
+      throw new Error(`Manuscript ${id} not found in versions or workspaces.`);
     }
-    return { id, isBestThesis: nextBest } as ManuscriptVersion;
+
+    const current = snap.data() as ManuscriptVersion;
+    const nextBest = isBestThesis !== undefined ? isBestThesis : !current?.isBestThesis;
+
+    await updateDoc(docRef, {
+      isBestThesis: nextBest,
+      bestThesisNotes: nextBest ? (notes || current?.bestThesisNotes || 'Selected as Best Thesis.') : '',
+      updatedAt: new Date().toISOString()
+    });
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
+    const refreshed = await getDoc(docRef);
+    return refreshed.data() as ManuscriptVersion;
   },
+
 
   /**
    * Add comments / feedback to a manuscript

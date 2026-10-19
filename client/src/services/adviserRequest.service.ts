@@ -13,6 +13,8 @@ import {
 import { db } from '../firebase/firebase';
 import api from './api';
 import notificationService from './notification.service';
+import { dataCache } from './dataCache';
+
 
 export type AdviserRequestStatus = 'pending' | 'accepted' | 'declined';
 
@@ -67,6 +69,11 @@ class AdviserRequestService {
         console.warn('[adviserRequestService] Request saved, but adviser notification failed:', error);
       });
     }
+
+    dataCache.invalidatePattern('adviser_request');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
+    this.inflightRequests.clear();
 
     return request;
   }
@@ -176,6 +183,11 @@ class AdviserRequestService {
       updatedAt: new Date().toISOString()
     });
 
+    dataCache.invalidatePattern('adviser_request');
+    dataCache.invalidatePattern('group');
+    dataCache.invalidatePattern('workspace');
+    this.inflightRequests.clear();
+
     if (requestData) {
       // Update the actual research group to assign the adviser
       if (requestData.groupId && requestData.adviserId) {
@@ -187,6 +199,14 @@ class AdviserRequestService {
             requestData.adviserName,
             requestId
           );
+          // Also idempotently trigger workspace creation so it's ready immediately
+          const { researchWorkspaceService } = await import('./researchWorkspace.service');
+          await researchWorkspaceService.getOrCreateWorkspaceForAdviserRequest(requestData, {
+            uid: requestData.studentId,
+            fullName: requestData.studentName,
+          }).catch((wsErr) => {
+            console.warn('[adviserRequestService] Auto workspace creation warning:', wsErr);
+          });
         } catch (error) {
           console.error('Error updating group adviser:', error);
         }
@@ -214,6 +234,10 @@ class AdviserRequestService {
       updatedAt: new Date().toISOString()
     });
 
+    dataCache.invalidatePattern('adviser_request');
+    dataCache.invalidatePattern('group');
+    this.inflightRequests.clear();
+
     if (requestData) {
       await notificationService.createNotification({
         userId: requestData.studentId,
@@ -230,7 +254,11 @@ class AdviserRequestService {
   async deleteRequest(requestId: string): Promise<void> {
     const ref = doc(db, COLLECTION, requestId);
     await deleteDoc(ref);
+    dataCache.invalidatePattern('adviser_request');
+    dataCache.invalidatePattern('group');
+    this.inflightRequests.clear();
   }
+
 
   /**
    * Archive or Unarchive a request

@@ -14,9 +14,17 @@ import {
 import { db, auth } from '../firebase/firebase';
 import { ResearchGroup, CreateResearchGroupInput, GroupInvitation } from '../types/group.types';
 import { notificationService } from './notification.service';
+import { dataCache } from './dataCache';
 
 const COLLECTION_NAME = 'research_groups';
 const INVITATIONS_COLLECTION = 'group_invitations';
+
+const invalidateGroupCaches = () => {
+  dataCache.invalidatePattern('group');
+  dataCache.invalidatePattern('workspace');
+  dataCache.invalidatePattern('adviser_');
+  dataCache.invalidatePattern('schedules_');
+};
 
 export const groupService = {
   /**
@@ -79,6 +87,8 @@ export const groupService = {
       });
     }
 
+    invalidateGroupCaches();
+
     return newGroup;
   },
 
@@ -139,6 +149,8 @@ export const groupService = {
     // Automatically assign group project, title, adviser & workspace to the new member
     await this.syncMemberToGroupProject(groupId, newMember.uid, newMember);
 
+    invalidateGroupCaches();
+
     return {
       ...group,
       members: updatedMembers,
@@ -170,6 +182,8 @@ export const groupService = {
 
     // Unlink member from the group's research project and workspace
     await this.unlinkMemberFromGroupProject(groupId, memberUid);
+
+    invalidateGroupCaches();
 
     return {
       ...group,
@@ -251,6 +265,16 @@ export const groupService = {
             group.title = activeProp.title;
           }
         }
+        if (!group.title) {
+          const reqQuery = query(collection(db, 'adviser_requests'), where('groupId', '==', group.id));
+          const reqSnap = await getDocs(reqQuery);
+          const acceptedReq = reqSnap.docs
+            .map((d) => d.data())
+            .find((r) => r.status === 'accepted' && !r.isArchived);
+          if (acceptedReq?.researchTitle) {
+            group.title = acceptedReq.researchTitle;
+          }
+        }
       } catch (e) {}
     }
 
@@ -289,6 +313,7 @@ export const groupService = {
       updates.lastAcceptedAdviserRequestId = adviserRequestId;
     }
     await updateDoc(ref, updates);
+    invalidateGroupCaches();
   },
 
   /**
@@ -368,6 +393,7 @@ export const groupService = {
     }
     
     await updateDoc(ref, updateData);
+    invalidateGroupCaches();
 
     // If members were updated, auto-sync each member to the group project
     if (data.members !== undefined && Array.isArray(data.members)) {
@@ -714,6 +740,7 @@ export const groupService = {
     }
     const ref = doc(db, COLLECTION_NAME, groupId);
     await deleteDoc(ref);
+    invalidateGroupCaches();
   },
 
   /**
@@ -812,6 +839,8 @@ export const groupService = {
       console.warn('[groupService] Error logging archive activity:', actErr);
     }
 
+    invalidateGroupCaches();
+
     return { ...group, ...updates } as ResearchGroup;
   },
 
@@ -879,6 +908,8 @@ export const groupService = {
         targetType: 'group',
       });
     } catch (actErr) {}
+
+    invalidateGroupCaches();
 
     return { ...group, ...updates } as ResearchGroup;
   },

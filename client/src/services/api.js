@@ -24,11 +24,11 @@ api.interceptors.request.use(
         }
       }
 
-      // 2. Fallback to Firebase Auth Token if not in dev mode
+      // 2. Fallback to Firebase Auth Token if not in dev mode (use cached token, 0ms)
       if (!usingDevToken) {
         const currentUser = auth.currentUser;
         if (currentUser) {
-          const token = await currentUser.getIdToken(true);
+          const token = await currentUser.getIdToken(false);
           config.headers.Authorization = `Bearer ${token}`;
         }
       }
@@ -40,12 +40,23 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor for Error Handling
+// Response Interceptor for Error Handling with 401 auto-refresh retry
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn('[API Error 401] Unauthorized access - redirecting or clearing auth token');
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response && error.response.status === 401 && !originalRequest?._retry) {
+      originalRequest._retry = true;
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const freshToken = await currentUser.getIdToken(true);
+          originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshErr) {
+        console.warn('[API Error 401] Token refresh failed:', refreshErr);
+      }
     }
     return Promise.reject(error);
   }

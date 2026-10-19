@@ -88,7 +88,14 @@ export const SubmitTitle = () => {
       );
 
       if (activeRequest?.status === "accepted") {
-        navigate("/research/workspace");
+        setExistingGroupTitle({
+          title: activeRequest.researchTitle || "Assigned Research Project",
+          groupName: activeRequest.groupName || "Research Group",
+          adviserName: activeRequest.adviserName || "Assigned Adviser",
+        });
+        setPendingRequest(null);
+        setIsRestoredRequest(false);
+        setLoading(false);
         return;
       }
       if (activeRequest) {
@@ -133,7 +140,14 @@ export const SubmitTitle = () => {
               return;
             }
             if (request.status === "accepted") {
-              navigate("/research/workspace");
+              setExistingGroupTitle({
+                title: request.researchTitle || "Assigned Research Project",
+                groupName: request.groupName || "Research Group",
+                adviserName: request.adviserName || "Assigned Adviser",
+              });
+              setPendingRequest(null);
+              setIsRestoredRequest(false);
+              setLoading(false);
             } else if (request.status === "pending") {
               setPendingRequest(request);
               setIsRestoredRequest(true);
@@ -173,7 +187,20 @@ export const SubmitTitle = () => {
           );
 
         if (activeRequest?.status === "accepted") {
-          navigate("/research/workspace");
+          if (isMounted) {
+            setExistingGroupTitle({
+              title: activeRequest.researchTitle || group?.title || "Assigned Research Project",
+              groupName: activeRequest.groupName || group?.name || "Research Group",
+              adviserName: activeRequest.adviserName || group?.adviserName || "Assigned Adviser",
+            });
+            setPendingRequest(null);
+            setIsRestoredRequest(false);
+            setLoading(false);
+            // Ensure workspace creation in background
+            researchWorkspaceService
+              .getOrCreateWorkspaceForAdviserRequest(activeRequest, userProfile)
+              .catch(() => {});
+          }
           return;
         }
         if (activeRequest) {
@@ -217,7 +244,7 @@ export const SubmitTitle = () => {
           currentUser.uid,
           group?.id,
         );
-        if (!ws && group && group.status !== 'forming' && group.title && group.adviserId) {
+        if (!ws && group && group.title && group.adviserId) {
           try {
             ws = await researchWorkspaceService.getOrCreateWorkspaceForGroup(
               group,
@@ -235,7 +262,7 @@ export const SubmitTitle = () => {
           return;
         }
 
-        if (group?.title && group?.status !== 'forming' && isMounted) {
+        if (group?.title && (group?.adviserId || group?.status !== 'forming') && isMounted) {
           setExistingGroupTitle({
             title: group.title,
             groupName: group.name,

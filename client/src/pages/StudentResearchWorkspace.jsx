@@ -204,7 +204,7 @@ export const StudentResearchWorkspace = () => {
           );
 
           // If no workspace found yet, check if group already has title, adviser, or accepted request/proposal
-          if (!targetWorkspace && group && group.status !== 'forming' && group.adviserId && group.title) {
+          if (!targetWorkspace && group && group.adviserId && (group.title || group.name)) {
             try {
               targetWorkspace = await researchWorkspaceService.getOrCreateWorkspaceForGroup(group, userProfile, leaderUid);
             } catch (e) {
@@ -212,10 +212,8 @@ export const StudentResearchWorkspace = () => {
             }
           }
 
-          // If no active workspace yet, check if matching is finished or redirect to /submit-title
+          // If no active workspace yet, check if matching is finished via accepted request or approved proposal
           if (!targetWorkspace) {
-            setLoading(false);
-            // Check if there are any accepted requests or approved proposals
             try {
               const requests = await adviserRequestService.getRequestsForStudentOrGroup(currentUser.uid, group?.id);
               const accepted = requests.find((r) => r.status === 'accepted' && !r.isArchived);
@@ -225,15 +223,13 @@ export const StudentResearchWorkspace = () => {
                   userProfile
                 );
                 targetWorkspace = newWs;
-              } else {
+              } else if (group?.id) {
                 // If there is an approved proposal with assigned adviser
-                if (group?.id) {
-                  const props = await titleProposalService.getProposalsByGroup(group.id, leaderUid);
-                  const approvedProp = props.find((p) => p.status === 'approved' && !p.isArchived);
-                  if (approvedProp && (approvedProp.adviserId || group.adviserId)) {
-                    const newWs = await researchWorkspaceService.getOrCreateWorkspaceForProposal(approvedProp, userProfile);
-                    targetWorkspace = newWs;
-                  }
+                const props = await titleProposalService.getProposalsByGroup(group.id, leaderUid);
+                const approvedProp = props.find((p) => p.status === 'approved' && !p.isArchived);
+                if (approvedProp && (approvedProp.adviserId || group.adviserId)) {
+                  const newWs = await researchWorkspaceService.getOrCreateWorkspaceForProposal(approvedProp, userProfile);
+                  targetWorkspace = newWs;
                 }
               }
             } catch (err) {
@@ -241,13 +237,11 @@ export const StudentResearchWorkspace = () => {
             }
 
             if (!targetWorkspace) {
-              // The group has NOT completed the matching process!
-              // Redirect to submit-title immediately
+              // No active workspace found. We do NOT forcefully redirect to avoid infinite navigation loops.
+              // We dispatch the status event so sidebar and state update gracefully.
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('workspace-status-changed', { detail: { hasWorkspace: false } }));
               }
-              navigate('/submit-title', { replace: true });
-              return;
             }
           }
         }
@@ -578,6 +572,13 @@ export const StudentResearchWorkspace = () => {
               onClick={() => navigate('/proposals')}
             >
               View Title Proposals
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/submit-title')}
+            >
+              Submit / Select Title
             </Button>
             <Button
               variant="outline"

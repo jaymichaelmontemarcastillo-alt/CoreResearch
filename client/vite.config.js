@@ -9,11 +9,15 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'script-defer',
       devOptions: {
-        enabled: true
+        enabled: false
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 5000000 // 5 MB
+        maximumFileSizeToCacheInBytes: 5000000, // 5 MB
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true
       },
+
       manifest: {
         name: 'CoreResearch',
         short_name: 'CoreResearch',

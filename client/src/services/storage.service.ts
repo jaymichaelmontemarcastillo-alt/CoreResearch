@@ -80,25 +80,20 @@ export const storageService = {
     try {
       const storageRef: StorageReference = ref(storage, fullPath);
 
-      return await new Promise<FileUploadResult>((resolve) => {
-        let isResolved = false;
+      return await new Promise<FileUploadResult>((resolve, reject) => {
+        let isDone = false;
 
-        const safeResolve = (result: FileUploadResult) => {
-          if (!isResolved) {
-            isResolved = true;
-            resolve(result);
+        // 60-second safety timeout for large manuscripts/attachments
+        const timeoutId = setTimeout(() => {
+          if (!isDone) {
+            isDone = true;
+            console.warn(`[storageService] Upload timed out after 60s for ${fileName}.`);
+            try {
+              uploadTask.cancel();
+            } catch (_) {}
+            reject(new Error(`Upload timed out for "${fileName}". Please check your internet connection and try again.`));
           }
-        };
-
-        // 8-second safety timeout so UI never hangs
-        const timeoutId = setTimeout(async () => {
-          console.warn(`[storageService] Upload timed out for ${fileName}. Using fallback data URL.`);
-          try {
-            uploadTask.cancel();
-          } catch (_) {}
-          const fallback = await createFallbackResult();
-          safeResolve(fallback);
-        }, 8000);
+        }, 60000);
 
         const uploadTask = uploadBytesResumable(storageRef, file, {
           contentType: file.type || 'application/pdf',
@@ -112,37 +107,42 @@ export const storageService = {
               onProgress(progress);
             }
           },
-          async (error) => {
+          (error) => {
             clearTimeout(timeoutId);
-            console.warn('[storageService] uploadBytesResumable error:', error.message);
-            const fallback = await createFallbackResult();
-            safeResolve(fallback);
+            if (!isDone) {
+              isDone = true;
+              console.error('[storageService] uploadBytesResumable error:', error.message);
+              reject(new Error(`Upload failed: ${error.message || 'Storage network error'}`));
+            }
           },
           async () => {
             clearTimeout(timeoutId);
-            try {
-              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              onProgress(100);
-              safeResolve({
-                downloadUrl,
-                fullPath,
-                fileName: file.name,
-                fileSize: file.size,
-                contentType: file.type || 'application/pdf',
-              });
-            } catch (urlError) {
-              console.warn('[storageService] getDownloadURL error:', urlError);
-              const fallback = await createFallbackResult();
-              safeResolve(fallback);
+            if (!isDone) {
+              isDone = true;
+              try {
+                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                onProgress(100);
+                resolve({
+                  downloadUrl,
+                  fullPath,
+                  fileName: file.name,
+                  fileSize: file.size,
+                  contentType: file.type || 'application/pdf',
+                });
+              } catch (urlError: any) {
+                console.error('[storageService] getDownloadURL error:', urlError);
+                reject(new Error(`Uploaded successfully, but failed to retrieve URL: ${urlError.message}`));
+              }
             }
           }
         );
       });
-    } catch (err) {
-      console.warn('[storageService] Top-level upload error:', err);
-      return createFallbackResult();
+    } catch (err: any) {
+      console.error('[storageService] Top-level upload error:', err);
+      throw err;
     }
   },
+
 
   /**
    * Upload a PDF manuscript version document.
