@@ -933,6 +933,28 @@ export const researchWorkspaceService = {
   async getWorkspaceByDocumentId(documentId: string): Promise<ManuscriptWorkspace | null> {
     if (!documentId) return null;
     try {
+      // 1. Direct document lookup to get workspaceId or groupId
+      try {
+        const docSnap = await getDoc(doc(db, 'documents', documentId));
+        if (docSnap.exists()) {
+          const docData = docSnap.data();
+          if (docData?.workspaceId) {
+            const ws = await this.getWorkspaceById(docData.workspaceId);
+            if (ws && isActiveWorkspace(ws)) return ws;
+          }
+          if (docData?.groupId) {
+            const ws = await this.getWorkspaceByStudentOrGroup('', docData.groupId);
+            if (ws && isActiveWorkspace(ws)) return ws;
+          }
+          if (docData?.projectId) {
+            const ws = await this.getWorkspaceById('ws-' + docData.projectId).catch(() => null);
+            if (ws && isActiveWorkspace(ws)) return ws;
+          }
+        }
+      } catch (docErr) {
+        // Fallback to query
+      }
+
       const q = query(
         collection(db, COLLECTION_NAME),
         where('documentId', '==', documentId)
@@ -1360,39 +1382,7 @@ export const researchWorkspaceService = {
         }
       } catch (e) {}
 
-      // 3. Check all active workspaces for advisee match (e.g. JP Empalmado)
-      try {
-        const allSnap = await getDocs(collection(db, COLLECTION_NAME));
-        const allWs = allSnap.docs.map((d) => d.data() as ManuscriptWorkspace);
-
-        for (const candidateWs of allWs) {
-          if (candidateWs.status === 'archived' || candidateWs.isArchived) continue;
-
-          const isAssigned = candidateWs.adviserId === adviserUid;
-          const hasAdviserNameMatch = Boolean(
-            adviserName && candidateWs.adviserName?.toLowerCase().includes('castillo')
-          );
-          const hasAdviseeMatch = Boolean(
-            candidateWs.studentName?.toLowerCase().includes('empalmado') ||
-            candidateWs.members?.some((m) => m.fullName?.toLowerCase().includes('empalmado'))
-          );
-
-          if (isAssigned || hasAdviserNameMatch || hasAdviseeMatch) {
-            if (!candidateWs.adviserId && hasAdviseeMatch) {
-              updateDoc(doc(db, COLLECTION_NAME, candidateWs.id), {
-                adviserId: adviserUid,
-                adviserName: adviserName || candidateWs.adviserName || 'Michael Castillo',
-                updatedAt: new Date().toISOString(),
-              }).catch(() => {});
-              candidateWs.adviserId = adviserUid;
-            }
-
-            if (!wsList.some((w) => w.id === candidateWs.id)) {
-              wsList.push(candidateWs);
-            }
-          }
-        }
-      } catch (e) {}
+      // 3. Advisee workspaces are fully covered by steps 1 & 2 (assigned workspaces and assigned groups)
 
       // 4. Fetch existing notifications of type manuscript for this adviser
       const notifQ = query(

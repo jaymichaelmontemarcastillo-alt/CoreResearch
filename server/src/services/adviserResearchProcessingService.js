@@ -210,8 +210,9 @@ class AdviserResearchProcessingService {
     }
   }
 
-  async deleteDocument(documentId, adviserId) {
-    const doc = await AdviserResearchDocument.findOne({ id: documentId, adviserId });
+  async deleteDocument(documentId, adviserId, isPrivileged = false) {
+    const query = isPrivileged ? { id: documentId } : { id: documentId, adviserId };
+    const doc = await AdviserResearchDocument.findOne(query);
     if (!doc) {
       throw new Error('Document not found or unauthorized');
     }
@@ -233,8 +234,9 @@ class AdviserResearchProcessingService {
   /**
    * Reprocess a FAILED document by re-downloading from storage and re-running NLP.
    */
-  async reprocessDocument(documentId, adviserId) {
-    const doc = await AdviserResearchDocument.findOne({ id: documentId, adviserId });
+  async reprocessDocument(documentId, adviserId, isPrivileged = false) {
+    const query = isPrivileged ? { id: documentId } : { id: documentId, adviserId };
+    const doc = await AdviserResearchDocument.findOne(query);
     if (!doc) {
       throw new Error('Document not found or unauthorized');
     }

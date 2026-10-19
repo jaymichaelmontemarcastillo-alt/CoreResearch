@@ -27,40 +27,41 @@ const decodeJwtPayload = (token) => {
  * Middleware to verify Firebase Authorization token or dev bearer token.
  * Attaches req.user with all required profile fields.
  */
-export const verifyToken = async (req, res, next) => {
+export const resolveUserFromToken = async (req) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      success: false,
-      error: "Unauthorized",
-      message:
-        "Missing or invalid Authorization header. Expected Bearer token.",
-    });
+    return {
+      error: {
+        status: 401,
+        body: {
+          success: false,
+          error: "Unauthorized",
+          message: "Missing or invalid Authorization header. Expected Bearer token.",
+        }
+      }
+    };
   }
 
   const token = authHeader.split("Bearer ")[1].trim();
 
-  try {
-    // 1. Dev token handling (format: dev-token-{uid}-{role})
-    if (
-      token.startsWith("dev-token-") &&
-      process.env.NODE_ENV !== "production"
-    ) {
-      let uid = "dev-user-id";
-      let role = "student";
+  // 1. Dev token handling (format: dev-token-{uid}-{role})
+  if (token.startsWith("dev-token-") && process.env.NODE_ENV !== "production") {
+    let uid = "dev-user-id";
+    let role = "student";
 
-      const parts = token.split("-");
-      if (parts.length >= 4) {
-        uid = parts.slice(2, -1).join("-");
-        role = parts[parts.length - 1];
-      }
+    const parts = token.split("-");
+    if (parts.length >= 4) {
+      uid = parts.slice(2, -1).join("-");
+      role = parts[parts.length - 1];
+    }
 
-      const existingMock = mockUsersDb.get(uid);
-      if (existingMock) {
-        req.user = existingMock;
-      } else {
-        const nameParts = `Demo ${role.toUpperCase()}`.split(" ");
-        req.user = {
+    const existingMock = mockUsersDb.get(uid);
+    if (existingMock) {
+      return { user: existingMock };
+    } else {
+      const nameParts = `Demo ${role.toUpperCase()}`.split(" ");
+      return {
+        user: {
           uid,
           email: `${role}@university.edu`,
           first_name: nameParts[0] || "Demo",
@@ -76,111 +77,138 @@ export const verifyToken = async (req, res, next) => {
           profile_image: "",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
-      }
-      return next();
+        }
+      };
     }
+  }
 
-    // 2. Real Firebase Token Verification
-    let decodedToken = null;
-    try {
-      if (auth) {
-        decodedToken = await auth.verifyIdToken(token);
-      }
-    } catch (verifyErr) {
-      console.warn(
-        "[AuthMiddleware] Firebase verifyIdToken warning:",
-        verifyErr.message,
-      );
-      // Permit unsigned payload decoding only in the explicit local mock mode.
-      // In production, an unverified JWT must never authorize request creation.
-      if (isDevMockMode && process.env.NODE_ENV !== "production") {
-        decodedToken = decodeJwtPayload(token);
-      } else {
-        return res.status(401).json({
+  // 2. Real Firebase Token Verification
+  let decodedToken = null;
+  try {
+    if (auth) {
+      decodedToken = await auth.verifyIdToken(token);
+    }
+  } catch (verifyErr) {
+    console.warn("[AuthMiddleware] Firebase verifyIdToken warning:", verifyErr.message);
+    if (isDevMockMode && process.env.NODE_ENV !== "production") {
+      decodedToken = decodeJwtPayload(token);
+    } else {
+      return {
+        error: {
+          status: 401,
+          body: {
+            success: false,
+            error: "Unauthorized",
+            message: "Invalid or expired authentication token.",
+          }
+        }
+      };
+    }
+  }
+
+  if (!decodedToken || (!decodedToken.uid && !decodedToken.user_id)) {
+    return {
+      error: {
+        status: 401,
+        body: {
           success: false,
           error: "Unauthorized",
           message: "Invalid or expired authentication token.",
-        });
+        }
+      }
+    };
+  }
+
+  const uid = decodedToken.uid || decodedToken.user_id;
+  const email = decodedToken.email || "";
+  const name = decodedToken.name || email.split("@")[0] || "User";
+  const picture = decodedToken.picture || "";
+
+  // 3. Fetch user profile from MongoDB, then Firestore, or mock DB safely
+  let userData = null;
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const userDoc = await User.findOne({
+        $or: [
+          { uid },
+          ...(email ? [{ email: email.toLowerCase() }, { email }] : [])
+        ]
+      }).lean();
+      if (userDoc) {
+        userData = userDoc;
       }
     }
+  } catch (dbErr) {
+    console.warn("[AuthMiddleware] MongoDB read warning:", dbErr.message);
+  }
 
-    if (!decodedToken || (!decodedToken.uid && !decodedToken.user_id)) {
-      return res.status(401).json({
-        success: false,
-        error: "Unauthorized",
-        message: "Invalid or expired authentication token.",
-      });
-    }
-
-    const uid = decodedToken.uid || decodedToken.user_id;
-    const email = decodedToken.email || "";
-    const name = decodedToken.name || email.split("@")[0] || "User";
-    const picture = decodedToken.picture || "";
-
-    // 3. Fetch user profile from MongoDB, then Firestore, or mock DB safely
-    let userData = null;
-
+  if (!userData && db) {
     try {
-      if (mongoose.connection.readyState === 1) {
-        const userDoc = await User.findOne({ uid }).lean();
-        if (userDoc) {
-          userData = userDoc;
+      let userDoc = await db.collection("users").doc(uid).get();
+      if (userDoc.exists) {
+        userData = userDoc.data();
+      } else if (email) {
+        const emailSnap = await db.collection("users").where("email", "==", email.toLowerCase()).limit(1).get();
+        if (!emailSnap.empty) {
+          userData = emailSnap.docs[0].data();
         }
       }
     } catch (dbErr) {
-      console.warn("[AuthMiddleware] MongoDB read warning:", dbErr.message);
+      console.warn(
+        "[AuthMiddleware] Firestore read warning (using in-memory fallback):",
+        dbErr.message,
+      );
     }
+  }
 
-    if (!userData && db) {
-      try {
-        const userDoc = await db.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          userData = userDoc.data();
+  if (!userData && isDevMockMode) {
+    userData = mockUsersDb.get(uid) || null;
+  }
+
+  const isRegistrationRequest = req.originalUrl?.split('?')[0] === '/api/auth/register';
+  if (!userData && !isDevMockMode && !isRegistrationRequest) {
+    return {
+      error: {
+        status: 403,
+        body: {
+          success: false,
+          error: 'Forbidden',
+          message: 'A registered user profile is required.'
         }
-      } catch (dbErr) {
-        console.warn(
-          "[AuthMiddleware] Firestore read warning (using in-memory fallback):",
-          dbErr.message,
-        );
       }
-    }
+    };
+  }
 
-    if (!userData && isDevMockMode) {
-      userData = mockUsersDb.get(uid) || null;
-    }
+  const isPrivilegedAdmin = ['admin', 'research_coordinator', 'coordinator'].includes(userData?.role);
+  if (
+    userData &&
+    !isRegistrationRequest &&
+    !isPrivilegedAdmin &&
+    (
+      userData.is_approved === false ||
+      userData.status === 'rejected' ||
+      userData.status === 'pending'
+    )
+  ) {
+    return {
+      error: {
+        status: 403,
+        body: {
+          success: false,
+          error: 'Forbidden',
+          message: 'This account is not approved to access the application.'
+        }
+      }
+    };
+  }
 
-    const isRegistrationRequest = req.originalUrl.split('?')[0] === '/api/auth/register';
-    if (!userData && !isDevMockMode && !isRegistrationRequest) {
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden',
-        message: 'A registered user profile is required.'
-      });
-    }
+  const nameParts = (userData?.fullName || name).trim().split(" ");
+  const first_name = userData?.first_name || nameParts[0] || "User";
+  const last_name = userData?.last_name || nameParts.slice(1).join(" ") || "";
 
-    const isPrivilegedAdmin = ['admin', 'research_coordinator', 'coordinator'].includes(userData?.role);
-    if (
-      userData &&
-      !isRegistrationRequest &&
-      !isPrivilegedAdmin &&
-      (
-        userData.is_approved !== true ||
-        !['active', 'approved'].includes(userData.status)
-      )
-    ) {
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden',
-        message: 'This account is not approved to access the application.'
-      });
-    }
-
-    const nameParts = (userData?.fullName || name).trim().split(" ");
-    const first_name = userData?.first_name || nameParts[0] || "User";
-    const last_name = userData?.last_name || nameParts.slice(1).join(" ") || "";
-
-    req.user = {
+  return {
+    user: {
       uid,
       email: userData?.email || email,
       first_name,
@@ -189,25 +217,27 @@ export const verifyToken = async (req, res, next) => {
       role: userData?.role || "student",
       role_id: userData?.role_id || userData?.role || "student",
       department: userData?.department || "Computer Studies",
-      department_id:
-        userData?.department_id || userData?.department || "Computer Studies",
+      department_id: userData?.department_id || userData?.department || "Computer Studies",
       studentIdOrEmployeeId: userData?.studentIdOrEmployeeId || "",
       status: userData?.status || (isDevMockMode ? "active" : "pending"),
-      is_approved:
-        userData?.is_approved !== undefined ? userData.is_approved : isDevMockMode,
+      is_approved: userData?.is_approved !== undefined ? userData.is_approved : isDevMockMode,
       profile_image: userData?.profile_image || picture || "",
-      created_at:
-        userData?.created_at || userData?.createdAt || new Date().toISOString(),
-      updated_at:
-        userData?.updated_at || userData?.updatedAt || new Date().toISOString(),
-    };
+      created_at: userData?.created_at || userData?.createdAt || new Date().toISOString(),
+      updated_at: userData?.updated_at || userData?.updatedAt || new Date().toISOString(),
+    }
+  };
+};
 
+export const verifyToken = async (req, res, next) => {
+  try {
+    const result = await resolveUserFromToken(req);
+    if (result.error) {
+      return res.status(result.error.status).json(result.error.body);
+    }
+    req.user = result.user;
     return next();
   } catch (error) {
-    console.error(
-      "[AuthMiddleware] Exception during token verification:",
-      error.message,
-    );
+    console.error("[AuthMiddleware] Exception during token verification:", error.message);
     return res.status(401).json({
       success: false,
       error: "Unauthorized",
@@ -259,13 +289,25 @@ export const requireRole = (allowedRoles = []) => {
 };
 
 /**
- * Middleware that parses authentication token if present, but allows request to proceed if unauthenticated.
+ * Middleware that parses authentication token if present, but allows request to proceed as guest if unauthenticated.
  */
 export const optionalVerifyToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      req.user = null;
+      return next();
+    }
+    const result = await resolveUserFromToken(req);
+    if (result.error) {
+      // Graceful fallback for optional endpoints: treat as guest rather than erroring with 401/403
+      req.user = null;
+      return next();
+    }
+    req.user = result.user;
+    return next();
+  } catch (err) {
     req.user = null;
     return next();
   }
-  return verifyToken(req, res, next);
 };

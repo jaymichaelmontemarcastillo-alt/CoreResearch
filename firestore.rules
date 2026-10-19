@@ -30,6 +30,8 @@ service cloud.firestore {
           request.auth.uid in get(/databases/$(database)/documents/research_groups/$(groupId)).data.get('memberIds', [])
           || get(/databases/$(database)/documents/research_groups/$(groupId)).data.get('leaderUid', '') == request.auth.uid
           || get(/databases/$(database)/documents/research_groups/$(groupId)).data.get('studentId', '') == request.auth.uid
+          || get(/databases/$(database)/documents/research_groups/$(groupId)).data.get('adviserId', '') == request.auth.uid
+          || get(/databases/$(database)/documents/research_groups/$(groupId)).data.get('adviser', '') == request.auth.uid
         );
     }
 
@@ -173,7 +175,11 @@ service cloud.firestore {
     }
 
     match /research_groups/{groupId} {
-      allow read: if staff() || participant(resource.data) || (approved() && resource.data.get('sectionId', '') == profile().get('sectionId', ''));
+      allow read: if staff()
+        || (approved() && resource.data.get('adviserId', '') == request.auth.uid)
+        || (approved() && resource.data.get('adviser', '') == request.auth.uid)
+        || participant(resource.data)
+        || (approved() && resource.data.get('sectionId', '') == profile().get('sectionId', ''));
       allow create: if staff()
         || (
           approved()
@@ -334,7 +340,11 @@ service cloud.firestore {
     }
 
     match /manuscript_workspaces/{workspaceId} {
-      allow read: if staff() || participant(resource.data);
+      allow read: if staff()
+        || (approved() && resource.data.get('adviserId', '') == request.auth.uid)
+        || (approved() && resource.data.get('studentId', '') == request.auth.uid)
+        || (approved() && resource.data.get('groupId', '') != '' && groupMember(resource.data.get('groupId', '')))
+        || participant(resource.data);
       allow create: if staff() || (
         participant(request.resource.data)
         && (
@@ -363,7 +373,12 @@ service cloud.firestore {
     }
 
     match /documents/{documentId} {
-      allow read: if staff() || participant(resource.data);
+      allow read: if staff()
+        || (approved() && resource.data.get('ownerId', '') == request.auth.uid)
+        || (approved() && resource.data.get('adviserId', '') == request.auth.uid)
+        || (approved() && resource.data.get('studentId', '') == request.auth.uid)
+        || (approved() && resource.data.get('groupId', '') != '' && groupMember(resource.data.get('groupId', '')))
+        || participant(resource.data);
       allow create: if approved() && (
         request.resource.data.get('ownerId', '') == request.auth.uid
           && (
@@ -439,7 +454,11 @@ service cloud.firestore {
     }
 
     match /research_tasks/{taskId} {
-      allow read: if staff() || participant(resource.data) || workspaceParticipant(resource.data.get('workspaceId', ''));
+      allow read: if staff()
+        || (approved() && resource.data.get('adviserId', '') == request.auth.uid)
+        || (approved() && resource.data.get('studentId', '') == request.auth.uid)
+        || (approved() && workspaceParticipant(resource.data.get('workspaceId', '')))
+        || participant(resource.data);
       allow create: if staff()
         || (
           approved()
@@ -667,6 +686,16 @@ service cloud.firestore {
     match /evaluations/{evaluationId} {
       allow read: if canAccessEvaluation(resource.data);
       allow create, update, delete: if staff();
+    }
+
+    match /repository_publications/{publicationId} {
+      allow read: if signedIn();
+      allow create: if staff()
+        || (
+          approved()
+          && request.resource.data.get('publicationStatus', 'pending_publication') == 'pending_publication'
+        );
+      allow update, delete: if staff();
     }
 
     match /{document=**} {

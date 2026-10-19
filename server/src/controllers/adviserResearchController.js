@@ -41,7 +41,24 @@ export const uploadDocument = async (req, res) => {
 export const getMyDocuments = async (req, res) => {
   try {
     const adviserId = req.user.uid;
-    const docs = await AdviserResearchDocument.find({ adviserId })
+    const userEmail = req.user.email;
+    const isPrivileged = ['admin', 'research_coordinator', 'coordinator'].includes(req.user.role);
+
+    let filter;
+    if (isPrivileged && req.query.all === 'true') {
+      filter = {};
+    } else if (isPrivileged && req.query.adviserId) {
+      filter = { adviserId: req.query.adviserId };
+    } else {
+      filter = {
+        $or: [
+          { adviserId },
+          ...(userEmail ? [{ adviserEmail: userEmail.toLowerCase() }, { adviserEmail: userEmail }] : [])
+        ]
+      };
+    }
+
+    const docs = await AdviserResearchDocument.find(filter)
       .select('-extractedText -embedding') // Don't send huge texts/vectors to frontend
       .sort({ created_at: -1 });
 
@@ -111,8 +128,9 @@ export const deleteDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
     const adviserId = req.user.uid;
+    const isPrivileged = ['admin', 'research_coordinator', 'coordinator'].includes(req.user.role);
 
-    await adviserResearchProcessingService.deleteDocument(documentId, adviserId);
+    await adviserResearchProcessingService.deleteDocument(documentId, adviserId, isPrivileged);
 
     return res.status(200).json({
       success: true,
@@ -134,8 +152,9 @@ export const reprocessDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
     const adviserId = req.user.uid;
+    const isPrivileged = ['admin', 'research_coordinator', 'coordinator'].includes(req.user.role);
 
-    const result = await adviserResearchProcessingService.reprocessDocument(documentId, adviserId);
+    const result = await adviserResearchProcessingService.reprocessDocument(documentId, adviserId, isPrivileged);
 
     return res.status(200).json({
       success: true,
