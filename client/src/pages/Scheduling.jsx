@@ -338,19 +338,109 @@ export const Scheduling = () => {
     };
   };
 
+  const getSectionGroups = (targetSection, targetCourse) => {
+    if (!targetSection) return [];
+    const secCourseId = (targetSection.courseId || targetCourse?.id || '').toLowerCase();
+    const cleanSec = (targetSection.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
+
+    return groups.filter((g) => {
+      if (g.sectionId === targetSection.id) return true;
+      if (g.specializationId && targetSection.specializationId && g.specializationId.toLowerCase() !== targetSection.specializationId.toLowerCase()) {
+        return false;
+      }
+      const sameCourse =
+        (g.courseId || '').toLowerCase() === secCourseId ||
+        (g.courseId || '').toLowerCase() === (targetCourse?.code || '').toLowerCase() ||
+        (g.courseId || '').toLowerCase() === (targetSection.courseId || '').toLowerCase();
+      const cleanGSec = (g.sectionName || g.section || '').replace(/^section\s+/i, '').trim().toLowerCase();
+      if (sameCourse && cleanGSec && cleanSec && (cleanGSec === cleanSec || cleanGSec.replace(/^3/i, '') === cleanSec.replace(/^3/i, ''))) {
+        return true;
+      }
+      if (g.sectionId === `${targetSection.courseId}-sec-${cleanSec}`) return true;
+      return false;
+    });
+  };
+
+  const getFilteredGroupsForCurrentSelection = () => {
+    const activeCourse = courses.find(
+      (c) =>
+        c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
+        c.code?.toLowerCase() === selectedCourse?.toLowerCase()
+    );
+    const courseIdClean = activeCourse?.id?.toLowerCase() || selectedCourse?.toLowerCase();
+
+    // 1. If a specific section is selected
+    if (selectedSection) {
+      const allSecs = (selectedCourse && allSectionsByCourse[selectedCourse]) || sections || [];
+      const curSecObj = allSecs.find((s) => s.id === selectedSection) || relevantSections.find((s) => s.id === selectedSection);
+      if (curSecObj) {
+        return getSectionGroups(curSecObj, activeCourse);
+      }
+    }
+
+    // 2. If a specialization is selected (all sections under that specialization)
+    if (selectedSpecialization) {
+      const specClean = selectedSpecialization.toLowerCase();
+      return groups.filter((g) => {
+        if (selectedCourse) {
+          const gCourse = (g.courseId || '').toLowerCase();
+          const sameCourse =
+            gCourse === courseIdClean ||
+            gCourse === activeCourse?.code?.toLowerCase();
+          if (!sameCourse) return false;
+        }
+        const gSpec = (g.specializationId || g.specialization || '').toLowerCase();
+        if (gSpec) return gSpec === specClean;
+        const allSecs = (selectedCourse && allSectionsByCourse[selectedCourse]) || sections || [];
+        const sec = allSecs.find((s) => s.id === g.sectionId);
+        return sec?.specializationId?.toLowerCase() === specClean;
+      });
+    }
+
+    // 3. If only a course/program is selected
+    if (selectedCourse) {
+      return groups.filter((g) => {
+        const gCourse = (g.courseId || '').toLowerCase();
+        return (
+          gCourse === courseIdClean ||
+          gCourse === activeCourse?.code?.toLowerCase()
+        );
+      });
+    }
+
+    // 4. "All Programs"
+    return groups;
+  };
+
+  const getSelectedScopeInfo = () => {
+    const activeCourse = courses.find(
+      (c) =>
+        c.id?.toLowerCase() === selectedCourse?.toLowerCase() ||
+        c.code?.toLowerCase() === selectedCourse?.toLowerCase()
+    );
+    const spec = activeCourse?.specializations?.find(
+      (s) =>
+        s.id?.toLowerCase() === selectedSpecialization?.toLowerCase() ||
+        s.code?.toLowerCase() === selectedSpecialization?.toLowerCase()
+    );
+    const allSecs = (selectedCourse && allSectionsByCourse[selectedCourse]) || sections || [];
+    const sec = allSecs.find((s) => s.id === selectedSection) || relevantSections.find((s) => s.id === selectedSection);
+
+    return {
+      courseName: activeCourse?.name,
+      courseCode: activeCourse?.code,
+      specializationName: spec?.name,
+      specializationCode: spec?.code,
+      sectionName: sec?.name ? sec.name.replace(/^section\s+/i, '') : undefined
+    };
+  };
+
   const handleClearAllTimes = async () => {
     if (!selectedSection) {
        showToast("Please select a specific section to clear times.", "info");
        return;
     }
-    const curSecObj = relevantSections.find(sec => sec.id === selectedSection);
-    const cleanCurSec = (curSecObj?.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
-    const sectionGroups = groups.filter((g) => {
-      if (g.sectionId === selectedSection) return true;
-      const cleanGSec = (g.sectionName || '').replace(/^section\s+/i, '').trim().toLowerCase();
-      if (cleanGSec && cleanCurSec && cleanGSec === cleanCurSec) return true;
-      return false;
-    });
+    const sectionGroups = getFilteredGroupsForCurrentSelection();
     const currentViewGroups = sectionGroups.filter((g) => {
       const q = searchQuery.toLowerCase();
       if (!q) return true;
@@ -540,7 +630,7 @@ export const Scheduling = () => {
 
         <div className="w-full md:w-auto shrink-0 mt-4 md:mt-0 flex flex-wrap items-center gap-2">
           {/* The Clear All Times button logic needs a specific section scope to be safe */}
-          {selectedCourse && selectedSection && groups.filter(g => g.sectionId === selectedSection).some(g => {
+          {selectedCourse && selectedSection && getFilteredGroupsForCurrentSelection().some(g => {
             const s = getScheduleForGroup(g.id);
             return s && (s.startTime || s.date);
           }) && (
@@ -628,18 +718,7 @@ export const Scheduling = () => {
               return (
                 <div key={course.id} className="space-y-8">
                   {displaySections.map((section) => {
-                    const sectionGroups = groups.filter((g) => {
-                      if (g.sectionId === section.id) return true;
-                      if (g.specializationId && section.specializationId && g.specializationId.toLowerCase() !== section.specializationId.toLowerCase()) {
-                        return false;
-                      }
-                      const sameCourse = g.courseId?.toLowerCase() === course.id?.toLowerCase() || g.courseId?.toLowerCase() === section.courseId?.toLowerCase();
-                      const cleanGSec = (g.sectionName || g.section || '').replace(/^section\s+/i, '').trim().toLowerCase();
-                      const cleanSec = (section.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
-                      if (sameCourse && cleanGSec && cleanSec && (cleanGSec === cleanSec || cleanGSec.replace(/^3/i, '') === cleanSec.replace(/^3/i, ''))) return true;
-                      if (g.sectionId === `${section.courseId}-sec-${cleanSec}`) return true;
-                      return false;
-                    });
+                    const sectionGroups = getSectionGroups(section, course);
 
                     const filteredSectionGroups = sectionGroups.filter((g) => {
                       const q = searchQuery.toLowerCase();
@@ -935,11 +1014,7 @@ export const Scheduling = () => {
             setSelectedScheduleForEditing(null);
             setIsRedefenseMode(false);
           }}
-          groups={
-            selectedSection
-              ? groups.filter((g) => g.sectionId === selectedSection)
-              : groups
-          }
+          groups={getFilteredGroupsForCurrentSelection()}
           proposals={proposals}
           schedules={schedules}
           preselectedGroup={selectedGroupForScheduling}
@@ -980,15 +1055,8 @@ export const Scheduling = () => {
         <GenerateScheduleModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
-          groups={groups
-            .filter((g) => {
-              if (g.sectionId === selectedSection) return true;
-              const curSecObj = relevantSections.find(sec => sec.id === selectedSection);
-              const cleanCurSec = (curSecObj?.name || '').replace(/^section\s+/i, '').trim().toLowerCase();
-              const cleanGSec = (g.sectionName || '').replace(/^section\s+/i, '').trim().toLowerCase();
-              if (cleanGSec && cleanCurSec && cleanGSec === cleanCurSec) return true;
-              return false;
-            })
+          scopeInfo={getSelectedScopeInfo()}
+          groups={getFilteredGroupsForCurrentSelection()
             .map((g) => {
               const schedule = getScheduleForGroup(g.id);
               const panelists =

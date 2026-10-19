@@ -6,7 +6,7 @@ import { Badge } from '../ui/Badge';
 import { HiCalendar, HiClock, HiMapPin, HiCheck } from 'react-icons/hi2';
 import scheduleService from '../../services/schedule.service';
 
-export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCreated }) => {
+export const GenerateScheduleModal = ({ isOpen, onClose, groups = [], scopeInfo, onSchedulesCreated }) => {
   const [step, setStep] = useState(1); // 1 = Config, 2 = Preview
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -194,10 +194,26 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
                 </div>
               </div>
               
-              <div className="pt-4 border-t border-gray-100 dark:border-[#222433]">
-                 <p className="text-sm text-gray-600 dark:text-[#9396a8]">
-                   You are about to schedule <strong className="text-blue-600 dark:text-blue-400">{groups.length}</strong> research group(s).
-                 </p>
+              <div className="pt-4 border-t border-gray-100 dark:border-[#222433] space-y-1.5">
+                {scopeInfo && (scopeInfo.courseCode || scopeInfo.courseName || scopeInfo.specializationCode || scopeInfo.sectionName) && (
+                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                    <span className="font-semibold text-gray-500 dark:text-[#9396a8] uppercase tracking-wider text-[11px]">Selected Scope:</span>
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {scopeInfo.courseCode || scopeInfo.courseName}
+                      {scopeInfo.specializationCode || scopeInfo.specializationName ? ` — ${scopeInfo.specializationCode || scopeInfo.specializationName}` : ''}
+                      {scopeInfo.sectionName ? ` (Section ${scopeInfo.sectionName})` : ''}
+                    </span>
+                  </div>
+                )}
+                <p className="text-sm text-gray-600 dark:text-[#9396a8]">
+                  You are about to schedule <strong className="text-blue-600 dark:text-blue-400">{groups.length}</strong> research group(s)
+                  {scopeInfo?.sectionName ? ` in Section ${scopeInfo.sectionName}` : ''}.
+                </p>
+                {groups.length === 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-200 dark:border-amber-800/40">
+                    No research groups found matching the selected specialization and section. Please verify that groups are enrolled in this section.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -224,6 +240,13 @@ export const GenerateScheduleModal = ({ isOpen, onClose, groups, onSchedulesCrea
                 <p className="text-sm font-medium text-gray-500 dark:text-[#9396a8] mt-1">
                   <HiCalendar className="inline w-4 h-4 mr-1 text-blue-500" /> {new Date(config.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
+                {scopeInfo && (scopeInfo.courseCode || scopeInfo.specializationCode || scopeInfo.sectionName) && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">
+                    {scopeInfo.courseCode || scopeInfo.courseName}
+                    {scopeInfo.specializationCode ? ` — ${scopeInfo.specializationCode}` : ''}
+                    {scopeInfo.sectionName ? ` (Section ${scopeInfo.sectionName})` : ''}
+                  </p>
+                )}
               </div>
               <Badge variant="blue">{previewData.proposedSchedules.length} Schedules Generated</Badge>
             </div>
