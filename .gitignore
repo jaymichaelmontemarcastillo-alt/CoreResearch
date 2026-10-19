@@ -47,3 +47,6 @@ uploads/
 
 # Vite temporary build cache
 *.timestamp-*.mjs
+
+# Firebase cache
+.firebase/
