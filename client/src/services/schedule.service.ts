@@ -117,6 +117,8 @@ export const scheduleService = {
     if (!data?.data || data.data.id !== scheduleId) {
       throw new Error('The schedules API returned an invalid updated schedule.');
     }
+    dataCache.invalidatePattern('schedule');
+    dataCache.invalidatePattern('defense');
     return data.data;
   },
 

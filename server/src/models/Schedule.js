@@ -10,7 +10,7 @@ const ScheduleSchema = new mongoose.Schema({
   time: { type: String },
   endTime: { type: String },
   location: { type: String },
-  type: { type: String, enum: ['proposal', 'final_defense'] },
+  type: { type: String, enum: ['proposal', 'final_defense', 'proposal_defense'], default: 'proposal' },
   status: {
     type: String,
     enum: ['scheduled', 'rescheduled', 'completed', 'cancelled', 'failed', 'for_redefense', 'archived'],
@@ -21,7 +21,11 @@ const ScheduleSchema = new mongoose.Schema({
   attempt: { type: Number },
   defenseStage: { type: String },
   notes: { type: String },
-  resultStatus: { type: String, enum: ['passed', 're_defense', 'failed', 'pending'] },
+  resultStatus: {
+    type: String,
+    enum: ['passed', 're_defense', 'failed', 'pending', 'scheduled', 'completed', 'approved'],
+    default: 'pending'
+  },
   panelists: [{
     id: String,
     name: String,

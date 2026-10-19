@@ -14,6 +14,22 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary caught error]:', error, errorInfo);
+
+    // Auto-recover if error is due to an outdated chunk hash after deployment
+    const isChunkLoadError =
+      error?.message?.includes('dynamically imported module') ||
+      error?.message?.includes('Failed to fetch') ||
+      error?.name === 'ChunkLoadError';
+
+    if (isChunkLoadError) {
+      const lastReload = sessionStorage.getItem('chunk_reload_retry');
+      const now = Date.now();
+      // Guard with 10s cooldown to prevent infinite reload loops
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        sessionStorage.setItem('chunk_reload_retry', now.toString());
+        window.location.reload();
+      }
+    }
   }
 
   handleReload = () => {

@@ -20,6 +20,8 @@ import { scheduleService } from '../../services/schedule.service';
 import { userService } from '../../services/user.service';
 import { groupService } from '../../services/group.service';
 
+let cachedAvailableUsers = null;
+
 export const ScheduleDefenseModal = ({
   isOpen,
   onClose,
@@ -27,10 +29,12 @@ export const ScheduleDefenseModal = ({
   proposals = [],
   schedules = [],
   preselectedGroup = null,
+  scheduleToEdit = null,
   isRedefenseMode = false,
   onScheduleSaved,
 }) => {
   const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [editingScheduleId, setEditingScheduleId] = useState(null);
   const [groupSearchQuery, setGroupSearchQuery] = useState('');
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
 
@@ -54,13 +58,17 @@ export const ScheduleDefenseModal = ({
   const [techName, setTechName] = useState('');
 
   // Available Users
-  const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState(cachedAvailableUsers || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch users for adviser/panelist selections
+  // Fetch users for adviser/panelist selections with module-level caching
   useEffect(() => {
     const fetchUsers = async () => {
+      if (cachedAvailableUsers && cachedAvailableUsers.length > 0) {
+        setAvailableUsers(cachedAvailableUsers);
+        return;
+      }
       try {
         const [panelists, advisers, faculty, coordinators, admins] = await Promise.all([
           userService.getUsersByRole('panelist').catch(() => []),
@@ -71,6 +79,7 @@ export const ScheduleDefenseModal = ({
         ]);
         const combined = [...panelists, ...advisers, ...faculty, ...coordinators, ...admins];
         const unique = Array.from(new Map(combined.map((u) => [u.uid, u])).values());
+        cachedAvailableUsers = unique;
         setAvailableUsers(unique);
       } catch (err) {
         console.error('Failed to fetch faculty for scheduling:', err);
@@ -100,22 +109,23 @@ export const ScheduleDefenseModal = ({
       .sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
   }, [schedules, selectedGroupId]);
 
-  // Synchronize on modal open or preselected group change
+  // Synchronize on modal open or preselected group / scheduleToEdit change
   useEffect(() => {
     if (isOpen) {
       setError(null);
       const targetGroup = preselectedGroup || (groups.length > 0 ? groups[0] : null);
       if (targetGroup) {
         setSelectedGroupId(targetGroup.id);
-        populateFromGroup(targetGroup.id, isRedefenseMode);
+        populateFromGroup(targetGroup.id, scheduleToEdit, isRedefenseMode);
       } else {
         setSelectedGroupId('');
+        setEditingScheduleId(null);
       }
     }
-  }, [isOpen, preselectedGroup, isRedefenseMode]);
+  }, [isOpen, preselectedGroup, scheduleToEdit, isRedefenseMode]);
 
   // Auto-populate form when a group is selected
-  const populateFromGroup = (groupId, forceRedefense = false) => {
+  const populateFromGroup = (groupId, explicitSchedule = null, forceRedefense = false) => {
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
 
@@ -124,22 +134,32 @@ export const ScheduleDefenseModal = ({
       (s) => s.projectId === groupId || s.groupId === groupId
     );
 
-    // Auto-detect proposal vs final defense from latest schedule
-    const latestSchedule = pastSchedules[pastSchedules.length - 1];
-    const prevType = latestSchedule?.defenseType === 'final_defense' ? 'final_defense' : 'proposal_defense';
-    setDefenseStage(prevType);
-    setIsRedefense(forceRedefense || isRedefenseMode || latestSchedule?.status === 'for_redefense' || false);
+    // Prioritize explicitSchedule if passed and matches, or find an active schedule
+    const activeSchedule = (explicitSchedule && (explicitSchedule.projectId === groupId || explicitSchedule.groupId === groupId))
+      ? explicitSchedule
+      : (pastSchedules.find(s => (s.status === 'scheduled' || s.status === 'for_redefense') && (s.startTime || s.date)) || pastSchedules[pastSchedules.length - 1]);
+
+    const isEditing = !forceRedefense && !isRedefenseMode && Boolean(activeSchedule && (activeSchedule.startTime || activeSchedule.date));
+    setEditingScheduleId(isEditing ? activeSchedule.id : null);
+
+    // Auto-detect proposal vs final defense from schedule
+    const schedType = activeSchedule?.defenseType || activeSchedule?.type;
+    const stageType = schedType === 'final_defense' ? 'final_defense' : 'proposal_defense';
+    setDefenseStage(stageType);
+
+    const isRedef = forceRedefense || isRedefenseMode || activeSchedule?.status === 'for_redefense' || activeSchedule?.resultStatus === 're_defense' || false;
+    setIsRedefense(isRedef);
 
     // Auto-populate Adviser
-    const advId = group.adviserId || '';
-    const advName = group.adviserName || '';
+    const advId = activeSchedule?.adviserId || group.adviserId || '';
+    const advName = activeSchedule?.adviserName || group.adviserName || '';
     setAdviserId(advId);
     setAdviserName(advName);
 
-    // Auto-populate Panelists from existing schedule or group
+    // Auto-populate Panelists from active schedule or group
     const sourcePanelists =
-      latestSchedule?.panelists?.length > 0
-        ? latestSchedule.panelists
+      activeSchedule?.panelists?.length > 0
+        ? activeSchedule.panelists
         : group.panelists || [];
 
     const subj = sourcePanelists.find((p) =>
@@ -159,21 +179,32 @@ export const ScheduleDefenseModal = ({
     setTechId(tech?.id || tech?.uid || '');
     setTechName(tech?.name || tech?.fullName || '');
 
-    // Venue & Date default
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setDate(tomorrow.toISOString().split('T')[0]);
-    setStartTime('09:00');
-    setEndTime('10:00');
-    setVenue(latestSchedule?.venue || latestSchedule?.location || 'Conference Room A');
-    setNotes('');
+    // Venue, Date, Time & Notes
+    if (isEditing && activeSchedule) {
+      setDate(activeSchedule.date || '');
+      setStartTime(activeSchedule.startTime || activeSchedule.time || '09:00');
+      setEndTime(activeSchedule.endTime || '10:00');
+      setVenue(activeSchedule.venue || activeSchedule.location || 'Conference Room A');
+      setNotes(activeSchedule.notes || '');
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const y = tomorrow.getFullYear();
+      const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+      const d = String(tomorrow.getDate()).padStart(2, '0');
+      setDate(`${y}-${m}-${d}`);
+      setStartTime('09:00');
+      setEndTime('10:00');
+      setVenue(activeSchedule?.venue || activeSchedule?.location || 'Conference Room A');
+      setNotes('');
+    }
   };
 
   const handleGroupSelect = (groupId) => {
     setSelectedGroupId(groupId);
     setGroupDropdownOpen(false);
     setGroupSearchQuery('');
-    populateFromGroup(groupId, isRedefenseMode);
+    populateFromGroup(groupId, null, isRedefenseMode);
   };
 
   const handleDurationPreset = (minutes) => {
@@ -266,6 +297,7 @@ export const ScheduleDefenseModal = ({
           currentGroup.name ||
           'Untitled Research',
         defenseType: defenseStage,
+        type: defenseStage === 'final_defense' ? 'final_defense' : 'proposal',
         date,
         startTime,
         endTime,
@@ -275,30 +307,36 @@ export const ScheduleDefenseModal = ({
         panelistIds: panelistIdList,
         panelists: panelistObjects,
         status: 'scheduled',
-        resultStatus: isRedefenseActive ? 're_defense' : 'scheduled',
+        resultStatus: isRedefenseActive ? 're_defense' : 'pending',
         defenseStage: stageLabel,
         isRedefense: isRedefenseActive,
         notes: notes.trim(),
       };
 
-      // 1. Create the new chronological schedule entry
-      await scheduleService.createSchedule(payload);
+      let savedRecord;
+      if (editingScheduleId) {
+        // 1. UPDATE existing schedule in place
+        savedRecord = await scheduleService.updateSchedule(editingScheduleId, payload);
+      } else {
+        // 1. Create the new chronological schedule entry
+        savedRecord = await scheduleService.createSchedule(payload);
 
-      // 2. Mark previous schedules for this group as completed or for_redefense if they were still scheduled
-      if (groupSchedulesHistory.length > 0) {
-        await Promise.all(
-          groupSchedulesHistory.map((s) => {
-            if (s.status === 'scheduled') {
-              return scheduleService
-                .updateSchedule(s.id, {
-                  status: isRedefenseActive ? 'for_redefense' : 'completed',
-                  resultStatus: isRedefenseActive ? 're_defense' : 'completed',
-                })
-                .catch(() => null);
-            }
-            return Promise.resolve();
-          })
-        );
+        // 2. Mark previous schedules for this group as completed or for_redefense if they were still scheduled
+        if (groupSchedulesHistory.length > 0) {
+          await Promise.all(
+            groupSchedulesHistory.map((s) => {
+              if (s.status === 'scheduled') {
+                return scheduleService
+                  .updateSchedule(s.id, {
+                    status: isRedefenseActive ? 'for_redefense' : 'completed',
+                    resultStatus: isRedefenseActive ? 're_defense' : 'completed',
+                  })
+                  .catch(() => null);
+              }
+              return Promise.resolve();
+            })
+          );
+        }
       }
 
       // 3. Update group records with assigned adviser, panelists, and stage
@@ -312,11 +350,11 @@ export const ScheduleDefenseModal = ({
         })
         .catch(() => null);
 
-      onScheduleSaved(payload);
+      onScheduleSaved(savedRecord || payload);
       onClose();
     } catch (err) {
       console.error('[ScheduleDefenseModal] save error:', err);
-      setError(err.message || 'Failed to create schedule.');
+      setError(err.response?.data?.message || err.message || (editingScheduleId ? 'Failed to update schedule.' : 'Failed to create schedule.'));
     } finally {
       setLoading(false);
     }
@@ -340,7 +378,13 @@ export const ScheduleDefenseModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isRedefenseMode ? 'Schedule Re-defense Presentation' : 'Schedule Defense Presentation'}
+      title={
+        isRedefenseMode
+          ? 'Schedule Re-defense Presentation'
+          : editingScheduleId
+            ? 'Edit Defense Schedule'
+            : 'Schedule Defense Presentation'
+      }
       icon={isRedefenseMode ? CalendarPlus : HiCalendarDays}
       maxWidth="max-w-3xl"
     >
@@ -759,9 +803,14 @@ export const ScheduleDefenseModal = ({
             {loading ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Scheduling...
+                Saving...
               </span>
-            ) : defenseStage === 'redefense' ? (
+            ) : editingScheduleId ? (
+              <span className="flex items-center gap-1.5">
+                <HiCalendarDays className="w-4 h-4" />
+                Save Changes
+              </span>
+            ) : defenseStage === 'redefense' || isRedefense ? (
               <span className="flex items-center gap-1.5">
                 <HiArrowPath className="w-4 h-4" />
                 Confirm Re-defense Schedule

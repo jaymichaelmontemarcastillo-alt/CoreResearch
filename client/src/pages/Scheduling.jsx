@@ -29,12 +29,33 @@ import { ScheduleDefenseModal } from "../components/scheduling/ScheduleDefenseMo
 
 const formatTime12Hour = (time) => {
   if (!time) return '';
-  const parts = time.split(':');
-  if (parts.length < 2) return time;
+  let cleanTime = time;
+  if (cleanTime.includes('T')) {
+    cleanTime = cleanTime.split('T')[1].split('.')[0];
+  }
+  const parts = cleanTime.split(':');
+  if (parts.length < 2) return cleanTime;
   const h = parseInt(parts[0], 10);
+  if (isNaN(h)) return cleanTime;
+  const m = (parts[1] || '00').slice(0, 2);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const formattedHour = h % 12 || 12;
-  return `${formattedHour}:${parts[1]} ${ampm}`;
+  return `${formattedHour}:${m} ${ampm}`;
+};
+
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+  }
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? dateStr : parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
 export const Scheduling = () => {
@@ -63,6 +84,7 @@ export const Scheduling = () => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isScheduleDefenseModalOpen, setIsScheduleDefenseModalOpen] = useState(false);
   const [selectedGroupForScheduling, setSelectedGroupForScheduling] = useState(null);
+  const [selectedScheduleForEditing, setSelectedScheduleForEditing] = useState(null);
   const [isRedefenseMode, setIsRedefenseMode] = useState(false);
   const [evaluations, setEvaluations] = useState({ proposalEvaluations: [], finalEvaluations: [] });
 
@@ -540,6 +562,7 @@ export const Scheduling = () => {
             className="w-full md:w-auto h-10 shadow-sm border-gray-200 dark:border-[#2b2d3b] hover:bg-gray-50 dark:hover:bg-[#1a1b26]"
             onClick={() => {
               setSelectedGroupForScheduling(null);
+              setSelectedScheduleForEditing(null);
               setIsRedefenseMode(false);
               setIsScheduleDefenseModalOpen(true);
             }}
@@ -709,7 +732,7 @@ export const Scheduling = () => {
                                           {formatTime12Hour(schedule.startTime)} {schedule.endTime ? `- ${formatTime12Hour(schedule.endTime)}` : ''}
                                         </span>
                                         <span className="text-[10px] text-gray-500 font-medium">
-                                          {schedule.date ? new Date(schedule.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                                          {formatDateDisplay(schedule.date)}
                                         </span>
                                         {schedule.venue && (
                                           <span className="text-[10px] text-gray-400 truncate max-w-[110px]" title={schedule.venue}>
@@ -831,6 +854,7 @@ export const Scheduling = () => {
                                           title="Set Re-defense presentation schedule"
                                           onClick={() => {
                                             setSelectedGroupForScheduling(group);
+                                            setSelectedScheduleForEditing(schedule);
                                             setIsRedefenseMode(true);
                                             setIsScheduleDefenseModalOpen(true);
                                           }}
@@ -848,6 +872,7 @@ export const Scheduling = () => {
                                           } 
                                           onClick={() => {
                                             setSelectedGroupForScheduling(group);
+                                            setSelectedScheduleForEditing(schedule);
                                             setIsRedefenseMode(false);
                                             setIsScheduleDefenseModalOpen(true);
                                           }}
@@ -907,6 +932,7 @@ export const Scheduling = () => {
           onClose={() => {
             setIsScheduleDefenseModalOpen(false);
             setSelectedGroupForScheduling(null);
+            setSelectedScheduleForEditing(null);
             setIsRedefenseMode(false);
           }}
           groups={
@@ -917,16 +943,31 @@ export const Scheduling = () => {
           proposals={proposals}
           schedules={schedules}
           preselectedGroup={selectedGroupForScheduling}
+          scheduleToEdit={selectedScheduleForEditing}
           isRedefenseMode={isRedefenseMode}
-          onScheduleSaved={() => {
+          onScheduleSaved={(savedSchedule) => {
             setIsScheduleDefenseModalOpen(false);
             setSelectedGroupForScheduling(null);
+            setSelectedScheduleForEditing(null);
             setIsRedefenseMode(false);
             showToast(
               isRedefenseMode
                 ? "Re-defense schedule confirmed successfully!"
-                : "Defense schedule created successfully!"
+                : (savedSchedule?.id && schedules.some(s => s.id === savedSchedule.id)
+                  ? "Defense schedule updated successfully!"
+                  : "Defense schedule created successfully!")
             );
+            if (savedSchedule?.id) {
+              setSchedules((prev) => {
+                const idx = prev.findIndex((s) => s.id === savedSchedule.id);
+                if (idx >= 0) {
+                  const updated = [...prev];
+                  updated[idx] = { ...updated[idx], ...savedSchedule };
+                  return updated;
+                }
+                return [...prev, savedSchedule];
+              });
+            }
             refreshData(false);
           }}
         />

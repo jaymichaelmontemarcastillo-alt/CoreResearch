@@ -186,12 +186,19 @@ export const createSchedule = async (req, res) => {
 
     try {
       if (mongoose.connection.readyState === 1) {
-        const panelistsList = panelistIds ? panelistIds.map((pid, idx) => ({
-          id: pid,
-          name: panelistNames[idx] || 'Panelist',
-          email: '',
-          role: 'panelist'
-        })) : [];
+        const panelistsList = Array.isArray(panelists) && panelists.length > 0
+          ? panelists.map(p => ({
+              id: p.id || p.uid,
+              name: p.name || p.fullName || 'Panelist',
+              email: p.email || '',
+              role: p.role || 'panelist'
+            }))
+          : (panelistIds ? panelistIds.map((pid, idx) => ({
+              id: pid,
+              name: panelistNames[idx] || 'Panelist',
+              email: '',
+              role: 'panelist'
+            })) : []);
 
         createdSchedule = await MongoSchedule.create({
           id: newScheduleId,
@@ -203,7 +210,7 @@ export const createSchedule = async (req, res) => {
           time: startTime,
           endTime: endTime || '11:00',
           location: venue || 'Conference Room A',
-          type: defenseType === 'proposal_defense' ? 'proposal' : 'final_defense',
+          type: (defenseType === 'final_defense' || defenseType === 'final') ? 'final_defense' : 'proposal',
           status: 'scheduled',
           adviserId,
           adviserName,
@@ -211,7 +218,7 @@ export const createSchedule = async (req, res) => {
           attempt: attempt || 1,
           defenseStage: defenseStage || (attempt > 1 ? `Re-defense (Attempt ${attempt})` : 'Title Defense'),
           notes,
-          resultStatus
+          resultStatus: resultStatus || 'pending'
         });
         mongoSuccess = true;
       }
@@ -329,14 +336,24 @@ export const getSchedules = async (req, res) => {
         const missingGroupIds = idArray.filter(id => !groupMap.has(id));
         if (missingGroupIds.length > 0) {
           try {
-            await Promise.all(
-              missingGroupIds.map(async (gid) => {
-                const docSnap = await db.collection('research_groups').doc(gid).get();
-                if (docSnap.exists) {
-                  groupMap.set(gid, { id: docSnap.id, ...docSnap.data() });
+            if (typeof db.getAll === 'function') {
+              const refs = missingGroupIds.map(gid => db.collection('research_groups').doc(gid));
+              const docSnaps = await db.getAll(...refs);
+              docSnaps.forEach(snap => {
+                if (snap.exists) {
+                  groupMap.set(snap.id, { id: snap.id, ...snap.data() });
                 }
-              })
-            );
+              });
+            } else {
+              await Promise.all(
+                missingGroupIds.map(async (gid) => {
+                  const docSnap = await db.collection('research_groups').doc(gid).get();
+                  if (docSnap.exists) {
+                    groupMap.set(gid, { id: docSnap.id, ...docSnap.data() });
+                  }
+                })
+              );
+            }
           } catch (fErr) {
             console.warn('[ScheduleController] Firestore groups lookup warn:', fErr.message);
           }
@@ -417,7 +434,14 @@ export const getSchedules = async (req, res) => {
     });
 
     list = enrichedDocs.map(toDefenseScheduleProjection);
-    list.sort((a, b) => new Date(`${a.date}T${a.startTime}`) - new Date(`${b.date}T${b.startTime}`));
+    list.sort((a, b) => {
+      const dateA = a.date || '9999-12-31';
+      const dateB = b.date || '9999-12-31';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const timeA = (a.startTime || '23:59').padStart(5, '0');
+      const timeB = (b.startTime || '23:59').padStart(5, '0');
+      return timeA.localeCompare(timeB);
+    });
 
     return res.status(200).json({
       success: true,
@@ -498,7 +522,33 @@ export const updateScheduleStatus = async (req, res) => {
 export const updateSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, startTime, endTime, venue, adviserId, adviserName, panelists, status, attempt, defenseStage, notes, resultStatus } = req.body;
+    const {
+      projectId,
+      groupId,
+      projectTitle,
+      title,
+      studentName,
+      members,
+      memberIds,
+      defenseType,
+      type,
+      date,
+      startTime,
+      time,
+      endTime,
+      venue,
+      location,
+      adviserId,
+      adviserName,
+      panelistIds: requestedPanelistIds,
+      panelists,
+      status,
+      attempt,
+      defenseStage,
+      notes,
+      resultStatus
+    } = req.body;
+
     const allowedStatuses = ['scheduled', 'rescheduled', 'completed', 'cancelled', 'failed', 'for_redefense', 'archived'];
 
     // Enforce Section 8.1 & 8.3: Group Adviser CANNOT be Panelist
@@ -521,12 +571,22 @@ export const updateSchedule = async (req, res) => {
     }
 
     const updates = {};
+    if (projectId !== undefined || groupId !== undefined) updates.projectId = projectId || groupId;
+    if (projectTitle !== undefined || title !== undefined) updates.projectTitle = projectTitle || title;
+    if (studentName !== undefined) updates.studentName = studentName;
+    if (memberIds !== undefined) updates.memberIds = memberIds;
     if (date !== undefined) updates.date = date;
-    if (startTime !== undefined) updates.time = startTime;
+    if (startTime !== undefined || time !== undefined) updates.time = startTime || time;
     if (endTime !== undefined) updates.endTime = endTime;
-    if (venue !== undefined) updates.location = venue;
+    if (venue !== undefined || location !== undefined) updates.location = venue || location;
     if (adviserId !== undefined) updates.adviserId = adviserId;
     if (adviserName !== undefined) updates.adviserName = adviserName;
+
+    if (defenseType !== undefined || type !== undefined) {
+      const rawType = defenseType || type;
+      updates.type = (rawType === 'final_defense' || rawType === 'final') ? 'final_defense' : 'proposal';
+    }
+
     if (panelists !== undefined) {
       updates.panelists = panelists.map(panelist => ({
         id: panelist.id || panelist.uid,
@@ -534,18 +594,43 @@ export const updateSchedule = async (req, res) => {
         email: panelist.email || '',
         role: panelist.role || 'panelist'
       }));
+    } else if (Array.isArray(requestedPanelistIds)) {
+      updates.panelists = requestedPanelistIds.map(pid => ({
+        id: pid,
+        name: 'Panelist',
+        email: '',
+        role: 'panelist'
+      }));
     }
+
     if (status !== undefined) updates.status = status;
     if (attempt !== undefined) updates.attempt = attempt;
     if (defenseStage !== undefined) updates.defenseStage = defenseStage;
     if (notes !== undefined) updates.notes = notes;
     if (resultStatus !== undefined) updates.resultStatus = resultStatus;
 
-    const updatedSchedule = await MongoSchedule.findOneAndUpdate(
-      { id },
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+    // Match by custom string `id` or Mongo `_id`
+    const queryConditions = [{ id: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      queryConditions.push({ _id: new mongoose.Types.ObjectId(id) });
+    }
+
+    let updatedSchedule;
+    try {
+      updatedSchedule = await MongoSchedule.findOneAndUpdate(
+        { $or: queryConditions },
+        { $set: updates },
+        { new: true, runValidators: true }
+      );
+    } catch (mongoErr) {
+      console.error('[ScheduleController] MongoDB update schedule error:', mongoErr.message);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation Error',
+        message: mongoErr.message
+      });
+    }
+
     if (!updatedSchedule) {
       return res.status(404).json({ success: false, error: 'Not Found', message: 'Schedule not found.' });
     }
@@ -561,10 +646,24 @@ export const updateSchedule = async (req, res) => {
         scheduleId: updatedSchedule.id
       });
     }
+
+    // Sync to Firestore 'schedules' and 'defense_schedules'
+    const projection = toDefenseScheduleProjection(updatedSchedule);
+    if (db) {
+      try {
+        await Promise.all([
+          db.collection('schedules').doc(updatedSchedule.id).set(projection, { merge: true }),
+          db.collection('defense_schedules').doc(updatedSchedule.id).set(projection, { merge: true })
+        ]);
+      } catch (fErr) {
+        console.warn('[ScheduleController] Firestore update sync warning:', fErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      message: `Schedule updated successfully.`,
-      data: toDefenseScheduleProjection(updatedSchedule)
+      message: 'Schedule updated successfully.',
+      data: projection
     });
   } catch (error) {
     console.error('[ScheduleController] updateSchedule error:', error);
