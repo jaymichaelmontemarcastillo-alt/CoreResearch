@@ -97,8 +97,9 @@ export const getAllUsers = async (req, res) => {
     let limitNum = limit ? parseInt(limit, 10) : 10;
     const targetProgram = (program || courseId || '').trim();
     const targetSpec = (specialization || major || '').trim();
+    const hasSearchFilter = Boolean(search && search.trim());
     const hasPostQueryFilters = Boolean(
-      (search && search.trim()) ||
+      hasSearchFilter ||
       (targetProgram && targetProgram.toLowerCase() !== 'all') ||
       (targetSpec && targetSpec.toLowerCase() !== 'all')
     );
@@ -113,7 +114,7 @@ export const getAllUsers = async (req, res) => {
           status,
           ...(hasPostQueryFilters ? { search, program, courseId, specialization, major } : {})
         });
-        if (!hasPostQueryFilters && (page || limit)) {
+        if (!hasSearchFilter && (page || limit)) {
           const [count, pageUsers] = await Promise.all([
             User.countDocuments(mongoFilter),
             User.find(mongoFilter)

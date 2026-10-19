@@ -78,7 +78,7 @@ export const canAccessProject = async (user, projectId, additionalRecord = null)
 
   if (records.some((record) => isResourceParticipant(record, user))) return true;
 
-  // 2. Resolve group from MongoDB
+  // 2. Resolve group and schedule from MongoDB (fast & authoritative)
   const groupIds = new Set(records.map((record) => record.groupId).filter(Boolean));
   if (records.some((record) => record.id === projectId)) {
     groupIds.add(projectId);
@@ -131,45 +131,7 @@ export const canAccessProject = async (user, projectId, additionalRecord = null)
 
   if (records.some((record) => isResourceParticipant(record, user))) return true;
 
-  // 3. Firestore checks (with timeout protection)
-  const collectionNames = [
-    'research_groups',
-    'research_projects',
-    'manuscript_workspaces',
-    'proposals',
-    'manuscript_drafts',
-    'documents'
-  ];
-
-  for (const collectionName of collectionNames) {
-    const record = await getFirestoreRecord(collectionName, projectId);
-    if (record) {
-      records.push(record);
-      if (record.groupId) groupIds.add(record.groupId);
-    }
-  }
-
-  if (db && !isDevMockMode) {
-    try {
-      const wsPromise = db.collection('manuscript_workspaces').where('documentId', '==', projectId).limit(1).get();
-      const wsSnap = await withTimeout(wsPromise, 1500);
-      if (!wsSnap.empty) {
-        const wsDoc = wsSnap.docs[0];
-        const wsData = { id: wsDoc.id, ...wsDoc.data() };
-        records.push(wsData);
-        if (wsData.groupId) groupIds.add(wsData.groupId);
-      }
-    } catch (e) {}
-  }
-
-  if (records.some((record) => isResourceParticipant(record, user))) return true;
-
-  for (const groupId of groupIds) {
-    const group = await getFirestoreRecord('research_groups', groupId);
-    if (group && isResourceParticipant(group, user)) return true;
-  }
-
-  // 4. Schedule check for adviser and panelist
+  // 3. Early Schedule check for adviser and panelist via MongoDB
   if (['adviser', 'panelist'].includes(user.role) && mongoose.connection.readyState === 1) {
     try {
       const { Schedule } = await import('../models/Schedule.js');
@@ -186,6 +148,56 @@ export const canAccessProject = async (user, projectId, additionalRecord = null)
           Array.isArray(schedule.panelists) &&
           schedule.panelists.some((panelist) => panelist?.id === user.uid || panelist?.uid === user.uid)
         ) return true;
+      }
+    } catch (e) {}
+  }
+
+  // 4. Fallback to Firestore checks concurrently with low timeout if MongoDB has no record
+  const collectionNames = [
+    'research_groups',
+    'research_projects',
+    'manuscript_workspaces',
+    'proposals',
+    'manuscript_drafts',
+    'documents'
+  ];
+
+  try {
+    const firestoreResults = await Promise.allSettled(
+      collectionNames.map((col) => getFirestoreRecord(col, projectId))
+    );
+    for (const res of firestoreResults) {
+      if (res.status === 'fulfilled' && res.value) {
+        records.push(res.value);
+        if (res.value.groupId) groupIds.add(res.value.groupId);
+      }
+    }
+  } catch (e) {}
+
+  if (db && !isDevMockMode) {
+    try {
+      const wsPromise = db.collection('manuscript_workspaces').where('documentId', '==', projectId).limit(1).get();
+      const wsSnap = await withTimeout(wsPromise, 800);
+      if (!wsSnap.empty) {
+        const wsDoc = wsSnap.docs[0];
+        const wsData = { id: wsDoc.id, ...wsDoc.data() };
+        records.push(wsData);
+        if (wsData.groupId) groupIds.add(wsData.groupId);
+      }
+    } catch (e) {}
+  }
+
+  if (records.some((record) => isResourceParticipant(record, user))) return true;
+
+  if (groupIds.size > 0) {
+    try {
+      const groupResults = await Promise.allSettled(
+        Array.from(groupIds).map((gid) => getFirestoreRecord('research_groups', gid))
+      );
+      for (const res of groupResults) {
+        if (res.status === 'fulfilled' && res.value && isResourceParticipant(res.value, user)) {
+          return true;
+        }
       }
     } catch (e) {}
   }

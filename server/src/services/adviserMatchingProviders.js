@@ -218,10 +218,19 @@ export class NLPAdviserMatchingProvider {
 // ── Gemini Provider ───────────────────────────────────────────────────────────
 
 import { GoogleGenAI } from '@google/genai';
+import { createHash } from 'crypto';
 import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 
-// Simple in-memory cache for adviser embeddings to save API calls
+// Simple in-memory cache for adviser embeddings and research docs
 const adviserEmbeddingCache = new Map();
+const studentProposalCache = new Map();
+const STUDENT_PROPOSAL_TTL = 10 * 60 * 1000; // 10 minutes
+
+let cachedResearchDocs = {
+  docs: null,
+  timestamp: 0,
+};
+const RESEARCH_DOCS_TTL = 60 * 1000; // 60s
 
 // Helper to compute cosine similarity
 function cosineSimilarity(vecA, vecB) {
@@ -352,10 +361,20 @@ export class GeminiAdviserMatchingProvider {
     const startTime = Date.now();
     const researchText = `${title}\n\n${description || ''}`.trim();
     
-    console.log(`[GeminiProvider] Analyzing student proposal: "${title.substring(0, 40)}..."`);
+    const proposalHash = createHash('sha256').update(researchText).digest('hex');
+    let studentData = null;
+    let studentEmbedding = null;
 
-    // 1. Analyze student proposal with same schema
-    const prompt = `
+    const cachedProposal = studentProposalCache.get(proposalHash);
+    if (cachedProposal && Date.now() - cachedProposal.timestamp < STUDENT_PROPOSAL_TTL) {
+      console.log(`[GeminiProvider] Using cached proposal analysis and embedding for "${title.substring(0, 40)}..."`);
+      studentData = cachedProposal.studentData;
+      studentEmbedding = cachedProposal.studentEmbedding;
+    } else {
+      console.log(`[GeminiProvider] Analyzing student proposal: "${title.substring(0, 40)}..."`);
+
+      // 1. Analyze student proposal with same schema
+      const prompt = `
 Analyze the following student research proposal and extract structured metadata.
 Focus on identifying the research concepts, methodologies, and specific domain keywords.
 Do NOT extract generic academic terms.
@@ -366,63 +385,86 @@ ${researchText.substring(0, 5000)}
 ---
 `;
 
-    const responseSchema = {
-      type: "OBJECT",
-      properties: {
-        abstract: { type: "STRING" },
-        keywords: { type: "ARRAY", items: { type: "STRING" } },
-        keyPhrases: { type: "ARRAY", items: { type: "STRING" } },
-        researchTopics: { type: "ARRAY", items: { type: "STRING" } },
-        researchConcepts: { type: "ARRAY", items: { type: "STRING" } },
-        methodologies: { type: "ARRAY", items: { type: "STRING" } },
-        researchDomain: { type: "STRING" },
-        researchProblem: { type: "STRING" }
-      },
-      required: ["abstract", "keywords", "researchTopics", "researchConcepts", "methodologies", "researchDomain", "researchProblem"]
-    };
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          abstract: { type: "STRING" },
+          keywords: { type: "ARRAY", items: { type: "STRING" } },
+          keyPhrases: { type: "ARRAY", items: { type: "STRING" } },
+          researchTopics: { type: "ARRAY", items: { type: "STRING" } },
+          researchConcepts: { type: "ARRAY", items: { type: "STRING" } },
+          methodologies: { type: "ARRAY", items: { type: "STRING" } },
+          researchDomain: { type: "STRING" },
+          researchProblem: { type: "STRING" }
+        },
+        required: ["abstract", "keywords", "researchTopics", "researchConcepts", "methodologies", "researchDomain", "researchProblem"]
+      };
 
-    let studentData = {
-      abstract: '', keywords: [], keyPhrases: [], researchTopics: [],
-      researchConcepts: [], methodologies: [], researchDomain: '', researchProblem: ''
-    };
+      studentData = {
+        abstract: '', keywords: [], keyPhrases: [], researchTopics: [],
+        researchConcepts: [], methodologies: [], researchDomain: '', researchProblem: ''
+      };
 
-    try {
-      const response = await this.ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: responseSchema
-        }
+      try {
+        const response = await this.ai.models.generateContent({
+          model: 'gemini-3.6-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: responseSchema
+          }
+        });
+        studentData = JSON.parse(response.text);
+      } catch (err) {
+        console.warn('[GeminiProvider] Failed to parse student proposal with Gemini:', err.message);
+        // Fallback: just use raw text for simple overlap if Gemini structured output fails
+      }
+
+      const studentRepresentation = [
+        title,
+        studentData.abstract || description || '',
+        ...(studentData.researchTopics || []),
+        ...(studentData.keywords || []),
+        ...(studentData.keyPhrases || []),
+        ...(studentData.researchConcepts || []),
+        ...(studentData.methodologies || []),
+        studentData.researchDomain || '',
+        studentData.researchProblem || ''
+      ].join(' ');
+
+      console.log(`[GeminiProvider] Generating semantic embedding for student proposal.`);
+      studentEmbedding = await this._getEmbedding(studentRepresentation);
+
+      if (studentProposalCache.size > 200) {
+        const oldestKey = studentProposalCache.keys().next().value;
+        studentProposalCache.delete(oldestKey);
+      }
+      studentProposalCache.set(proposalHash, {
+        studentData,
+        studentEmbedding,
+        timestamp: Date.now(),
       });
-      studentData = JSON.parse(response.text);
-    } catch (err) {
-      console.warn('[GeminiProvider] Failed to parse student proposal with Gemini:', err.message);
-      // Fallback: just use raw text for simple overlap if Gemini structured output fails
     }
 
-    const studentRepresentation = [
-      title,
-      studentData.abstract || description || '',
-      ...(studentData.researchTopics || []),
-      ...(studentData.keywords || []),
-      ...(studentData.keyPhrases || []),
-      ...(studentData.researchConcepts || []),
-      ...(studentData.methodologies || []),
-      studentData.researchDomain || '',
-      studentData.researchProblem || ''
-    ].join(' ');
+    // 2. Fetch all READY research documents for the eligible advisers (using cache if fresh)
+    const eligibleAdviserIds = new Set(advisers.map(a => a.adviserId));
+    let allReadyDocs;
+    if (cachedResearchDocs.docs && (Date.now() - cachedResearchDocs.timestamp < RESEARCH_DOCS_TTL)) {
+      allReadyDocs = cachedResearchDocs.docs;
+    } else {
+      allReadyDocs = await AdviserResearchDocument.find({
+        processingStatus: 'READY'
+      }).lean();
+      cachedResearchDocs = {
+        docs: allReadyDocs,
+        timestamp: Date.now(),
+      };
+      allReadyDocs.forEach(d => {
+        if (d.id && d.embedding) adviserEmbeddingCache.set(d.id, d.embedding);
+      });
+    }
 
-    console.log(`[GeminiProvider] Generating semantic embedding for student proposal.`);
-    const studentEmbedding = await this._getEmbedding(studentRepresentation);
-    
-    // 2. Fetch all READY research documents for the eligible advisers
-    const eligibleAdviserIds = advisers.map(a => a.adviserId);
-    const researchDocs = await AdviserResearchDocument.find({
-      adviserId: { $in: eligibleAdviserIds },
-      processingStatus: 'READY'
-    }).lean();
-
+    const researchDocs = allReadyDocs.filter(d => eligibleAdviserIds.has(d.adviserId));
     console.log(`[GeminiProvider] Found ${researchDocs.length} processed research documents for eligible advisers.`);
 
     const adviserDocScores = new Map();

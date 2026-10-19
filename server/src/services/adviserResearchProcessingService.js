@@ -3,6 +3,7 @@ import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 import mongoose from 'mongoose';
 import { documentAnalysisService } from './DocumentAnalysisService.js';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
+import { GoogleGenAI } from '@google/genai';
 
 class AdviserResearchProcessingService {
   constructor() {
@@ -65,7 +66,7 @@ class AdviserResearchProcessingService {
     return this._ai;
   }
 
-  async importResearchDocument({ fileBuffer, fileName, mimeType, fileSize, adviserId }) {
+  async importResearchDocument({ fileBuffer, fileName, mimeType, fileSize, adviserId, title }) {
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new Error('No file data received.');
     }
@@ -99,7 +100,7 @@ class AdviserResearchProcessingService {
     const doc = await AdviserResearchDocument.create({
       id: documentId,
       adviserId,
-      title: fileName.replace(/\.[^/.]+$/, ''),
+      title: title || fileName.replace(/\.[^/.]+$/, ''),
       originalFilename: cleanFileName,
       storageKey,
       fileUrl: uploadResult.url,

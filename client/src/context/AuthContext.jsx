@@ -261,16 +261,16 @@ export const AuthProvider = ({ children }) => {
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedStudentId = studentId.trim();
 
-      // 1. Check unique Student ID
-      const studentIdExists = await userService.checkStudentIdExists(normalizedStudentId);
+      // 1 & 2. Check unique Student ID and Email in parallel
+      const [studentIdExists, emailExists] = await Promise.all([
+        userService.checkStudentIdExists(normalizedStudentId),
+        userService.checkEmailExists(normalizedEmail),
+      ]);
       if (studentIdExists) {
         const idErr = new Error("Student ID Already Registered\nThis Student ID Number is already associated with an account.");
         idErr.code = "auth/student-id-exists";
         throw idErr;
       }
-
-      // 2. Check unique Email
-      const emailExists = await userService.checkEmailExists(normalizedEmail);
       if (emailExists) {
         const emailErr = new Error("Email Already Registered\nAn account with this email address already exists.");
         emailErr.code = "auth/email-already-in-use";
@@ -338,15 +338,19 @@ export const AuthProvider = ({ children }) => {
       };
 
       // 4. Persist profile document:
+      let backendRegistered = false;
       try {
         await api.post('/auth/register', userProfileData);
+        backendRegistered = true;
       } catch (apiErr) {
         console.warn('[AuthContext] Backend register error:', apiErr);
       }
-      try {
-        await setDoc(doc(db, 'users', result.user.uid), userProfileData, { merge: true });
-      } catch (fsErr) {
-        console.warn('[AuthContext] Client Firestore write error:', fsErr);
+      if (!backendRegistered) {
+        try {
+          await setDoc(doc(db, 'users', result.user.uid), userProfileData, { merge: true });
+        } catch (fsErr) {
+          console.warn('[AuthContext] Client Firestore write error:', fsErr);
+        }
       }
 
       // 6. Keep session & profile active with pending status.
@@ -383,16 +387,14 @@ export const AuthProvider = ({ children }) => {
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedEmployeeId = employeeId ? employeeId.trim() : '';
 
-      // Check unique employee id if provided
-      if (normalizedEmployeeId) {
-        const empExists = await userService.checkStudentIdExists(normalizedEmployeeId);
-        if (empExists) {
-          throw new Error("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
-        }
+      // Check unique employee id and email in parallel
+      const [empExists, emailExists] = await Promise.all([
+        normalizedEmployeeId ? userService.checkStudentIdExists(normalizedEmployeeId) : Promise.resolve(false),
+        userService.checkEmailExists(normalizedEmail),
+      ]);
+      if (empExists) {
+        throw new Error("Employee ID Already Registered\nThis Employee ID is already associated with an account.");
       }
-
-      // Check unique email
-      const emailExists = await userService.checkEmailExists(normalizedEmail);
       if (emailExists) {
         const emailErr = new Error("Email Already Registered\nAn account with this email address already exists.");
         emailErr.code = "auth/email-already-in-use";
@@ -426,15 +428,19 @@ export const AuthProvider = ({ children }) => {
         updated_at: new Date().toISOString()
       };
 
+      let backendRegistered = false;
       try {
         await api.post('/auth/register', userProfileData);
+        backendRegistered = true;
       } catch (apiErr) {
         console.warn('[AuthContext] Backend register error:', apiErr);
       }
-      try {
-        await setDoc(doc(db, 'users', result.user.uid), userProfileData, { merge: true });
-      } catch (fsErr) {
-        console.warn('[AuthContext] Client Firestore write error:', fsErr);
+      if (!backendRegistered) {
+        try {
+          await setDoc(doc(db, 'users', result.user.uid), userProfileData, { merge: true });
+        } catch (fsErr) {
+          console.warn('[AuthContext] Client Firestore write error:', fsErr);
+        }
       }
 
       // Keep session & profile active with pending status.

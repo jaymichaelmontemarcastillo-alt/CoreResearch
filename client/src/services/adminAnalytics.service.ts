@@ -426,9 +426,12 @@ export const adminAnalyticsService = {
    * and count() where full document bodies are not needed.
    */
   async fetchAnalyticsData(filters: AnalyticsFilterOptions = {}): Promise<AdminAnalyticsDataset> {
-    const { getDocs, query, where, collection, getCountFromServer } = await import('firebase/firestore');
-    const { db } = await import('../firebase/firebase');
-    const { default: dataCache, CACHE_TTL } = await import('./dataCache');
+    const { default: dataCache } = await import('./dataCache');
+    const cacheKey = `analytics_${filters.academicYear || 'all'}_${filters.semester || 'all'}_${filters.program || 'all'}`;
+
+    return dataCache.getOrFetch(cacheKey, async () => {
+      const { getDocs, query, where, collection, getCountFromServer } = await import('firebase/firestore');
+      const { db } = await import('../firebase/firebase');
 
     const filterAY = filters.academicYear && filters.academicYear !== 'all' ? filters.academicYear : null;
     const filterSem = filters.semester && filters.semester !== 'all' ? filters.semester : null;
@@ -1148,19 +1151,20 @@ export const adminAnalyticsService = {
       name: c.name,
     }));
 
-    return {
-      summary: { totalStudents, activeProjects, pendingReviews, completedProjects },
-      statusDistribution,
-      progressTrend,
-      topicalTrends,
-      adviserWorkload,
-      studentsByProgram,
-      proposalOverview,
-      completionRate,
-      availableAcademicYears,
-      availableSemesters,
-      availablePrograms,
-    };
+      return {
+        summary: { totalStudents, activeProjects, pendingReviews, completedProjects },
+        statusDistribution,
+        progressTrend,
+        topicalTrends,
+        adviserWorkload,
+        studentsByProgram,
+        proposalOverview,
+        completionRate,
+        availableAcademicYears,
+        availableSemesters,
+        availablePrograms,
+      };
+    }, 120000); // 2 minutes TTL
   },
 };
 

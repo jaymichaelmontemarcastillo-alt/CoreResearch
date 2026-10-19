@@ -593,12 +593,29 @@ export const restartWorkspace = async (req, res) => {
   }
 };
 
+let adviserWorkloadsCache = {
+  data: null,
+  timestamp: 0,
+};
+const ADVISER_WORKLOADS_TTL = 60 * 1000; // 60s
+
+export function invalidateAdviserWorkloadsCache() {
+  adviserWorkloadsCache = { data: null, timestamp: 0 };
+}
+
 /**
  * Get active advisee workload counts for all advisers
  * Accessible to authenticated users (students, faculty, admin)
  */
 export const getAdviserWorkloads = async (req, res) => {
   try {
+    if (
+      adviserWorkloadsCache.data &&
+      Date.now() - adviserWorkloadsCache.timestamp < ADVISER_WORKLOADS_TTL
+    ) {
+      return res.status(200).json({ success: true, data: adviserWorkloadsCache.data, cached: true });
+    }
+
     const workloads = {};
 
     if (isDevMockMode) {
@@ -635,9 +652,17 @@ export const getAdviserWorkloads = async (req, res) => {
       }
     }
 
+    adviserWorkloadsCache = {
+      data: workloads,
+      timestamp: Date.now(),
+    };
+
     return res.status(200).json({ success: true, data: workloads });
   } catch (error) {
     console.error('[workspaceController] getAdviserWorkloads error:', error);
+    if (adviserWorkloadsCache.data) {
+      return res.status(200).json({ success: true, data: adviserWorkloadsCache.data, stale: true });
+    }
     return res.status(500).json({ success: false, error: error.message });
   }
 };

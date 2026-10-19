@@ -30,6 +30,7 @@ import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
 import { groupService } from "../services/group.service";
 import { researchWorkspaceService } from "../services/researchWorkspace.service";
+import dataCache, { CACHE_TTL } from "../services/dataCache";
 
 export const UserDirectory = () => {
   const { role, userProfile } = useAuth();
@@ -104,13 +105,21 @@ export const UserDirectory = () => {
   useEffect(() => {
     const loadAcademicConfig = async () => {
       try {
-        const coursesData = await courseService.getAllCourses();
+        const coursesData = await dataCache.getOrFetch(
+          "courses",
+          () => courseService.getAllCourses(),
+          CACHE_TTL.STABLE
+        );
         setCourses(coursesData);
         const sectionMap = {};
         await Promise.all(
           coursesData.map(async (c) => {
             try {
-              const secs = await sectionService.getSectionsByCourseId(c.id);
+              const secs = await dataCache.getOrFetch(
+                `sections_${c.id}`,
+                () => sectionService.getSectionsByCourseId(c.id),
+                CACHE_TTL.STABLE
+              );
               sectionMap[c.id] = secs;
             } catch {
               sectionMap[c.id] = [];

@@ -173,7 +173,7 @@ export const AdviserDashboardView = () => {
         dataCache.getOrFetch('sections', () => sectionService.getAllSections(), CACHE_TTL.STABLE).catch(() => []),
       ]);
 
-      // 1. Map known workspaces by groupId, id, and studentId
+      // 1. Map known workspaces by groupId, id, and studentId (including studentIds / members)
       const wsList = [...(adviserWorkspaces || [])];
       const wsByGroupId = {};
       const wsByStudentId = {};
@@ -182,22 +182,37 @@ export const AdviserDashboardView = () => {
         if (w.groupId) wsByGroupId[w.groupId] = w;
         if (w.id) wsByGroupId[w.id] = w;
         if (w.studentId) wsByStudentId[w.studentId] = w;
+        if (Array.isArray(w.studentIds)) {
+          w.studentIds.forEach((sid) => {
+            if (sid) wsByStudentId[sid] = w;
+          });
+        }
+        if (Array.isArray(w.members)) {
+          w.members.forEach((m) => {
+            if (m?.uid) wsByStudentId[m.uid] = w;
+          });
+        }
       });
 
-      // 2. For any group without a matched workspace in adviserWorkspaces, query workspace by groupId or member UID
-      await Promise.all(
-        (adviserGroups || []).map(async (grp) => {
-          if (!wsByGroupId[grp.id]) {
+      // 2. Resolve missing workspaces for groups only if not already matched in memory
+      const missingGroups = (adviserGroups || []).filter((grp) => {
+        if (wsByGroupId[grp.id]) return false;
+        // Check if any member UID already maps to a known workspace in memory
+        if (Array.isArray(grp.members)) {
+          const matchedWs = grp.members.map((m) => wsByStudentId[m.uid]).find(Boolean);
+          if (matchedWs) {
+            wsByGroupId[grp.id] = matchedWs;
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (missingGroups.length > 0) {
+        await Promise.all(
+          missingGroups.map(async (grp) => {
             try {
-              let ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', grp.id);
-              if (!ws && Array.isArray(grp.members) && grp.members.length > 0) {
-                for (const m of grp.members) {
-                  if (m.uid) {
-                    ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(m.uid);
-                    if (ws) break;
-                  }
-                }
-              }
+              const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup('', grp.id);
               if (ws) {
                 wsByGroupId[grp.id] = ws;
                 if (ws.studentId) wsByStudentId[ws.studentId] = ws;
@@ -206,9 +221,9 @@ export const AdviserDashboardView = () => {
             } catch (err) {
               console.warn('[AdviserDashboardView] Workspace resolution failed for group:', grp.id, err);
             }
-          }
-        })
-      );
+          })
+        );
+      }
 
       // 3. Enrich advisee groups with the actual submitted research title and status
       const enrichedGroups = (adviserGroups || []).map((grp) => {

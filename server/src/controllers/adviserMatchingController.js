@@ -61,10 +61,31 @@ async function getEligibleAdvisers() {
   return advisers;
 }
 
+let adviserPapersCache = {
+  map: null,
+  timestamp: 0,
+};
+const ADVISER_PAPERS_TTL = 60 * 1000;
+
+let availableAdvisersCache = {
+  data: null,
+  count: 0,
+  timestamp: 0,
+};
+const AVAILABLE_ADVISERS_TTL = 60 * 1000;
+
+export function invalidateAdviserCache() {
+  adviserPapersCache = { map: null, timestamp: 0 };
+  availableAdvisersCache = { data: null, count: 0, timestamp: 0 };
+}
+
 /**
  * Load published research documents for advisers from MongoDB.
  */
 async function getAdviserPapersMap() {
+  if (adviserPapersCache.map && Date.now() - adviserPapersCache.timestamp < ADVISER_PAPERS_TTL) {
+    return adviserPapersCache.map;
+  }
   const adviserPapersMap = new Map();
   try {
     if (mongoose.connection.readyState === 1) {
@@ -95,6 +116,10 @@ async function getAdviserPapersMap() {
           status: paper.processingStatus || "READY",
         });
       });
+      adviserPapersCache = {
+        map: adviserPapersMap,
+        timestamp: Date.now(),
+      };
     }
   } catch (paperErr) {
     console.warn(
@@ -470,38 +495,7 @@ export const matchAdvisers = async (req, res) => {
     const executionTimeMs = Date.now() - startTime;
 
     // ── Load Published Research Documents for Advisers ──────────────────
-    let adviserPapersMap = new Map();
-    try {
-      if (mongoose.connection.readyState === 1) {
-        const allPapers = await AdviserResearchDocument.find({
-          processingStatus: "READY",
-        })
-          .select(
-            "id adviserId title abstract keywords researchTopics methodologies fileUrl",
-          )
-          .lean();
-
-        allPapers.forEach((paper) => {
-          if (!adviserPapersMap.has(paper.adviserId)) {
-            adviserPapersMap.set(paper.adviserId, []);
-          }
-          adviserPapersMap.get(paper.adviserId).push({
-            id: paper.id,
-            title: paper.title,
-            abstract: paper.abstract || "",
-            keywords: paper.keywords || [],
-            researchTopics: paper.researchTopics || [],
-            methodologies: paper.methodologies || [],
-            fileUrl: paper.fileUrl || "",
-          });
-        });
-      }
-    } catch (paperErr) {
-      console.warn(
-        "[AdviserMatching] Could not load adviser papers:",
-        paperErr.message,
-      );
-    }
+    const adviserPapersMap = await getAdviserPapersMap();
 
     // ── Validate & Enrich Results ─────────────────────────────────────────
     const adviserMap = new Map(advisers.map((a) => [a.uid, a]));
@@ -775,39 +769,20 @@ export const extractDocument = async (req, res) => {
  */
 export const getAvailableAdvisers = async (req, res) => {
   try {
-    const advisers = await getEligibleAdvisers();
-    let adviserPapersMap = new Map();
-    if (mongoose.connection.readyState === 1) {
-      try {
-        const allPapers = await AdviserResearchDocument.find({
-          processingStatus: "READY",
-        })
-          .select(
-            "id adviserId title abstract keywords researchTopics methodologies fileUrl",
-          )
-          .lean();
-
-        allPapers.forEach((paper) => {
-          if (!adviserPapersMap.has(paper.adviserId)) {
-            adviserPapersMap.set(paper.adviserId, []);
-          }
-          adviserPapersMap.get(paper.adviserId).push({
-            id: paper.id,
-            title: paper.title,
-            abstract: paper.abstract || "",
-            keywords: paper.keywords || [],
-            researchTopics: paper.researchTopics || [],
-            methodologies: paper.methodologies || [],
-            fileUrl: paper.fileUrl || "",
-          });
-        });
-      } catch (err) {
-        console.warn(
-          "[AdviserMatching] getAvailableAdvisers papers error:",
-          err.message,
-        );
-      }
+    if (
+      availableAdvisersCache.data &&
+      Date.now() - availableAdvisersCache.timestamp < AVAILABLE_ADVISERS_TTL
+    ) {
+      return res.status(200).json({
+        success: true,
+        data: availableAdvisersCache.data,
+        count: availableAdvisersCache.count,
+        cached: true,
+      });
     }
+
+    const advisers = await getEligibleAdvisers();
+    const adviserPapersMap = await getAdviserPapersMap();
 
     const available = advisers
       .filter((adv) => {
@@ -844,6 +819,12 @@ export const getAvailableAdvisers = async (req, res) => {
         };
       })
       .sort((a, b) => b.availableSlots - a.availableSlots);
+
+    availableAdvisersCache = {
+      data: available,
+      count: available.length,
+      timestamp: Date.now(),
+    };
 
     return res.status(200).json({
       success: true,

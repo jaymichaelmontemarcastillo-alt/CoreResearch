@@ -46,6 +46,21 @@ const getEditorType = () => {
   return 'desktop';
 };
 
+// Session-level memoization of runtime server configuration
+let cachedServerConfigPromise = null;
+
+const getRuntimeServerUrl = () => {
+  if (!cachedServerConfigPromise) {
+    cachedServerConfigPromise = api.get('/config')
+      .then(res => res.data?.onlyofficeServerUrl || null)
+      .catch(err => {
+        console.warn('[OnlyOfficeEditor] Runtime config fetch fallback:', err.message);
+        return null;
+      });
+  }
+  return cachedServerConfigPromise;
+};
+
 export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
   const [config, setConfig] = useState(null);
   const [documentServerUrl, setDocumentServerUrl] = useState(null);
@@ -88,24 +103,21 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
         let serverUrl = import.meta.env.VITE_ONLYOFFICE_SERVER_URL || 'http://localhost:8080/';
         const configUrl = `/onlyoffice/config/${documentId}${mode ? `?mode=${encodeURIComponent(mode)}` : ''}`;
 
-        // Fetch both configs in parallel to speed up editor loading
-        const [configResult, docConfigResult] = await Promise.allSettled([
-          api.get('/config'),
-          api.get(configUrl)
+        // Fetch runtime server URL and document config in parallel
+        const [cachedUrl, docConfigResult] = await Promise.all([
+          getRuntimeServerUrl(),
+          api.get(configUrl).catch(err => ({ error: err }))
         ]);
 
-        // Process runtime server config
-        if (configResult.status === 'fulfilled' && configResult.value.data?.onlyofficeServerUrl) {
-          serverUrl = configResult.value.data.onlyofficeServerUrl;
-        } else if (configResult.status === 'rejected') {
-          console.warn('[OnlyOfficeEditor] Could not fetch runtime config, using fallback URL:', serverUrl);
+        if (cachedUrl) {
+          serverUrl = cachedUrl;
         }
 
         if (isMounted) setDocumentServerUrl(serverUrl);
 
         // Process document config
-        if (docConfigResult.status === 'fulfilled') {
-          const data = docConfigResult.value.data;
+        if (!docConfigResult.error && docConfigResult.data) {
+          const data = docConfigResult.data;
           if (data.success && isMounted) {
             const finalConfig = {
               ...data.config,
@@ -117,9 +129,9 @@ export const OnlyOfficeEditor = ({ documentId, mode, workspace, tasks }) => {
             setError(data.message || 'Failed to load editor configuration');
           }
         } else {
-          // Promise was rejected
+          // Request had an error
           if (isMounted) {
-            const err = docConfigResult.reason;
+            const err = docConfigResult.error;
             const errMsg = err?.response?.data?.message || 'Network error while loading editor configuration';
             setError(errMsg);
             console.error('[OnlyOfficeEditor] fetchConfig error:', err);

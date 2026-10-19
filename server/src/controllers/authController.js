@@ -112,7 +112,10 @@ const notifyAdminsOfRegistration = async (userProfile) => {
       ? `${userProfile.fullName} has registered a new Student account. Student ID: ${userProfile.studentIdOrEmployeeId} | Email: ${userProfile.email} | Program: ${userProfile.programCode || userProfile.program || 'BSIT'} | Major: ${userProfile.majorCode || userProfile.programSpecialization || 'None'} | Section: ${userProfile.sectionName || 'None'} | Status: Pending Approval`
       : `${userProfile.fullName} has registered a new Faculty/Adviser account. Email: ${userProfile.email} | Department: ${userProfile.department || 'College of Computer Studies'} | Status: Pending Approval`;
 
-    await Promise.all(adminSnapshot.docs.map(async (adminDoc) => {
+    if (adminSnapshot.empty) return;
+
+    const batch = db.batch();
+    adminSnapshot.docs.forEach((adminDoc) => {
       const notificationId = `registration-${userProfile.uid}-${adminDoc.id}`;
       const notificationRef = db.collection('notifications').doc(notificationId);
       const notification = {
@@ -130,13 +133,10 @@ const notifyAdminsOfRegistration = async (userProfile) => {
         createdAt: now,
       };
 
-      await db.runTransaction(async (transaction) => {
-        const existing = await transaction.get(notificationRef);
-        if (!existing.exists) {
-          transaction.create(notificationRef, notification);
-        }
-      });
-    }));
+      batch.set(notificationRef, notification, { merge: true });
+    });
+
+    await batch.commit();
   } catch (error) {
     console.warn('[AuthController] Admin registration notification warning:', error.message);
   }

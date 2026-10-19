@@ -9,7 +9,8 @@
     "dev": "nodemon src/server.js",
     "seed:db": "node --env-file=.env src/scripts/seedFirestoreAdmin.js",
     "sync:schedules": "node src/scripts/syncDefenseSchedules.js",
-    "import:repository": "node src/scripts/importRepositoryBatch.js"
+    "import:repository": "node src/scripts/importRepositoryBatch.js",
+    "seed:adviser-docs": "node src/scripts/seedAdviserResearchDocuments.js"
   },
   "dependencies": {
     "@google/genai": "^2.18.0",

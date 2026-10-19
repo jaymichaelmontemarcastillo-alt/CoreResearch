@@ -24,6 +24,21 @@ const decodeJwtPayload = (token) => {
   return null;
 };
 
+// In-memory cache for resolved user profiles to eliminate redundant database round-trips
+const userAuthCache = new Map();
+const AUTH_CACHE_TTL = 45 * 1000; // 45 seconds
+
+/**
+ * Invalidate user auth cache when user profile is updated or status changed
+ */
+export const invalidateUserAuthCache = (uid) => {
+  if (uid) {
+    userAuthCache.delete(uid);
+  } else {
+    userAuthCache.clear();
+  }
+};
+
 /**
  * Middleware to verify Firebase Authorization token or dev bearer token.
  * Attaches req.user with all required profile fields.
@@ -140,31 +155,43 @@ export const resolveUserFromToken = async (req) => {
     };
   }
 
+
   const uid = decodedToken.uid || decodedToken.user_id;
   const email = decodedToken.email || "";
   const name = decodedToken.name || email.split("@")[0] || "User";
   const picture = decodedToken.picture || "";
 
-  // 3. Fetch user profile from MongoDB, then Firestore, or mock DB safely
+  // 3. Fetch user profile from Cache, MongoDB, then Firestore, or mock DB safely
   let userData = null;
 
-  try {
-    if (mongoose.connection.readyState !== 1) {
-      await connectDB();
-    }
-    if (mongoose.connection.readyState === 1) {
-      const userDoc = await User.findOne({
-        $or: [
-          { uid },
-          ...(email ? [{ email: email.toLowerCase() }, { email }] : [])
-        ]
-      }).lean();
-      if (userDoc) {
-        userData = userDoc;
+  const cachedEntry = uid ? userAuthCache.get(uid) : null;
+  if (cachedEntry && Date.now() < cachedEntry.expiresAt) {
+    userData = cachedEntry.userData;
+  }
+
+  if (!userData) {
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        await connectDB();
       }
+      if (mongoose.connection.readyState === 1) {
+        // Fast direct index lookup by uid first, fallback to email if uid lookup missed
+        let userDoc = uid ? await User.findOne({ uid }).lean() : null;
+        if (!userDoc && email) {
+          userDoc = await User.findOne({
+            $or: [{ email: email.toLowerCase() }, { email }]
+          }).lean();
+        }
+        if (userDoc) {
+          userData = userDoc;
+          if (uid) {
+            userAuthCache.set(uid, { userData, expiresAt: Date.now() + AUTH_CACHE_TTL });
+          }
+        }
+      }
+    } catch (dbErr) {
+      console.warn("[AuthMiddleware] MongoDB read warning:", dbErr.message);
     }
-  } catch (dbErr) {
-    console.warn("[AuthMiddleware] MongoDB read warning:", dbErr.message);
   }
 
   if (!userData && db) {
@@ -172,6 +199,9 @@ export const resolveUserFromToken = async (req) => {
       let userDoc = await db.collection("users").doc(uid).get();
       if (userDoc.exists) {
         userData = userDoc.data();
+        if (uid) {
+          userAuthCache.set(uid, { userData, expiresAt: Date.now() + AUTH_CACHE_TTL });
+        }
       } else if (email) {
         const emailSnap = await db.collection("users").where("email", "==", email.toLowerCase()).limit(1).get();
         if (!emailSnap.empty) {
