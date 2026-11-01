@@ -32,6 +32,28 @@ export const AuthProvider = ({ children }) => {
   const [currentFacultyMode, setCurrentFacultyMode] = useState(
     localStorage.getItem('core_research_faculty_mode') || 'adviser'
   );
+  const recentProfileDocRef = useRef({ uid: null, promise: null, docSnap: null, timestamp: 0 });
+
+  // Deduplicate concurrent or back-to-back getDoc('users/{uid}') calls triggered simultaneously
+  // by login() and the onAuthStateChanged listener.
+  const getCachedUserDoc = async (uid) => {
+    const now = Date.now();
+    const cached = recentProfileDocRef.current;
+    if (cached.uid === uid) {
+      if (cached.promise) return cached.promise;
+      if (cached.docSnap && now - cached.timestamp < 3000) return cached.docSnap;
+    }
+    const userDocRef = doc(db, 'users', uid);
+    const promise = getDoc(userDocRef).then((snap) => {
+      recentProfileDocRef.current = { uid, promise: null, docSnap: snap, timestamp: Date.now() };
+      return snap;
+    }).catch((err) => {
+      recentProfileDocRef.current = { uid: null, promise: null, docSnap: null, timestamp: 0 };
+      throw err;
+    });
+    recentProfileDocRef.current = { uid, promise, docSnap: null, timestamp: now };
+    return promise;
+  };
 
   // Read the client-facing Firestore profile projection after authentication.
   // Kapag nag-login o register ang user via Firebase Auth (email man o Google), 
@@ -40,8 +62,7 @@ export const AuthProvider = ({ children }) => {
   // para magamit ng buong app (e.g. for Dashboard at Protected Routes).
   const syncProfileWithBackend = async (firebaseUser, defaultRole = 'student') => {
     try {
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
+      const userDoc = await getCachedUserDoc(firebaseUser.uid);
       
       if (userDoc.exists()) {
         const profile = userDoc.data();
@@ -166,9 +187,8 @@ export const AuthProvider = ({ children }) => {
       const normalizedEmail = email.trim();
       const result = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       
-      // Fetch Firestore profile directly to inspect role & approval
-      const userDocRef = doc(db, 'users', result.user.uid);
-      const userDoc = await getDoc(userDocRef);
+      // Fetch Firestore profile (deduplicated with onAuthStateChanged) to inspect role & approval
+      const userDoc = await getCachedUserDoc(result.user.uid);
 
       if (userDoc.exists()) {
         const profile = userDoc.data();

@@ -1,5 +1,8 @@
+import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { canAccessProject, isPrivilegedRole } from '../middleware/resourceAuthorization.js';
+import { User } from '../models/User.js';
+import { invalidateAdviserCache } from './adviserMatchingController.js';
 
 const SEED_DEFAULT_SECTIONS = [
   { id: 'chapter_1', name: 'Chapter 1: Introduction & Background', order: 1, status: 'not_started', progress: 0 },
@@ -70,10 +73,9 @@ export const getWorkspacesByAdviser = async (req, res) => {
       list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }
 
-    const accessResults = await Promise.all(list.map((workspace) =>
-      canAccessProject(req.user, workspace.id || workspace.groupId, workspace)
-    ));
-    list = list.filter((_, index) => accessResults[index]);
+    // Caller is already verified as either the assigned adviser (adviserId === req.user.uid)
+    // or a privileged role (admin / research_coordinator), and every returned workspace has
+    // workspace.adviserId === adviserId, so per-item canAccessProject lookups are redundant.
     return res.status(200).json({ success: true, count: list.length, data: list });
   } catch (error) {
     console.error('[workspaceController] getWorkspacesByAdviser error:', error);
@@ -209,8 +211,8 @@ export const updateTask = async (req, res) => {
     } else {
       const ref = db.collection('research_tasks').doc(id);
       await ref.update(updates);
-      const snap = await ref.get();
-      return res.status(200).json({ success: true, data: { id, ...snap.data() } });
+      // Merge in memory instead of performing an extra Firestore .get() read
+      return res.status(200).json({ success: true, data: { ...existing, ...updates } });
     }
   } catch (error) {
     console.error('[workspaceController] updateTask error:', error);
@@ -581,6 +583,9 @@ export const restartWorkspace = async (req, res) => {
       }
     }
 
+    invalidateAdviserWorkloadsCache();
+    invalidateAdviserCache();
+
     return res.status(200).json({
       success: true,
       message: 'Research progress archived successfully. Group members and accounts are preserved.',
@@ -617,6 +622,52 @@ export const getAdviserWorkloads = async (req, res) => {
     }
 
     const workloads = {};
+    let populatedFromMongo = false;
+
+    // 1. Prefer authoritative MongoDB aggregation when connected to avoid scanning full Firestore collections
+    if (!isDevMockMode && mongoose.connection.readyState === 1) {
+      try {
+        const [adviserDocs, groupCounts] = await Promise.all([
+          User.find({
+            role: { $in: ['adviser', 'faculty', 'research_coordinator'] },
+            activeGroupsCount: { $gt: 0 },
+          })
+            .select('uid activeGroupsCount')
+            .lean(),
+          mongoose.connection
+            .collection('researchgroups')
+            .aggregate([
+              {
+                $match: {
+                  adviserId: { $exists: true, $nin: [null, '', 'undefined'] },
+                  isArchived: { $ne: true },
+                  status: { $ne: 'archived' },
+                },
+              },
+              { $group: { _id: '$adviserId', count: { $sum: 1 } } },
+            ])
+            .toArray()
+            .catch(() => []),
+        ]);
+
+        adviserDocs.forEach((u) => {
+          if (u.uid && u.activeGroupsCount > 0) {
+            workloads[u.uid] = Number(u.activeGroupsCount);
+          }
+        });
+        groupCounts.forEach((g) => {
+          if (g._id && g.count > (workloads[g._id] || 0)) {
+            workloads[g._id] = g.count;
+          }
+        });
+
+        if (Object.keys(workloads).length > 0) {
+          populatedFromMongo = true;
+        }
+      } catch (mongoErr) {
+        console.warn('[workspaceController] getAdviserWorkloads MongoDB read warning:', mongoErr.message);
+      }
+    }
 
     if (isDevMockMode) {
       const map = mockFirestoreDb.get('manuscript_workspaces') || new Map();
@@ -625,30 +676,40 @@ export const getAdviserWorkloads = async (req, res) => {
           workloads[ws.adviserId] = (workloads[ws.adviserId] || 0) + 1;
         }
       }
-    } else if (db) {
-      // 1. Check manuscript_workspaces
-      const wsSnap = await db.collection('manuscript_workspaces').get();
+    } else if (db && !populatedFromMongo) {
+      // Fallback to Firestore using field-masked queries where supported to minimize payload transfer
+      const wsCol = db.collection('manuscript_workspaces');
+      const groupCol = db.collection('research_groups');
+      const [wsSnap, groupSnap] = await Promise.all([
+        (typeof wsCol.select === 'function'
+          ? wsCol.select('adviserId', 'status', 'isArchived').get()
+          : wsCol.get()),
+        (typeof groupCol.select === 'function'
+          ? groupCol.select('adviserId', 'status', 'isArchived').get()
+          : groupCol.get()),
+      ]);
+
+      const wsPerAdv = {};
       wsSnap.docs.forEach((doc) => {
         const data = doc.data();
-        if (data.adviserId && data.status !== 'archived') {
-          workloads[data.adviserId] = (workloads[data.adviserId] || 0) + 1;
+        if (data.adviserId && data.status !== 'archived' && !data.isArchived) {
+          wsPerAdv[data.adviserId] = (wsPerAdv[data.adviserId] || 0) + 1;
         }
       });
 
-      // 2. Check research_groups to account for active assigned groups
-      const groupSnap = await db.collection('research_groups').get();
       const groupsPerAdv = {};
       groupSnap.docs.forEach((doc) => {
         const data = doc.data();
-        if (data.adviserId && !data.isArchived && data.adviserId !== 'undefined') {
+        if (data.adviserId && !data.isArchived && data.status !== 'archived' && data.adviserId !== 'undefined') {
           groupsPerAdv[data.adviserId] = (groupsPerAdv[data.adviserId] || 0) + 1;
         }
       });
 
+      for (const [advId, count] of Object.entries(wsPerAdv)) {
+        workloads[advId] = Math.max(workloads[advId] || 0, count);
+      }
       for (const [advId, count] of Object.entries(groupsPerAdv)) {
-        if (!workloads[advId] || count > workloads[advId]) {
-          workloads[advId] = count;
-        }
+        workloads[advId] = Math.max(workloads[advId] || 0, count);
       }
     }
 

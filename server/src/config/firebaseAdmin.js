@@ -40,6 +40,7 @@ try {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
       const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
       const emailDomain = clientEmail.includes('@') ? clientEmail.split('@')[1] : '';
+      const emailProjectId = emailDomain.split('.')[0] || '';
       const resolvedProjectId = (process.env.FIREBASE_PROJECT_ID && !['coreresearch-db63b', 'db63b'].includes(process.env.FIREBASE_PROJECT_ID))
         ? process.env.FIREBASE_PROJECT_ID
         : ((emailProjectId && !['iam', 'coreresearch-db63b', 'db63b'].includes(emailProjectId)) ? emailProjectId : 'coreresearch-33a17');

@@ -17,6 +17,16 @@ import { AppNotification, CreateNotificationInput } from '../types/notification.
 
 const COLLECTION_NAME = 'notifications';
 
+// Share a single Firestore onSnapshot listener per userId across Header and Notifications page
+const activeNotificationListeners = new Map<
+  string,
+  {
+    callbacks: Set<(notifications: AppNotification[]) => void>;
+    latest: AppNotification[] | null;
+    unsubscribe: () => void;
+  }
+>();
+
 export const notificationService = {
   /**
    * Deduplicate an array of notifications and purge duplicate documents in the background.
@@ -114,17 +124,53 @@ export const notificationService = {
    * Real-time subscription to a user's notifications (deduplicated).
    */
   subscribeUserNotifications(userId: string, callback: (notifications: AppNotification[]) => void): () => void {
+    const existing = activeNotificationListeners.get(userId);
+    if (existing) {
+      existing.callbacks.add(callback);
+      if (existing.latest) {
+        callback(existing.latest);
+      }
+      return () => {
+        existing.callbacks.delete(callback);
+        if (existing.callbacks.size === 0) {
+          existing.unsubscribe();
+          activeNotificationListeners.delete(userId);
+        }
+      };
+    }
+
+    const callbacks = new Set<(notifications: AppNotification[]) => void>([callback]);
     const q = query(
       collection(db, COLLECTION_NAME),
       where('userId', '==', userId)
     );
-    return onSnapshot(q, (querySnap) => {
+    const unsubscribe = onSnapshot(q, (querySnap) => {
       const results = querySnap.docs.map((docSnap) => docSnap.data() as AppNotification);
       const deduplicated = this.deduplicateNotifications(results);
-      callback(deduplicated);
+      const entry = activeNotificationListeners.get(userId);
+      if (entry) {
+        entry.latest = deduplicated;
+        entry.callbacks.forEach((cb) => cb(deduplicated));
+      }
     }, (error) => {
       console.error('Error subscribing to notifications:', error);
     });
+
+    activeNotificationListeners.set(userId, {
+      callbacks,
+      latest: null,
+      unsubscribe,
+    });
+
+    return () => {
+      const entry = activeNotificationListeners.get(userId);
+      if (!entry) return;
+      entry.callbacks.delete(callback);
+      if (entry.callbacks.size === 0) {
+        entry.unsubscribe();
+        activeNotificationListeners.delete(userId);
+      }
+    };
   },
 
   /**
@@ -139,7 +185,8 @@ export const notificationService = {
    * Mark all notifications as read for a given user.
    */
   async markAllAsRead(userId: string): Promise<void> {
-    const userNotifications = await this.getUserNotifications(userId);
+    const cached = activeNotificationListeners.get(userId)?.latest;
+    const userNotifications = cached ?? (await this.getUserNotifications(userId));
     const unread = userNotifications.filter((n) => !n.read);
 
     if (unread.length === 0) return;

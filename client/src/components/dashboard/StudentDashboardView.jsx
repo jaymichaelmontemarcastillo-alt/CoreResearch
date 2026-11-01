@@ -4,8 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  HiDocumentText, 
+import {
+  HiDocumentText,
   HiArrowTopRightOnSquare,
   HiOutlineBookOpen,
 } from 'react-icons/hi2';
@@ -129,8 +129,8 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
               }
             }
             return fetchedWs;
-          }, CACHE_TTL.SHORT),
-          (userProfile?.courseId && userProfile?.sectionId) ? 
+          }, CACHE_TTL.SHORT, { cacheNull: true }),
+          (userProfile?.courseId && userProfile?.sectionId) ?
             dataCache.getOrFetch(`sections_${userProfile.courseId}`, () => sectionService.getSectionsByCourseId(userProfile.courseId), CACHE_TTL.STABLE) : Promise.resolve([])
         ]);
 
@@ -231,7 +231,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
                   updatedAt: new Date().toISOString(),
                 });
                 ws.documentId = resolvedDocId;
-              } catch (e) {}
+              } catch (e) { }
             }
           }
         }
@@ -511,7 +511,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
   const hasWorkspace = Boolean(workspace);
   const hasDeadlines = !loading && hasWorkspace && upcomingDeadlines.length > 0;
   const hasRevisions = !loading && hasWorkspace && revisions.length > 0;
-  
+
   const total7DayActions = dailyActivity.reduce((acc, curr) => acc + (curr.count || 0), 0);
   const hasActivityChart = !loading && hasWorkspace && total7DayActions > 1;
   const hasFeed = !loading && hasWorkspace && recentActivities.length > 0;

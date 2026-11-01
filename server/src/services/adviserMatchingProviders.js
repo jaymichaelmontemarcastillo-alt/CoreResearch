@@ -221,8 +221,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createHash } from 'crypto';
 import { AdviserResearchDocument } from '../models/AdviserResearchDocument.js';
 
-// Simple in-memory cache for adviser embeddings and research docs
-const adviserEmbeddingCache = new Map();
+// Simple in-memory cache for student proposals and adviser research docs
 const studentProposalCache = new Map();
 const STUDENT_PROPOSAL_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -232,8 +231,14 @@ let cachedResearchDocs = {
 };
 const RESEARCH_DOCS_TTL = 60 * 1000; // 60s
 
-// Helper to compute cosine similarity
+// Allow background document processing and deletion to invalidate cached research embeddings immediately
+export function invalidateResearchDocsCache() {
+  cachedResearchDocs = { docs: null, timestamp: 0 };
+}
+
+// Helper to compute cosine similarity safely across equal-dimension vectors
 function cosineSimilarity(vecA, vecB) {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
@@ -407,7 +412,7 @@ ${researchText.substring(0, 5000)}
 
       try {
         const response = await this.ai.models.generateContent({
-          model: 'gemini-3.6-flash',
+          model: 'gemini-2.5-flash',
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -452,16 +457,14 @@ ${researchText.substring(0, 5000)}
     if (cachedResearchDocs.docs && (Date.now() - cachedResearchDocs.timestamp < RESEARCH_DOCS_TTL)) {
       allReadyDocs = cachedResearchDocs.docs;
     } else {
+      // Exclude raw extractedText (up to 30k chars per paper) since matching uses precomputed NLP fields and embeddings
       allReadyDocs = await AdviserResearchDocument.find({
         processingStatus: 'READY'
-      }).lean();
+      }).select('-extractedText').lean();
       cachedResearchDocs = {
         docs: allReadyDocs,
         timestamp: Date.now(),
       };
-      allReadyDocs.forEach(d => {
-        if (d.id && d.embedding) adviserEmbeddingCache.set(d.id, d.embedding);
-      });
     }
 
     const researchDocs = allReadyDocs.filter(d => eligibleAdviserIds.has(d.adviserId));

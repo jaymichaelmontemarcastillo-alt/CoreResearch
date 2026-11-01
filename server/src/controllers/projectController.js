@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb, mockUsersDb } from '../config/firebaseAdmin.js';
 import { Document as MongoDocument } from '../models/Document.js';
 import { User } from '../models/User.js';
+import { invalidateAdviserCache } from './adviserMatchingController.js';
+import { invalidateAdviserWorkloadsCache } from './workspaceController.js';
 
 // Pre-seed mock research projects if store is empty
 const seedMockProjectsIfEmpty = () => {
@@ -42,19 +44,32 @@ export const getProjects = async (req, res) => {
 
     try {
       if (mongoose.connection.readyState === 1) {
-        const mongoDocs = await MongoDocument.find().lean();
+        // Push role filter to MongoDB and exclude heavy binary/full-text fields from list payloads
+        let mongoFilter = {};
+        if (user.role === 'student') {
+          mongoFilter = { $or: [{ authors: user.uid }, { ownerId: user.uid }] };
+        } else if (user.role === 'adviser') {
+          mongoFilter = { adviser: user.uid };
+        } else if (user.role === 'panelist') {
+          mongoFilter = { panelists: user.uid };
+        }
+        const mongoDocs = await MongoDocument.find(mongoFilter)
+          .select('-yjsBinaryState -plainText')
+          .lean();
         if (mongoDocs && mongoDocs.length > 0) {
           // Map Document schema back to expected project format for frontend compatibility during migration
           projectsList = mongoDocs.map(doc => ({
             id: doc.id,
             proposalId: doc.proposalId || '',
             title: doc.title,
-            studentId: doc.authors && doc.authors[0] ? doc.authors[0] : '',
-            studentName: 'Student', // In a real scenario, this would be populated
+            studentId: doc.studentId || (doc.authors && doc.authors[0] ? doc.authors[0] : ''),
+            ownerId: doc.ownerId || '',
+            authors: doc.authors || [],
+            studentName: doc.studentName || 'Student',
             adviserId: doc.adviser || '',
-            adviserName: 'Adviser',
+            adviserName: doc.adviserName || 'Adviser',
             panelistIds: doc.panelists || [],
-            department: 'Computer Studies',
+            department: doc.department || 'Computer Studies',
             status: doc.status === 'approved' ? 'completed' : 'in_progress',
             createdAt: doc.createdAt,
             updatedAt: doc.updatedAt || doc.createdAt
@@ -69,20 +84,32 @@ export const getProjects = async (req, res) => {
     if (!fetchedFromMongo) {
       // [TEMPORARY MIGRATION COMPATIBILITY] 
       // Fallback to Firestore if MongoDB fails or hasn't been migrated yet.
-      // In the FINAL PRODUCTION ARCHITECTURE, this fallback will be removed.
+      // Scope Firestore query by role to avoid full-collection scans.
       if (isDevMockMode) {
         seedMockProjectsIfEmpty();
         const map = mockFirestoreDb.get('projects');
         projectsList = Array.from(map.values());
-      } else {
-        const snapshot = await db.collection('research_projects').get();
+      } else if (db) {
+        let queryRef = db.collection('research_projects');
+        if (user.role === 'student') {
+          queryRef = queryRef.where('studentId', '==', user.uid);
+        } else if (user.role === 'adviser') {
+          queryRef = queryRef.where('adviserId', '==', user.uid);
+        } else if (user.role === 'panelist') {
+          queryRef = queryRef.where('panelistIds', 'array-contains', user.uid);
+        }
+        const snapshot = await queryRef.get();
         projectsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
     }
 
-    // Role-based filtering
+    // Role-based filtering (accounting for co-authors when mapped from MongoDB Document)
     if (user.role === 'student') {
-      projectsList = projectsList.filter(p => p.studentId === user.uid);
+      projectsList = projectsList.filter(p =>
+        p.studentId === user.uid ||
+        p.ownerId === user.uid ||
+        (Array.isArray(p.authors) && p.authors.includes(user.uid))
+      );
     } else if (user.role === 'adviser') {
       projectsList = projectsList.filter(p => p.adviserId === user.uid);
     } else if (user.role === 'panelist') {
@@ -119,17 +146,33 @@ export const createProject = async (req, res) => {
     let adviserEmail = '';
 
     if (adviserId) {
-      if (isDevMockMode) {
-        const adv = mockUsersDb.get(adviserId);
-        if (adv) {
-          adviserName = adv.fullName;
-          adviserEmail = adv.email;
+      // Query authoritative MongoDB User profile first before falling back to Firestore
+      if (mongoose.connection.readyState === 1) {
+        try {
+          const advDoc = await User.findOne({ uid: adviserId })
+            .select('fullName first_name last_name email')
+            .lean();
+          if (advDoc) {
+            adviserName = advDoc.fullName || `${advDoc.first_name || ''} ${advDoc.last_name || ''}`.trim() || 'Adviser';
+            adviserEmail = advDoc.email || '';
+          }
+        } catch (err) {
+          console.warn('[ProjectController] createProject MongoDB adviser lookup fallback:', err.message);
         }
-      } else {
-        const advDoc = await db.collection('users').doc(adviserId).get();
-        if (advDoc.exists) {
-          adviserName = advDoc.data().fullName;
-          adviserEmail = advDoc.data().email;
+      }
+      if (adviserName === 'Unassigned') {
+        if (isDevMockMode) {
+          const adv = mockUsersDb.get(adviserId);
+          if (adv) {
+            adviserName = adv.fullName;
+            adviserEmail = adv.email;
+          }
+        } else if (db) {
+          const advDoc = await db.collection('users').doc(adviserId).get();
+          if (advDoc.exists) {
+            adviserName = advDoc.data().fullName;
+            adviserEmail = advDoc.data().email;
+          }
         }
       }
     }
@@ -322,27 +365,28 @@ export const assignAdviser = async (req, res) => {
       updated = existingProject;
     } else {
       const ref = db.collection('research_projects').doc(id);
-      await ref.update({
+      const patch = {
         adviserId,
         adviserName,
         adviserEmail,
         updatedAt,
-      });
-      const doc = await ref.get();
-      updated = { id: doc.id, ...doc.data() };
+      };
+      await ref.update(patch);
+      // Merge in memory to avoid an extra Firestore read after update
+      updated = { ...existingProject, ...patch };
     }
 
-    // Synchronize activeGroupsCount on both new and previous advisers
+    // Synchronize adviser assignment and activeGroupsCount in MongoDB
     const newActiveCount = currentWorkload + 1;
     if (mongoose.connection.readyState === 1) {
       try {
-        await User.findOneAndUpdate({ uid: adviserId }, { activeGroupsCount: newActiveCount });
-        if (previousAdviserId && previousAdviserId !== adviserId) {
-          await User.findOneAndUpdate(
-            { uid: previousAdviserId },
-            { $inc: { activeGroupsCount: -1 } }
-          );
-        }
+        await Promise.all([
+          MongoDocument.findOneAndUpdate({ id }, { $set: { adviser: adviserId } }),
+          User.findOneAndUpdate({ uid: adviserId }, { activeGroupsCount: newActiveCount }),
+          ...(previousAdviserId && previousAdviserId !== adviserId
+            ? [User.findOneAndUpdate({ uid: previousAdviserId }, { $inc: { activeGroupsCount: -1 } })]
+            : []),
+        ]);
       } catch (syncErr) {
         console.warn('[ProjectController] sync activeGroupsCount warning:', syncErr.message);
       }
@@ -370,6 +414,10 @@ export const assignAdviser = async (req, res) => {
         console.warn('[ProjectController] Firestore users activeGroupsCount sync warning:', fsSyncErr.message);
       }
     }
+
+    // Invalidate adviser availability and workload caches once after activeGroupsCount changes
+    invalidateAdviserCache();
+    invalidateAdviserWorkloadsCache();
 
     return res.status(200).json({
       success: true,

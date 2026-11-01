@@ -47,4 +47,11 @@ const AdviserResearchDocumentSchema = new mongoose.Schema({
   strict: false 
 });
 
+// Compound indexes for ready-paper matching lookups and stale-processing recovery scans
+AdviserResearchDocumentSchema.index({ processingStatus: 1, updated_at: -1 });
+AdviserResearchDocumentSchema.index({ adviserId: 1, processingStatus: 1 });
+AdviserResearchDocumentSchema.index({ adviserId: 1, created_at: -1 });
+AdviserResearchDocumentSchema.index({ created_at: -1 });
+AdviserResearchDocumentSchema.index({ adviserEmail: 1 });
+
 export const AdviserResearchDocument = mongoose.model('AdviserResearchDocument', AdviserResearchDocumentSchema);

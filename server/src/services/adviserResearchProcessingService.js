@@ -4,6 +4,8 @@ import mongoose from 'mongoose';
 import { documentAnalysisService } from './DocumentAnalysisService.js';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { GoogleGenAI } from '@google/genai';
+import { invalidateResearchDocsCache } from './adviserMatchingProviders.js';
+import { invalidateAdviserCache } from '../controllers/adviserMatchingController.js';
 
 class AdviserResearchProcessingService {
   constructor() {
@@ -25,7 +27,9 @@ class AdviserResearchProcessingService {
       const staleDocs = await AdviserResearchDocument.find({
         processingStatus: 'PROCESSING',
         updated_at: { $lt: tenMinsAgo }
-      });
+      })
+        .select('id adviserId processingAttempts')
+        .lean();
 
       for (const doc of staleDocs) {
         if ((doc.processingAttempts || 0) < 3) {
@@ -151,30 +155,35 @@ class AdviserResearchProcessingService {
       
       const { embedding, embeddingDimensions } = await documentAnalysisService.generateEmbedding(nlpData);
 
-      // 4. Save final representation
-      await AdviserResearchDocument.findOneAndUpdate({ id: documentId }, { processingStage: 'SAVING_RESULTS' });
+      // 4. Save final representation in a single update and return minimal notification fields
+      const updatedDoc = await AdviserResearchDocument.findOneAndUpdate(
+        { id: documentId },
+        {
+          abstract: nlpData.abstract || '',
+          keywords: nlpData.keywords || [],
+          keyPhrases: nlpData.keyPhrases || [],
+          researchTopics: nlpData.researchTopics || [],
+          researchConcepts: nlpData.researchConcepts || [],
+          methodologies: nlpData.methodologies || [],
+          researchDomain: nlpData.researchDomain || '',
+          researchProblem: nlpData.researchProblem || '',
+          embedding: embedding,
+          embeddingModel: 'gemini-embedding-2',
+          embeddingDimensions: embeddingDimensions,
+          processingStatus: 'READY',
+          processingStage: 'READY'
+        },
+        { new: true }
+      )
+        .select('adviserId title originalFilename')
+        .lean();
 
-      await AdviserResearchDocument.findOneAndUpdate({ id: documentId }, {
-        abstract: nlpData.abstract || '',
-        keywords: nlpData.keywords || [],
-        keyPhrases: nlpData.keyPhrases || [],
-        researchTopics: nlpData.researchTopics || [],
-        researchConcepts: nlpData.researchConcepts || [],
-        methodologies: nlpData.methodologies || [],
-        researchDomain: nlpData.researchDomain || '',
-        researchProblem: nlpData.researchProblem || '',
-        embedding: embedding,
-        embeddingModel: 'gemini-embedding-2',
-        embeddingDimensions: embeddingDimensions,
-        processingStatus: 'READY',
-        processingStage: 'READY'
-      });
-
+      invalidateResearchDocsCache();
+      invalidateAdviserCache();
       console.log(`[AdviserResearchProcessingService] Successfully processed document ${documentId}`);
 
       // Send In-App Notification to Adviser
       try {
-        const updatedDoc = await AdviserResearchDocument.findOne({ id: documentId });
         if (updatedDoc && updatedDoc.adviserId) {
           const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2,6)}`;
           const notif = {
@@ -213,7 +222,9 @@ class AdviserResearchProcessingService {
 
   async deleteDocument(documentId, adviserId, isPrivileged = false) {
     const query = isPrivileged ? { id: documentId } : { id: documentId, adviserId };
-    const doc = await AdviserResearchDocument.findOne(query);
+    const doc = await AdviserResearchDocument.findOne(query)
+      .select('id adviserId storageKey')
+      .lean();
     if (!doc) {
       throw new Error('Document not found or unauthorized');
     }
@@ -229,6 +240,8 @@ class AdviserResearchProcessingService {
     }
 
     await AdviserResearchDocument.deleteOne({ id: documentId });
+    invalidateResearchDocsCache();
+    invalidateAdviserCache();
     return true;
   }
 
@@ -237,7 +250,9 @@ class AdviserResearchProcessingService {
    */
   async reprocessDocument(documentId, adviserId, isPrivileged = false) {
     const query = isPrivileged ? { id: documentId } : { id: documentId, adviserId };
-    const doc = await AdviserResearchDocument.findOne(query);
+    const doc = await AdviserResearchDocument.findOne(query)
+      .select('id adviserId storageKey mimeType processingStatus')
+      .lean();
     if (!doc) {
       throw new Error('Document not found or unauthorized');
     }

@@ -4,6 +4,7 @@ import { titleProposalService } from './titleProposal.service';
 import { researchWorkspaceService } from './researchWorkspace.service';
 import { groupService } from './group.service';
 import { courseService } from './course.service';
+import { gradingService } from './grading.service';
 import { UserProfile } from '../types/user.types';
 import { TitleProposal } from '../types/proposal.types';
 import { ManuscriptWorkspace } from '../types/researchWorkspace.types';
@@ -426,11 +427,11 @@ export const adminAnalyticsService = {
    * and count() where full document bodies are not needed.
    */
   async fetchAnalyticsData(filters: AnalyticsFilterOptions = {}): Promise<AdminAnalyticsDataset> {
-    const { default: dataCache } = await import('./dataCache');
+    const { default: dataCache, CACHE_TTL } = await import('./dataCache');
     const cacheKey = `analytics_${filters.academicYear || 'all'}_${filters.semester || 'all'}_${filters.program || 'all'}`;
 
     return dataCache.getOrFetch(cacheKey, async () => {
-      const { getDocs, query, where, collection, getCountFromServer } = await import('firebase/firestore');
+      const { getDocs, query, where, collection } = await import('firebase/firestore');
       const { db } = await import('../firebase/firebase');
 
     const filterAY = filters.academicYear && filters.academicYear !== 'all' ? filters.academicYear : null;
@@ -465,44 +466,44 @@ export const adminAnalyticsService = {
     // 2. Setup Queries
     const wsQuery = query(collection(db, 'manuscript_workspaces'), ...wsConstraints);
     const propQuery = query(collection(db, 'proposals'), ...propConstraints);
-    const studentQuery = query(collection(db, 'users'), ...studentConstraints);
-    const advisersQuery = query(collection(db, 'users'), where('role', '==', 'adviser'));
     const groupsQuery = query(collection(db, 'research_groups'), ...groupConstraints);
 
-    // 3. Execute Optimized Fetches
-    // We fetch full filtered workspaces and proposals because we need them for Progress Trend and Status Distribution.
-    // However, they are now strictly limited to the applied global filters!
-    // Fetch Evaluations for Final Verdict Distribution
-    const proposalEvalQuery = query(collection(db, 'proposal_evaluations'));
-    const finalEvalQuery = query(collection(db, 'final_evaluations'));
-
+    // 3. Execute Optimized Fetches: reuse cached userService.getAllUsers() and gradingService.getAllEvaluations()
+    // instead of firing duplicate Firestore queries for users and evaluations.
     const [
       courses,
       filteredWsSnap,
       filteredPropSnap,
       allUsersFromService,
-      filteredStudentsSnap,
-      advisersSnap,
       filteredGroupsSnap,
-      proposalEvalSnap,
-      finalEvalSnap
+      cachedEvaluations
     ] = await Promise.all([
       dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE).catch(() => [] as Course[]),
       getDocs(wsQuery),
       getDocs(propQuery),
       userService.getAllUsers().catch(() => [] as UserProfile[]),
-      getDocs(studentQuery),
-      getDocs(advisersQuery), // For advisers
       getDocs(groupsQuery), // For adviser workload
-      getDocs(proposalEvalQuery),
-      getDocs(finalEvalQuery)
+      gradingService.getAllEvaluations().catch(() => ({ proposalEvaluations: [], finalEvaluations: [] }))
     ]);
 
     const filteredWorkspaces = filteredWsSnap.docs.map(d => d.data() as ManuscriptWorkspace);
     const filteredProposals = filteredPropSnap.docs.map(d => d.data() as TitleProposal);
-    const firestoreStudentUsers = filteredStudentsSnap.docs.map(d => d.data() as UserProfile);
-    const advisers = advisersSnap.docs.map(d => d.data() as UserProfile);
     const groups = filteredGroupsSnap.docs.map(d => d.data() as ResearchGroup);
+
+    let firestoreStudentUsers: UserProfile[] = [];
+    let advisers: UserProfile[] = [];
+    if (allUsersFromService && allUsersFromService.length > 0) {
+      advisers = allUsersFromService.filter((u) => u.role === 'adviser' || u.role === 'faculty');
+    } else {
+      const studentQuery = query(collection(db, 'users'), ...studentConstraints);
+      const advisersQuery = query(collection(db, 'users'), where('role', '==', 'adviser'));
+      const [filteredStudentsSnap, advisersSnap] = await Promise.all([
+        getDocs(studentQuery),
+        getDocs(advisersQuery)
+      ]);
+      firestoreStudentUsers = filteredStudentsSnap.docs.map(d => d.data() as UserProfile);
+      advisers = advisersSnap.docs.map(d => d.data() as UserProfile);
+    }
 
     // Filter strictly for students: exclude advisers, admins, panelists, and faculty
     const nonStudentRoles = ['adviser', 'admin', 'panelist', 'faculty', 'research_coordinator'];
@@ -529,8 +530,8 @@ export const adminAnalyticsService = {
     
     // Process evaluations for Final Verdicts
     const allEvaluations = [
-      ...proposalEvalSnap.docs.map(d => d.data()),
-      ...finalEvalSnap.docs.map(d => d.data())
+      ...(cachedEvaluations.proposalEvaluations || []),
+      ...(cachedEvaluations.finalEvaluations || [])
     ];
 
     const courseMap = new Map<string, Course>();

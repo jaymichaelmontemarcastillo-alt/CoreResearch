@@ -14,7 +14,7 @@ import {
 import { db, auth } from '../firebase/firebase';
 import { ResearchGroup, CreateResearchGroupInput, GroupInvitation } from '../types/group.types';
 import { notificationService } from './notification.service';
-import { dataCache } from './dataCache';
+import { dataCache, CACHE_TTL } from './dataCache';
 
 const COLLECTION_NAME = 'research_groups';
 const INVITATIONS_COLLECTION = 'group_invitations';
@@ -210,87 +210,103 @@ export const groupService = {
 
   /**
    * Fetch research group by student member ID.
+   * Uses short-TTL cache + in-flight deduplication so Sidebar, StudentDashboardView, and AdviserMatching share one read.
    */
   async getGroupByStudentId(studentId: string): Promise<ResearchGroup | null> {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('memberIds', 'array-contains', studentId)
-    );
-    const querySnap = await getDocs(q);
-    let group: ResearchGroup | null = null;
+    if (!studentId) return null;
+    return dataCache.getOrFetch(
+      `group_${studentId}`,
+      async () => {
+        const q = query(
+          collection(db, COLLECTION_NAME),
+          where('memberIds', 'array-contains', studentId)
+        );
+        const querySnap = await getDocs(q);
+        let group: ResearchGroup | null = null;
 
-    if (!querySnap.empty) {
-      // Filter out archived groups to only return the active one
-      const activeGroups = querySnap.docs
-        .map(doc => doc.data() as ResearchGroup)
-        .filter(g => g.status !== 'archived' && !g.isArchived);
-      
-      if (activeGroups.length > 0) {
-        group = activeGroups[0];
-      }
-    } 
-
-    if (!group) {
-      // Fallback: check if the student's user profile has groupId
-      try {
-        const userDoc = await getDoc(doc(db, 'users', studentId));
-        if (userDoc.exists() && userDoc.data().groupId) {
-          const fallbackGroup = await this.getGroupById(userDoc.data().groupId);
-          if (fallbackGroup && fallbackGroup.status !== 'archived' && !fallbackGroup.isArchived) {
-            group = fallbackGroup;
+        if (!querySnap.empty) {
+          // Filter out archived groups to only return the active one
+          const activeGroups = querySnap.docs
+            .map(doc => doc.data() as ResearchGroup)
+            .filter(g => g.status !== 'archived' && !g.isArchived);
+          
+          if (activeGroups.length > 0) {
+            group = activeGroups[0];
           }
-        }
-      } catch (e) {}
-    }
+        } 
 
-    if (!group) return null;
-
-    // If group does not have title in its record, check if workspace/proposal has it
-    if (!group.title) {
-      try {
-        const wsQuery = query(collection(db, 'manuscript_workspaces'), where('groupId', '==', group.id));
-        const wsSnap = await getDocs(wsQuery);
-        const activeWorkspace = wsSnap.docs
-          .map((workspaceDoc) => workspaceDoc.data())
-          .find((workspace) => workspace.status !== 'archived' && !workspace.isArchived);
-        if (activeWorkspace?.title) {
-          group.title = activeWorkspace.title;
-        } else if (group.status !== 'forming') {
-          const propQuery = query(collection(db, 'proposals'), where('groupId', '==', group.id));
-          const propSnap = await getDocs(propQuery);
-          const activeProp = propSnap.docs
-            .map((docSnap) => docSnap.data())
-            .find((proposal) => proposal.status === 'approved' && !proposal.isArchived);
-          if (activeProp?.title) {
-            group.title = activeProp.title;
-          }
+        if (!group) {
+          // Fallback: check if the student's user profile has groupId
+          try {
+            const userDoc = await getDoc(doc(db, 'users', studentId));
+            if (userDoc.exists() && userDoc.data().groupId) {
+              const fallbackGroup = await this.getGroupById(userDoc.data().groupId);
+              if (fallbackGroup && fallbackGroup.status !== 'archived' && !fallbackGroup.isArchived) {
+                group = fallbackGroup;
+              }
+            }
+          } catch (e) {}
         }
+
+        if (!group) return null;
+
+        // If group does not have title in its record, check if workspace/proposal has it
         if (!group.title) {
-          const reqQuery = query(collection(db, 'adviser_requests'), where('groupId', '==', group.id));
-          const reqSnap = await getDocs(reqQuery);
-          const acceptedReq = reqSnap.docs
-            .map((d) => d.data())
-            .find((r) => r.status === 'accepted' && !r.isArchived);
-          if (acceptedReq?.researchTitle) {
-            group.title = acceptedReq.researchTitle;
-          }
+          try {
+            const wsQuery = query(collection(db, 'manuscript_workspaces'), where('groupId', '==', group.id));
+            const wsSnap = await getDocs(wsQuery);
+            const activeWorkspace = wsSnap.docs
+              .map((workspaceDoc) => workspaceDoc.data())
+              .find((workspace) => workspace.status !== 'archived' && !workspace.isArchived);
+            if (activeWorkspace?.title) {
+              group.title = activeWorkspace.title;
+            } else if (group.status !== 'forming') {
+              const propQuery = query(collection(db, 'proposals'), where('groupId', '==', group.id));
+              const propSnap = await getDocs(propQuery);
+              const activeProp = propSnap.docs
+                .map((docSnap) => docSnap.data())
+                .find((proposal) => proposal.status === 'approved' && !proposal.isArchived);
+              if (activeProp?.title) {
+                group.title = activeProp.title;
+              }
+            }
+            if (!group.title) {
+              const reqQuery = query(collection(db, 'adviser_requests'), where('groupId', '==', group.id));
+              const reqSnap = await getDocs(reqQuery);
+              const acceptedReq = reqSnap.docs
+                .map((d) => d.data())
+                .find((r) => r.status === 'accepted' && !r.isArchived);
+              if (acceptedReq?.researchTitle) {
+                group.title = acceptedReq.researchTitle;
+              }
+            }
+          } catch (e) {}
         }
-      } catch (e) {}
-    }
 
-    return group;
+        return group;
+      },
+      CACHE_TTL.SHORT,
+      { cacheNull: true }
+    );
   },
 
   /**
    * Fetch all groups assigned to a specific adviser.
    */
   async getGroupsByAdviserId(adviserId: string): Promise<ResearchGroup[]> {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('adviserId', '==', adviserId)
+    if (!adviserId) return [];
+    return dataCache.getOrFetch(
+      `adviser_groups_${adviserId}`,
+      async () => {
+        const q = query(
+          collection(db, COLLECTION_NAME),
+          where('adviserId', '==', adviserId)
+        );
+        const querySnap = await getDocs(q);
+        return querySnap.docs.map((d) => d.data() as ResearchGroup);
+      },
+      CACHE_TTL.SHORT
     );
-    const querySnap = await getDocs(q);
-    return querySnap.docs.map((d) => d.data() as ResearchGroup);
   },
 
   /**

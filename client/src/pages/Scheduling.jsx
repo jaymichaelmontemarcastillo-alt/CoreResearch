@@ -241,27 +241,47 @@ export const Scheduling = () => {
   const getProposalForGroup = (groupId) => proposals.find(p => p.groupId === groupId);
 
   const getAllSchedulesForGroup = (groupId) => {
-    return schedules.filter(
-      (s) => s.projectId === groupId || s.groupId === groupId
-    );
+    return schedules
+      .filter((s) => s.projectId === groupId || s.groupId === groupId)
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.createdAt || 0).getTime() -
+          new Date(a.updatedAt || a.createdAt || 0).getTime()
+      );
   };
 
   const getScheduleForGroup = (groupId) => {
     const groupSchedules = getAllSchedulesForGroup(groupId);
     if (groupSchedules.length === 0) return null;
 
-    // Prefer schedule that is currently active or scheduled with a valid time
+    // 1. Prefer the most recently updated 'scheduled' record with both a valid date and startTime
     const activeScheduled = groupSchedules.find(
-      (s) => (s.status === 'scheduled' || s.status === 'for_redefense') && s.startTime && s.startTime.trim() !== ''
+      (s) =>
+        s.status === 'scheduled' &&
+        s.date &&
+        s.date.trim() !== '' &&
+        s.startTime &&
+        s.startTime.trim() !== ''
     );
     if (activeScheduled) return activeScheduled;
 
-    // Next prefer any scheduled entry
+    // 2. Next prefer any 'scheduled' or 'for_redefense' record with a valid date and startTime
+    const activeWithDateAndTime = groupSchedules.find(
+      (s) =>
+        (s.status === 'scheduled' || s.status === 'for_redefense') &&
+        s.date &&
+        s.date.trim() !== '' &&
+        s.startTime &&
+        s.startTime.trim() !== ''
+    );
+    if (activeWithDateAndTime) return activeWithDateAndTime;
+
+    // 3. Next prefer any 'scheduled' entry
     const anyScheduled = groupSchedules.find((s) => s.status === 'scheduled');
     if (anyScheduled) return anyScheduled;
 
-    // Fallback to the latest chronological schedule
-    return groupSchedules[groupSchedules.length - 1];
+    // 4. Fallback to the most recently updated schedule for this group
+    return groupSchedules[0];
   };
 
   const getGroupDefenseState = (groupId) => {

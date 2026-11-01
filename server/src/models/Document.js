@@ -36,4 +36,13 @@ const DocumentSchema = new mongoose.Schema({
   strict: false // Allow dynamic fields if we merge metadata here later
 });
 
+// Indexes for role-scoped project queries, workspace resolution, and recent document sorting
+DocumentSchema.index({ authors: 1 });
+DocumentSchema.index({ adviser: 1 });
+DocumentSchema.index({ panelists: 1 });
+DocumentSchema.index({ groupId: 1 });
+DocumentSchema.index({ projectId: 1 });
+DocumentSchema.index({ ownerId: 1 });
+DocumentSchema.index({ status: 1, updated_at: -1 });
+
 export const Document = mongoose.model('Document', DocumentSchema);

@@ -1,5 +1,17 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 
+// Per-user short-TTL cache to reduce Firestore notification reads on dashboard polling
+const notificationsCache = new Map();
+const NOTIF_CACHE_TTL_MS = 15 * 1000;
+
+export const invalidateNotificationsCache = (userId = null) => {
+  if (userId) {
+    notificationsCache.delete(userId);
+  } else {
+    notificationsCache.clear();
+  }
+};
+
 const seedMockNotificationsIfEmpty = () => {
   if (!mockFirestoreDb.has('notifications')) {
     const initialNotifs = [
@@ -30,6 +42,17 @@ const seedMockNotificationsIfEmpty = () => {
 export const getNotifications = async (req, res) => {
   try {
     const user = req.user;
+    if (!isDevMockMode && user?.uid) {
+      const cached = notificationsCache.get(user.uid);
+      if (cached && Date.now() < cached.expiresAt) {
+        return res.status(200).json({
+          success: true,
+          count: cached.data.length,
+          data: cached.data
+        });
+      }
+    }
+
     let list = [];
 
     if (isDevMockMode) {
@@ -37,11 +60,26 @@ export const getNotifications = async (req, res) => {
       const map = mockFirestoreDb.get('notifications');
       list = Array.from(map.values()).filter(n => n.userId === user.uid || n.userId === 'all');
     } else {
-      const snapshot = await db.collection('notifications').where('userId', 'in', [user.uid, 'all']).get();
+      const snapshot = await db
+        .collection('notifications')
+        .where('userId', 'in', [user.uid, 'all'])
+        .limit(100)
+        .get();
       list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
     list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    if (!isDevMockMode && user?.uid) {
+      if (notificationsCache.size >= 500) {
+        const oldestKey = notificationsCache.keys().next().value;
+        if (oldestKey) notificationsCache.delete(oldestKey);
+      }
+      notificationsCache.set(user.uid, {
+        data: list,
+        expiresAt: Date.now() + NOTIF_CACHE_TTL_MS
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -68,6 +106,8 @@ export const markNotificationRead = async (req, res) => {
     } else {
       await db.collection('notifications').doc(id).update({ read: true });
     }
+
+    invalidateNotificationsCache(req.user?.uid);
 
     return res.status(200).json({ success: true, message: 'Notification marked read.' });
   } catch (error) {

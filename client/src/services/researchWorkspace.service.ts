@@ -27,7 +27,7 @@ import progressService from './progress.service';
 import { systemActivityService } from './systemActivity.service';
 import { researchFeedbackService } from './researchFeedback.service';
 import { notificationService } from './notification.service';
-import { dataCache } from './dataCache';
+import { dataCache, CACHE_TTL } from './dataCache';
 
 
 const COLLECTION_NAME = 'manuscript_workspaces';
@@ -758,135 +758,150 @@ export const researchWorkspaceService = {
     groupId?: string,
     leaderUid?: string
   ): Promise<ManuscriptWorkspace | null> {
-    const sortWorkspaces = (docs: ManuscriptWorkspace[]) => {
-      return [...docs].sort((a, b) => {
-        if (a.documentId && !b.documentId) return -1;
-        if (!a.documentId && b.documentId) return 1;
-        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
-        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
-        return timeB - timeA;
-      });
-    };
+    const cacheKey = `workspace_${studentUid || groupId || leaderUid || 'none'}`;
+    return dataCache.getOrFetch(
+      cacheKey,
+      async () => {
+        const sortWorkspaces = (docs: ManuscriptWorkspace[]) => {
+          return [...docs].sort((a, b) => {
+            if (a.documentId && !b.documentId) return -1;
+            if (!a.documentId && b.documentId) return 1;
+            const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return timeB - timeA;
+          });
+        };
 
-    // 1. Query by groupId if available
-    if (groupId) {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('groupId', '==', groupId)
-      );
-      const snap = await getDocs(q);
-      const activeDocs = sortWorkspaces(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
-      if (activeDocs.length > 0) {
-        const ws = activeDocs[0];
-        // Ensure studentUid is included in memberIds if missing
-        if (studentUid && ws.memberIds && !ws.memberIds.includes(studentUid)) {
-          const updatedIds = Array.from(new Set([...ws.memberIds, studentUid]));
-          updateDoc(doc(db, COLLECTION_NAME, ws.id), {
-            memberIds: updatedIds,
-            updatedAt: new Date().toISOString(),
-          }).catch(() => {});
-          ws.memberIds = updatedIds;
-        }
-        return ws;
-      }
-
-      // If no leaderUid was passed explicitly, try resolving from group doc
-      if (!leaderUid) {
-        try {
-          const groupSnap = await getDoc(doc(db, 'research_groups', groupId));
-          if (groupSnap.exists()) {
-            const gData = groupSnap.data();
-            leaderUid = gData.memberIds?.[0] || gData.members?.[0]?.uid;
+        // 1. Query by groupId if available
+        if (groupId) {
+          const q = query(
+            collection(db, COLLECTION_NAME),
+            where('groupId', '==', groupId)
+          );
+          const snap = await getDocs(q);
+          const activeDocs = sortWorkspaces(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
+          if (activeDocs.length > 0) {
+            const ws = activeDocs[0];
+            // Ensure studentUid is included in memberIds if missing
+            if (studentUid && ws.memberIds && !ws.memberIds.includes(studentUid)) {
+              const updatedIds = Array.from(new Set([...ws.memberIds, studentUid]));
+              updateDoc(doc(db, COLLECTION_NAME, ws.id), {
+                memberIds: updatedIds,
+                updatedAt: new Date().toISOString(),
+              }).catch(() => {});
+              ws.memberIds = updatedIds;
+            }
+            return ws;
           }
-        } catch (e) {}
-      }
-    }
 
-    // 2. Query by leaderUid (Group leader's workspace)
-    if (leaderUid) {
-      // Check if leader created workspace directly
-      const qLeader = query(
-        collection(db, COLLECTION_NAME),
-        where('studentId', '==', leaderUid)
-      );
-      const snapLeader = await getDocs(qLeader);
-      const activeLeaderDocs = sortWorkspaces(snapLeader.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
-      let leaderWs = activeLeaderDocs.length === 0 ? null : activeLeaderDocs[0];
-
-      if (!leaderWs) {
-        const qLeaderMember = query(
-          collection(db, COLLECTION_NAME),
-          where('memberIds', 'array-contains', leaderUid)
-        );
-        const snapLeaderMember = await getDocs(qLeaderMember);
-        const activeLeaderMemberDocs = sortWorkspaces(snapLeaderMember.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
-        if (activeLeaderMemberDocs.length > 0) {
-          leaderWs = activeLeaderMemberDocs[0];
-        }
-      }
-
-      if (leaderWs) {
-        // Link this workspace to the group and add the student
-        try {
-          const wsRef = doc(db, COLLECTION_NAME, leaderWs.id);
-          const currentMemberIds = Array.isArray(leaderWs.memberIds) ? leaderWs.memberIds : [leaderWs.studentId];
-          const updatedMemberIds = Array.from(new Set([...currentMemberIds, ...(studentUid ? [studentUid] : [])]));
-          const updates: any = {
-            memberIds: updatedMemberIds,
-            updatedAt: new Date().toISOString(),
-          };
-          if (groupId && !leaderWs.groupId) {
-            updates.groupId = groupId;
+          // If no leaderUid was passed explicitly, try resolving from group doc
+          if (!leaderUid) {
+            try {
+              const groupSnap = await getDoc(doc(db, 'research_groups', groupId));
+              if (groupSnap.exists()) {
+                const gData = groupSnap.data();
+                leaderUid = gData.memberIds?.[0] || gData.members?.[0]?.uid;
+              }
+            } catch (e) {}
           }
-          await updateDoc(wsRef, updates);
-          leaderWs.memberIds = updatedMemberIds;
-          if (groupId) leaderWs.groupId = groupId;
-        } catch (e) {
-          console.warn('[researchWorkspaceService] Error backfilling leader workspace:', e);
         }
-        return leaderWs;
-      }
-    }
 
-    if (studentUid) {
-      // 3. Query by memberIds array-contains
-      const qMember = query(
-        collection(db, COLLECTION_NAME),
-        where('memberIds', 'array-contains', studentUid)
-      );
-      const snapMember = await getDocs(qMember);
-      const activeMemberDocs = sortWorkspaces(snapMember.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
-      if (activeMemberDocs.length > 0) {
-        return activeMemberDocs[0];
-      }
+        // 2. Query by leaderUid (Group leader's workspace)
+        if (leaderUid) {
+          // Check if leader created workspace directly
+          const qLeader = query(
+            collection(db, COLLECTION_NAME),
+            where('studentId', '==', leaderUid)
+          );
+          const snapLeader = await getDocs(qLeader);
+          const activeLeaderDocs = sortWorkspaces(snapLeader.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
+          let leaderWs = activeLeaderDocs.length === 0 ? null : activeLeaderDocs[0];
 
-      // 4. Query by studentId (creator)
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('studentId', '==', studentUid)
-      );
-      const snap = await getDocs(q);
-      const activeDocs = sortWorkspaces(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
-      if (activeDocs.length > 0) {
-        return activeDocs[0];
-      }
-    }
+          if (!leaderWs) {
+            const qLeaderMember = query(
+              collection(db, COLLECTION_NAME),
+              where('memberIds', 'array-contains', leaderUid)
+            );
+            const snapLeaderMember = await getDocs(qLeaderMember);
+            const activeLeaderMemberDocs = sortWorkspaces(snapLeaderMember.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
+            if (activeLeaderMemberDocs.length > 0) {
+              leaderWs = activeLeaderMemberDocs[0];
+            }
+          }
 
-    return null;
+          if (leaderWs) {
+            // Link this workspace to the group and add the student
+            try {
+              const wsRef = doc(db, COLLECTION_NAME, leaderWs.id);
+              const currentMemberIds = Array.isArray(leaderWs.memberIds) ? leaderWs.memberIds : [leaderWs.studentId];
+              const updatedMemberIds = Array.from(new Set([...currentMemberIds, ...(studentUid ? [studentUid] : [])]));
+              const updates: any = {
+                memberIds: updatedMemberIds,
+                updatedAt: new Date().toISOString(),
+              };
+              if (groupId && !leaderWs.groupId) {
+                updates.groupId = groupId;
+              }
+              await updateDoc(wsRef, updates);
+              leaderWs.memberIds = updatedMemberIds;
+              if (groupId) leaderWs.groupId = groupId;
+            } catch (e) {
+              console.warn('[researchWorkspaceService] Error backfilling leader workspace:', e);
+            }
+            return leaderWs;
+          }
+        }
+
+        if (studentUid) {
+          // 3. Query by memberIds array-contains
+          const qMember = query(
+            collection(db, COLLECTION_NAME),
+            where('memberIds', 'array-contains', studentUid)
+          );
+          const snapMember = await getDocs(qMember);
+          const activeMemberDocs = sortWorkspaces(snapMember.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
+          if (activeMemberDocs.length > 0) {
+            return activeMemberDocs[0];
+          }
+
+          // 4. Query by studentId (creator)
+          const q = query(
+            collection(db, COLLECTION_NAME),
+            where('studentId', '==', studentUid)
+          );
+          const snap = await getDocs(q);
+          const activeDocs = sortWorkspaces(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as ManuscriptWorkspace)).filter(isActiveWorkspace));
+          if (activeDocs.length > 0) {
+            return activeDocs[0];
+          }
+        }
+
+        return null;
+      },
+      CACHE_TTL.SHORT,
+      { cacheNull: true }
+    );
   },
 
   /**
    * Fetch all workspaces assigned to a specific adviser
    */
   async getWorkspacesByAdviser(adviserId: string): Promise<ManuscriptWorkspace[]> {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('adviserId', '==', adviserId)
-    );
-    const snap = await getDocs(q);
-    const list = snap.docs.map((d) => d.data() as ManuscriptWorkspace);
-    return list.sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    if (!adviserId) return [];
+    return dataCache.getOrFetch(
+      `adviser_workspaces_${adviserId}`,
+      async () => {
+        const q = query(
+          collection(db, COLLECTION_NAME),
+          where('adviserId', '==', adviserId)
+        );
+        const snap = await getDocs(q);
+        const list = snap.docs.map((d) => d.data() as ManuscriptWorkspace);
+        return list.sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      },
+      CACHE_TTL.SHORT
     );
   },
 
@@ -894,10 +909,16 @@ export const researchWorkspaceService = {
    * Fetch all workspaces (for Coordinators / Admins)
    */
   async getAllWorkspaces(): Promise<ManuscriptWorkspace[]> {
-    const snap = await getDocs(collection(db, COLLECTION_NAME));
-    const list = snap.docs.map((d) => d.data() as ManuscriptWorkspace);
-    return list.sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    return dataCache.getOrFetch(
+      'workspaces_all',
+      async () => {
+        const snap = await getDocs(collection(db, COLLECTION_NAME));
+        const list = snap.docs.map((d) => d.data() as ManuscriptWorkspace);
+        return list.sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      },
+      CACHE_TTL.SHORT
     );
   },
 
@@ -906,13 +927,19 @@ export const researchWorkspaceService = {
    * Accessible by all authenticated roles (students, faculty, coordinators, admin)
    */
   async getAdviserWorkloads(): Promise<Record<string, number>> {
-    try {
-      const res = await api.get('/workspaces/adviser-workloads');
-      return res.data?.data || {};
-    } catch (e) {
-      console.warn('[researchWorkspaceService] Failed to fetch adviser workloads:', e);
-      return {};
-    }
+    return dataCache.getOrFetch(
+      'adviser_workloads',
+      async () => {
+        try {
+          const res = await api.get('/workspaces/adviser-workloads');
+          return res.data?.data || {};
+        } catch (e) {
+          console.warn('[researchWorkspaceService] Failed to fetch adviser workloads:', e);
+          return {};
+        }
+      },
+      CACHE_TTL.SHORT
+    );
   },
 
   /**

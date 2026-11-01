@@ -27,10 +27,12 @@ vi.mock('firebase/firestore', () => firestoreMock);
 vi.mock('./api', () => ({ default: apiMock }));
 
 import { userService } from './user.service';
+import { dataCache } from './dataCache';
 
-describe('userService.updateUser', () => {
+describe('userService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dataCache.clear();
   });
 
   it('routes self-profile changes through the backend without a Firestore write', async () => {
@@ -56,5 +58,38 @@ describe('userService.updateUser', () => {
     );
     expect(firestoreMock.setDoc).not.toHaveBeenCalled();
     expect(firestoreMock.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('caches getUserById and deduplicates repeated reads', async () => {
+    firestoreMock.getDoc.mockResolvedValue({
+      exists: () => true,
+      id: 'user-99',
+      data: () => ({ uid: 'user-99', fullName: 'Cached User', role: 'student' })
+    });
+
+    const first = await userService.getUserById('user-99');
+    const second = await userService.getUserById('user-99');
+
+    expect(first?.fullName).toBe('Cached User');
+    expect(second?.fullName).toBe('Cached User');
+    expect(firestoreMock.getDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches getAllUsers and deduplicates concurrent/repeated requests', async () => {
+    apiMock.get.mockResolvedValue({
+      data: {
+        success: true,
+        data: [{ uid: 'user-1', fullName: 'User One', role: 'student' }]
+      }
+    });
+
+    const [first, second] = await Promise.all([
+      userService.getAllUsers(),
+      userService.getAllUsers()
+    ]);
+
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(apiMock.get).toHaveBeenCalledTimes(1);
   });
 });

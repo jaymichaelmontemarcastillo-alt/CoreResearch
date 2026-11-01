@@ -22,7 +22,8 @@ const COLLECTION_NAME = 'manuscript_versions';
 
 import api from './api';
 import { notificationService } from './notification.service';
-import { dataCache } from './dataCache';
+import { gradingService } from './grading.service';
+import { dataCache, CACHE_TTL } from './dataCache';
 
 export const manuscriptService = {
   /**
@@ -30,22 +31,35 @@ export const manuscriptService = {
    * Connects directly to real manuscript versions, student workspaces, and actual panelist defense evaluations.
    */
   async getAllAdminManuscripts(): Promise<ManuscriptVersion[]> {
+    return dataCache.getOrFetch(
+      'manuscripts_admin_all',
+      async () => this._fetchAllAdminManuscriptsUncached(),
+      CACHE_TTL.SHORT
+    );
+  },
+
+  async _fetchAllAdminManuscriptsUncached(): Promise<ManuscriptVersion[]> {
     let apiList: ManuscriptVersion[] = [];
+    let apiSucceeded = false;
     try {
       const res = await api.get('/manuscripts/admin/all');
       if (res.data && Array.isArray(res.data.data)) {
         apiList = res.data.data;
+        apiSucceeded = true;
       }
     } catch (err) {
       console.warn('[manuscriptService] API fetch fallback to Firestore:', err);
     }
 
+    // Only scan Firestore manuscript_versions and manuscript_workspaces directly
+    // when the backend endpoint fails or returns empty (e.g. offline/mock fallback).
     let firestoreList: ManuscriptVersion[] = [];
-    try {
-      const [versionsSnap, wsSnap] = await Promise.all([
-        getDocs(collection(db, COLLECTION_NAME)).catch(() => ({ docs: [] })),
-        getDocs(collection(db, 'manuscript_workspaces')).catch(() => ({ docs: [] })),
-      ]);
+    if (!apiSucceeded || apiList.length === 0) {
+      try {
+        const [versionsSnap, wsSnap] = await Promise.all([
+          getDocs(collection(db, COLLECTION_NAME)).catch(() => ({ docs: [] })),
+          getDocs(collection(db, 'manuscript_workspaces')).catch(() => ({ docs: [] })),
+        ]);
 
       const resolveMajor = (raw?: string) => {
         if (!raw) return '';
@@ -128,9 +142,10 @@ export const manuscriptService = {
         } as ManuscriptVersion;
       });
 
-      firestoreList = [...versionItems, ...workspaceItems];
-    } catch (fsErr) {
-      console.warn('[manuscriptService] Firestore fallback error:', fsErr);
+        firestoreList = [...versionItems, ...workspaceItems];
+      } catch (fsErr) {
+        console.warn('[manuscriptService] Firestore fallback error:', fsErr);
+      }
     }
 
     // Merge API & Firestore items without dummy mock items (no ms-101..107 or proj-501..507)
@@ -146,17 +161,15 @@ export const manuscriptService = {
 
     const combinedList = Array.from(manuscriptMap.values());
 
-    // Retrieve real defense evaluations from panelist defense collections
+    // Retrieve real defense evaluations using shared cached gradingService.getAllEvaluations()
     try {
-      const [finalSnap, propSnap, evalSnap] = await Promise.all([
-        getDocs(collection(db, 'final_evaluations')).catch(() => ({ docs: [] })),
-        getDocs(collection(db, 'proposal_evaluations')).catch(() => ({ docs: [] })),
+      const [cachedAllEvals, evalSnap] = await Promise.all([
+        gradingService.getAllEvaluations().catch(() => ({ proposalEvaluations: [], finalEvaluations: [] })),
         getDocs(collection(db, 'evaluations')).catch(() => ({ docs: [] })),
       ]);
 
       const finalEvalsByWs = new Map<string, any[]>();
-      finalSnap.docs.forEach((d: any) => {
-        const ev = d.data();
+      (cachedAllEvals.finalEvaluations || []).forEach((ev: any) => {
         const keys = [ev.workspaceId, ev.projectId, ev.groupId, ev.documentId, ev.defenseId].filter(Boolean);
         keys.forEach((k) => {
           if (!finalEvalsByWs.has(k)) finalEvalsByWs.set(k, []);
@@ -165,8 +178,7 @@ export const manuscriptService = {
       });
 
       const propEvalsByWs = new Map<string, any[]>();
-      propSnap.docs.forEach((d: any) => {
-        const ev = d.data();
+      (cachedAllEvals.proposalEvaluations || []).forEach((ev: any) => {
         const keys = [ev.workspaceId, ev.projectId, ev.groupId, ev.documentId, ev.defenseId].filter(Boolean);
         keys.forEach((k) => {
           if (!propEvalsByWs.has(k)) propEvalsByWs.set(k, []);
@@ -279,11 +291,11 @@ export const manuscriptService = {
       throw new Error(`Manuscript ${id} not found in versions or workspaces.`);
     }
 
-    await updateDoc(docRef, { ...updates, updatedAt: new Date().toISOString() });
+    const patch = { ...updates, updatedAt: new Date().toISOString() };
+    await updateDoc(docRef, patch);
     dataCache.invalidatePattern('manuscript');
     dataCache.invalidatePattern('workspace');
-    const refreshed = await getDoc(docRef);
-    return refreshed.data() as ManuscriptVersion;
+    return { ...(snap.data() as ManuscriptVersion), id: snap.id, ...patch };
   },
 
   /**
@@ -316,11 +328,11 @@ export const manuscriptService = {
       throw new Error(`Manuscript ${id} not found in versions or workspaces.`);
     }
 
-    await updateDoc(docRef, { grade: gradeData, updatedAt: new Date().toISOString() });
+    const patch = { grade: gradeData as any, updatedAt: new Date().toISOString() };
+    await updateDoc(docRef, patch);
     dataCache.invalidatePattern('manuscript');
     dataCache.invalidatePattern('workspace');
-    const refreshed = await getDoc(docRef);
-    return refreshed.data() as ManuscriptVersion;
+    return { ...(snap.data() as ManuscriptVersion), id: snap.id, ...patch };
   },
 
   /**
@@ -354,15 +366,15 @@ export const manuscriptService = {
 
     const current = snap.data() as ManuscriptVersion;
     const nextArchive = isArchived !== undefined ? isArchived : !current?.isArchived;
-
-    await updateDoc(docRef, {
+    const patch = {
       isArchived: nextArchive,
       updatedAt: new Date().toISOString()
-    });
+    };
+
+    await updateDoc(docRef, patch);
     dataCache.invalidatePattern('manuscript');
     dataCache.invalidatePattern('workspace');
-    const refreshed = await getDoc(docRef);
-    return refreshed.data() as ManuscriptVersion;
+    return { ...current, id: snap.id, ...patch };
   },
 
 
@@ -399,6 +411,8 @@ export const manuscriptService = {
         reviewerName,
       });
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
+        dataCache.invalidatePattern('workspace');
         return res.data.data;
       }
     } catch (err) {
@@ -437,6 +451,8 @@ export const manuscriptService = {
       }
     }
 
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
     return { success: true };
   },
 
@@ -454,6 +470,8 @@ export const manuscriptService = {
         reviewerName,
       });
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
+        dataCache.invalidatePattern('workspace');
         return res.data.data;
       }
     } catch (err) {
@@ -493,6 +511,8 @@ export const manuscriptService = {
       }
     }
 
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
     return { success: true };
   },
 
@@ -503,6 +523,8 @@ export const manuscriptService = {
     try {
       const res = await api.patch(`/manuscripts/${id}/best-thesis`, { isBestThesis, notes });
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
+        dataCache.invalidatePattern('workspace');
         return res.data.data;
       }
     } catch (err) {
@@ -524,16 +546,16 @@ export const manuscriptService = {
 
     const current = snap.data() as ManuscriptVersion;
     const nextBest = isBestThesis !== undefined ? isBestThesis : !current?.isBestThesis;
-
-    await updateDoc(docRef, {
+    const patch = {
       isBestThesis: nextBest,
       bestThesisNotes: nextBest ? (notes || current?.bestThesisNotes || 'Selected as Best Thesis.') : '',
       updatedAt: new Date().toISOString()
-    });
+    };
+
+    await updateDoc(docRef, patch);
     dataCache.invalidatePattern('manuscript');
     dataCache.invalidatePattern('workspace');
-    const refreshed = await getDoc(docRef);
-    return refreshed.data() as ManuscriptVersion;
+    return { ...current, id: snap.id, ...patch };
   },
 
 
@@ -544,6 +566,7 @@ export const manuscriptService = {
     try {
       const res = await api.post(`/manuscripts/${id}/feedback`, { text, section });
       if (res.data && res.data.data) {
+        dataCache.invalidatePattern('manuscript');
         return res.data.data;
       }
     } catch (err) {
@@ -569,6 +592,8 @@ export const manuscriptService = {
   async publishToRepository(id: string): Promise<any> {
     try {
       const res = await api.post(`/manuscripts/${id}/publish-repository`);
+      dataCache.invalidatePattern('manuscript');
+      dataCache.invalidatePattern('workspace');
       return res.data;
     } catch (err) {
       console.warn('[manuscriptService] publishToRepository error:', err);
@@ -591,6 +616,7 @@ export const manuscriptService = {
       createdAt: now,
     };
     await setDoc(docRef, newManuscript);
+    dataCache.invalidatePattern('manuscript');
     return newManuscript;
   },
 
@@ -622,6 +648,7 @@ export const manuscriptService = {
   async updateManuscriptStatus(id: string, status: ManuscriptStatus): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, id);
     await updateDoc(docRef, { status });
+    dataCache.invalidatePattern('manuscript');
   },
 
   /**
@@ -637,6 +664,7 @@ export const manuscriptService = {
       comments,
       commentsCount: comments.length,
     });
+    dataCache.invalidatePattern('manuscript');
   },
 
   /**
@@ -645,6 +673,7 @@ export const manuscriptService = {
   async deleteManuscript(id: string): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(docRef);
+    dataCache.invalidatePattern('manuscript');
   },
 
   /**
@@ -660,6 +689,8 @@ export const manuscriptService = {
         await this.deleteManuscript(id);
       }
     }
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
   },
 
   /**
@@ -673,6 +704,8 @@ export const manuscriptService = {
     fileSize?: number;
   }): Promise<any> {
     const res = await api.post(`/manuscripts/${id}/post-defense-revisions`, payload);
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
     return res.data;
   },
 
@@ -684,6 +717,8 @@ export const manuscriptService = {
     reviewNotes?: string;
   }): Promise<any> {
     const res = await api.post(`/manuscripts/${id}/post-defense-revisions/review`, payload);
+    dataCache.invalidatePattern('manuscript');
+    dataCache.invalidatePattern('workspace');
     return res.data;
   },
 

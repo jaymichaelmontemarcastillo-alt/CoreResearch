@@ -39,6 +39,10 @@ ScheduleSchema.index({ date: 1 });
 ScheduleSchema.index({ memberIds: 1 });
 ScheduleSchema.index({ 'panelists.id': 1 });
 ScheduleSchema.index({ 'panelists.email': 1 });
+ScheduleSchema.index({ adviserId: 1 });
+ScheduleSchema.index({ status: 1, date: 1 });
+ScheduleSchema.index({ projectId: 1, type: 1 });
+ScheduleSchema.index({ groupId: 1 });
 
 export const Schedule = mongoose.model('Schedule', ScheduleSchema);
 

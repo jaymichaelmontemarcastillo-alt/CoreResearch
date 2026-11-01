@@ -27,6 +27,16 @@ const decodeJwtPayload = (token) => {
 // In-memory cache for resolved user profiles to eliminate redundant database round-trips
 const userAuthCache = new Map();
 const AUTH_CACHE_TTL = 45 * 1000; // 45 seconds
+const AUTH_CACHE_MAX_SIZE = 500;
+
+const setAuthCache = (uid, userData) => {
+  if (!uid || !userData) return;
+  if (userAuthCache.size >= AUTH_CACHE_MAX_SIZE) {
+    const oldestKey = userAuthCache.keys().next().value;
+    if (oldestKey) userAuthCache.delete(oldestKey);
+  }
+  userAuthCache.set(uid, { userData, expiresAt: Date.now() + AUTH_CACHE_TTL });
+};
 
 /**
  * Invalidate user auth cache when user profile is updated or status changed
@@ -165,8 +175,12 @@ export const resolveUserFromToken = async (req) => {
   let userData = null;
 
   const cachedEntry = uid ? userAuthCache.get(uid) : null;
-  if (cachedEntry && Date.now() < cachedEntry.expiresAt) {
-    userData = cachedEntry.userData;
+  if (cachedEntry) {
+    if (Date.now() < cachedEntry.expiresAt) {
+      userData = cachedEntry.userData;
+    } else {
+      userAuthCache.delete(uid);
+    }
   }
 
   if (!userData) {
@@ -184,9 +198,7 @@ export const resolveUserFromToken = async (req) => {
         }
         if (userDoc) {
           userData = userDoc;
-          if (uid) {
-            userAuthCache.set(uid, { userData, expiresAt: Date.now() + AUTH_CACHE_TTL });
-          }
+          setAuthCache(uid, userData);
         }
       }
     } catch (dbErr) {
@@ -199,13 +211,12 @@ export const resolveUserFromToken = async (req) => {
       let userDoc = await db.collection("users").doc(uid).get();
       if (userDoc.exists) {
         userData = userDoc.data();
-        if (uid) {
-          userAuthCache.set(uid, { userData, expiresAt: Date.now() + AUTH_CACHE_TTL });
-        }
+        setAuthCache(uid, userData);
       } else if (email) {
         const emailSnap = await db.collection("users").where("email", "==", email.toLowerCase()).limit(1).get();
         if (!emailSnap.empty) {
           userData = emailSnap.docs[0].data();
+          setAuthCache(uid, userData);
         }
       }
     } catch (dbErr) {
@@ -263,6 +274,7 @@ export const resolveUserFromToken = async (req) => {
 
   return {
     user: {
+      ...(userData || {}),
       uid,
       email: userData?.email || email,
       first_name,

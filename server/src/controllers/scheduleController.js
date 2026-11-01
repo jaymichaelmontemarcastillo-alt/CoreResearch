@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 import { Schedule as MongoSchedule } from '../models/Schedule.js';
+import { User } from '../models/User.js';
 import { generateTimeSlots } from '../services/schedulingService.js';
 import {
   syncDefenseScheduleProjections,
@@ -27,9 +28,18 @@ const sendDefenseNotifications = async (schedules) => {
       let adviserId = s.adviserId;
       let panelistIds = s.panelistIds || (s.panelists || []).map(p => p.id || p.uid).filter(Boolean);
 
-      // If studentIds is empty, query Firestore or MongoDB research_groups
+      // If studentIds is empty, query MongoDB researchgroups first, then Firestore research_groups
       if ((!studentIds || studentIds.length === 0) && s.projectId) {
-        if (db) {
+        if (mongoose.connection.readyState === 1) {
+          try {
+            const mg = await mongoose.connection.db.collection('researchgroups').findOne({ id: s.projectId });
+            if (mg) {
+              studentIds = mg.memberIds || (mg.members || []).map(m => m.uid || m.id).filter(Boolean);
+              if (!adviserId) adviserId = mg.adviserId;
+            }
+          } catch (e) {}
+        }
+        if ((!studentIds || studentIds.length === 0) && db) {
           try {
             const groupDoc = await db.collection('research_groups').doc(s.projectId).get();
             if (groupDoc.exists) {
@@ -165,13 +175,17 @@ export const createSchedule = async (req, res) => {
     }
 
     let panelistNames = [];
-    if (Array.isArray(panelistIds)) {
+    if (Array.isArray(panelistIds) && panelistIds.length > 0) {
       if (isDevMockMode) {
         panelistNames = panelistIds.map(pid => {
           const u = mockUsersDb.get(pid);
           return u ? u.fullName : 'Panelist';
         });
-      } else {
+      } else if (mongoose.connection.readyState === 1) {
+        const panelUsers = await User.find({ uid: { $in: panelistIds } }).select('uid fullName').lean();
+        const nameByUid = new Map(panelUsers.map(u => [u.uid, u.fullName]));
+        panelistNames = panelistIds.map(pid => nameByUid.get(pid) || 'Panelist');
+      } else if (db) {
         const docs = await Promise.all(panelistIds.map(pid => db.collection('users').doc(pid).get()));
         panelistNames = docs.map(d => d.exists ? d.data().fullName : 'Panelist');
       }
@@ -247,13 +261,10 @@ export const createSchedule = async (req, res) => {
       });
     }
 
-    // Sync to Firestore schedules and defense_schedules
+    // Sync to Firestore 'schedules' collection (defense_schedules is already synced by syncDefenseScheduleProjections)
     if (db) {
       try {
-        await Promise.all([
-          db.collection('schedules').doc(newScheduleId).set(responseData, { merge: true }),
-          db.collection('defense_schedules').doc(newScheduleId).set(responseData, { merge: true })
-        ]);
+        await db.collection('schedules').doc(newScheduleId).set(responseData, { merge: true });
       } catch (e) {
         console.warn('[ScheduleController] Firestore create sync warning:', e.message);
       }
@@ -295,11 +306,8 @@ export const getSchedules = async (req, res) => {
       queryFilter.status = req.query.status;
     }
 
-    // If no schedules found because of archive status, allow non-deleted schedules as fallback
-    let mongoDocs = await MongoSchedule.find(queryFilter).lean();
-    if (mongoDocs.length === 0 && !req.query.status) {
-      mongoDocs = await MongoSchedule.find({ status: { $ne: 'deleted' } }).lean();
-    }
+    // Query active schedules directly without triggering a second unindexed fallback query on empty results
+    const mongoDocs = await MongoSchedule.find(queryFilter).lean();
 
     // Load referenced research groups from Mongo and Firestore to enrich schedules with course, specialization, and student members
     const groupMap = new Map();
@@ -647,14 +655,11 @@ export const updateSchedule = async (req, res) => {
       });
     }
 
-    // Sync to Firestore 'schedules' and 'defense_schedules'
+    // Sync to Firestore 'schedules' (defense_schedules is already synced by syncDefenseScheduleProjections)
     const projection = toDefenseScheduleProjection(updatedSchedule);
     if (db) {
       try {
-        await Promise.all([
-          db.collection('schedules').doc(updatedSchedule.id).set(projection, { merge: true }),
-          db.collection('defense_schedules').doc(updatedSchedule.id).set(projection, { merge: true })
-        ]);
+        await db.collection('schedules').doc(updatedSchedule.id).set(projection, { merge: true });
       } catch (fErr) {
         console.warn('[ScheduleController] Firestore update sync warning:', fErr.message);
       }

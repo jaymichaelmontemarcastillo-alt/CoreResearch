@@ -181,9 +181,54 @@ export const Schedules = () => {
     return { hasRedefense, isPassed };
   };
 
+  // Deduplicate schedules per (groupId/projectId, defenseCategory) so that each group
+  // appears at most once per defense stage (Proposal vs Final), selecting the most
+  // authoritative active schedule and ignoring cleared/unscheduled remnants.
+  const deduplicatedSchedules = useMemo(() => {
+    const scoreSchedule = (s) => {
+      const hasDate = Boolean(s.date && String(s.date).trim() !== "");
+      const hasTime = Boolean(s.startTime && String(s.startTime).trim() !== "");
+      let rank = 0;
+      if (hasDate && hasTime && s.status === "scheduled") rank = 4;
+      else if (hasDate && hasTime) rank = 3;
+      else if (hasDate || hasTime) rank = 2;
+      else rank = 1;
+      const ts = new Date(s.updatedAt || s.createdAt || 0).getTime() || 0;
+      return { rank, ts };
+    };
+
+    const byGroupAndStage = new Map();
+    schedules.forEach((sch) => {
+      // Skip completely cleared/unscheduled placeholder records on the public Schedule page
+      const hasDate = Boolean(sch.date && String(sch.date).trim() !== "");
+      const hasTime = Boolean(sch.startTime && String(sch.startTime).trim() !== "");
+      if (!hasDate && !hasTime) return;
+
+      const cat = getDefenseCategory(sch);
+      const groupKey = sch.projectId || sch.groupId || sch.id;
+      const mapKey = `${groupKey}::${cat}`;
+
+      const existing = byGroupAndStage.get(mapKey);
+      if (!existing) {
+        byGroupAndStage.set(mapKey, sch);
+      } else {
+        const curScore = scoreSchedule(sch);
+        const prevScore = scoreSchedule(existing);
+        if (
+          curScore.rank > prevScore.rank ||
+          (curScore.rank === prevScore.rank && curScore.ts >= prevScore.ts)
+        ) {
+          byGroupAndStage.set(mapKey, sch);
+        }
+      }
+    });
+
+    return Array.from(byGroupAndStage.values());
+  }, [schedules]);
+
   // Filter schedules based on Search, Defense Category, Program, and Specialization
   const filteredSchedules = useMemo(() => {
-    return schedules.filter((sch) => {
+    return deduplicatedSchedules.filter((sch) => {
       // 1. Defense Type Filter
       const cat = getDefenseCategory(sch);
       if (defenseFilter !== "all" && cat !== defenseFilter) return false;
@@ -216,7 +261,7 @@ export const Schedules = () => {
 
       return false;
     });
-  }, [schedules, searchQuery, defenseFilter, programFilter, specializationFilter]);
+  }, [deduplicatedSchedules, searchQuery, defenseFilter, programFilter, specializationFilter]);
 
   // Group schedules into Proposal Defense and Final Defense, then by Program & Specialization
   const groupedSections = useMemo(() => {

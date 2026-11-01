@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 
 import { db } from '../firebase/firebase';
-import { dataCache } from './dataCache';
+import { dataCache, CACHE_TTL } from './dataCache';
 
 
 import {
@@ -119,50 +119,56 @@ export const titleProposalService = {
    */
   async getProposalsByGroup(groupId: string, leaderUid?: string): Promise<TitleProposal[]> {
     if (!groupId) return [];
-    const q = query(collection(db, COLLECTION), where('groupId', '==', groupId));
-    const snap = await getDocs(q);
-    let list = snap.docs.map((d) => d.data() as TitleProposal);
+    return dataCache.getOrFetch(
+      `proposals_group_${groupId}`,
+      async () => {
+        const q = query(collection(db, COLLECTION), where('groupId', '==', groupId));
+        const snap = await getDocs(q);
+        let list = snap.docs.map((d) => d.data() as TitleProposal);
 
-    if (list.length === 0) {
-      // If no leaderUid passed, attempt reading from group doc
-      let resolvedLeaderUid = leaderUid;
-      let groupMembers: any[] = [];
-      let groupMemberIds: string[] = [];
-      try {
-        const gSnap = await getDoc(doc(db, 'research_groups', groupId));
-        if (gSnap.exists()) {
-          const gData = gSnap.data();
-          if (!resolvedLeaderUid) {
-            resolvedLeaderUid = gData.memberIds?.[0] || gData.members?.[0]?.uid;
+        if (list.length === 0) {
+          // If no leaderUid passed, attempt reading from group doc
+          let resolvedLeaderUid = leaderUid;
+          let groupMembers: any[] = [];
+          let groupMemberIds: string[] = [];
+          try {
+            const gSnap = await getDoc(doc(db, 'research_groups', groupId));
+            if (gSnap.exists()) {
+              const gData = gSnap.data();
+              if (!resolvedLeaderUid) {
+                resolvedLeaderUid = gData.memberIds?.[0] || gData.members?.[0]?.uid;
+              }
+              groupMembers = gData.members || [];
+              groupMemberIds = gData.memberIds || [];
+            }
+          } catch (e) {}
+
+          if (resolvedLeaderUid) {
+            const leaderQ = query(collection(db, COLLECTION), where('submittedByUid', '==', resolvedLeaderUid));
+            const leaderSnap = await getDocs(leaderQ);
+            if (!leaderSnap.empty) {
+              list = leaderSnap.docs.map((d) => d.data() as TitleProposal);
+              // Link this proposal to the group in Firestore
+              for (const d of leaderSnap.docs) {
+                const prop = d.data() as TitleProposal;
+                const curMemberIds = Array.isArray(prop.memberIds) ? prop.memberIds : [prop.submittedByUid];
+                const mergedIds = Array.from(new Set([...curMemberIds, ...groupMemberIds]));
+                updateDoc(d.ref, {
+                  groupId: groupId,
+                  memberIds: mergedIds,
+                  members: groupMembers.length > 0 ? groupMembers : (prop.members || []),
+                  updatedAt: new Date().toISOString(),
+                }).catch(() => {});
+              }
+            }
           }
-          groupMembers = gData.members || [];
-          groupMemberIds = gData.memberIds || [];
         }
-      } catch (e) {}
 
-      if (resolvedLeaderUid) {
-        const leaderQ = query(collection(db, COLLECTION), where('submittedByUid', '==', resolvedLeaderUid));
-        const leaderSnap = await getDocs(leaderQ);
-        if (!leaderSnap.empty) {
-          list = leaderSnap.docs.map((d) => d.data() as TitleProposal);
-          // Link this proposal to the group in Firestore
-          for (const d of leaderSnap.docs) {
-            const prop = d.data() as TitleProposal;
-            const curMemberIds = Array.isArray(prop.memberIds) ? prop.memberIds : [prop.submittedByUid];
-            const mergedIds = Array.from(new Set([...curMemberIds, ...groupMemberIds]));
-            updateDoc(d.ref, {
-              groupId: groupId,
-              memberIds: mergedIds,
-              members: groupMembers.length > 0 ? groupMembers : (prop.members || []),
-              updatedAt: new Date().toISOString(),
-            }).catch(() => {});
-          }
-        }
-      }
-    }
-
-    return list.sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        return list.sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      },
+      CACHE_TTL.SHORT
     );
   },
 

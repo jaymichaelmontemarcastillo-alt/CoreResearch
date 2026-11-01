@@ -72,9 +72,15 @@ export const Sidebar = ({
             CACHE_TTL.MODERATE,
             { cacheNull: true }
           );
-          const ws = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
-            currentUser.uid,
-            group?.id
+          // Share in-flight and cached workspace lookup with StudentDashboardView
+          const ws = await dataCache.getOrFetch(
+            `workspace_${currentUser.uid}`,
+            () => researchWorkspaceService.getWorkspaceByStudentOrGroup(
+              currentUser.uid,
+              group?.id
+            ),
+            CACHE_TTL.SHORT,
+            { cacheNull: true }
           );
 
           if (ws) {

@@ -101,6 +101,10 @@ const seedMockEvaluationsIfEmpty = () => {
   }
 };
 
+// Cache the active rubric for 5 minutes to avoid repeated Firestore queries during grading sessions
+let activeRubricCache = { data: null, expiresAt: 0 };
+const RUBRIC_CACHE_TTL_MS = 5 * 60 * 1000;
+
 /**
  * Helper to fetch active rubric from storage or fallback to DEFAULT_RUBRIC
  */
@@ -112,15 +116,21 @@ export const fetchActiveRubricHelper = async () => {
     const active = rubrics.find(r => r.isActive);
     return active || DEFAULT_RUBRIC;
   } else {
+    if (activeRubricCache.data && Date.now() < activeRubricCache.expiresAt) {
+      return activeRubricCache.data;
+    }
     try {
       const snap = await db.collection('evaluation_rubrics').where('isActive', '==', true).limit(1).get();
       if (!snap.empty) {
         const doc = snap.docs[0];
-        return { id: doc.id, ...doc.data() };
+        const rubric = { id: doc.id, ...doc.data() };
+        activeRubricCache = { data: rubric, expiresAt: Date.now() + RUBRIC_CACHE_TTL_MS };
+        return rubric;
       }
     } catch (e) {
       console.warn('[EvaluationController] fetchActiveRubricHelper fallback:', e.message);
     }
+    activeRubricCache = { data: DEFAULT_RUBRIC, expiresAt: Date.now() + RUBRIC_CACHE_TTL_MS };
     return DEFAULT_RUBRIC;
   }
 };
@@ -274,6 +284,7 @@ export const saveRubric = async (req, res) => {
       };
       batch.set(newRubricRef, newRubric);
       await batch.commit();
+      activeRubricCache = { data: newRubric, expiresAt: Date.now() + RUBRIC_CACHE_TTL_MS };
 
       return res.status(201).json({
         success: true,
@@ -367,13 +378,18 @@ export const getEvaluations = async (req, res) => {
       seedMockEvaluationsIfEmpty();
       const map = mockFirestoreDb.get('evaluations');
       list = Array.from(map.values());
+      if (projectId && projectId !== 'all') {
+        list = list.filter(e => e.projectId === projectId);
+      }
+    } else if (projectId && projectId !== 'all') {
+      // Push projectId filter down to Firestore to avoid full-collection scans
+      const snapshot = await db.collection('evaluations')
+        .where('projectId', '==', projectId)
+        .get();
+      list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       const snapshot = await db.collection('evaluations').get();
       list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-
-    if (projectId && projectId !== 'all') {
-      list = list.filter(e => e.projectId === projectId);
     }
 
     // Attach criteriaSnapshot if legacy evaluation lacked it

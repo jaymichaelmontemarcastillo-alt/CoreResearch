@@ -2,7 +2,17 @@ import mongoose from 'mongoose';
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { seedMockRepositoryIfEmpty } from './repositoryController.js';
 import { Comment as MongoComment } from '../models/Comment.js';
+import { RepositoryPublication } from '../models/RepositoryPublication.js';
 import { canAccessProject, isPrivilegedRole } from '../middleware/resourceAuthorization.js';
+
+// Short-lived cache for getAllAdminManuscripts to avoid repeated full-collection scans
+// of manuscript_versions and manuscript_workspaces across admin/coordinator views.
+let adminManuscriptsCache = { data: null, expiresAt: 0 };
+const ADMIN_MANUSCRIPTS_CACHE_TTL = 30 * 1000; // 30 seconds
+
+export const invalidateAdminManuscriptsCache = () => {
+  adminManuscriptsCache = { data: null, expiresAt: 0 };
+};
 
 // Pre-seed mock manuscript version history & drafts if empty
 const defaultDraftContentHtml = `<h1 style="text-align: center; color: #1e293b;">Smart IoT Moisture & Nutrient Sensing System for Urban Farming</h1>
@@ -241,8 +251,21 @@ export const uploadManuscriptVersion = async (req, res) => {
           const repoMap = mockFirestoreDb.get('repository');
           repoMap.set(newPublication.id, newPublication);
         }
+        if (mongoose.connection.readyState === 1) {
+          try {
+            await RepositoryPublication.findOneAndUpdate(
+              { id: newPublication.id },
+              { $set: newPublication },
+              { upsert: true, new: true }
+            );
+          } catch (mongoPubErr) {
+            console.warn('[ManuscriptController] MongoDB RepositoryPublication sync warning:', mongoPubErr.message);
+          }
+        }
       }
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(201).json({
       success: true,
@@ -264,22 +287,37 @@ export const getManuscriptVersions = async (req, res) => {
     const { projectId } = req.params;
     let list = [];
 
-    if (isDevMockMode) {
-      seedMockManuscriptsIfEmpty();
-      const map = mockFirestoreDb.get('manuscripts');
-      list = Array.from(map.values());
-    } else {
-      const snapshot = await db.collection('manuscript_versions').get();
+    // When a specific projectId is requested, verify access once and filter at the Firestore query level
+    // instead of fetching all manuscript_versions across the entire system.
+    if (!isDevMockMode && projectId && projectId !== 'all') {
+      const hasAccess = await canAccessProject(req.user, projectId);
+      if (!hasAccess) {
+        return res.status(200).json({ success: true, count: 0, data: [] });
+      }
+      const snapshot = await db.collection('manuscript_versions')
+        .where('projectId', '==', projectId)
+        .get();
       list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
+    } else {
+      if (isDevMockMode) {
+        seedMockManuscriptsIfEmpty();
+        const map = mockFirestoreDb.get('manuscripts');
+        list = Array.from(map.values());
+      } else {
+        const snapshot = await db.collection('manuscript_versions').get();
+        list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
 
-    if (projectId && projectId !== 'all') {
-      list = list.filter(m => m.projectId === projectId);
+      if (projectId && projectId !== 'all') {
+        list = list.filter(m => m.projectId === projectId);
+      }
+      if (!isPrivilegedRole(req.user.role)) {
+        const accessResults = await Promise.all(list.map((manuscript) =>
+          canAccessProject(req.user, manuscript.projectId || manuscript.id, manuscript)
+        ));
+        list = list.filter((_, index) => accessResults[index]);
+      }
     }
-    const accessResults = await Promise.all(list.map((manuscript) =>
-      canAccessProject(req.user, manuscript.projectId || manuscript.id, manuscript)
-    ));
-    list = list.filter((_, index) => accessResults[index]);
 
     // Sort descending by date
     list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -333,6 +371,7 @@ export const updateManuscriptStatus = async (req, res) => {
     } else {
       await db.collection('manuscript_versions').doc(id).update({ status });
     }
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -483,6 +522,8 @@ export const getManuscriptDraft = async (req, res) => {
         return res.status(403).json({ success: false, error: 'You are not assigned to this project.' });
       }
       if (!docSnap.exists) {
+        // Return default template in-memory on GET without burning a Firestore write;
+        // draft is persisted when saveManuscriptDraft (PUT) is invoked.
         draft = {
           projectId,
           projectTitle: 'Research Project Manuscript',
@@ -491,7 +532,6 @@ export const getManuscriptDraft = async (req, res) => {
           lastSavedByName: req.user.fullName || req.user.email,
           updatedAt: new Date().toISOString()
         };
-        await docRef.set(draft);
       }
     }
 
@@ -574,7 +614,7 @@ export const getManuscriptComments = async (req, res) => {
 
     try {
       if (mongoose.connection.readyState === 1) {
-        const mongoDocs = await MongoComment.find({ documentId: projectId }).lean();
+        const mongoDocs = await MongoComment.find({ documentId: projectId }).sort({ createdAt: -1 }).lean();
         if (mongoDocs) {
           comments = mongoDocs.map(doc => ({
             id: doc.id,
@@ -793,6 +833,15 @@ export const updateManuscriptComment = async (req, res) => {
 export const getAllAdminManuscripts = async (req, res) => {
   try {
     seedMockManuscriptsIfEmpty();
+
+    if (!isDevMockMode && adminManuscriptsCache.data && Date.now() < adminManuscriptsCache.expiresAt) {
+      return res.status(200).json({
+        success: true,
+        count: adminManuscriptsCache.data.length,
+        data: adminManuscriptsCache.data
+      });
+    }
+
     let list = [];
 
     if (isDevMockMode) {
@@ -800,13 +849,17 @@ export const getAllAdminManuscripts = async (req, res) => {
       list = Array.from(map.values());
     } else {
       try {
-        const snapshot = await db.collection('manuscript_versions').get();
+        // Fetch both collections in parallel instead of sequentially
+        const [snapshot, wsSnap] = await Promise.all([
+          db.collection('manuscript_versions').get(),
+          db.collection('manuscript_workspaces').get()
+        ]);
+
         if (!snapshot.empty) {
           list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
 
         // Also retrieve active student manuscript workspaces
-        const wsSnap = await db.collection('manuscript_workspaces').get();
         if (!wsSnap.empty) {
           const wsList = wsSnap.docs.map(doc => {
             const data = doc.data();
@@ -862,6 +915,13 @@ export const getAllAdminManuscripts = async (req, res) => {
     list = list.filter(m => !m.id?.startsWith('ms-10') && !m.projectId?.startsWith('proj-50'));
 
     list.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+    if (!isDevMockMode) {
+      adminManuscriptsCache = {
+        data: list,
+        expiresAt: Date.now() + ADMIN_MANUSCRIPTS_CACHE_TTL
+      };
+    }
 
     return res.status(200).json({
       success: true,
@@ -923,14 +983,16 @@ export const adminUpdateManuscript = async (req, res) => {
       }
 
       if (targetRef && targetDoc.exists) {
-        await targetRef.update({
+        const patch = {
           ...updates,
           updatedAt: new Date().toISOString()
-        });
-        const refreshed = await targetRef.get();
-        updated = { id: refreshed.id, ...refreshed.data() };
+        };
+        await targetRef.update(patch);
+        updated = { id: targetDoc.id, ...targetDoc.data(), ...patch };
       }
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -1008,13 +1070,15 @@ export const updateManuscriptGrade = async (req, res) => {
       updated = item;
     } else {
       const ref = db.collection(targetColl).doc(id);
-      await ref.update({
+      const patch = {
         grade: gradeObj,
         updatedAt: new Date().toISOString()
-      });
-      const doc = await ref.get();
-      updated = { id: doc.id, ...doc.data() };
+      };
+      await ref.update(patch);
+      updated = { ...existing, ...patch };
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -1072,9 +1136,10 @@ export const toggleArchiveManuscript = async (req, res) => {
         updatedAt: new Date().toISOString()
       };
       await targetRef.update(patch);
-      const refreshed = await targetRef.get();
-      updated = { id: refreshed.id, ...refreshed.data() };
+      updated = { id: targetDoc.id, ...current, ...patch };
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -1134,10 +1199,10 @@ export const toggleBestThesis = async (req, res) => {
         updatedAt: new Date().toISOString()
       };
       await targetRef.update(patch);
-      const refreshed = await targetRef.get();
-      updated = { id: refreshed.id, ...refreshed.data() };
+      updated = { id: targetDoc.id, ...current, ...patch };
     }
 
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -1203,18 +1268,18 @@ export const addManuscriptFeedback = async (req, res) => {
       updated = item;
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
-      const doc = await ref.get();
-      const current = doc.data() || {};
-      const comments = current.comments || [];
+      const comments = Array.isArray(existing.comments) ? [...existing.comments] : [];
       comments.push(newComment);
-      await ref.update({
+      const patch = {
         comments,
         commentsCount: comments.length,
         updatedAt: new Date().toISOString()
-      });
-      const refreshed = await ref.get();
-      updated = { id: refreshed.id, ...refreshed.data() };
+      };
+      await ref.update(patch);
+      updated = { ...existing, ...patch };
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(201).json({
       success: true,
@@ -1347,7 +1412,20 @@ export const publishManuscriptToRepository = async (req, res) => {
       repoMap.set(repoPub.id, repoPub);
     } else {
       await db.collection('repository_publications').doc(repoPub.id).set(repoPub);
+      if (mongoose.connection.readyState === 1) {
+        try {
+          await RepositoryPublication.findOneAndUpdate(
+            { id: repoPub.id },
+            { $set: repoPub },
+            { upsert: true, new: true }
+          );
+        } catch (mongoPubErr) {
+          console.warn('[ManuscriptController] MongoDB RepositoryPublication sync warning:', mongoPubErr.message);
+        }
+      }
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -1390,6 +1468,8 @@ export const deleteAdminManuscripts = async (req, res) => {
       });
       await batch.commit();
     }
+
+    invalidateAdminManuscriptsCache();
 
     return res.status(200).json({
       success: true,
@@ -1445,18 +1525,18 @@ export const updateManuscriptPublicationStatus = async (req, res) => {
       const docV = await refV.get();
       if (docV.exists) {
         await refV.update(updates);
-        const refD = await refV.get();
-        updated = { id: refD.id, ...refD.data() };
+        updated = { id: docV.id, ...docV.data(), ...updates };
       } else {
         const refW = db.collection('manuscript_workspaces').doc(id);
         const docW = await refW.get();
         if (docW.exists) {
           await refW.update(updates);
-          const refD = await refW.get();
-          updated = { id: refD.id, ...refD.data() };
+          updated = { id: docW.id, ...docW.data(), ...updates };
         }
       }
     }
+
+    invalidateAdminManuscriptsCache();
 
     // Sync corresponding RepositoryPublication if it exists
     try {
@@ -1568,20 +1648,28 @@ export const submitPostDefenseRevision = async (req, res) => {
       }
     }
 
-    // Trigger in-app notifications to panel and adviser
+    invalidateAdminManuscriptsCache();
+
+    // Trigger in-app notifications to panel and adviser using a single Firestore batch
     try {
-      const notifUsers = [manuscript.adviserId, ...(manuscript.panelistIds || [])].filter(Boolean);
-      for (const recipientId of notifUsers) {
-        await db.collection('notifications').add({
-          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          userId: recipientId,
-          type: 'post_defense_revision',
-          title: 'Post-Defense Revisions Submitted',
-          message: `${manuscript.studentName || 'Student Group'} has submitted revised manuscript and point-by-point revision matrix for "${manuscript.title || manuscript.projectTitle || 'Research Project'}".`,
-          linkUrl: `/workspace?id=${id}&tab=revisions`,
-          read: false,
-          createdAt: new Date().toISOString()
-        }).catch(() => {});
+      const notifUsers = [...new Set([manuscript.adviserId, ...(manuscript.panelistIds || [])].filter(Boolean))];
+      if (!isDevMockMode && db && notifUsers.length > 0) {
+        const batch = db.batch();
+        const nowIso = new Date().toISOString();
+        for (const recipientId of notifUsers) {
+          const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+          batch.set(db.collection('notifications').doc(notifId), {
+            id: notifId,
+            userId: recipientId,
+            type: 'post_defense_revision',
+            title: 'Post-Defense Revisions Submitted',
+            message: `${manuscript.studentName || 'Student Group'} has submitted revised manuscript and point-by-point revision matrix for "${manuscript.title || manuscript.projectTitle || 'Research Project'}".`,
+            linkUrl: `/workspace?id=${id}&tab=revisions`,
+            read: false,
+            createdAt: nowIso
+          });
+        }
+        await batch.commit().catch(() => {});
       }
     } catch (notifErr) {
       console.warn('[ManuscriptController] Error sending revision notifications:', notifErr.message);
@@ -1648,9 +1736,22 @@ export const reviewPostDefenseRevision = async (req, res) => {
     } else {
       const ref = db.collection('manuscript_versions').doc(id);
       const doc = await ref.get();
+      let targetRef = ref;
+      let targetDoc = doc;
+
+      if (!doc.exists) {
+        const wsRef = db.collection('manuscript_workspaces').doc(id);
+        const wsDoc = await wsRef.get();
+        if (!wsDoc.exists) {
+          return res.status(404).json({ success: false, error: 'Manuscript not found' });
+        }
+        targetRef = wsRef;
+        targetDoc = wsDoc;
+      }
+
       const updateData = {
         postDefenseRevisionStatus: decision,
-        postDefenseReviews: [...(doc.data()?.postDefenseReviews || []), reviewRecord],
+        postDefenseReviews: [...(targetDoc.data()?.postDefenseReviews || []), reviewRecord],
         updatedAt: reviewedAt
       };
       if (decision === 'approved') {
@@ -1659,36 +1760,33 @@ export const reviewPostDefenseRevision = async (req, res) => {
         updateData.postDefenseRevisionApprovedAt = reviewedAt;
       }
 
-      if (!doc.exists) {
-        const wsRef = db.collection('manuscript_workspaces').doc(id);
-        const wsDoc = await wsRef.get();
-        if (!wsDoc.exists) {
-          return res.status(404).json({ success: false, error: 'Manuscript not found' });
-        }
-        await wsRef.update(updateData);
-        manuscript = { id: wsDoc.id, ...wsDoc.data(), ...updateData };
-      } else {
-        await ref.update(updateData);
-        manuscript = { id: doc.id, ...doc.data(), ...updateData };
-      }
+      await targetRef.update(updateData);
+      manuscript = { id: targetDoc.id, ...targetDoc.data(), ...updateData };
     }
 
-    // Send notification to students
+    invalidateAdminManuscriptsCache();
+
+    // Send notification to students in a single Firestore batch
     try {
-      const studentRecipients = manuscript.memberIds || [manuscript.studentId, manuscript.userId].filter(Boolean);
-      for (const stId of studentRecipients) {
-        await db.collection('notifications').add({
-          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          userId: stId,
-          type: 'post_defense_review',
-          title: decision === 'approved' ? 'Post-Defense Revisions Approved!' : 'Further Revisions Required',
-          message: decision === 'approved'
-            ? `${reviewerName} has verified and approved your post-defense revisions. You may now publish to the Institutional Repository.`
-            : `${reviewerName} reviewed your post-defense revisions and requested additional corrections: ${reviewNotes || 'Check feedback.'}`,
-          linkUrl: `/workspace?id=${id}`,
-          read: false,
-          createdAt: reviewedAt
-        }).catch(() => {});
+      const studentRecipients = [...new Set((manuscript.memberIds || [manuscript.studentId, manuscript.userId]).filter(Boolean))];
+      if (!isDevMockMode && db && studentRecipients.length > 0) {
+        const batch = db.batch();
+        for (const stId of studentRecipients) {
+          const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+          batch.set(db.collection('notifications').doc(notifId), {
+            id: notifId,
+            userId: stId,
+            type: 'post_defense_review',
+            title: decision === 'approved' ? 'Post-Defense Revisions Approved!' : 'Further Revisions Required',
+            message: decision === 'approved'
+              ? `${reviewerName} has verified and approved your post-defense revisions. You may now publish to the Institutional Repository.`
+              : `${reviewerName} reviewed your post-defense revisions and requested additional corrections: ${reviewNotes || 'Check feedback.'}`,
+            linkUrl: `/workspace?id=${id}`,
+            read: false,
+            createdAt: reviewedAt
+          });
+        }
+        await batch.commit().catch(() => {});
       }
     } catch (notifErr) {
       console.warn('[ManuscriptController] Error sending student review notifications:', notifErr.message);

@@ -38,6 +38,7 @@ const RepositoryPublicationSchema = new mongoose.Schema({
 });
 
 RepositoryPublicationSchema.index({ publishedAt: -1 });
+RepositoryPublicationSchema.index({ publicationStatus: 1, publishedAt: -1 });
 RepositoryPublicationSchema.index({ department: 1, publicationYear: 1 });
 
 export const RepositoryPublication = mongoose.model('RepositoryPublication', RepositoryPublicationSchema);

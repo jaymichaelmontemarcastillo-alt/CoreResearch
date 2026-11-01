@@ -29,4 +29,7 @@ const MatchCacheSchema = new mongoose.Schema(
   },
 );
 
+// Compound index for retrieving a student's most recent matching session without in-memory sorting
+MatchCacheSchema.index({ studentId: 1, generatedAt: -1 });
+
 export const MatchCache = mongoose.model("MatchCache", MatchCacheSchema);

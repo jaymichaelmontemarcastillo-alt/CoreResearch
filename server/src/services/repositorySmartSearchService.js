@@ -155,6 +155,10 @@ class RepositorySmartSearchService {
             try {
               const text = this._buildPublicationText(doc);
               const vec = await this._getEmbedding(text);
+              if (publicationEmbeddingCache.size >= 500) {
+                const oldestKey = publicationEmbeddingCache.keys().next().value;
+                if (oldestKey) publicationEmbeddingCache.delete(oldestKey);
+              }
               publicationEmbeddingCache.set(doc.id, {
                 vec,
                 updatedAt: Date.now()

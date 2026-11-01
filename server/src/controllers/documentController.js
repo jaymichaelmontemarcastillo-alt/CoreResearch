@@ -29,7 +29,9 @@ export const importDocument = async (req, res) => {
 
     const existingDocumentId = req.body?.documentId || null;
     if (existingDocumentId) {
-      const existingDocument = await Document.findOne({ id: existingDocumentId }).lean();
+      const existingDocument = await Document.findOne({ id: existingDocumentId })
+        .select('-yjsBinaryState -plainText')
+        .lean();
       if (!existingDocument) {
         return res.status(404).json({ success: false, message: 'Document not found.' });
       }
@@ -93,7 +95,9 @@ export const serveStorageAsset = async (req, res) => {
 
     const pathParts = cleanKey.split('/');
     if (pathParts[0] === 'documents' && pathParts[1]) {
-      const document = await Document.findOne({ id: pathParts[1] }).lean();
+      const document = await Document.findOne({ id: pathParts[1] })
+        .select('-yjsBinaryState -plainText')
+        .lean();
       if (document && !(await canAccessProject(req.user, document.id, document))) {
         return res.status(403).json({ success: false, message: 'You are not authorized to access this asset.' });
       }
@@ -186,7 +190,9 @@ export const updatePageSettings = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid page settings.' });
     }
 
-    const document = await Document.findOne({ id: documentId }).lean();
+    const document = await Document.findOne({ id: documentId })
+      .select('-yjsBinaryState -plainText')
+      .lean();
     if (!document) {
       return res.status(404).json({ success: false, message: 'Document not found' });
     }
@@ -194,20 +200,16 @@ export const updatePageSettings = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You are not authorized to update this document.' });
     }
 
-    const updatedDoc = await Document.findOneAndUpdate(
+    const mergedPageSettings = { ...(document.pageSettings || {}), ...pageSettings };
+    await Document.updateOne(
       { id: documentId },
-      { $set: { pageSettings: pageSettings } },
-      { new: true } // Return updated doc
+      { $set: { pageSettings: mergedPageSettings } }
     );
-
-    if (!updatedDoc) {
-      return res.status(404).json({ success: false, message: 'Document not found' });
-    }
 
     return res.status(200).json({
       success: true,
       message: 'Page settings updated successfully.',
-      pageSettings: updatedDoc.pageSettings,
+      pageSettings: mergedPageSettings,
     });
   } catch (error) {
     console.error('[documentController] updatePageSettings error:', error);

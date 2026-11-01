@@ -104,7 +104,20 @@ const notifyAdminsOfRegistration = async (userProfile) => {
   if (!db || isDevMockMode) return;
 
   try {
-    const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+    let adminIds = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const mongoAdmins = await User.find({ role: 'admin' }).select('uid').lean();
+        adminIds = mongoAdmins.map((a) => a.uid).filter(Boolean);
+      } catch (e) {}
+    }
+
+    if (adminIds.length === 0) {
+      const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+      if (adminSnapshot.empty) return;
+      adminIds = adminSnapshot.docs.map((doc) => doc.id);
+    }
+
     const now = new Date().toISOString();
     const isStudent = userProfile.role === 'student';
     const notificationTitle = isStudent ? 'New Student Registration' : 'New Faculty Registration';
@@ -112,15 +125,13 @@ const notifyAdminsOfRegistration = async (userProfile) => {
       ? `${userProfile.fullName} has registered a new Student account. Student ID: ${userProfile.studentIdOrEmployeeId} | Email: ${userProfile.email} | Program: ${userProfile.programCode || userProfile.program || 'BSIT'} | Major: ${userProfile.majorCode || userProfile.programSpecialization || 'None'} | Section: ${userProfile.sectionName || 'None'} | Status: Pending Approval`
       : `${userProfile.fullName} has registered a new Faculty/Adviser account. Email: ${userProfile.email} | Department: ${userProfile.department || 'College of Computer Studies'} | Status: Pending Approval`;
 
-    if (adminSnapshot.empty) return;
-
     const batch = db.batch();
-    adminSnapshot.docs.forEach((adminDoc) => {
-      const notificationId = `registration-${userProfile.uid}-${adminDoc.id}`;
+    adminIds.forEach((adminId) => {
+      const notificationId = `registration-${userProfile.uid}-${adminId}`;
       const notificationRef = db.collection('notifications').doc(notificationId);
       const notification = {
         id: notificationId,
-        userId: adminDoc.id,
+        userId: adminId,
         title: notificationTitle,
         message: notificationMessage,
         type: 'system',
@@ -257,6 +268,7 @@ export const loginSync = async (req, res) => {
 
     // 1. Fetch existing document from MongoDB if available
     let fetchedFromMongo = false;
+    let shouldSyncFirestore = Boolean(req.body?.forceSync);
     try {
       if (mongoose.connection.readyState === 1) {
         const userDoc = await User.findOne({ uid: user.uid }).lean();
@@ -268,6 +280,7 @@ export const loginSync = async (req, res) => {
           await User.findOneAndUpdate({ uid: user.uid }, initialDoc, { upsert: true, new: true, setDefaultsOnInsert: true });
           profileData = { ...profileData, ...initialDoc };
           fetchedFromMongo = true;
+          shouldSyncFirestore = true;
         }
       }
     } catch (mongoErr) {
@@ -307,7 +320,9 @@ export const loginSync = async (req, res) => {
     // Save back to mock db for consistency
     mockUsersDb.set(user.uid, finalProfile);
 
-    if (fetchedFromMongo && db && !isDevMockMode) {
+    // Only write to Firestore on login if profile was newly created or explicitly requested,
+    // avoiding an unnecessary Firestore write on every routine session sync.
+    if (fetchedFromMongo && shouldSyncFirestore && db && !isDevMockMode) {
       try {
         await db.collection('users').doc(user.uid).set(finalProfile, { merge: true });
       } catch (syncError) {
@@ -398,8 +413,8 @@ export const checkIdentifierAvailability = async (req, res) => {
         if (found) exists = true;
       }
 
-      // Check Firestore if not found in MongoDB
-      if (!exists && db) {
+      // Check Firestore only if MongoDB is unavailable
+      if (!exists && mongoose.connection.readyState !== 1 && db) {
         try {
           const snap = await db.collection('users')
             .where('studentIdOrEmployeeId', '==', trimmedId)

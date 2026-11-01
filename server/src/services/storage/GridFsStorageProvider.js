@@ -38,6 +38,14 @@ export class GridFsStorageProvider extends IStorageProvider {
       });
 
       uploadStream.on('finish', () => {
+        const newFileId = uploadStream.id;
+        // Asynchronously prune older revisions with the same filename to prevent orphaned GridFS chunk bloat
+        bucket
+          .find({ filename, _id: { $ne: newFileId } })
+          .toArray()
+          .then((oldFiles) => Promise.all(oldFiles.map((f) => bucket.delete(f._id).catch(() => {}))))
+          .catch(() => {});
+
         resolve({
           storageKey: filename,
           storageProvider: 'gridfs',
@@ -58,10 +66,10 @@ export class GridFsStorageProvider extends IStorageProvider {
     const bucket = this.getBucket();
     const filename = key.replace(/^\/+/, '');
 
-    const files = await bucket.find({ filename }).toArray();
+    const files = await bucket.find({ filename }).sort({ uploadDate: -1 }).limit(1).toArray();
     if (files.length === 0) return null;
 
-    return bucket.openDownloadStreamByName(filename);
+    return bucket.openDownloadStream(files[0]._id);
   }
 
   async delete(key) {

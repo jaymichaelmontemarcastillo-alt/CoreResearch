@@ -289,14 +289,19 @@ export const AdviserDashboardView = () => {
       });
       setSchedules(adviserSchedules);
 
-      // Calculate progress for all advisee groups using progressService
-      const computedProgress = await facultyService.getGroupsProgressSummary(enrichedGroups);
-      // Recalculate accurately from workspace chapters (20% per completed chapter)
+      // Compute progress directly from already-loaded workspaces first, and only query Firestore
+      // for advisee groups that did not have a workspace in wsList.
+      const computedProgress = {};
       wsList.forEach((ws) => {
         if (ws.groupId) {
           computedProgress[ws.groupId] = progressService.calculateWorkspaceProgress(ws, [], []);
         }
       });
+      const groupsMissingWs = enrichedGroups.filter((g) => !computedProgress[g.id]);
+      if (groupsMissingWs.length > 0) {
+        const fallbackProgress = await facultyService.getGroupsProgressSummary(groupsMissingWs);
+        Object.assign(computedProgress, fallbackProgress);
+      }
       setProgressMap(computedProgress);
     } catch (err) {
       console.error('[AdviserDashboardView] Failed to load dashboard data:', err);

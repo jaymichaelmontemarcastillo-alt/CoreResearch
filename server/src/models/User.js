@@ -36,5 +36,14 @@ const UserSchema = new mongoose.Schema({
 });
 
 UserSchema.index({ role: 1, status: 1 });
+UserSchema.index({ role: 1, status: 1, is_approved: 1 });
+UserSchema.index({ role: 1, isAvailable: 1 });
+UserSchema.index({ role: 1, courseId: 1, sectionId: 1 });
+UserSchema.index({ role: 1, programCode: 1, majorCode: 1, sectionName: 1 });
+UserSchema.index({ courseId: 1 });
+UserSchema.index({ sectionId: 1 });
+UserSchema.index({ is_approved: 1 });
+UserSchema.index({ studentIdOrEmployeeId: 1 });
+UserSchema.index({ studentId: 1 });
 
 export const User = mongoose.model('User', UserSchema);

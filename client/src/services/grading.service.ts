@@ -10,6 +10,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
+import { dataCache, CACHE_TTL } from './dataCache';
 import {
   Evaluation,
   SubmitEvaluationInput,
@@ -154,6 +155,8 @@ export const gradingService = {
       submittedAt: now,
     };
     await setDoc(docRef, evaluation);
+    dataCache.invalidatePattern('evaluations_');
+    dataCache.invalidatePattern('manuscript');
     return evaluation;
   },
 
@@ -247,6 +250,8 @@ export const gradingService = {
       }
     }
 
+    dataCache.invalidatePattern('evaluations_');
+    dataCache.invalidatePattern('manuscript');
     return evaluation;
   },
 
@@ -344,6 +349,8 @@ export const gradingService = {
       }
     }
 
+    dataCache.invalidatePattern('evaluations_');
+    dataCache.invalidatePattern('manuscript');
     return evaluation;
   },
 
@@ -436,87 +443,102 @@ export const gradingService = {
     }
     if (ids.length === 0) return { proposalEvaluations: [], finalEvaluations: [] };
 
-    const propMap = new Map<string, ProposalEvaluation>();
-    const finalMap = new Map<string, FinalDefenseEvaluation>();
+    const cacheKey = `evaluations_entity_${[...ids].sort().join('_')}`;
+    return dataCache.getOrFetch(
+      cacheKey,
+      async () => {
+        const propMap = new Map<string, ProposalEvaluation>();
+        const finalMap = new Map<string, FinalDefenseEvaluation>();
 
-    const idSet = new Set(ids);
-    const matchesId = (data: any) => {
-      const matchKeys = [data.workspaceId, data.groupId, data.projectId, data.defenseId, data.documentId].filter(Boolean);
-      return matchKeys.some((k) => idSet.has(k));
-    };
+        const idSet = new Set(ids);
+        const matchesId = (data: any) => {
+          const matchKeys = [data.workspaceId, data.groupId, data.projectId, data.defenseId, data.documentId].filter(Boolean);
+          return matchKeys.some((k) => idSet.has(k));
+        };
 
-    const queryPromises: Promise<void>[] = [];
-    const fields = ['workspaceId', 'groupId', 'projectId', 'defenseId', 'documentId'];
+        const queryPromises: Promise<void>[] = [];
+        const fields = ['workspaceId', 'groupId', 'projectId', 'defenseId', 'documentId'];
+        const batchIds = ids.slice(0, 10);
+        let hadQueryError = false;
 
-    // Targeted queries for each candidate ID across all potential foreign key fields
-    ids.forEach((id) => {
-      fields.forEach((field) => {
-        queryPromises.push(
-          getDocs(query(collection(db, PROPOSAL_COLLECTION), where(field, '==', id)))
-            .then((snap) => {
-              snap.docs.forEach((d) => propMap.set(d.id, d.data() as ProposalEvaluation));
-            })
-            .catch(() => {})
-        );
-        queryPromises.push(
-          getDocs(query(collection(db, FINAL_DEFENSE_COLLECTION), where(field, '==', id)))
-            .then((snap) => {
-              snap.docs.forEach((d) => finalMap.set(d.id, d.data() as FinalDefenseEvaluation));
-            })
-            .catch(() => {})
-        );
-      });
-    });
+        // Batch candidate IDs using Firestore 'in' queries per foreign key field
+        // instead of issuing ids.length * 10 individual queries.
+        fields.forEach((field) => {
+          const constraint = batchIds.length === 1 ? where(field, '==', batchIds[0]) : where(field, 'in', batchIds);
+          queryPromises.push(
+            getDocs(query(collection(db, PROPOSAL_COLLECTION), constraint))
+              .then((snap) => {
+                snap?.docs?.forEach((d) => {
+                  const data = d.data() as ProposalEvaluation;
+                  if (matchesId(data)) propMap.set(d.id, data);
+                });
+              })
+              .catch(() => {
+                hadQueryError = true;
+              })
+          );
+          queryPromises.push(
+            getDocs(query(collection(db, FINAL_DEFENSE_COLLECTION), constraint))
+              .then((snap) => {
+                snap?.docs?.forEach((d) => {
+                  const data = d.data() as FinalDefenseEvaluation;
+                  if (matchesId(data)) finalMap.set(d.id, data);
+                });
+              })
+              .catch(() => {
+                hadQueryError = true;
+              })
+          );
+        });
 
-    // Also run collection scan as fallback (e.g. for Admins/Coordinators)
-    queryPromises.push(
-      getDocs(collection(db, PROPOSAL_COLLECTION))
-        .then((snap) => {
-          snap.docs.forEach((d) => {
-            const data = d.data() as ProposalEvaluation;
-            if (matchesId(data)) propMap.set(d.id, data);
+        await Promise.all(queryPromises);
+
+        // If targeted queries return no results, fall back to the shared cached getAllEvaluations()
+        // so collection scans are deduplicated and cached across all callers via 'evaluations_all'.
+        if (propMap.size === 0 && finalMap.size === 0) {
+          const allEvals = await this.getAllEvaluations();
+          allEvals.proposalEvaluations.forEach((data) => {
+            if (matchesId(data)) propMap.set(data.id, data);
           });
-        })
-        .catch(() => {})
-    );
-    queryPromises.push(
-      getDocs(collection(db, FINAL_DEFENSE_COLLECTION))
-        .then((snap) => {
-          snap.docs.forEach((d) => {
-            const data = d.data() as FinalDefenseEvaluation;
-            if (matchesId(data)) finalMap.set(d.id, data);
+          allEvals.finalEvaluations.forEach((data) => {
+            if (matchesId(data)) finalMap.set(data.id, data);
           });
-        })
-        .catch(() => {})
+        }
+
+        const sortFn = (a: any, b: any) =>
+          new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
+
+        return {
+          proposalEvaluations: Array.from(propMap.values()).sort(sortFn),
+          finalEvaluations: Array.from(finalMap.values()).sort(sortFn),
+        };
+      },
+      CACHE_TTL.SHORT
     );
-
-    await Promise.all(queryPromises);
-
-    const sortFn = (a: any, b: any) =>
-      new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
-
-    return {
-      proposalEvaluations: Array.from(propMap.values()).sort(sortFn),
-      finalEvaluations: Array.from(finalMap.values()).sort(sortFn),
-    };
   },
 
   /**
    * Fetch all proposal and final evaluations (e.g. for Admin/Coordinator Scheduling & Master Views).
    */
   async getAllEvaluations(): Promise<{ proposalEvaluations: ProposalEvaluation[]; finalEvaluations: FinalDefenseEvaluation[] }> {
-    try {
-      const [propSnap, finalSnap] = await Promise.all([
-        getDocs(collection(db, PROPOSAL_COLLECTION)).catch(() => null),
-        getDocs(collection(db, FINAL_DEFENSE_COLLECTION)).catch(() => null),
-      ]);
-      const proposalEvaluations: ProposalEvaluation[] = propSnap ? propSnap.docs.map((d) => d.data() as ProposalEvaluation) : [];
-      const finalEvaluations: FinalDefenseEvaluation[] = finalSnap ? finalSnap.docs.map((d) => d.data() as FinalDefenseEvaluation) : [];
-      return { proposalEvaluations, finalEvaluations };
-    } catch (err) {
-      console.warn('[gradingService] getAllEvaluations error:', err);
-      return { proposalEvaluations: [], finalEvaluations: [] };
-    }
+    return dataCache.getOrFetch(
+      'evaluations_all',
+      async () => {
+        try {
+          const [propSnap, finalSnap] = await Promise.all([
+            getDocs(collection(db, PROPOSAL_COLLECTION)).catch(() => null),
+            getDocs(collection(db, FINAL_DEFENSE_COLLECTION)).catch(() => null),
+          ]);
+          const proposalEvaluations: ProposalEvaluation[] = propSnap ? propSnap.docs.map((d) => d.data() as ProposalEvaluation) : [];
+          const finalEvaluations: FinalDefenseEvaluation[] = finalSnap ? finalSnap.docs.map((d) => d.data() as FinalDefenseEvaluation) : [];
+          return { proposalEvaluations, finalEvaluations };
+        } catch (err) {
+          console.warn('[gradingService] getAllEvaluations error:', err);
+          return { proposalEvaluations: [], finalEvaluations: [] };
+        }
+      },
+      CACHE_TTL.SHORT
+    );
   },
 };
 

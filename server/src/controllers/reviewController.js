@@ -125,7 +125,7 @@ export const getReviewComments = async (req, res) => {
     try {
       if (mongoose.connection.readyState === 1) {
         const query = manuscriptId && manuscriptId !== 'all' ? { manuscriptId } : {};
-        const mongoDocs = await MongoReview.find(query).lean();
+        const mongoDocs = await MongoReview.find(query).sort({ createdAt: -1 }).lean();
         
         if (mongoDocs) {
           list = mongoDocs.map(doc => ({

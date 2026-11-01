@@ -1,5 +1,5 @@
 import api from './api';
-import { dataCache } from './dataCache';
+import { dataCache, CACHE_TTL } from './dataCache';
 import {
   DefenseSchedule,
   CreateScheduleInput,
@@ -55,13 +55,20 @@ export const scheduleService = {
 
   /**
    * Fetch all defense schedules.
+   * Uses short-TTL cache + in-flight deduplication so multiple dashboard widgets share one request.
    */
   async getAllSchedules(): Promise<DefenseSchedule[]> {
-    const { data } = await api.get('/schedules');
-    if (!Array.isArray(data?.data)) {
-      throw new Error('The schedules API returned an invalid response.');
-    }
-    return data.data;
+    return dataCache.getOrFetch(
+      'schedules_all',
+      async () => {
+        const { data } = await api.get('/schedules');
+        if (!Array.isArray(data?.data)) {
+          throw new Error('The schedules API returned an invalid response.');
+        }
+        return data.data;
+      },
+      CACHE_TTL.SHORT
+    );
   },
 
   /**

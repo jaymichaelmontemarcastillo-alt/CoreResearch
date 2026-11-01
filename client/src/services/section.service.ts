@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { Section, CreateSectionInput, UpdateSectionInput } from '../types/section.types';
+import { dataCache, CACHE_TTL } from './dataCache';
 
 const COLLECTION_NAME = 'sections';
 
@@ -31,6 +32,7 @@ export const sectionService = {
     };
     
     await setDoc(sectionRef, newSection);
+    dataCache.invalidatePattern('section');
     return newSection;
   },
 
@@ -74,17 +76,23 @@ export const sectionService = {
    * Fetch all sections globally.
    */
   async getAllSections(): Promise<Section[]> {
-    try {
-      const q = query(collection(db, COLLECTION_NAME));
-      const querySnap = await getDocs(q);
-      const sections = querySnap.docs.map((docSnap) =>
-        this.normalizeSection(docSnap.id, docSnap.data())
-      );
-      return sections.sort((a, b) => a.name.localeCompare(b.name));
-    } catch (err) {
-      console.warn('[sectionService] getAllSections error:', err);
-      return [];
-    }
+    return dataCache.getOrFetch(
+      'sections_all',
+      async () => {
+        try {
+          const q = query(collection(db, COLLECTION_NAME));
+          const querySnap = await getDocs(q);
+          const sections = querySnap.docs.map((docSnap) =>
+            this.normalizeSection(docSnap.id, docSnap.data())
+          );
+          return sections.sort((a, b) => a.name.localeCompare(b.name));
+        } catch (err) {
+          console.warn('[sectionService] getAllSections error:', err);
+          return [];
+        }
+      },
+      CACHE_TTL.MODERATE
+    );
   },
 
   /**
@@ -144,6 +152,7 @@ export const sectionService = {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+    dataCache.invalidatePattern('section');
   },
 
   /**
@@ -152,6 +161,7 @@ export const sectionService = {
   async deleteSection(id: string): Promise<void> {
     const sectionRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(sectionRef);
+    dataCache.invalidatePattern('section');
   },
 };
 

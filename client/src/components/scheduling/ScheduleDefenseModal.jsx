@@ -129,25 +129,45 @@ export const ScheduleDefenseModal = ({
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
 
-    // Past attempts for this group
-    const pastSchedules = schedules.filter(
-      (s) => s.projectId === groupId || s.groupId === groupId
-    );
+    // Past attempts for this group, sorted newest-first so we always pick the latest schedule
+    const pastSchedules = schedules
+      .filter((s) => s.projectId === groupId || s.groupId === groupId)
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.createdAt || 0).getTime() -
+          new Date(a.updatedAt || a.createdAt || 0).getTime()
+      );
 
-    // Prioritize explicitSchedule if passed and matches, or find an active schedule
-    const activeSchedule = (explicitSchedule && (explicitSchedule.projectId === groupId || explicitSchedule.groupId === groupId))
-      ? explicitSchedule
-      : (pastSchedules.find(s => (s.status === 'scheduled' || s.status === 'for_redefense') && (s.startTime || s.date)) || pastSchedules[pastSchedules.length - 1]);
+    // Prioritize explicitSchedule if passed and matches, or find the most recent active schedule
+    const activeSchedule =
+      explicitSchedule && (explicitSchedule.projectId === groupId || explicitSchedule.groupId === groupId)
+        ? explicitSchedule
+        : pastSchedules.find(
+          (s) => (s.status === 'scheduled' || s.status === 'for_redefense') && s.date && s.startTime
+        ) ||
+        pastSchedules.find((s) => s.date || s.startTime) ||
+        pastSchedules[0];
 
-    const isEditing = !forceRedefense && !isRedefenseMode && Boolean(activeSchedule && (activeSchedule.startTime || activeSchedule.date));
-    setEditingScheduleId(isEditing ? activeSchedule.id : null);
+    // Always bind editingScheduleId when an existing schedule record exists for this group
+    // (including Re-defense scheduling and records whose date/time was cleared),
+    // preventing duplicate insertions on save.
+    setEditingScheduleId(activeSchedule?.id || null);
 
     // Auto-detect proposal vs final defense from schedule
     const schedType = activeSchedule?.defenseType || activeSchedule?.type;
-    const stageType = schedType === 'final_defense' ? 'final_defense' : 'proposal_defense';
+    const stageType =
+      schedType === 'final_defense' || (activeSchedule?.defenseStage || '').toLowerCase().includes('final')
+        ? 'final_defense'
+        : 'proposal_defense';
     setDefenseStage(stageType);
 
-    const isRedef = forceRedefense || isRedefenseMode || activeSchedule?.status === 'for_redefense' || activeSchedule?.resultStatus === 're_defense' || false;
+    const isRedef =
+      forceRedefense ||
+      isRedefenseMode ||
+      activeSchedule?.status === 'for_redefense' ||
+      activeSchedule?.resultStatus === 're_defense' ||
+      Boolean(activeSchedule?.isRedefense) ||
+      (activeSchedule?.defenseStage || '').toLowerCase().includes('re-defense');
     setIsRedefense(isRedef);
 
     // Auto-populate Adviser
@@ -180,8 +200,8 @@ export const ScheduleDefenseModal = ({
     setTechName(tech?.name || tech?.fullName || '');
 
     // Venue, Date, Time & Notes
-    if (isEditing && activeSchedule) {
-      setDate(activeSchedule.date || '');
+    if (activeSchedule && activeSchedule.date) {
+      setDate(activeSchedule.date);
       setStartTime(activeSchedule.startTime || activeSchedule.time || '09:00');
       setEndTime(activeSchedule.endTime || '10:00');
       setVenue(activeSchedule.venue || activeSchedule.location || 'Conference Room A');
@@ -193,10 +213,10 @@ export const ScheduleDefenseModal = ({
       const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
       const d = String(tomorrow.getDate()).padStart(2, '0');
       setDate(`${y}-${m}-${d}`);
-      setStartTime('09:00');
-      setEndTime('10:00');
+      setStartTime(activeSchedule?.startTime || activeSchedule?.time || '09:00');
+      setEndTime(activeSchedule?.endTime || '10:00');
       setVenue(activeSchedule?.venue || activeSchedule?.location || 'Conference Room A');
-      setNotes('');
+      setNotes(activeSchedule?.notes || '');
     }
   };
 
@@ -288,6 +308,14 @@ export const ScheduleDefenseModal = ({
         ? (defenseStage === 'final_defense' ? 'Final Re-defense' : 'Proposal Re-defense')
         : (defenseStage === 'final_defense' ? 'Final Defense' : 'Proposal Defense');
 
+      const groupMemberIds = (currentGroup.members || [])
+        .map((m) => m.uid || m.id)
+        .filter(Boolean);
+      const leadStudentName =
+        (currentGroup.members || [])[0]?.fullName ||
+        currentGroup.leaderName ||
+        'Student Researcher';
+
       const payload = {
         projectId: currentGroup.id,
         groupId: currentGroup.id,
@@ -296,6 +324,8 @@ export const ScheduleDefenseModal = ({
           currentGroup.title ||
           currentGroup.name ||
           'Untitled Research',
+        studentName: leadStudentName,
+        memberIds: groupMemberIds,
         defenseType: defenseStage,
         type: defenseStage === 'final_defense' ? 'final_defense' : 'proposal',
         date,
@@ -313,30 +343,47 @@ export const ScheduleDefenseModal = ({
         notes: notes.trim(),
       };
 
-      let savedRecord;
-      if (editingScheduleId) {
-        // 1. UPDATE existing schedule in place
-        savedRecord = await scheduleService.updateSchedule(editingScheduleId, payload);
-      } else {
-        // 1. Create the new chronological schedule entry
-        savedRecord = await scheduleService.createSchedule(payload);
+      // Find any existing schedule(s) for this group matching the target defense stage
+      const isTargetFinal = defenseStage === 'final_defense';
+      const matchingStageSchedules = [...groupSchedulesHistory]
+        .filter((s) => {
+          const sFinal =
+            s.defenseType === 'final_defense' ||
+            s.type === 'final_defense' ||
+            (s.defenseStage || '').toLowerCase().includes('final');
+          return sFinal === isTargetFinal;
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt || b.createdAt || 0).getTime() -
+            new Date(a.updatedAt || a.createdAt || 0).getTime()
+        );
 
-        // 2. Mark previous schedules for this group as completed or for_redefense if they were still scheduled
-        if (groupSchedulesHistory.length > 0) {
+      const targetScheduleId =
+        matchingStageSchedules[0]?.id ||
+        editingScheduleId ||
+        groupSchedulesHistory[groupSchedulesHistory.length - 1]?.id ||
+        null;
+
+      let savedRecord;
+      if (targetScheduleId) {
+        // 1. UPDATE existing schedule entry in place instead of inserting a duplicate
+        savedRecord = await scheduleService.updateSchedule(targetScheduleId, payload);
+
+        // 2. Clean up any redundant duplicate schedule entries for the same group and defense stage
+        const duplicateStageSchedules = matchingStageSchedules.filter(
+          (s) => s.id && s.id !== targetScheduleId
+        );
+        if (duplicateStageSchedules.length > 0) {
           await Promise.all(
-            groupSchedulesHistory.map((s) => {
-              if (s.status === 'scheduled') {
-                return scheduleService
-                  .updateSchedule(s.id, {
-                    status: isRedefenseActive ? 'for_redefense' : 'completed',
-                    resultStatus: isRedefenseActive ? 're_defense' : 'completed',
-                  })
-                  .catch(() => null);
-              }
-              return Promise.resolve();
-            })
+            duplicateStageSchedules.map((dup) =>
+              scheduleService.deleteSchedule(dup.id).catch(() => null)
+            )
           );
         }
+      } else {
+        // 1. Create the schedule entry only when no schedule exists yet for this group
+        savedRecord = await scheduleService.createSchedule(payload);
       }
 
       // 3. Update group records with assigned adviser, panelists, and stage
@@ -473,9 +520,8 @@ export const ScheduleDefenseModal = ({
                             key={g.id}
                             type="button"
                             onClick={() => handleGroupSelect(g.id)}
-                            className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-[#1c1d28] transition-colors flex items-start justify-between gap-2 ${
-                              isSelected ? 'bg-blue-50/40 dark:bg-blue-900/20' : ''
-                            }`}
+                            className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-[#1c1d28] transition-colors flex items-start justify-between gap-2 ${isSelected ? 'bg-blue-50/40 dark:bg-blue-900/20' : ''
+                              }`}
                           >
                             <div className="min-w-0">
                               <div className="font-semibold text-xs text-gray-900 dark:text-white">
@@ -528,22 +574,20 @@ export const ScheduleDefenseModal = ({
                   <button
                     type="button"
                     onClick={() => setDefenseStage('proposal_defense')}
-                    className={`px-2.5 py-1 text-xs rounded-md font-medium transition ${
-                      defenseStage === 'proposal_defense'
+                    className={`px-2.5 py-1 text-xs rounded-md font-medium transition ${defenseStage === 'proposal_defense'
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                      }`}
                   >
                     Proposal Defense
                   </button>
                   <button
                     type="button"
                     onClick={() => setDefenseStage('final_defense')}
-                    className={`px-2.5 py-1 text-xs rounded-md font-medium transition ${
-                      defenseStage === 'final_defense'
+                    className={`px-2.5 py-1 text-xs rounded-md font-medium transition ${defenseStage === 'final_defense'
                         ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                      }`}
                   >
                     Final Defense
                   </button>
@@ -552,11 +596,10 @@ export const ScheduleDefenseModal = ({
                 <button
                   type="button"
                   onClick={() => setIsRedefense(prev => !prev)}
-                  className={`px-2.5 py-1 text-xs rounded-lg font-bold transition border ${
-                    isRedefense
+                  className={`px-2.5 py-1 text-xs rounded-lg font-bold transition border ${isRedefense
                       ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
                       : 'bg-white dark:bg-[#181a24] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-[#222433] hover:text-gray-900'
-                  }`}
+                    }`}
                   title="Toggle Re-defense"
                 >
                   {isRedefense ? 'Re-defense (Active)' : 'Mark as Re-defense'}

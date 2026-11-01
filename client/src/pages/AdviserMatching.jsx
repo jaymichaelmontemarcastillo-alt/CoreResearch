@@ -28,6 +28,7 @@ import adviserRequestService from '../services/adviserRequest.service';
 import adviserMatchingService from '../services/adviserMatching.service';
 import { courseService } from '../services/course.service';
 import { sectionService } from '../services/section.service';
+import { dataCache, CACHE_TTL } from '../services/dataCache';
 
 // Progressive loading messages
 const LOADING_MESSAGES = [
@@ -59,6 +60,7 @@ export const AdviserMatching = () => {
   const [toast, setToast] = useState('');
   const [serviceError, setServiceError] = useState(null);
   const loadingIntervalRef = useRef(null);
+  const hasFetchedRecommendationsRef = useRef(false);
 
   // Progressive loading message rotation
   useEffect(() => {
@@ -116,8 +118,9 @@ export const AdviserMatching = () => {
               return;
             }
 
-            if (location.state?.title && !activeRequest && matches.length === 0 && !serviceError) {
-              // Only fetch recommendations if we haven't already
+            if (location.state?.title && !activeRequest && !hasFetchedRecommendationsRef.current && matches.length === 0 && !serviceError) {
+              // Guard with ref so real-time subscription updates do not re-trigger recommendations fetch
+              hasFetchedRecommendationsRef.current = true;
               setTitle(location.state.title);
               setDescription(location.state.description || '');
 
@@ -189,9 +192,11 @@ export const AdviserMatching = () => {
 
     setSubmittingId(adviser.adviserId);
     try {
-      // 1. Get full group & academic info for the request
-      const group = await groupService.getGroupByStudentId(currentUser.uid);
-      const allCourses = await courseService.getAllCourses();
+      // 1. Get full group & academic info for the request (reusing cached group, courses, and sections)
+      const [group, allCourses] = await Promise.all([
+        groupService.getGroupByStudentId(currentUser.uid),
+        dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE),
+      ]);
 
       const courseId = group?.courseId || userProfile?.courseId;
       const sectionId = group?.sectionId || userProfile?.sectionId;

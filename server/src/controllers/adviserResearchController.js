@@ -65,7 +65,8 @@ export const getMyDocuments = async (req, res) => {
 
     const docs = await AdviserResearchDocument.find(filter)
       .select('-extractedText -embedding') // Don't send huge texts/vectors to frontend
-      .sort({ created_at: -1 });
+      .sort({ created_at: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,

@@ -1,6 +1,7 @@
 import { db, isDevMockMode, mockFirestoreDb } from '../config/firebaseAdmin.js';
 import { getStorageProvider } from '../services/storage/storageManager.js';
 import { RepositoryPublication } from '../models/RepositoryPublication.js';
+import { repositorySmartSearchService } from '../services/repositorySmartSearchService.js';
 
 // Pre-seed mock repository publications if empty
 export const seedMockRepositoryIfEmpty = () => {
@@ -320,22 +321,38 @@ export const approveRepositoryPublication = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Publication record not found' });
     }
 
-    // Also sync manuscript if linked
-    if (pub.manuscriptId && !isDevMockMode) {
+    // Also sync manuscript and Firestore repository_publications if linked
+    if (!isDevMockMode && db) {
       try {
-        const mRef = db.collection('manuscript_versions').doc(pub.manuscriptId);
-        const mDoc = await mRef.get();
-        if (mDoc.exists) {
-          await mRef.update({
+        await db.collection('repository_publications').doc(id).set({
+          publicationStatus: 'approved',
+          reviewedBy: reviewerId,
+          reviewedByName: reviewerName,
+          reviewedAt: new Date().toISOString()
+        }, { merge: true });
+
+        if (pub.manuscriptId) {
+          const mRef = db.collection('manuscript_versions').doc(pub.manuscriptId);
+          const mDoc = await mRef.get();
+          const patch = {
             publicationStatus: 'approved',
             publicationReviewedAt: new Date().toISOString(),
             publicationReviewerName: reviewerName
-          });
+          };
+          if (mDoc.exists) {
+            await mRef.update(patch);
+          } else {
+            const wsRef = db.collection('manuscript_workspaces').doc(pub.manuscriptId);
+            const wsDoc = await wsRef.get();
+            if (wsDoc.exists) await wsRef.update(patch);
+          }
         }
       } catch (syncErr) {
         console.warn('[RepositoryController] manuscript sync warning:', syncErr);
       }
     }
+
+    repositorySmartSearchService.invalidateCache(id);
 
     return res.status(200).json({
       success: true,
@@ -378,23 +395,40 @@ export const rejectRepositoryPublication = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Publication record not found' });
     }
 
-    // Also sync manuscript if linked
-    if (pub.manuscriptId && !isDevMockMode) {
+    // Also sync manuscript and Firestore repository_publications if linked
+    if (!isDevMockMode && db) {
       try {
-        const mRef = db.collection('manuscript_versions').doc(pub.manuscriptId);
-        const mDoc = await mRef.get();
-        if (mDoc.exists) {
-          await mRef.update({
+        await db.collection('repository_publications').doc(id).set({
+          publicationStatus: 'rejected',
+          rejectionReason: reason.trim(),
+          reviewedBy: reviewerId,
+          reviewedByName: reviewerName,
+          reviewedAt: new Date().toISOString()
+        }, { merge: true });
+
+        if (pub.manuscriptId) {
+          const mRef = db.collection('manuscript_versions').doc(pub.manuscriptId);
+          const mDoc = await mRef.get();
+          const patch = {
             publicationStatus: 'rejected',
             publicationRejectionReason: reason.trim(),
             publicationReviewedAt: new Date().toISOString(),
             publicationReviewerName: reviewerName
-          });
+          };
+          if (mDoc.exists) {
+            await mRef.update(patch);
+          } else {
+            const wsRef = db.collection('manuscript_workspaces').doc(pub.manuscriptId);
+            const wsDoc = await wsRef.get();
+            if (wsDoc.exists) await wsRef.update(patch);
+          }
         }
       } catch (syncErr) {
         console.warn('[RepositoryController] manuscript sync warning:', syncErr);
       }
     }
+
+    repositorySmartSearchService.invalidateCache(id);
 
     return res.status(200).json({
       success: true,
@@ -413,6 +447,10 @@ export const updateRepositoryPublication = async (req, res) => {
     const { department } = req.body;
     
     await RepositoryPublication.findOneAndUpdate({ id }, { department });
+    if (!isDevMockMode && db) {
+      await db.collection('repository_publications').doc(id).set({ department }, { merge: true }).catch(() => {});
+    }
+    repositorySmartSearchService.invalidateCache(id);
     
     return res.status(200).json({ success: true, message: 'Updated successfully' });
   } catch (error) {
@@ -424,6 +462,10 @@ export const deleteRepositoryPublication = async (req, res) => {
   try {
     const { id } = req.params;
     await RepositoryPublication.deleteOne({ id });
+    if (!isDevMockMode && db) {
+      await db.collection('repository_publications').doc(id).delete().catch(() => {});
+    }
+    repositorySmartSearchService.invalidateCache(id);
     return res.status(200).json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

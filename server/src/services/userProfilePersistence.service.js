@@ -2,6 +2,14 @@ import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { db, isDevMockMode, mockUsersDb } from '../config/firebaseAdmin.js';
 import { invalidateUserAuthCache } from '../middleware/authMiddleware.js';
+import { invalidateAdviserCache } from '../controllers/adviserMatchingController.js';
+import { invalidateAdviserWorkloadsCache } from '../controllers/workspaceController.js';
+
+const invalidateRelatedUserCaches = (uid) => {
+  invalidateUserAuthCache(uid);
+  invalidateAdviserCache();
+  invalidateAdviserWorkloadsCache();
+};
 
 const toProfileObject = (profile) => {
   const data = typeof profile.toObject === 'function' ? profile.toObject() : profile;
@@ -55,7 +63,7 @@ export const updateUserProfileStores = async (uid, updates) => {
       console.warn('[userProfilePersistence] MongoDB updated, but Firestore Admin is unavailable for synchronization.');
     }
     mockUsersDb.set(uid, profile);
-    invalidateUserAuthCache(uid);
+    invalidateRelatedUserCaches(uid);
     return profile;
   }
 
@@ -64,7 +72,7 @@ export const updateUserProfileStores = async (uid, updates) => {
     if (!existingProfile) return null;
     const profile = { ...existingProfile, ...updates, uid };
     mockUsersDb.set(uid, profile);
-    invalidateUserAuthCache(uid);
+    invalidateRelatedUserCaches(uid);
     return profile;
   }
 
@@ -74,7 +82,7 @@ export const updateUserProfileStores = async (uid, updates) => {
     if (!existingProfile.exists) return null;
     const profile = { ...existingProfile.data(), ...updates, uid };
     await userRef.set(profile, { merge: true });
-    invalidateUserAuthCache(uid);
+    invalidateRelatedUserCaches(uid);
     return profile;
   }
 

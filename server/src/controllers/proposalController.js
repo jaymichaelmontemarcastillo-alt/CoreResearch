@@ -182,29 +182,63 @@ export const getProposals = async (req, res) => {
     const user = req.user;
     let proposalsList = [];
 
+    // Scope Firestore queries by role to avoid scanning the entire proposals collection
+    // and running N+1 canAccessProject lookups per document.
+    if (!['student', 'adviser', 'research_coordinator', 'admin'].includes(user.role)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
     if (isDevMockMode) {
       seedMockProposalsIfEmpty();
       const proposalsMap = mockFirestoreDb.get('proposals');
       proposalsList = Array.from(proposalsMap.values());
+
+      if (user.role === 'student' || user.role === 'adviser') {
+        const accessResults = await Promise.all(proposalsList.map((proposal) =>
+          canAccessProject(user, proposal.groupId || proposal.id, proposal)
+        ));
+        proposalsList = proposalsList.filter((_, index) => accessResults[index]);
+        if (user.role === 'adviser') {
+          proposalsList = proposalsList.filter(p => p.status !== 'draft');
+        }
+      } else {
+        proposalsList = proposalsList.filter(p => p.status !== 'draft' || req.query.includeDrafts === 'true');
+      }
+    } else if (user.role === 'student') {
+      const proposalMap = new Map();
+      const queries = [db.collection('proposals').where('studentId', '==', user.uid).get()];
+      let resolvedGroupId = user.groupId || null;
+
+      if (!resolvedGroupId) {
+        const groupSnap = await db.collection('research_groups')
+          .where('memberIds', 'array-contains', user.uid)
+          .limit(1)
+          .get();
+        if (!groupSnap.empty) {
+          resolvedGroupId = groupSnap.docs[0].id;
+        }
+      }
+      if (resolvedGroupId) {
+        queries.push(db.collection('proposals').where('groupId', '==', resolvedGroupId).get());
+      }
+
+      const snapshots = await Promise.all(queries);
+      snapshots.forEach((snap) => {
+        snap.docs.forEach((docSnap) => {
+          proposalMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+        });
+      });
+      proposalsList = Array.from(proposalMap.values());
+    } else if (user.role === 'adviser') {
+      const snapshot = await db.collection('proposals').where('adviserId', '==', user.uid).get();
+      proposalsList = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(p => p.status !== 'draft');
     } else {
       const snapshot = await db.collection('proposals').get();
-      proposalsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-
-    // Role-based filtering
-    if (user.role === 'student' || user.role === 'adviser') {
-      const accessResults = await Promise.all(proposalsList.map((proposal) =>
-        canAccessProject(user, proposal.groupId || proposal.id, proposal)
-      ));
-      proposalsList = proposalsList.filter((_, index) => accessResults[index]);
-      if (user.role === 'adviser') {
-        proposalsList = proposalsList.filter(p => p.status !== 'draft');
-      }
-    } else if (['research_coordinator', 'admin'].includes(user.role)) {
-      // Coordinators & Admins see all non-draft proposals (or drafts if querying directly)
-      proposalsList = proposalsList.filter(p => p.status !== 'draft' || req.query.includeDrafts === 'true');
-    } else {
-      return res.status(403).json({ success: false, error: 'Forbidden' });
+      proposalsList = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(p => p.status !== 'draft' || req.query.includeDrafts === 'true');
     }
 
     // Sort newest first
@@ -507,7 +541,7 @@ export const updateProposalStatus = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden', message: 'You are not assigned to review this proposal.' });
     }
 
-    updated = { ...existing, ...updateData };
+    const updated = { ...existing, ...updateData };
     if (isDevMockMode) {
       mockFirestoreDb.get('proposals').set(id, updated);
     } else {

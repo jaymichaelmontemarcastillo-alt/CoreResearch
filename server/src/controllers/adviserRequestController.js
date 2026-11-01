@@ -8,16 +8,22 @@ const COLLECTION = "adviser_requests";
 // Short-term in-memory cache to prevent burning Firestore read quota on repeated fetches
 const requestsCache = new Map();
 const CACHE_TTL_MS = 20000; // 20 seconds
+const REQUESTS_CACHE_MAX_SIZE = 500;
 
 function getCachedRequests(key) {
   const item = requestsCache.get(key);
-  if (item && Date.now() - item.timestamp < CACHE_TTL_MS) {
+  if (!item) return null;
+  if (Date.now() - item.timestamp < CACHE_TTL_MS) {
     return item.data;
   }
   return null;
 }
 
 function setCachedRequests(key, data) {
+  if (requestsCache.size >= REQUESTS_CACHE_MAX_SIZE) {
+    const oldestKey = requestsCache.keys().next().value;
+    if (oldestKey) requestsCache.delete(oldestKey);
+  }
   requestsCache.set(key, { data, timestamp: Date.now() });
 }
 
@@ -48,14 +54,12 @@ export const getAdviserRequests = async (req, res) => {
   }
 
   try {
-    const snapshots = [
-      await db.collection(COLLECTION).where("studentId", "==", studentId).get(),
-    ];
-    if (groupId) {
-      const groupSnapshot = await db
-        .collection("research_groups")
-        .doc(groupId)
-        .get();
+    const [studentRequestsSnap, groupSnapshot] = await Promise.all([
+      db.collection(COLLECTION).where("studentId", "==", studentId).get(),
+      groupId ? db.collection("research_groups").doc(groupId).get() : Promise.resolve(null),
+    ]);
+    const snapshots = [studentRequestsSnap];
+    if (groupSnapshot) {
       if (groupSnapshot.exists) {
         const group = groupSnapshot.data();
         const isMember =
@@ -249,11 +253,6 @@ export const createAdviserRequest = async (req, res) => {
       });
 
       if (activeDoc) {
-        if (!lockSnapshot.exists) {
-          transaction.create(lockRef, { scope, updatedAt: now });
-        } else {
-          transaction.update(lockRef, { updatedAt: now });
-        }
         return {
           request: { id: activeDoc.id, ...activeDoc.data() },
           created: false,
@@ -313,15 +312,15 @@ export const createAdviserRequest = async (req, res) => {
     const errorCode = isQuotaExceeded
       ? "STORAGE_QUOTA_EXCEEDED"
       : error.status === 403
-      ? "FORBIDDEN"
-      : error.status === 404
-      ? "NOT_FOUND"
-      : "INTERNAL_ERROR";
+        ? "FORBIDDEN"
+        : error.status === 404
+          ? "NOT_FOUND"
+          : "INTERNAL_ERROR";
     const errorMessage = error.status
       ? error.message
       : isQuotaExceeded
-      ? "Database storage quota exceeded. Please wait a moment and retry."
-      : "Unable to submit the adviser request.";
+        ? "Database storage quota exceeded. Please wait a moment and retry."
+        : "Unable to submit the adviser request.";
 
     return res.status(statusCode).json({
       success: false,

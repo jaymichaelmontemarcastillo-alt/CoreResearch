@@ -11,7 +11,7 @@ import {
 import { auth, db } from '../firebase/firebase';
 import { UserProfile, CreateUserInput, UpdateUserInput, UserRole } from '../types/user.types';
 import api from './api';
-import { dataCache } from './dataCache';
+import { dataCache, CACHE_TTL } from './dataCache';
 
 
 const COLLECTION_NAME = 'users';
@@ -124,62 +124,76 @@ export const userService = {
    */
   async getUserById(uid: string): Promise<UserProfile | null> {
     if (!uid) return null;
-    try {
-      const userRef = doc(db, COLLECTION_NAME, uid);
-      const docSnap = await getDoc(userRef);
-      if (docSnap.exists()) {
-        return normalizeUserProfile({ uid: docSnap.id, ...docSnap.data() });
-      }
-    } catch (fsErr: any) {
-      console.warn('[userService] getUserById Firestore read warning:', fsErr?.message);
-    }
+    return dataCache.getOrFetch(
+      `user_${uid}`,
+      async () => {
+        try {
+          const userRef = doc(db, COLLECTION_NAME, uid);
+          const docSnap = await getDoc(userRef);
+          if (docSnap.exists()) {
+            return normalizeUserProfile({ uid: docSnap.id, ...docSnap.data() });
+          }
+        } catch (fsErr: any) {
+          console.warn('[userService] getUserById Firestore read warning:', fsErr?.message);
+        }
 
-    // Fallback: If not in Firestore or read fails, check backend API
-    try {
-      const res = await api.get(`/users?search=${encodeURIComponent(uid)}`);
-      if (res?.data?.success && Array.isArray(res.data.data)) {
-        const found = res.data.data.find((u: any) => u.uid === uid || u._id === uid);
-        if (found) return normalizeUserProfile(found);
-      }
-    } catch (apiErr: any) {
-      console.warn('[userService] getUserById Backend fallback warning:', apiErr?.message);
-    }
+        // Fallback: If not in Firestore or read fails, check backend API
+        try {
+          const res = await api.get(`/users?search=${encodeURIComponent(uid)}`);
+          if (res?.data?.success && Array.isArray(res.data.data)) {
+            const found = res.data.data.find((u: any) => u.uid === uid || u._id === uid);
+            if (found) return normalizeUserProfile(found);
+          }
+        } catch (apiErr: any) {
+          console.warn('[userService] getUserById Backend fallback warning:', apiErr?.message);
+        }
 
-    return null;
+        return null;
+      },
+      CACHE_TTL.MODERATE,
+      { cacheNull: false }
+    );
   },
 
   /**
    * Fetch all users from backend API with fallback to Firestore.
+   * Uses short-TTL cache + in-flight request deduplication so concurrent callers share one request.
    */
   async getAllUsers(): Promise<UserProfile[]> {
-    // 1. Try backend API first to stay synchronized with MongoDB
-    try {
-      const res = await api.get('/users?limit=1000');
-      if (res?.data?.success && Array.isArray(res.data.data)) {
-        return res.data.data.map((u: any) => normalizeUserProfile(u));
-      }
-    } catch (apiErr: any) {
-      console.warn('[userService] getAllUsers Backend query warning (using Firestore fallback):', apiErr?.message);
-    }
+    return dataCache.getOrFetch(
+      'users_all',
+      async () => {
+        // 1. Try backend API first to stay synchronized with MongoDB
+        try {
+          const res = await api.get('/users?limit=1000');
+          if (res?.data?.success && Array.isArray(res.data.data)) {
+            return res.data.data.map((u: any) => normalizeUserProfile(u));
+          }
+        } catch (apiErr: any) {
+          console.warn('[userService] getAllUsers Backend query warning (using Firestore fallback):', apiErr?.message);
+        }
 
-    // 2. Fallback to Firestore by role-targeted queries (which adhere to Firestore rules)
-    try {
-      const [advisers, facultyUsers, coords, students, admins] = await Promise.all([
-        this.getUsersByRole('adviser').catch(() => []),
-        this.getUsersByRole('faculty').catch(() => []),
-        this.getUsersByRole('research_coordinator').catch(() => []),
-        this.getUsersByRole('student').catch(() => []),
-        this.getUsersByRole('admin').catch(() => []),
-      ]);
-      const map = new Map<string, UserProfile>();
-      [...advisers, ...facultyUsers, ...coords, ...students, ...admins].forEach((u) => {
-        if (u.uid) map.set(u.uid, u);
-      });
-      return Array.from(map.values());
-    } catch (fsErr: any) {
-      console.warn('[userService] getAllUsers Firestore read warning:', fsErr?.message);
-      return [];
-    }
+        // 2. Fallback to Firestore by role-targeted queries (which adhere to Firestore rules)
+        try {
+          const [advisers, facultyUsers, coords, students, admins] = await Promise.all([
+            this.getUsersByRole('adviser').catch(() => []),
+            this.getUsersByRole('faculty').catch(() => []),
+            this.getUsersByRole('research_coordinator').catch(() => []),
+            this.getUsersByRole('student').catch(() => []),
+            this.getUsersByRole('admin').catch(() => []),
+          ]);
+          const map = new Map<string, UserProfile>();
+          [...advisers, ...facultyUsers, ...coords, ...students, ...admins].forEach((u) => {
+            if (u.uid) map.set(u.uid, u);
+          });
+          return Array.from(map.values());
+        } catch (fsErr: any) {
+          console.warn('[userService] getAllUsers Firestore read warning:', fsErr?.message);
+          return [];
+        }
+      },
+      CACHE_TTL.SHORT
+    );
   },
 
   /**
@@ -323,8 +337,11 @@ export const userService = {
    * Fetch all users matching a specific role (e.g. 'student', 'adviser', 'panelist', 'admin', 'faculty').
    */
   async getUsersByRole(role: string): Promise<UserProfile[]> {
-    try {
-      if (role === 'faculty') {
+    return dataCache.getOrFetch(
+      `users_role_${role}`,
+      async () => {
+        try {
+          if (role === 'faculty') {
         const [adviserSnap, facultySnap, coordSnap] = await Promise.all([
           getDocs(query(collection(db, COLLECTION_NAME), where('role', '==', 'adviser'))).catch(() => ({ docs: [] })),
           getDocs(query(collection(db, COLLECTION_NAME), where('role', '==', 'faculty'))).catch(() => ({ docs: [] })),
@@ -353,8 +370,11 @@ export const userService = {
       if (role === 'faculty') {
         return all.filter((u) => ['adviser', 'faculty', 'research_coordinator', 'panelist'].includes(u.role));
       }
-      return all.filter((u) => u.role === role);
-    }
+          return all.filter((u) => u.role === role);
+        }
+      },
+      CACHE_TTL.MODERATE
+    );
   },
 
   /**
@@ -602,15 +622,13 @@ export const userService = {
       updatePayload.activeGroupsCount = (user as any)?.activeGroupsCount || 0;
     }
 
-    // 1. Send update to authoritative backend (updates MongoDB & syncs Firestore)
-    await api.patch(`/users/${uid}`, updatePayload);
-
-    // 2. Also directly update Firestore from client if possible for immediate reactive UI
+    // Send update to authoritative backend (which updates MongoDB and synchronizes Firestore);
+    // only fall back to direct client Firestore write if the backend endpoint is unreachable.
     try {
+      await api.patch(`/users/${uid}`, updatePayload);
+    } catch (apiErr: any) {
       const userRef = doc(db, COLLECTION_NAME, uid);
       await setDoc(userRef, stripUndefined(updatePayload), { merge: true });
-    } catch (fsErr: any) {
-      console.warn('[userService] approveUser direct Firestore write warning:', fsErr?.message);
     }
     dataCache.invalidatePattern('user');
     dataCache.invalidatePattern('adviser');
@@ -627,15 +645,12 @@ export const userService = {
       updated_at: now,
     };
 
-    // 1. Send update to authoritative backend
-    await api.patch(`/users/${uid}`, updatePayload);
-
-    // 2. Also directly update Firestore from client if possible
+    // Send update to authoritative backend; fall back to client Firestore write only on API failure.
     try {
+      await api.patch(`/users/${uid}`, updatePayload);
+    } catch (apiErr: any) {
       const userRef = doc(db, COLLECTION_NAME, uid);
       await setDoc(userRef, updatePayload, { merge: true });
-    } catch (fsErr: any) {
-      console.warn('[userService] rejectUser direct Firestore write warning:', fsErr?.message);
     }
     dataCache.invalidatePattern('user');
     dataCache.invalidatePattern('adviser');

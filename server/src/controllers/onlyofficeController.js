@@ -21,7 +21,9 @@ export const generateConfig = async (req, res) => {
     if (!isValidDocumentId(documentId)) {
       return res.status(400).json({ success: false, message: 'Invalid document ID.' });
     }
-    const document = await Document.findOne({ id: documentId });
+    const document = await Document.findOne({ id: documentId })
+      .select('-yjsBinaryState -plainText')
+      .lean();
     const user = req.user;
 
     const isExplicitPanelistMode = req.query.mode === 'panelist';
@@ -36,7 +38,7 @@ export const generateConfig = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Document has no ONLYOFFICE file key. Not migrated.' });
     }
 
-    if (!(await canAccessProject(user, document.id, document.toObject()))) {
+    if (!(await canAccessProject(user, document.id, document))) {
       return res.status(403).json({ success: false, message: 'You are not authorized to access this document.' });
     }
 
@@ -128,7 +130,9 @@ export const downloadDocument = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Download token does not authorize this document.' });
     }
 
-    const document = await Document.findOne({ id: documentId });
+    const document = await Document.findOne({ id: documentId })
+      .select('-yjsBinaryState -plainText')
+      .lean();
 
     if (!document || !document.onlyofficeFileKey || document.onlyofficeKey !== claims.key) {
       return res.status(404).json({ success: false, message: 'Document or file not found' });
@@ -184,7 +188,9 @@ export const callbackHandler = async (req, res) => {
     const status = payload.status;
     console.log(`[ONLYOFFICE] Callback received for document ${documentId}, status: ${status}`);
 
-    const document = await Document.findOne({ id: documentId });
+    const document = await Document.findOne({ id: documentId })
+      .select('-yjsBinaryState -plainText')
+      .lean();
     if (!document || !document.onlyofficeFileKey || document.onlyofficeKey !== payload.key) {
       return res.status(403).json({ error: 1, message: 'Callback is not bound to this document.' });
     }
@@ -264,9 +270,11 @@ export const createDocument = async (req, res) => {
     }
 
     // Check if document already exists
-    let document = await Document.findOne({ id: documentId });
+    let document = await Document.findOne({ id: documentId })
+      .select('-yjsBinaryState -plainText')
+      .lean();
     if (document) {
-      if (!(await canAccessProject(user, document.id, document.toObject()))) {
+      if (!(await canAccessProject(user, document.id, document))) {
         return res.status(403).json({ success: false, message: 'You are not authorized to access this document.' });
       }
       if (document.onlyofficeFileKey) {

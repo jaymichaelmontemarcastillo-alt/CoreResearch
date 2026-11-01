@@ -3,6 +3,9 @@ import { User } from '../models/User.js';
 import { db, isDevMockMode, mockUsersDb, auth } from '../config/firebaseAdmin.js';
 import { updateUserProfileStores } from '../services/userProfilePersistence.service.js';
 import { buildUserListCandidateFilter } from '../services/userListQuery.js';
+import { invalidateUserAuthCache } from '../middleware/authMiddleware.js';
+import { invalidateAdviserCache } from './adviserMatchingController.js';
+import { invalidateAdviserWorkloadsCache } from './workspaceController.js';
 
 const sendUserProfileUpdateError = (res, error, action) => {
   console.error(`[UserController] ${action} error:`, error);
@@ -114,7 +117,7 @@ export const getAllUsers = async (req, res) => {
           status,
           ...(hasPostQueryFilters ? { search, program, courseId, specialization, major } : {})
         });
-        if (!hasSearchFilter && (page || limit)) {
+        if (!hasPostQueryFilters && (page || limit)) {
           const [count, pageUsers] = await Promise.all([
             User.countDocuments(mongoFilter),
             User.find(mongoFilter)
@@ -573,6 +576,10 @@ export const deleteUser = async (req, res) => {
       });
     }
 
+    invalidateUserAuthCache(uid);
+    invalidateAdviserCache();
+    invalidateAdviserWorkloadsCache();
+
     return res.status(200).json({ success: true, message: 'User deleted successfully.' });
   } catch (error) {
     console.error('[UserController] deleteUser error:', error);
@@ -625,10 +632,15 @@ export const getClassmates = async (req, res) => {
     const sectionId = caller.sectionId || '';
     const sectionName = caller.sectionName || caller.section || 'A';
 
-    // Query students from MongoDB & Firestore
+    // Query active/approved students from MongoDB with field projection (excluding large profile_image payloads)
     let rawStudents = [];
     if (mongoose.connection.readyState === 1) {
-      rawStudents = await User.find({ role: 'student' }).lean();
+      rawStudents = await User.find({
+        role: 'student',
+        $or: [{ is_approved: true }, { status: { $in: ['active', 'approved'] } }]
+      })
+        .select('uid fullName first_name last_name studentIdOrEmployeeId studentId studentNumber courseId programCode program majorCode major programSpecialization specializationId sectionId sectionName section status is_approved enrollmentStatus')
+        .lean();
     }
     if ((!rawStudents || rawStudents.length === 0) && db) {
       const snap = await db.collection('users').where('role', '==', 'student').get();

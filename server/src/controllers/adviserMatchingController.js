@@ -28,6 +28,12 @@ import {
   mockUsersDb,
 } from "../config/firebaseAdmin.js";
 
+let eligibleAdvisersCache = {
+  data: null,
+  timestamp: 0,
+};
+const ELIGIBLE_ADVISERS_TTL = 60 * 1000;
+
 /**
  * Fetch all adviser users from MongoDB.
  * Returns users with role='adviser' or 'faculty' that are active and eligible.
@@ -35,6 +41,10 @@ import {
 async function getEligibleAdvisers() {
   if (mongoose.connection.readyState !== 1) {
     throw new Error("Database connection unavailable");
+  }
+
+  if (eligibleAdvisersCache.data && Date.now() - eligibleAdvisersCache.timestamp < ELIGIBLE_ADVISERS_TTL) {
+    return eligibleAdvisersCache.data;
   }
 
   console.log("[AdviserMatching] Fetching eligible advisers from MongoDB...");
@@ -58,6 +68,11 @@ async function getEligibleAdvisers() {
     return true;
   });
 
+  eligibleAdvisersCache = {
+    data: advisers,
+    timestamp: Date.now(),
+  };
+
   return advisers;
 }
 
@@ -75,6 +90,7 @@ let availableAdvisersCache = {
 const AVAILABLE_ADVISERS_TTL = 60 * 1000;
 
 export function invalidateAdviserCache() {
+  eligibleAdvisersCache = { data: null, timestamp: 0 };
   adviserPapersCache = { map: null, timestamp: 0 };
   availableAdvisersCache = { data: null, count: 0, timestamp: 0 };
 }

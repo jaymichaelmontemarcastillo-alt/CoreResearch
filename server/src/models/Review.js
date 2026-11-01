@@ -12,4 +12,6 @@ const ReviewSchema = new mongoose.Schema({
   studentResponse: { type: String, default: '' },
 }, { timestamps: true });
 
+ReviewSchema.index({ manuscriptId: 1, createdAt: -1 });
+
 export const Review = mongoose.model('Review', ReviewSchema);

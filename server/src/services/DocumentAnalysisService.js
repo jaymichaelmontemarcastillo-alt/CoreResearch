@@ -209,7 +209,7 @@ ${textToProcess.substring(0, 15000)}
       required: ["abstract", "keywords", "researchTopics", "researchConcepts", "methodologies", "researchDomain", "researchProblem"]
     };
 
-    const modelsToTry = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
     let nlpData = null;
 
     for (const model of modelsToTry) {
