@@ -1,5 +1,5 @@
 // src/pages/MyGroup.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { Card } from "../components/ui/Card";
@@ -28,16 +28,23 @@ import { sectionService } from "../services/section.service";
 import { studentService } from "../services/student.service";
 import { scheduleService } from "../services/schedule.service";
 import { GroupInvitationModal } from "../components/group/GroupInvitationModal";
+import dataCache, { CACHE_TTL } from "../services/dataCache";
 
 export const MyGroup = () => {
   const { userProfile, role } = useAuth();
   const { confirm } = useConfirm();
 
-  const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState(null);
-  const [course, setCourse] = useState(null);
-  const [section, setSection] = useState(null);
-  const [defenseSchedule, setDefenseSchedule] = useState(null);
+  const studentUid = userProfile?.uid;
+
+  // Synchronous cache hydration for instant initial render when navigating
+  const cachedGroupData = studentUid ? dataCache.get(`my_group_data_${studentUid}`) : null;
+  const cachedGroup = cachedGroupData?.group ?? (studentUid ? dataCache.get(`group_${studentUid}`) : null);
+
+  const [loading, setLoading] = useState(() => !cachedGroupData && !cachedGroup);
+  const [group, setGroup] = useState(() => cachedGroup || null);
+  const [course, setCourse] = useState(() => cachedGroupData?.course || null);
+  const [section, setSection] = useState(() => cachedGroupData?.section || null);
+  const [defenseSchedule, setDefenseSchedule] = useState(() => cachedGroupData?.defenseSchedule || null);
 
   // Creation & Member Management State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -51,8 +58,8 @@ export const MyGroup = () => {
   const [addingMember, setAddingMember] = useState(false);
 
   // Group Invitations State
-  const [pendingInvitations, setPendingInvitations] = useState([]);
-  const [receivedInvitations, setReceivedInvitations] = useState([]);
+  const [pendingInvitations, setPendingInvitations] = useState(() => cachedGroupData?.pendingInvitations || []);
+  const [receivedInvitations, setReceivedInvitations] = useState(() => cachedGroupData?.receivedInvitations || []);
   const [activeInviteModal, setActiveInviteModal] = useState(null);
   const [invitationActionLoading, setInvitationActionLoading] = useState(false);
 
@@ -63,83 +70,144 @@ export const MyGroup = () => {
     setToast({ message, variant });
   };
 
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (role === "student" && userProfile?.uid) {
       loadInitialData();
     } else {
       setLoading(false);
     }
-  }, [role, userProfile]);
+  }, [role, userProfile?.uid, userProfile?.courseId, userProfile?.sectionId]);
 
-  const loadInitialData = async () => {
-    setLoading(true);
+  const loadInitialData = async (forceRefresh = false) => {
+    if (!cachedGroupData && !cachedGroup) {
+      setLoading(true);
+    }
+
     try {
-      const [allCourses, allSections] = await Promise.all([
-        courseService.getAllCourses(),
-        sectionService.getAllSections(),
+      // 1. Parallel fetch of stable academic metadata (cached) and student's group
+      const coursesPromise = dataCache.getOrFetch(
+        "courses",
+        () => courseService.getAllCourses(),
+        CACHE_TTL.STABLE
+      );
+      const sectionsPromise = dataCache.getOrFetch(
+        "sections_all",
+        () => sectionService.getAllSections(),
+        CACHE_TTL.STABLE
+      );
+      const groupPromise = forceRefresh
+        ? groupService.getGroupByStudentId(userProfile.uid).then((g) => {
+            dataCache.set(`group_${userProfile.uid}`, g, CACHE_TTL.MODERATE);
+            return g;
+          })
+        : dataCache.getOrFetch(
+            `group_${userProfile.uid}`,
+            () => groupService.getGroupByStudentId(userProfile.uid),
+            CACHE_TTL.MODERATE,
+            { cacheNull: true }
+          );
+
+      const [allCourses, allSections, myGroup] = await Promise.all([
+        coursesPromise,
+        sectionsPromise,
+        groupPromise,
       ]);
 
+      if (!isMountedRef.current) return;
+
+      let resolvedCourse = null;
+      let resolvedSection = null;
+
       if (userProfile?.courseId) {
-        setCourse(allCourses.find((c) => c.id === userProfile.courseId) || null);
+        resolvedCourse = allCourses?.find((c) => c.id === userProfile.courseId) || null;
       }
       if (userProfile?.sectionId) {
-        setSection(allSections.find((s) => s.id === userProfile.sectionId) || null);
+        resolvedSection = allSections?.find((s) => s.id === userProfile.sectionId) || null;
       }
 
-      // Fetch group for this student
-      const myGroup = await groupService.getGroupByStudentId(userProfile.uid);
+      let groupPendingInvites = [];
+      let studentReceivedInvites = [];
+      let matchedSchedule = null;
+
       if (myGroup) {
-        setGroup(myGroup);
-        // Ensure student profile and assets are synced to this group project
+        if (myGroup.courseId && !resolvedCourse) {
+          resolvedCourse = allCourses?.find((c) => c.id === myGroup.courseId) || null;
+        }
+        if (myGroup.sectionId && !resolvedSection) {
+          resolvedSection = allSections?.find((s) => s.id === myGroup.sectionId) || null;
+        }
+
+        // Fire-and-forget sync to group project in Firestore
         groupService.syncMemberToGroupProject(myGroup.id, userProfile.uid, userProfile).catch(() => {});
 
-        // Fetch pending invitations sent by this group
-        try {
-          const sentInvites = await groupService.getPendingInvitationsForGroup(myGroup.id);
-          setPendingInvitations(sentInvites);
-        } catch (e) {
-          console.warn("[MyGroup] Pending invites fetch error:", e);
-        }
-        setReceivedInvitations([]);
+        // Fetch pending invites and schedule concurrently
+        const [sentInvites, schedules] = await Promise.all([
+          groupService.getPendingInvitationsForGroup(myGroup.id).catch((e) => {
+            console.warn("[MyGroup] Pending invites fetch error:", e);
+            return [];
+          }),
+          scheduleService.getSchedulesForStudent(userProfile.uid, myGroup.id).catch((e) => {
+            console.warn("[MyGroup] Schedule fetch fallback:", e);
+            return [];
+          }),
+        ]);
 
-        if (myGroup.courseId && !course) {
-          setCourse(allCourses.find((c) => c.id === myGroup.courseId) || null);
-        }
-        if (myGroup.sectionId && !section) {
-          setSection(allSections.find((s) => s.id === myGroup.sectionId) || null);
-        }
-
-        // Fetch defense schedule if available
-        try {
-          const schedules = await scheduleService.getAllSchedules();
-          const match = schedules.find(
-            (s) =>
-              (s.projectId === myGroup.id || s.groupId === myGroup.id) &&
-              s.status !== "cancelled"
-          );
-          setDefenseSchedule(match || null);
-        } catch (e) {
-          console.warn("[MyGroup] Schedule fetch fallback:", e);
-        }
+        groupPendingInvites = sentInvites || [];
+        matchedSchedule = schedules?.find(
+          (s) =>
+            (s.projectId === myGroup.id || s.groupId === myGroup.id) &&
+            s.status !== "cancelled"
+        ) || null;
       } else {
-        setGroup(null);
-        setDefenseSchedule(null);
-        setPendingInvitations([]);
-
         // Fetch any invitations this student received
-        try {
-          const received = await groupService.getPendingInvitationsForStudent(userProfile.uid);
-          setReceivedInvitations(received);
-        } catch (e) {
+        studentReceivedInvites = await groupService.getPendingInvitationsForStudent(userProfile.uid).catch((e) => {
           console.warn("[MyGroup] Received invites fetch error:", e);
-        }
+          return [];
+        });
+      }
+
+      if (isMountedRef.current) {
+        setGroup(myGroup);
+        setCourse(resolvedCourse);
+        setSection(resolvedSection);
+        setDefenseSchedule(matchedSchedule);
+        setPendingInvitations(groupPendingInvites);
+        setReceivedInvitations(studentReceivedInvites);
+        setLoading(false);
+
+        // Cache page bundle snapshot for instant return navigation
+        dataCache.set(`my_group_data_${userProfile.uid}`, {
+          group: myGroup,
+          course: resolvedCourse,
+          section: resolvedSection,
+          defenseSchedule: matchedSchedule,
+          pendingInvitations: groupPendingInvites,
+          receivedInvitations: studentReceivedInvites,
+        }, CACHE_TTL.MODERATE);
       }
     } catch (error) {
       console.error("[MyGroup] Initial load error:", error);
-      showToast("Unable to load group information. Please try again.", "error");
-    } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        showToast("Unable to load group information. Please try again.", "error");
+        setLoading(false);
+      }
     }
+  };
+
+  const invalidateGroupCaches = () => {
+    if (!userProfile?.uid) return;
+    dataCache.invalidate(`group_${userProfile.uid}`);
+    dataCache.invalidate(`my_group_data_${userProfile.uid}`);
+    dataCache.invalidate(`workspace_${userProfile.uid}`);
+    dataCache.invalidatePattern("masterlist");
   };
 
   const handleCreateGroup = async (e) => {
@@ -175,10 +243,12 @@ export const MyGroup = () => {
         ],
       });
 
+      invalidateGroupCaches();
       setGroup(created);
       setIsCreateModalOpen(false);
       setNewGroupName("");
       showToast("Research group created successfully!");
+      loadInitialData(true);
     } catch (err) {
       console.error("[MyGroup] Create group error:", err);
       showToast(
@@ -197,16 +267,16 @@ export const MyGroup = () => {
     setSelectedClassmateId("");
 
     try {
-      // 1. Get all students in this section
+      // 1. Get all students in this section (cached via studentService)
       const allStudents = await studentService.getAllStudents();
-      const sectionStudents = allStudents.filter(
+      const sectionStudents = (allStudents || []).filter(
         (s) => s.sectionId === userProfile.sectionId && s.uid !== userProfile.uid
       );
 
       // 2. Get all groups in this section to identify who is already in a group
       const sectionGroups = await groupService.getGroupsBySection(userProfile.sectionId);
       const assignedUids = new Set();
-      sectionGroups.forEach((g) => {
+      (sectionGroups || []).forEach((g) => {
         (g.memberIds || []).forEach((id) => assignedUids.add(id));
       });
 
@@ -251,6 +321,7 @@ export const MyGroup = () => {
       );
 
       setPendingInvitations((prev) => [...prev, inv]);
+      dataCache.invalidate(`my_group_data_${userProfile.uid}`);
       setIsAddModalOpen(false);
       showToast(`Invitation sent to ${candidate.fullName}! They will receive a notification to accept or decline.`);
     } catch (err) {
@@ -265,6 +336,7 @@ export const MyGroup = () => {
     try {
       await groupService.cancelInvitation(invitationId);
       setPendingInvitations((prev) => prev.filter((i) => i.id !== invitationId));
+      dataCache.invalidate(`my_group_data_${userProfile.uid}`);
       showToast("Invitation cancelled.");
     } catch (err) {
       console.error("[MyGroup] Cancel invitation error:", err);
@@ -276,11 +348,12 @@ export const MyGroup = () => {
     setInvitationActionLoading(true);
     try {
       const joinedGroup = await groupService.acceptInvitation(invitation.id, userProfile);
+      invalidateGroupCaches();
       setGroup(joinedGroup);
       setReceivedInvitations([]);
       setActiveInviteModal(null);
       showToast(`You have joined ${joinedGroup.name}!`);
-      loadInitialData();
+      loadInitialData(true);
     } catch (err) {
       console.error("[MyGroup] Accept invitation error:", err);
       showToast(err.message || "Failed to join group.", "error");
@@ -294,6 +367,7 @@ export const MyGroup = () => {
     try {
       await groupService.declineInvitation(invitation.id, userProfile);
       setReceivedInvitations((prev) => prev.filter((i) => i.id !== invitation.id));
+      dataCache.invalidate(`my_group_data_${userProfile.uid}`);
       setActiveInviteModal(null);
       showToast("Invitation declined.");
     } catch (err) {
@@ -325,7 +399,9 @@ export const MyGroup = () => {
         await groupService.removeMemberFromGroup(group.id, userProfile.uid);
         setGroup(null);
       }
+      invalidateGroupCaches();
       showToast("You have left the research group.");
+      loadInitialData(true);
     } catch (err) {
       console.error("[MyGroup] Leave error:", err);
       showToast("Failed to leave group. Please try again.", "error");

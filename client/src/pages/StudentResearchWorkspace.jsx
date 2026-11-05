@@ -1,5 +1,5 @@
 // src/pages/StudentResearchWorkspace.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
@@ -24,6 +24,7 @@ import {
   HiPlus,
   HiLockClosed,
   HiShieldCheck,
+  HiArrowPath,
 } from 'react-icons/hi2';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -38,7 +39,7 @@ import titleProposalService from '../services/titleProposal.service';
 import { adviserRequestService } from '../services/adviserRequest.service';
 import groupService from '../services/group.service';
 import { documentStore } from '../services/documentStore';
-import dataCache from '../services/dataCache';
+import { dataCache, CACHE_TTL } from '../services/dataCache';
 import gradingService from '../services/grading.service';
 import { ProposalGradingModal } from '../components/editor/ProposalGradingModal';
 import { FinalGradingModal } from '../components/editor/FinalGradingModal';
@@ -56,10 +57,19 @@ export const StudentResearchWorkspace = () => {
   const [searchParams] = useSearchParams();
   const queryWorkspaceId = searchParams.get('id') || searchParams.get('workspaceId');
 
-  const [workspace, setWorkspace] = useState(null);
+  // Cache key dedicated to this student's workspace
+  const cacheKey = currentUser?.uid
+    ? `workspace_${currentUser.uid}${queryWorkspaceId ? `_${queryWorkspaceId}` : ''}`
+    : null;
+
+  // Synchronous cache hydration on mount for instant zero-flash navigation
+  const cachedWorkspace = cacheKey ? dataCache.get(cacheKey) : null;
+
+  const [workspace, setWorkspace] = useState(cachedWorkspace);
   const [tasks, setTasks] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedWorkspace);
+  const [refreshing, setRefreshing] = useState(false);
   const [openingDoc, setOpeningDoc] = useState(false);
   const [toast, setToast] = useState('');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -150,7 +160,13 @@ export const StudentResearchWorkspace = () => {
       const res = await manuscriptService.submitPostDefenseRevision(workspace.id, payload);
       setToast(res.message || 'Post-defense revisions & revision matrix submitted for faculty verification!');
       setRevisionModalOpen(false);
-      if (res.data) setWorkspace(res.data);
+      if (res.data) {
+        setWorkspace(res.data);
+        if (cacheKey) {
+          dataCache.set(cacheKey, res.data, CACHE_TTL.MODERATE);
+        }
+        dataCache.invalidatePattern('my_group_data');
+      }
     } catch (err) {
       alert(`Submission error: ${err.response?.data?.message || err.message}`);
     } finally {
@@ -158,7 +174,7 @@ export const StudentResearchWorkspace = () => {
     }
   };
 
-  // 1. Initial Load
+  // 1. Initial Load and Real-time Subscriptions
   useEffect(() => {
     // Advisers and faculty manage advisee research from /advisees and should not see the student workspace
     if (!queryWorkspaceId && (role === 'adviser' || role === 'faculty')) {
@@ -174,23 +190,32 @@ export const StudentResearchWorkspace = () => {
     let unsubscribeWs = () => {};
     let unsubscribeTasks = () => {};
     let unsubscribeFb = () => {};
-    let unsubscribeRequests = () => {};
     let unsubscribePEvals = () => {};
     let unsubscribeFEvals = () => {};
 
-    const loadWorkspace = async () => {
-      setLoading(true);
+    const loadWorkspace = async (isManual = false) => {
+      if (isManual) {
+        setRefreshing(true);
+      } else if (!cachedWorkspace && !workspace) {
+        setLoading(true);
+      }
+
       try {
         let targetWorkspace = null;
 
         // If direct workspace ID passed in query
         if (queryWorkspaceId) {
           targetWorkspace = await researchWorkspaceService.getWorkspaceById(queryWorkspaceId);
-        } else if (isStudent) {
-          // Resolve student's group & proposal
-          const group = await groupService.getGroupByStudentId(currentUser.uid);
+        } else if (isStudent && currentUser?.uid) {
+          // Resolve student's group using cache deduplication
+          const group = await dataCache.getOrFetch(
+            `group_${currentUser.uid}`,
+            () => groupService.getGroupByStudentId(currentUser.uid),
+            CACHE_TTL.MODERATE
+          );
+
           const leaderUid = group?.memberIds?.[0] || group?.members?.[0]?.uid;
-          
+
           if (group) {
             groupService.syncMemberToGroupProject(group.id, currentUser.uid, userProfile).catch((e) => {
               console.warn('[StudentResearchWorkspace] syncMemberToGroupProject fallback:', e);
@@ -237,8 +262,6 @@ export const StudentResearchWorkspace = () => {
             }
 
             if (!targetWorkspace) {
-              // No active workspace found. We do NOT forcefully redirect to avoid infinite navigation loops.
-              // We dispatch the status event so sidebar and state update gracefully.
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('workspace-status-changed', { detail: { hasWorkspace: false } }));
               }
@@ -247,6 +270,11 @@ export const StudentResearchWorkspace = () => {
         }
 
         if (targetWorkspace) {
+          if (cacheKey) {
+            dataCache.set(cacheKey, targetWorkspace, CACHE_TTL.MODERATE);
+          }
+          setWorkspace(targetWorkspace);
+
           // Ensure current user is in workspace memberIds only if they are a student researcher
           if (isStudent && currentUser?.uid && (!targetWorkspace.memberIds || !targetWorkspace.memberIds.includes(currentUser.uid))) {
             researchWorkspaceService.addMemberToWorkspace(targetWorkspace.id, {
@@ -255,7 +283,6 @@ export const StudentResearchWorkspace = () => {
               email: userProfile?.email || '',
             }).catch(() => {});
           }
-          setWorkspace(targetWorkspace);
 
           // Auto-sync missing adviser notifications for any submitted chapters
           if (targetWorkspace.adviserId) {
@@ -270,19 +297,31 @@ export const StudentResearchWorkspace = () => {
             projectId: targetWorkspace.projectId,
             documentId: targetWorkspace.documentId,
           };
-          unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
-             setProposalEvals(evals);
-          }, evalOptions);
-          unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(targetWorkspace.id, (evals) => {
-             setFinalEvals(evals);
-          }, evalOptions);
+          unsubscribePEvals = gradingService.subscribeProposalEvaluationsByWorkspace(
+            targetWorkspace.id,
+            (evals) => {
+              setProposalEvals(evals);
+            },
+            evalOptions
+          );
+          unsubscribeFEvals = gradingService.subscribeFinalDefenseEvaluationsByWorkspace(
+            targetWorkspace.id,
+            (evals) => {
+              setFinalEvals(evals);
+            },
+            evalOptions
+          );
 
-
-          // Real-time subscriptions
+          // Real-time subscriptions for workspace, tasks, and feedback
           unsubscribeWs = researchWorkspaceService.subscribeWorkspace(
             targetWorkspace.id,
             (updated) => {
-              if (updated) setWorkspace(updated);
+              if (updated) {
+                setWorkspace(updated);
+                if (cacheKey) {
+                  dataCache.set(cacheKey, updated, CACHE_TTL.MODERATE);
+                }
+              }
             }
           );
 
@@ -300,6 +339,7 @@ export const StudentResearchWorkspace = () => {
         console.error('[StudentResearchWorkspace] Load failed:', err);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     };
 
@@ -311,7 +351,6 @@ export const StudentResearchWorkspace = () => {
       unsubscribeWs();
       unsubscribeTasks();
       unsubscribeFb();
-      unsubscribeRequests();
       unsubscribePEvals();
       unsubscribeFEvals();
     };
@@ -360,12 +399,15 @@ export const StudentResearchWorkspace = () => {
       setIsRestarting(true);
       const reason = 'Student restarted research progress';
 
-      // Authoritative backend restart archives all progress (workspace, manuscript, rubrics, tasks, schedules, comments)
-      // while keeping group members and accounts intact
       await researchWorkspaceService.restartWorkspace(workspace.id, reason);
 
+      if (cacheKey) {
+        dataCache.invalidate(cacheKey);
+      }
       dataCache.invalidate(`workspace_${currentUser.uid}`);
       dataCache.invalidate(`group_${currentUser.uid}`);
+      dataCache.invalidatePattern('my_group_data');
+      dataCache.invalidatePattern('masterlist');
       dataCache.invalidate('user_docs');
       dataCache.invalidate('research_groups');
       dataCache.invalidate('proposals');
@@ -491,12 +533,16 @@ export const StudentResearchWorkspace = () => {
     }
   };
 
-  // Dynamic progress calculations
-  const dynamicSections = progressService.getDynamicSections(workspace, tasks, feedbackList);
-  const overallProgress = progressService.calculateWorkspaceProgress(workspace, tasks, feedbackList);
-  const taskProgress = progressService.calculateTaskProgress(tasks, feedbackList);
-  const milestones = progressService.getResearchMilestones(workspace, tasks, feedbackList);
-  const currentFocusArea = progressService.getCurrentFocusArea(workspace, tasks, feedbackList);
+  // Memoized dynamic progress calculations to eliminate expensive recalculations on every render
+  const { dynamicSections, overallProgress, taskProgress, milestones, currentFocusArea } = useMemo(() => {
+    return {
+      dynamicSections: progressService.getDynamicSections(workspace, tasks, feedbackList),
+      overallProgress: progressService.calculateWorkspaceProgress(workspace, tasks, feedbackList),
+      taskProgress: progressService.calculateTaskProgress(tasks, feedbackList),
+      milestones: progressService.getResearchMilestones(workspace, tasks, feedbackList),
+      currentFocusArea: progressService.getCurrentFocusArea(workspace, tasks, feedbackList),
+    };
+  }, [workspace, tasks, feedbackList]);
 
   const handleSubmitChapter = async (chapterId, chapterName) => {
     const isConfirmed = await confirm({
@@ -531,12 +577,14 @@ export const StudentResearchWorkspace = () => {
     }
   };
 
-  const filteredTasks = tasks.filter((t) => {
-    const isDone = t.status === 'completed' || t.status === 'resolved';
-    if (taskFilter === 'active') return !isDone;
-    if (taskFilter === 'completed') return isDone;
-    return true;
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const isDone = t.status === 'completed' || t.status === 'resolved';
+      if (taskFilter === 'active') return !isDone;
+      if (taskFilter === 'completed') return isDone;
+      return true;
+    });
+  }, [tasks, taskFilter]);
 
   return (
     <div className="space-y-6">
@@ -552,6 +600,7 @@ export const StudentResearchWorkspace = () => {
 
       {loading ? (
         <div className="py-16 text-center text-gray-400 dark:text-gray-500">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
           Loading research workspace data...
         </div>
       ) : !workspace ? (
@@ -695,7 +744,6 @@ export const StudentResearchWorkspace = () => {
             </div>
           </Card>
 
-          
           {/* Defense Ratings Section */}
           {(proposalEvals.length > 0 || finalEvals.length > 0) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
@@ -872,7 +920,6 @@ export const StudentResearchWorkspace = () => {
             </Card>
           )}
 
-
           {/* Manuscript Chapters */}
           <div className="grid grid-cols-1 gap-4 sm:gap-5 items-stretch">
             <Card padding={false} className="p-4 sm:p-5 flex flex-col justify-between space-y-3 bg-white dark:bg-[#15161e] border border-gray-200/90 dark:border-[#222433] shadow-xs">
@@ -1018,8 +1065,6 @@ export const StudentResearchWorkspace = () => {
               </div>
             </Card>
           </div>
-
-
         </div>
       )}
 

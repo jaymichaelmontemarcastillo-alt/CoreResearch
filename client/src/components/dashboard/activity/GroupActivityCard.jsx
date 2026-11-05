@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 
-export const GroupActivityCard = ({ 
-  members = [], 
+export const GroupActivityCard = React.memo(({
+  members = [],
   activityRecords = [],
   currentUserId = null,
-  loading = false 
+  loading = false
 }) => {
-  const [filter, setFilter] = useState('all'); 
+  const [filter, setFilter] = useState('all');
 
   const filterOptions = [
     { key: 'all', label: 'All' },
@@ -78,11 +78,10 @@ export const GroupActivityCard = ({
               key={opt.key}
               type="button"
               onClick={() => setFilter(opt.key)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                filter === opt.key
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${filter === opt.key
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#222433]'
-              }`}
+                }`}
             >
               {opt.label}
             </button>
@@ -115,11 +114,10 @@ export const GroupActivityCard = ({
               <div key={member.uid || member.id} className="py-4 first:pt-0 last:pb-0 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      isMe 
-                        ? 'bg-blue-600 text-white' 
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isMe
+                        ? 'bg-blue-600 text-white'
                         : 'bg-gray-200 dark:bg-[#222433] text-gray-600 dark:text-gray-300'
-                    }`}>
+                      }`}>
                       {initials}
                     </div>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
@@ -136,9 +134,8 @@ export const GroupActivityCard = ({
                 <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-[#1c1d28] overflow-hidden">
                   <div
                     style={{ width: `${Math.max(widthPercent, count > 0 ? 4 : 0)}%` }}
-                    className={`h-full rounded-full transition-all duration-300 ease-out ${
-                      isMe ? 'bg-blue-500' : 'bg-emerald-500'
-                    }`}
+                    className={`h-full rounded-full transition-all duration-300 ease-out ${isMe ? 'bg-blue-500' : 'bg-emerald-500'
+                      }`}
                   />
                 </div>
 
@@ -158,6 +155,6 @@ export const GroupActivityCard = ({
       )}
     </div>
   );
-};
+});
 
 export default GroupActivityCard;

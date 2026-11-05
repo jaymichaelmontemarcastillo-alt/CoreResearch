@@ -1,5 +1,5 @@
 // src/pages/Masterlist.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -15,20 +15,31 @@ import {
   HiExclamationCircle,
   HiUsers,
   HiUserGroup,
+  HiArrowPath,
 } from "react-icons/hi2";
 import { studentService } from "../services/student.service";
 import { groupService } from "../services/group.service";
 import { courseService } from "../services/course.service";
 import { sectionService } from "../services/section.service";
+import { dataCache, CACHE_TTL } from "../services/dataCache";
 
 export const Masterlist = () => {
   const { userProfile, role } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [course, setCourse] = useState(null);
-  const [section, setSection] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [groups, setGroups] = useState([]);
+  // Cache key unique to this student's masterlist view
+  const cacheKey = userProfile?.uid
+    ? `masterlist_${userProfile.uid}_${userProfile?.sectionId || userProfile?.section || "none"}`
+    : null;
+
+  // Synchronous cache hydration on mount for instant zero-flash navigation
+  const cachedData = cacheKey ? dataCache.get(cacheKey) : null;
+
+  const [loading, setLoading] = useState(!cachedData);
+  const [refreshing, setRefreshing] = useState(false);
+  const [course, setCourse] = useState(cachedData?.course || null);
+  const [section, setSection] = useState(cachedData?.section || null);
+  const [students, setStudents] = useState(cachedData?.students || []);
+  const [groups, setGroups] = useState(cachedData?.groups || []);
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "error" });
 
@@ -38,107 +49,176 @@ export const Masterlist = () => {
     } else {
       setLoading(false);
     }
-  }, [role, userProfile]);
+  }, [role, userProfile?.uid, userProfile?.sectionId]);
 
-  const loadMasterlistData = async () => {
-    setLoading(true);
+  const loadMasterlistData = async (isManualRefresh = false) => {
+    if (isManualRefresh) {
+      setRefreshing(true);
+    } else if (!cachedData && students.length === 0) {
+      setLoading(true);
+    }
+
     try {
-      // Fetch classmates, groups, and section metadata via backend
-      const data = await studentService.getClassmates();
+      const fetcher = async () => {
+        // Fetch classmates, groups, and section metadata via backend
+        const data = await studentService.getClassmates();
 
-      const userCourseId = (userProfile?.courseId || (userProfile?.program?.toLowerCase().includes('computer science') ? 'bscs' : 'bsit')).toLowerCase();
-      const userProgramCode = (userProfile?.programCode || (userCourseId === 'bscs' ? 'BSCS' : 'BSIT')).toUpperCase();
+        const userCourseId = (
+          userProfile?.courseId ||
+          (userProfile?.program?.toLowerCase().includes("computer science") ? "bscs" : "bsit")
+        ).toLowerCase();
+        const userProgramCode = (
+          userProfile?.programCode ||
+          (userCourseId === "bscs" ? "BSCS" : "BSIT")
+        ).toUpperCase();
 
-      let userMajorCode = (userProfile?.majorCode || '').toUpperCase();
-      const specStr = (userProfile?.major || userProfile?.programSpecialization || '').toUpperCase();
-      if (!userMajorCode && specStr) {
-        if (specStr.includes('WMAD') || specStr.includes('WEB AND MOBILE')) userMajorCode = 'WMAD';
-        else if (specStr.includes('AMG') || specStr.includes('ANIMATION')) userMajorCode = 'AMG';
-        else if (specStr.includes('SMP') || specStr.includes('SERVICE MANAGEMENT')) userMajorCode = 'SMP';
-        else if (specStr.includes('IS') || specStr.includes('INTELLIGENT SYSTEMS')) userMajorCode = 'IS';
-      }
-      if (!userMajorCode && userProgramCode === 'BSIT') userMajorCode = 'WMAD';
-
-      const userSectionId = userProfile?.sectionId || data.section?.id || '';
-      const userSectionName = (userProfile?.sectionName || userProfile?.section || data.section?.name || 'A').toUpperCase();
-
-      // STRICT CLASSMATE FILTERING:
-      // "ONLY THE CLASSMATE OF LOGIN STUDETN WILL BE DISPLAYED ON TEH TABLE, NOT OTHER SPECIALIZATION OR COURSES/PROGRAM."
-      const classmateList = (data.classmates || []).filter((s) => {
-        // 1. Program / Course check
-        const sCourse = (s.courseId || (s.program?.toLowerCase().includes('computer science') ? 'bscs' : 'bsit')).toLowerCase();
-        const sProg = (s.programCode || (sCourse === 'bscs' ? 'BSCS' : 'BSIT')).toUpperCase();
-        if (sCourse !== userCourseId && sProg !== userProgramCode) return false;
-
-        // 2. Specialization / Major check
-        let sMajor = (s.majorCode || '').toUpperCase();
-        const sSpec = (s.major || s.programSpecialization || '').toUpperCase();
-        if (!sMajor && sSpec) {
-          if (sSpec.includes('WMAD') || sSpec.includes('WEB AND MOBILE')) sMajor = 'WMAD';
-          else if (sSpec.includes('AMG') || sSpec.includes('ANIMATION')) sMajor = 'AMG';
-          else if (sSpec.includes('SMP') || sSpec.includes('SERVICE MANAGEMENT')) sMajor = 'SMP';
-          else if (sSpec.includes('IS') || sSpec.includes('INTELLIGENT SYSTEMS')) sMajor = 'IS';
+        let userMajorCode = (userProfile?.majorCode || "").toUpperCase();
+        const specStr = (userProfile?.major || userProfile?.programSpecialization || "").toUpperCase();
+        if (!userMajorCode && specStr) {
+          if (specStr.includes("WMAD") || specStr.includes("WEB AND MOBILE")) userMajorCode = "WMAD";
+          else if (specStr.includes("AMG") || specStr.includes("ANIMATION")) userMajorCode = "AMG";
+          else if (specStr.includes("SMP") || specStr.includes("SERVICE MANAGEMENT")) userMajorCode = "SMP";
+          else if (specStr.includes("IS") || specStr.includes("INTELLIGENT SYSTEMS")) userMajorCode = "IS";
         }
-        if (!sMajor && sProg === 'BSIT') sMajor = 'WMAD';
-        if (userMajorCode && sMajor && sMajor !== userMajorCode) return false;
+        if (!userMajorCode && userProgramCode === "BSIT") userMajorCode = "WMAD";
 
-        // 3. Section check
-        const sSecId = s.sectionId || '';
-        const sSecName = (s.sectionName || s.section || '').toUpperCase();
-        if (userSectionId && sSecId && sSecId !== userSectionId) return false;
-        if (userSectionName && sSecName && sSecName !== userSectionName) return false;
+        const userSectionId = userProfile?.sectionId || data.section?.id || "";
+        const userSectionName = (
+          userProfile?.sectionName ||
+          userProfile?.section ||
+          data.section?.name ||
+          "A"
+        ).toUpperCase();
 
-        return true;
-      });
+        // STRICT CLASSMATE FILTERING:
+        // "ONLY THE CLASSMATE OF LOGIN STUDENT WILL BE DISPLAYED ON THE TABLE, NOT OTHER SPECIALIZATION OR COURSES/PROGRAM."
+        const classmateList = (data.classmates || []).filter((s) => {
+          // 1. Program / Course check
+          const sCourse = (
+            s.courseId ||
+            (s.program?.toLowerCase().includes("computer science") ? "bscs" : "bsit")
+          ).toLowerCase();
+          const sProg = (s.programCode || (sCourse === "bscs" ? "BSCS" : "BSIT")).toUpperCase();
+          if (sCourse !== userCourseId && sProg !== userProgramCode) return false;
 
-      setStudents(classmateList);
-      setGroups(data.groups || []);
-      if (data.course) setCourse(data.course);
-      if (data.section) setSection(data.section);
+          // 2. Specialization / Major check
+          let sMajor = (s.majorCode || "").toUpperCase();
+          const sSpec = (s.major || s.programSpecialization || "").toUpperCase();
+          if (!sMajor && sSpec) {
+            if (sSpec.includes("WMAD") || sSpec.includes("WEB AND MOBILE")) sMajor = "WMAD";
+            else if (sSpec.includes("AMG") || sSpec.includes("ANIMATION")) sMajor = "AMG";
+            else if (sSpec.includes("SMP") || sSpec.includes("SERVICE MANAGEMENT")) sMajor = "SMP";
+            else if (sSpec.includes("IS") || sSpec.includes("INTELLIGENT SYSTEMS")) sMajor = "IS";
+          }
+          if (!sMajor && sProg === "BSIT") sMajor = "WMAD";
+          if (userMajorCode && sMajor && sMajor !== userMajorCode) return false;
+
+          // 3. Section check
+          const sSecId = s.sectionId || "";
+          const sSecName = (s.sectionName || s.section || "").toUpperCase();
+          if (userSectionId && sSecId && sSecId !== userSectionId) return false;
+          if (userSectionName && sSecName && sSecName !== userSectionName) return false;
+
+          return true;
+        });
+
+        return {
+          students: classmateList,
+          groups: data.groups || [],
+          course: data.course || null,
+          section: data.section || null,
+        };
+      };
+
+      let masterlistPayload;
+      if (isManualRefresh && cacheKey) {
+        dataCache.invalidate(cacheKey);
+        masterlistPayload = await fetcher();
+        dataCache.set(cacheKey, masterlistPayload, CACHE_TTL.MODERATE);
+      } else if (cacheKey) {
+        masterlistPayload = await dataCache.getOrFetch(cacheKey, fetcher, CACHE_TTL.MODERATE);
+      } else {
+        masterlistPayload = await fetcher();
+      }
+
+      setStudents(masterlistPayload.students || []);
+      setGroups(masterlistPayload.groups || []);
+      if (masterlistPayload.course) setCourse(masterlistPayload.course);
+      if (masterlistPayload.section) setSection(masterlistPayload.section);
     } catch (err) {
       console.error("[Masterlist] Error loading section masterlist:", err);
       setToast({ message: "Unable to load section masterlist.", variant: "error" });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Helper to determine real-time group status
-  const getStudentGroupInfo = (studentUid) => {
-    const matchedGroup = groups.find((g) => (g.memberIds || []).includes(studentUid));
-    if (matchedGroup) {
-      return {
-        inGroup: true,
-        statusLabel: "In a Group",
-        groupName: matchedGroup.name,
-      };
-    }
-    return {
-      inGroup: false,
-      statusLabel: "Looking for a Group",
-      groupName: null,
-    };
-  };
+  // Pre-indexed map for O(1) group status lookup instead of O(N*M) linear array scanning on every render
+  const groupLookup = useMemo(() => {
+    const map = new Map();
+    (groups || []).forEach((g) => {
+      const memberIds = g.memberIds || [];
+      memberIds.forEach((uid) => {
+        map.set(uid, {
+          inGroup: true,
+          statusLabel: "In a Group",
+          groupName: g.name || "Unnamed Group",
+        });
+      });
+    });
+    return map;
+  }, [groups]);
 
-  // Filter students based on search query
-  const filteredStudents = students.filter((student) => {
+  // Fast O(1) helper to determine student group status
+  const getStudentGroupInfo = useCallback(
+    (studentUid) => {
+      return (
+        groupLookup.get(studentUid) || {
+          inGroup: false,
+          statusLabel: "Looking for a Group",
+          groupName: null,
+        }
+      );
+    },
+    [groupLookup]
+  );
+
+  // Memoized stats calculation - single O(N) pass
+  const { inGroupCount, noGroupCount } = useMemo(() => {
+    let inGroup = 0;
+    let noGroup = 0;
+    students.forEach((s) => {
+      if (groupLookup.has(s.uid)) {
+        inGroup++;
+      } else {
+        noGroup++;
+      }
+    });
+    return { inGroupCount: inGroup, noGroupCount: noGroup };
+  }, [students, groupLookup]);
+
+  // Memoized filter for students based on search query
+  const filteredStudents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
+    if (!q) return students;
 
-    const fullName = (
-      student.fullName ||
-      `${student.first_name || ""} ${student.last_name || ""}`
-    ).toLowerCase();
+    return students.filter((student) => {
+      const fullName = (
+        student.fullName ||
+        `${student.first_name || ""} ${student.last_name || ""}`
+      ).toLowerCase();
 
-    const studentNumber = (
-      student.studentIdOrEmployeeId ||
-      student.studentId ||
-      student.studentNumber ||
-      ""
-    ).toLowerCase();
+      const studentNumber = (
+        student.studentIdOrEmployeeId ||
+        student.studentId ||
+        student.studentNumber ||
+        ""
+      ).toLowerCase();
 
-    return fullName.includes(q) || studentNumber.includes(q);
-  });
+      return fullName.includes(q) || studentNumber.includes(q);
+    });
+  }, [students, searchQuery]);
 
   const tableColumns = [
     { label: "Student ID", className: "min-w-[130px]" },
@@ -158,7 +238,7 @@ export const Masterlist = () => {
     );
   }
 
-  // 1. EMPTY STATE: Student Has No Section Assigned Yet (Prompt Section 2.6)
+  // 1. EMPTY STATE: Student Has No Section Assigned Yet
   if (!userProfile?.sectionId && !section && students.length === 0) {
     return (
       <div className="space-y-6 font-inter">
@@ -222,7 +302,7 @@ export const Masterlist = () => {
           <div className="min-w-0">
             <span className="text-[9px] sm:text-xs text-gray-400 uppercase font-semibold block truncate">In Group</span>
             <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-              {students.filter((s) => getStudentGroupInfo(s.uid).inGroup).length}
+              {inGroupCount}
             </span>
           </div>
         </div>
@@ -234,22 +314,33 @@ export const Masterlist = () => {
           <div className="min-w-0">
             <span className="text-[9px] sm:text-xs text-gray-400 uppercase font-semibold block truncate">No Group</span>
             <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-              {students.filter((s) => !getStudentGroupInfo(s.uid).inGroup).length}
+              {noGroupCount}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Search Header */}
+      {/* Search & Actions Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-        <div className="relative w-full sm:max-w-xs">
-          <Input
-            icon={HiMagnifyingGlass}
-            placeholder="Search classmates by name or ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 text-sm"
-          />
+        <div className="flex items-center gap-2 w-full sm:max-w-md">
+          <div className="relative flex-1">
+            <Input
+              icon={HiMagnifyingGlass}
+              placeholder="Search classmates by name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-10 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => loadMasterlistData(true)}
+            disabled={refreshing}
+            title="Refresh Masterlist"
+            className="p-2.5 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-[#222433] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a1b26] transition-colors disabled:opacity-50 shrink-0"
+          >
+            <HiArrowPath className={`w-4 h-4 ${refreshing ? "animate-spin text-blue-600" : ""}`} />
+          </button>
         </div>
 
         <div className="text-xs text-gray-400">

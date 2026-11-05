@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { 
+import {
   HiChatBubbleBottomCenterText,
   HiClipboardDocumentCheck,
   HiDocumentText,
@@ -12,10 +12,10 @@ import {
 } from 'react-icons/hi2';
 import { Modal } from '../../ui/Modal';
 
-export const StudentRecentActivityFeed = ({ 
-  activities = [], 
+export const StudentRecentActivityFeed = React.memo(({
+  activities = [],
   currentUserId = null,
-  loading = false 
+  loading = false
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalFilter, setModalFilter] = useState('all');
@@ -217,11 +217,10 @@ export const StudentRecentActivityFeed = ({
                     key={tab.id}
                     type="button"
                     onClick={() => setModalFilter(tab.id)}
-                    className={`px-2.5 py-1 rounded-md font-medium shrink-0 transition-colors ${
-                      modalFilter === tab.id
+                    className={`px-2.5 py-1 rounded-md font-medium shrink-0 transition-colors ${modalFilter === tab.id
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-gray-100 dark:bg-[#1c1d28] text-gray-600 dark:text-[#9396a8] hover:bg-gray-200 dark:hover:bg-[#252736]'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -297,6 +296,6 @@ export const StudentRecentActivityFeed = ({
       </Modal>
     </div>
   );
-};
+});
 
 export default StudentRecentActivityFeed;

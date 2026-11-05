@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-export const ResearchActivityChart = ({ 
-  dailyActivity = [], 
-  loading = false 
+export const ResearchActivityChart = React.memo(({
+  dailyActivity = [],
+  loading = false
 }) => {
   const [hoveredDay, setHoveredDay] = useState(null);
 
@@ -49,7 +49,7 @@ export const ResearchActivityChart = ({
             {dailyActivity.map((day, idx) => {
               const rawRatio = (day.count || 0) / maxDailyCount;
               // Scale from 25% to 100% on active days so bars stand tall and use available space
-              const heightPercent = day.count > 0 
+              const heightPercent = day.count > 0
                 ? Math.round(25 + rawRatio * 75)
                 : 0;
 
@@ -74,24 +74,22 @@ export const ResearchActivityChart = ({
                   <div className="w-full max-w-[28px] bg-gray-50/70 dark:bg-[#1c1d28]/70 rounded-t overflow-hidden flex items-end h-[calc(100%-18px)]">
                     <div
                       style={{ height: `${heightPercent}%` }}
-                      className={`w-full rounded-t transition-all duration-300 ease-out ${
-                        day.count === 0
-                          ? 'bg-transparent'
-                          : isToday
+                      className={`w-full rounded-t transition-all duration-300 ease-out ${day.count === 0
+                        ? 'bg-transparent'
+                        : isToday
                           ? 'bg-blue-600 dark:bg-blue-500 shadow-sm shadow-blue-500/20'
                           : isHovered
-                          ? 'bg-blue-500 dark:bg-blue-400'
-                          : 'bg-blue-500/80 dark:bg-blue-600/70'
-                      }`}
+                            ? 'bg-blue-500 dark:bg-blue-400'
+                            : 'bg-blue-500/80 dark:bg-blue-600/70'
+                        }`}
                     />
                   </div>
 
                   {/* Day label */}
-                  <span className={`text-[11px] font-medium mt-1 leading-none transition ${
-                    isToday 
-                      ? 'text-blue-600 dark:text-blue-400 font-bold' 
-                      : 'text-gray-400 dark:text-gray-500'
-                  }`}>
+                  <span className={`text-[11px] font-medium mt-1 leading-none transition ${isToday
+                    ? 'text-blue-600 dark:text-blue-400 font-bold'
+                    : 'text-gray-400 dark:text-gray-500'
+                    }`}>
                     {day.day}
                   </span>
                 </div>
@@ -114,6 +112,6 @@ export const ResearchActivityChart = ({
       )}
     </div>
   );
-};
+});
 
 export default ResearchActivityChart;

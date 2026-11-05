@@ -4,15 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  HiDocumentText,
-  HiArrowTopRightOnSquare,
-  HiOutlineBookOpen,
-} from 'react-icons/hi2';
+import { HiOutlineBookOpen } from 'react-icons/hi2';
 
 // Child Dashboard Cards
 import { ManuscriptRevisionsCard } from './revisions/ManuscriptRevisionsCard';
-import { UpcomingDeadlinesCard } from './deadlines/UpcomingDeadlinesCard';
 import { ResearchActivityChart } from './activity/ResearchActivityChart';
 import { GroupActivityCard } from './activity/GroupActivityCard';
 import { StudentRecentActivityFeed } from './activity/StudentRecentActivityFeed';
@@ -22,7 +17,6 @@ import { groupService } from '../../services/group.service';
 import researchWorkspaceService from '../../services/researchWorkspace.service';
 import researchFeedbackService from '../../services/researchFeedback.service';
 import researchTaskService from '../../services/researchTask.service';
-import { scheduleService } from '../../services/schedule.service';
 import manuscriptDocumentAdapter from '../../services/manuscriptDocumentAdapter';
 import { documentStore } from '../../services/documentStore';
 import { courseService } from '../../services/course.service';
@@ -44,17 +38,28 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
   const studentUid = userProfile?.uid || currentUser?.uid;
 
-  const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState(null);
-  const [workspace, setWorkspace] = useState(null);
-  const [documentId, setDocumentId] = useState(null);
-  const [programInfo, setProgramInfo] = useState({ course: null, sectionName: '' });
+  // Synchronous cache hydration for instant initial render when navigating
+  const cachedGroup = studentUid ? dataCache.get(`group_${studentUid}`) : null;
+  const cachedWorkspace = studentUid ? dataCache.get(`workspace_${studentUid}`) : null;
+
+  const [loading, setLoading] = useState(() => !cachedWorkspace && !cachedGroup);
+  const [group, setGroup] = useState(() => cachedGroup);
+  const [workspace, setWorkspace] = useState(() => cachedWorkspace);
+  const [documentId, setDocumentId] = useState(() => cachedWorkspace?.documentId || null);
+  const [programInfo, setProgramInfo] = useState(() => ({
+    course: (userProfile?.programCode || userProfile?.program || userProfile?.courseId)
+      ? {
+          code: userProfile?.programCode || (userProfile?.courseId ? userProfile.courseId.toUpperCase() : userProfile?.program),
+          name: userProfile?.program || userProfile?.programCode || userProfile?.courseId,
+        }
+      : null,
+    sectionName: userProfile?.sectionName || userProfile?.section || userProfile?.sectionId || '',
+  }));
   const [groupProjectInfo, setGroupProjectInfo] = useState(null);
 
   // Real-time Data
   const [revisions, setRevisions] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [schedules, setSchedules] = useState([]);
   const [groupDocuments, setGroupDocuments] = useState([]);
 
   // Load Primary Group & Workspace
@@ -63,44 +68,63 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
     let isMounted = true;
     const initData = async () => {
-      setLoading(true);
+      // Only show full loading spinner if neither workspace nor group is cached
+      if (!cachedWorkspace && !cachedGroup) {
+        setLoading(true);
+      }
       try {
-        // Start independent requests alongside the group lookup; schedules need the group ID.
+        // 1. Parallel Core Fetches: Group and Workspace
         const studentGroupPromise = dataCache.getOrFetch(
           `group_${studentUid}`,
           () => groupService.getGroupByStudentId(studentUid),
           CACHE_TTL.MODERATE,
           { cacheNull: true }
         );
-        const coursesPromise = userProfile?.courseId
-          ? dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE)
-          : Promise.resolve([]);
-        const docsPromise = dataCache.getOrFetch(
-          'user_docs',
-          () => documentStore.fetchDocuments(userProfile),
-          CACHE_TTL.SHORT
-        ).catch(() => []);
-        const schedulesPromise = studentGroupPromise.then((studentGroup) =>
-          dataCache.getOrFetch(
-            `schedules_${studentUid}`,
-            () => scheduleService.getSchedulesForStudent(
+
+        // Fetch workspace in parallel with group lookup
+        const workspacePromise = dataCache.getOrFetch(
+          `workspace_${studentUid}`,
+          async () => {
+            let fetchedWs = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
               studentUid,
-              studentGroup?.id,
-              userProfile?.fullName
-            ),
-            CACHE_TTL.MODERATE
-          )
+              userProfile?.groupId
+            );
+
+            // If not found yet, wait for groupPromise to resolve to check group.id / leaderUid
+            if (!fetchedWs) {
+              const studentGroup = await studentGroupPromise;
+              const leaderUid = studentGroup?.memberIds?.[0] || studentGroup?.members?.[0]?.uid;
+              if (studentGroup?.id || leaderUid) {
+                fetchedWs = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
+                  studentUid,
+                  studentGroup?.id,
+                  leaderUid
+                );
+              }
+              // Auto-resolve / provision workspace only when group has assigned title/adviser
+              if (!fetchedWs && studentGroup && studentGroup.status !== 'forming' && (studentGroup.adviserId || studentGroup.title)) {
+                try {
+                  fetchedWs = await researchWorkspaceService.getOrCreateWorkspaceForGroup(studentGroup, userProfile, leaderUid);
+                } catch (e) {
+                  console.info('[StudentDashboardView] Workspace prerequisite pending:', e.message);
+                }
+              }
+            }
+            return fetchedWs;
+          },
+          CACHE_TTL.SHORT,
+          { cacheNull: true }
         );
-        const [studentGroup, courses, allSchedules, docs] = await Promise.all([
+
+        // Await the core data required to render the student's dashboard
+        const [studentGroup, ws] = await Promise.all([
           studentGroupPromise,
-          coursesPromise,
-          schedulesPromise,
-          docsPromise
+          workspacePromise,
         ]);
 
         const leaderUid = studentGroup?.memberIds?.[0] || studentGroup?.members?.[0]?.uid;
 
-        // Auto-sync student to group project in Firestore
+        // Auto-sync student to group project in Firestore (non-blocking background task)
         if (studentGroup) {
           groupService.syncMemberToGroupProject(studentGroup.id, studentUid, userProfile).catch((err) => {
             console.warn('[StudentDashboardView] Group project sync error:', err);
@@ -109,37 +133,16 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
 
         if (isMounted) {
           setGroup(studentGroup);
-          setSchedules(allSchedules || []);
-        }
-
-        // 2. Dependent fetches: Workspace and Sections
-        let [ws, sections] = await Promise.all([
-          dataCache.getOrFetch(`workspace_${studentUid}`, async () => {
-            let fetchedWs = await researchWorkspaceService.getWorkspaceByStudentOrGroup(
-              studentUid,
-              studentGroup?.id,
-              leaderUid
-            );
-            // Auto-resolve / provision workspace only when group has assigned title/adviser
-            if (!fetchedWs && studentGroup && studentGroup.status !== 'forming' && (studentGroup.adviserId || studentGroup.title)) {
-              try {
-                fetchedWs = await researchWorkspaceService.getOrCreateWorkspaceForGroup(studentGroup, userProfile, leaderUid);
-              } catch (e) {
-                console.info('[StudentDashboardView] Workspace prerequisite pending:', e.message);
-              }
-            }
-            return fetchedWs;
-          }, CACHE_TTL.SHORT, { cacheNull: true }),
-          (userProfile?.courseId && userProfile?.sectionId) ?
-            dataCache.getOrFetch(`sections_${userProfile.courseId}`, () => sectionService.getSectionsByCourseId(userProfile.courseId), CACHE_TTL.STABLE) : Promise.resolve([])
-        ]);
-
-        if (isMounted) {
           setWorkspace(ws);
+          if (ws?.documentId) {
+            setDocumentId(ws.documentId);
+          }
           if (onActiveResearchChange) onActiveResearchChange(Boolean(ws));
+          // Core dashboard view unblocks immediately
+          setLoading(false);
         }
 
-        // 2b. If still no workspace, resolve group project status (pending request / proposal / title)
+        // 2. If no workspace, resolve group project status (pending request / proposal / title)
         if (!ws && studentGroup) {
           try {
             let sharedTitle = studentGroup.title || '';
@@ -187,27 +190,25 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
           }
         }
 
-        // 3. Resolve ONLYOFFICE Document ID (requires workspace)
+        // 3. Resolve ONLYOFFICE Document ID if missing from workspace record
         let resolvedDocId = ws?.documentId || null;
         if (!resolvedDocId && ws) {
           try {
             const doc = await manuscriptDocumentAdapter.getOrCreateManuscriptDocument(ws, userProfile);
-            resolvedDocId = doc.id;
+            resolvedDocId = doc?.id || null;
+            if (isMounted && resolvedDocId) setDocumentId(resolvedDocId);
           } catch (e) {
             console.warn('[StudentDashboardView] Could not resolve manuscript document:', e);
           }
         }
-        if (isMounted) setDocumentId(resolvedDocId);
 
-        // 4. Set Program Info
-        if (isMounted && userProfile?.courseId) {
-          const course = courses.find((c) => c.id === userProfile.courseId);
-          const sec = sections.find((s) => s.id === userProfile.sectionId);
-          setProgramInfo({ course, sectionName: sec?.name || userProfile.sectionId || '' });
-        }
-
-        // 5. Set Filtered Documents
-        if (isMounted) {
+        // 4. Background Enrichment: Documents for Activity feed & stats (Non-blocking)
+        dataCache.getOrFetch(
+          `user_docs_${studentUid}`,
+          () => documentStore.fetchDocuments(userProfile),
+          CACHE_TTL.SHORT
+        ).then(async (docs) => {
+          if (!isMounted) return;
           const filtered = (docs || []).filter(
             (d) =>
               d.ownerId === studentUid ||
@@ -234,6 +235,26 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
               } catch (e) { }
             }
           }
+        }).catch(() => {});
+
+        // 5. Background Enrichment: Program & Section full names (Non-blocking)
+        if (userProfile?.courseId) {
+          Promise.all([
+            dataCache.getOrFetch('courses', () => courseService.getAllCourses(), CACHE_TTL.STABLE),
+            userProfile?.sectionId
+              ? dataCache.getOrFetch(`sections_${userProfile.courseId}`, () => sectionService.getSectionsByCourseId(userProfile.courseId), CACHE_TTL.STABLE)
+              : Promise.resolve([]),
+          ]).then(([courses, sections]) => {
+            if (!isMounted) return;
+            const course = courses?.find((c) => c.id === userProfile.courseId);
+            const sec = sections?.find((s) => s.id === userProfile.sectionId);
+            if (course || sec) {
+              setProgramInfo((prev) => ({
+                course: course || prev.course,
+                sectionName: sec?.name || prev.sectionName,
+              }));
+            }
+          }).catch(() => {});
         }
       } catch (err) {
         console.error('[StudentDashboardView] Init error:', err);
@@ -247,7 +268,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     return () => {
       isMounted = false;
     };
-  }, [studentUid, userProfile?.courseId, userProfile?.sectionId]);
+  }, [studentUid, userProfile?.courseId, userProfile?.sectionId, userProfile?.groupId]);
 
   // Real-time Subscriptions for Revisions (Feedback) & Tasks
   useEffect(() => {
@@ -275,128 +296,60 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     };
   }, [workspace?.id]);
 
-  // Compute Filtered Upcoming Deadlines
-  const upcomingDeadlines = useMemo(() => {
-    if (!workspace) return [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const list = [];
-
-    const leaderUid = group?.memberIds?.[0] || group?.members?.[0]?.uid;
-    const leaderName = group?.members?.[0]?.fullName;
-
-    // 1. Group / Student Defense Schedules
-    schedules.forEach((sch) => {
-      const matchesGroup = group?.id && (sch.projectId === group.id || sch.groupId === group.id);
-      const matchesStudent = sch.studentId === studentUid || sch.studentName === userProfile?.fullName;
-      const matchesLeader = leaderUid && (sch.studentId === leaderUid || (leaderName && sch.studentName === leaderName));
-      const matchesMember = group?.memberIds && group.memberIds.includes(sch.studentId);
-      const matchesTitle =
-        workspace?.title &&
-        (sch.projectTitle?.toLowerCase() === workspace.title.toLowerCase() ||
-          sch.title?.toLowerCase() === workspace.title.toLowerCase());
-
-      if (matchesGroup || matchesStudent || matchesLeader || matchesMember || matchesTitle) {
-        const schDate = new Date(sch.date);
-        if (!isNaN(schDate.getTime()) && schDate >= today) {
-          list.push({
-            id: `sch-${sch.id}`,
-            date: sch.date,
-            title: sch.projectTitle || sch.title || 'Research Presentation',
-            defenseType: sch.defenseType || 'defense',
-            startTime: sch.startTime,
-            endTime: sch.endTime,
-            venue: sch.venue,
-            link: '/schedules',
-          });
-        }
-      }
-    });
-
-    // 2. Tasks with due dates
-    tasks.forEach((t) => {
-      if (t.status !== 'completed' && t.dueDate) {
-        const tDate = new Date(t.dueDate);
-        if (!isNaN(tDate.getTime()) && tDate >= today) {
-          list.push({
-            id: `task-${t.id}`,
-            date: t.dueDate,
-            title: t.title,
-            type: 'task',
-            link: '/research/workspace',
-          });
-        }
-      }
-    });
-
-    // Sort ascending by date
-    list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return list;
-  }, [schedules, tasks, group?.id, studentUid, userProfile?.fullName, workspace?.title]);
-
-  // Compute 7-Day Recent Research Activity
+  // Compute 7-Day Recent Research Activity (Optimized single-pass bucketing)
   const dailyActivity = useMemo(() => {
     if (!workspace) return [];
-    const days = [];
     const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const now = new Date();
+    const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const MS_PER_DAY = 86400000;
 
-    // Generate rolling last 7 days (6 days ago through today)
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      d.setHours(0, 0, 0, 0);
+    // Pre-create the 7 day slots: index 0 = 6 days ago, index 6 = today
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const dayStart = todayMid - (6 - i) * MS_PER_DAY;
+      const d = new Date(dayStart);
+      return {
+        start: dayStart,
+        end: dayStart + MS_PER_DAY,
+        date: d.toISOString().split('T')[0],
+        day: weekdayNames[d.getDay()],
+        shortDate: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        fullDate: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+        count: 0,
+      };
+    });
 
-      const nextDay = new Date(d);
-      nextDay.setDate(nextDay.getDate() + 1);
+    const minTime = days[0].start;
+    const maxTime = days[6].end;
 
-      const dateStr = d.toISOString().split('T')[0];
-      const dayName = weekdayNames[d.getDay()];
-      const shortDate = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      const fullDate = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const countTimestamp = (ts) => {
+      if (!ts) return;
+      const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
+      if (isNaN(t) || t < minTime || t >= maxTime) return;
+      const dayIdx = Math.floor((t - minTime) / MS_PER_DAY);
+      if (dayIdx >= 0 && dayIdx < 7) {
+        days[dayIdx].count++;
+      }
+    };
 
-      // Count events matching this day
-      let count = 0;
+    tasks.forEach((t) => {
+      countTimestamp(t.completedAt);
+      countTimestamp(t.submittedAt);
+      countTimestamp(t.createdAt);
+      countTimestamp(t.updatedAt);
+    });
 
-      // Tasks (created, submitted, or completed on this day)
-      tasks.forEach((t) => {
-        [t.completedAt, t.submittedAt, t.createdAt, t.updatedAt].forEach((ts) => {
-          if (ts) {
-            const evDate = new Date(ts);
-            if (evDate >= d && evDate < nextDay) count++;
-          }
-        });
-      });
+    revisions.forEach((r) => {
+      countTimestamp(r.createdAt);
+      countTimestamp(r.updatedAt);
+    });
 
-      // Revisions / Feedback on this day
-      revisions.forEach((r) => {
-        [r.createdAt, r.updatedAt].forEach((ts) => {
-          if (ts) {
-            const evDate = new Date(ts);
-            if (evDate >= d && evDate < nextDay) count++;
-          }
-        });
-      });
-
-      // Manuscript documents updated on this day
-      groupDocuments.forEach((doc) => {
-        if (doc.updatedAt) {
-          const evDate = new Date(doc.updatedAt);
-          if (evDate >= d && evDate < nextDay) count++;
-        }
-      });
-
-      days.push({
-        date: dateStr,
-        day: dayName,
-        shortDate,
-        fullDate,
-        count,
-      });
-    }
+    groupDocuments.forEach((doc) => {
+      countTimestamp(doc.updatedAt);
+    });
 
     return days;
-  }, [tasks, revisions, groupDocuments]);
+  }, [workspace, tasks, revisions, groupDocuments]);
 
   // Compute Discrete Group Activity Records by Member
   const activityRecords = useMemo(() => {
@@ -436,7 +389,7 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     });
 
     return records;
-  }, [tasks, groupDocuments, revisions, studentUid]);
+  }, [workspace, tasks, groupDocuments, revisions, studentUid]);
 
   // Compute Chronological Recent Activity Feed for this Group
   const recentActivities = useMemo(() => {
@@ -505,11 +458,10 @@ export const StudentDashboardView = ({ onActiveResearchChange }) => {
     // Sort descending by timestamp
     feed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return feed;
-  }, [revisions, tasks, groupDocuments, upcomingDeadlines, documentId, studentUid]);
+  }, [workspace, revisions, tasks, groupDocuments, documentId, studentUid]);
 
   // Helper booleans for layout conditional rendering
   const hasWorkspace = Boolean(workspace);
-  const hasDeadlines = !loading && hasWorkspace && upcomingDeadlines.length > 0;
   const hasRevisions = !loading && hasWorkspace && revisions.length > 0;
 
   const total7DayActions = dailyActivity.reduce((acc, curr) => acc + (curr.count || 0), 0);

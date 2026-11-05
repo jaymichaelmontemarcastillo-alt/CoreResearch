@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -17,16 +17,23 @@ import {
   HiPlusCircle,
   HiPencilSquare,
   HiTrash,
+  HiArrowPath,
 } from "react-icons/hi2";
 import { useAuth } from "../context/AuthContext";
 import { PublicationDetailModal } from "../components/research/PublicationDetailModal";
+import { dataCache, CACHE_TTL } from "../services/dataCache";
 
 export const Repository = () => {
   const { role } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get("search") || "";
-  const [publications, setPublications] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  // Synchronous cache hydration on mount for instant zero-flash navigation
+  const cachedPubs = dataCache.get("repository_publications");
+
+  const [publications, setPublications] = useState(cachedPubs || []);
+  const [loading, setLoading] = useState(!cachedPubs);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState(initialSearch);
   
   // Smart Search State
@@ -100,14 +107,21 @@ export const Repository = () => {
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  const fetchPublications = async () => {
-    setLoading(true);
+  const fetchPublications = async (isManual = false) => {
+    if (isManual) {
+      setRefreshing(true);
+    } else if (!cachedPubs && publications.length === 0) {
+      setLoading(true);
+    }
+
     try {
-      // Fetch all publications once, we'll apply filters locally for instant Scholar-like UX
-      const res = await api.get("/repository");
-      if (res.data && res.data.data && res.data.data.length > 0) {
-        setPublications(res.data.data);
-      } else {
+      const fetcher = async () => {
+        // Fetch all publications once, we'll apply filters locally for instant Scholar-like UX
+        const res = await api.get("/repository");
+        if (res.data && res.data.data && res.data.data.length > 0) {
+          return res.data.data;
+        }
+
         // Direct Firestore fallback if API returns empty
         const q = query(
           collection(db, "repository_publications"),
@@ -117,8 +131,22 @@ export const Repository = () => {
         if (!snap.empty) {
           const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
           list.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
-          setPublications(list);
+          return list;
         }
+        return [];
+      };
+
+      let list;
+      if (isManual) {
+        dataCache.invalidate("repository_publications");
+        list = await fetcher();
+        dataCache.set("repository_publications", list, CACHE_TTL.SEMI_STABLE);
+      } else {
+        list = await dataCache.getOrFetch("repository_publications", fetcher, CACHE_TTL.SEMI_STABLE);
+      }
+
+      if (Array.isArray(list)) {
+        setPublications(list);
       }
     } catch (err) {
       console.warn("[Repository] API fetch warning, loading directly from Firestore:", err);
@@ -130,12 +158,14 @@ export const Repository = () => {
             .filter((p) => p.publicationStatus !== "pending_publication" && p.publicationStatus !== "rejected");
           list.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
           setPublications(list);
+          dataCache.set("repository_publications", list, CACHE_TTL.SEMI_STABLE);
         }
       } catch (fsErr) {
         console.error("[Repository] Firestore direct read error:", fsErr);
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -250,7 +280,8 @@ export const Repository = () => {
       setPubTitle("");
       setPubAbstract("");
       resetFile();
-      await fetchPublications();
+      dataCache.invalidate("repository_publications");
+      await fetchPublications(true);
     } catch (err) {
       const serverMsg = err.response?.data?.message || err.response?.data?.error;
       const msg = serverMsg
@@ -278,7 +309,8 @@ export const Repository = () => {
       setToast("Publication deleted successfully.");
       setDeleteModalOpen(false);
       setPubToDelete(null);
-      fetchPublications();
+      dataCache.invalidate("repository_publications");
+      fetchPublications(true);
     } catch (err) {
       alert(`Delete error: ${err.message}`);
     } finally {
@@ -301,7 +333,8 @@ export const Repository = () => {
       setToast("Publication department updated successfully.");
       setEditModalOpen(false);
       setEditingPub(null);
-      fetchPublications();
+      dataCache.invalidate("repository_publications");
+      fetchPublications(true);
     } catch (err) {
       alert(`Update error: ${err.message}`);
     } finally {
@@ -309,58 +342,63 @@ export const Repository = () => {
     }
   };
 
-  // Apply local filtering & sorting instantly
-  const filteredPublications = publications
-    .filter((pub) => {
-      // Search filter: Smart Search (semantic) when ON, exact keyword search when OFF
-      if (smartSearch && search.trim() && smartSearchResults) {
-        if (!smartSearchResults.has(pub.id)) {
-          return false;
-        }
-      } else if (search) {
-        const q = search.toLowerCase();
-        const matchTitle = pub.title?.toLowerCase().includes(q);
-        const matchAbstract = pub.abstract?.toLowerCase().includes(q);
-        const matchAuthors = Array.isArray(pub.authors) 
-          ? pub.authors.some(a => a.toLowerCase().includes(q)) 
-          : pub.authors?.toLowerCase().includes(q);
-        const matchKeywords = Array.isArray(pub.keywords) && pub.keywords.some(k => k.toLowerCase().includes(q));
-        
-        if (!matchTitle && !matchAbstract && !matchAuthors && !matchKeywords) {
-          return false;
-        }
-      }
+  // Apply local filtering & sorting memoized for instant Scholar-like UX
+  const filteredPublications = useMemo(() => {
+    return publications
+      .filter((pub) => {
+        // Search filter: Smart Search (semantic) when ON, exact keyword search when OFF
+        if (smartSearch && search.trim() && smartSearchResults) {
+          if (!smartSearchResults.has(pub.id)) {
+            return false;
+          }
+        } else if (search) {
+          const q = search.toLowerCase();
+          const matchTitle = pub.title?.toLowerCase().includes(q);
+          const matchAbstract = pub.abstract?.toLowerCase().includes(q);
+          const matchAuthors = Array.isArray(pub.authors)
+            ? pub.authors.some((a) => a.toLowerCase().includes(q))
+            : pub.authors?.toLowerCase().includes(q);
+          const matchKeywords = Array.isArray(pub.keywords) && pub.keywords.some((k) => k.toLowerCase().includes(q));
 
-      // Department filter
-      if (department !== "all") {
-        const matchesDept = pub.department === department ||
-          (department === "Information Technology" && (pub.department === "Information Technology" || pub.department === "Information Technology Department"));
-        if (!matchesDept) return false;
-      }
-      
-      // Date filter
-      if (yearFilter !== "any") {
-        const pYear = Number(pub.publicationYear);
-        if (yearFilter === "2026" && pYear < 2026) return false;
-        if (yearFilter === "2025" && pYear < 2025) return false;
-        if (yearFilter === "2022" && pYear < 2022) return false;
-      }
-      
-      return true;
-    })
-    .sort((a, b) => {
-      if (smartSearch && search.trim() && smartSearchResults && sortBy === "relevance") {
-        const scoreA = smartSearchResults.get(a.id)?.score || 0;
-        const scoreB = smartSearchResults.get(b.id)?.score || 0;
-        return scoreB - scoreA;
-      }
-      if (sortBy === "date") {
-        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : new Date(`${a.publicationYear}-01-01`).getTime();
-        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : new Date(`${b.publicationYear}-01-01`).getTime();
-        return dateB - dateA;
-      }
-      return (b.viewsCount || 0) - (a.viewsCount || 0); // Relevance fallback
-    });
+          if (!matchTitle && !matchAbstract && !matchAuthors && !matchKeywords) {
+            return false;
+          }
+        }
+
+        // Department filter
+        if (department !== "all") {
+          const matchesDept =
+            pub.department === department ||
+            (department === "Information Technology" &&
+              (pub.department === "Information Technology" ||
+                pub.department === "Information Technology Department"));
+          if (!matchesDept) return false;
+        }
+
+        // Date filter
+        if (yearFilter !== "any") {
+          const pYear = Number(pub.publicationYear);
+          if (yearFilter === "2026" && pYear < 2026) return false;
+          if (yearFilter === "2025" && pYear < 2025) return false;
+          if (yearFilter === "2022" && pYear < 2022) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (smartSearch && search.trim() && smartSearchResults && sortBy === "relevance") {
+          const scoreA = smartSearchResults.get(a.id)?.score || 0;
+          const scoreB = smartSearchResults.get(b.id)?.score || 0;
+          return scoreB - scoreA;
+        }
+        if (sortBy === "date") {
+          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : new Date(`${a.publicationYear}-01-01`).getTime();
+          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : new Date(`${b.publicationYear}-01-01`).getTime();
+          return dateB - dateA;
+        }
+        return (b.viewsCount || 0) - (a.viewsCount || 0); // Relevance fallback
+      });
+  }, [publications, smartSearch, search, smartSearchResults, department, yearFilter, sortBy]);
 
   return (
     <div className="bg-white min-h-screen dark:bg-[#202124] text-gray-900 dark:text-gray-100 font-sans">
@@ -428,6 +466,17 @@ export const Repository = () => {
                   )}
                 </label>
               </div>
+
+              {/* Refresh Action */}
+              <button
+                type="button"
+                onClick={() => fetchPublications(true)}
+                disabled={refreshing}
+                title="Refresh Publications Cache"
+                className="p-2.5 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 bg-gray-50 dark:bg-[#2a2b2e] border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0"
+              >
+                <HiArrowPath className={`w-4 h-4 ${refreshing ? "animate-spin text-blue-600" : ""}`} />
+              </button>
             </form>
 
             {/* Upload Action */}
@@ -555,6 +604,7 @@ export const Repository = () => {
 
           {loading ? (
             <div className="py-12 text-center text-gray-500 text-lg">
+              <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-3"></div>
               Loading repository...
             </div>
           ) : filteredPublications.length === 0 ? (
@@ -879,3 +929,5 @@ export const Repository = () => {
     </div>
   );
 };
+
+export default Repository;

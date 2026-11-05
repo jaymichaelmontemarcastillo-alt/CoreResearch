@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export const ManuscriptRevisionsCard = ({ 
+export const ManuscriptRevisionsCard = React.memo(({ 
   revisions = [], 
   workspace = null, 
   documentId = null,
@@ -155,6 +155,6 @@ export const ManuscriptRevisionsCard = ({
       )}
     </div>
   );
-};
+});
 
 export default ManuscriptRevisionsCard;
